@@ -1,0 +1,10 @@
+@prefix sh: <http://www.w3.org/ns/shacl#> .
+@prefix ex: <http://example.org/> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+
+ex:EntityShape a sh:NodeShape ;
+    sh:targetClass ex:Entity ;
+    sh:property [
+        sh:path ex:id ;
+        sh:datatype xsd:string ;
+    ] .

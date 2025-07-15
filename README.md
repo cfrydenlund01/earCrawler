@@ -78,6 +78,21 @@ crawler = Crawler(TradeGovClient(), FederalRegisterClient())
 entities, documents = crawler.run("renewable energy")
 ```
 
+## Ingestion
+```python
+from pathlib import Path
+from earCrawler.ingestion.ingest import Ingestor
+from earCrawler.api_clients.tradegov_client import TradeGovClient
+from earCrawler.api_clients.federalregister_client import FederalRegisterClient
+
+ingestor = Ingestor(
+  TradeGovClient(),
+  FederalRegisterClient(),
+  Path(r"C:\\Projects\\earCrawler\\data\\tdb2")
+)
+ingestor.run("emerging technology")
+```
+
 ## Testing
 Run the test suite with:
 ```cmd
