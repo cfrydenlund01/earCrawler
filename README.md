@@ -66,6 +66,18 @@ for doc in client.search_documents("export controls", per_page=50):
     print(doc["document_number"])
 ```
 
+## Core
+Combine both clients using the ``Crawler`` orchestration layer:
+
+```python
+from earCrawler.core.crawler import Crawler
+from earCrawler.api_clients.tradegov_client import TradeGovClient
+from earCrawler.api_clients.federalregister_client import FederalRegisterClient
+
+crawler = Crawler(TradeGovClient(), FederalRegisterClient())
+entities, documents = crawler.run("renewable energy")
+```
+
 ## Testing
 Run the test suite with:
 ```cmd
