@@ -22,7 +22,7 @@ cd C:\Users\cfrydenlund\Projects\earCrawler
 python -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install -r requirements.txt
-cmdkey /generic:earCrawler:tradegov_api /user:ignored /pass:<YOUR_API_KEY>
+cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<YOUR_API_KEY>
 ```
 
 ## Repository Structure
@@ -42,6 +42,17 @@ countries = tradegov.list_countries()
 
 federal = FederalRegisterClient()
 docs = federal.list_documents({"per_page": 5})
+```
+
+## API Clients
+Example use of the `TradeGovClient`:
+
+```python
+from api_clients.tradegov_client import TradeGovClient
+
+client = TradeGovClient()
+for entity in client.search_entities("export controls", page_size=50):
+    print(entity)
 ```
 
 ## Testing
