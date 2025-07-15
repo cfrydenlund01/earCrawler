@@ -17,11 +17,15 @@ jobs:
           pip install -r requirements.txt
       - name: Install ingestion deps
         run: pip install rdflib pyshacl
+      - name: Install service deps
+        run: pip install fastapi "uvicorn[standard]" SPARQLWrapper
       - name: Lint
         run: |
           pip install flake8
-          flake8 earCrawler/core/crawler.py
+          flake8 earCrawler/core/crawler.py earCrawler/service/sparql_service.py
       - name: Run pytest
         run: pytest --maxfail=1 --disable-warnings
       - name: Run ingest tests
         run: python -m pytest tests/ingestion
+      - name: Run service tests
+        run: python -m pytest tests/service
