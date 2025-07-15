@@ -6,3 +6,4 @@
 - Comprehensive `README.md` with Windows setup instructions.
 - Implement Trade.gov API client with paging, error handling, and pytest suite. [#VERSION]
 - Add Federal Register API client for EAR text retrieval with pagination, error handling, and pytest suite. [#VERSION]
+- Add core crawler orchestration to fetch entities and documents for ingestion. [#VERSION]
