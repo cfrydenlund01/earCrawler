@@ -8,3 +8,4 @@
 - Add Federal Register API client for EAR text retrieval with pagination, error handling, and pytest suite. [#VERSION]
 - Add core crawler orchestration to fetch entities and documents for ingestion. [#VERSION]
 - Add ETL ingestion script with SHACL validation and Jena TDB2 loading. [#VERSION]
+- Add FastAPI-based SPARQL query service for TDB2 data. [#VERSION]

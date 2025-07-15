@@ -92,6 +92,14 @@ ingestor = Ingestor(
 )
 ingestor.run("emerging technology")
 ```
+## Service
+```python
+from fastapi import FastAPI
+from earCrawler.service.sparql_service import app
+
+# run with: uvicorn earCrawler.service.sparql_service:app --reload
+```
+
 
 ## Testing
 Run the test suite with:
