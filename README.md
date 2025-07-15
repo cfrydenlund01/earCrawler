@@ -35,13 +35,14 @@ cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<YOUR_API_KEY>
 ## Usage
 ```python
 from api_clients.tradegov_client import TradeGovClient
-from api_clients.federal_register_client import FederalRegisterClient
+from api_clients.federalregister_client import FederalRegisterClient
 
 tradegov = TradeGovClient()
 countries = tradegov.list_countries()
 
 federal = FederalRegisterClient()
-docs = federal.list_documents({"per_page": 5})
+for doc in federal.search_documents("export controls", per_page=5):
+    print(doc)
 ```
 
 ## API Clients
@@ -53,6 +54,16 @@ from api_clients.tradegov_client import TradeGovClient
 client = TradeGovClient()
 for entity in client.search_entities("export controls", page_size=50):
     print(entity)
+```
+
+Example use of the `FederalRegisterClient`:
+
+```python
+from api_clients.federalregister_client import FederalRegisterClient
+
+client = FederalRegisterClient()
+for doc in client.search_documents("export controls", per_page=50):
+    print(doc["document_number"])
 ```
 
 ## Testing
