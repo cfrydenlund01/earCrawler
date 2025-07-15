@@ -4,3 +4,4 @@
 - Unit tests in `tests/` with mocking and error-handling checks.
 - GitHub Actions CI workflow targeting `windows-latest`.
 - Comprehensive `README.md` with Windows setup instructions.
+- Implement Trade.gov API client with paging, error handling, and pytest suite. [#VERSION]
