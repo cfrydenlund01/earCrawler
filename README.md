@@ -100,6 +100,16 @@ from earCrawler.service.sparql_service import app
 # run with: uvicorn earCrawler.service.sparql_service:app --reload
 ```
 
+## Analytics
+```python
+from earCrawler.analytics.reports import ReportsGenerator
+
+reports = ReportsGenerator()
+print(reports.count_entities_by_country())
+print(reports.count_documents_by_year())
+print(reports.get_document_count_for_entity("ENTITY123"))
+```
+
 
 ## Testing
 Run the test suite with:
