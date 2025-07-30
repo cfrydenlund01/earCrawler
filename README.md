@@ -23,6 +23,8 @@ python -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install -r requirements.txt
 cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<YOUR_API_KEY>
+REM Optional modules used by tests and examples
+python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper
 ```
 
 ## Repository Structure
@@ -98,6 +100,16 @@ from fastapi import FastAPI
 from earCrawler.service.sparql_service import app
 
 # run with: uvicorn earCrawler.service.sparql_service:app --reload
+```
+
+## Analytics
+```python
+from earCrawler.analytics.reports import ReportsGenerator
+
+reports = ReportsGenerator()
+print(reports.count_entities_by_country())
+print(reports.count_documents_by_year())
+print(reports.get_document_count_for_entity("ENTITY123"))
 ```
 
 
