@@ -10,3 +10,4 @@
 - Add ETL ingestion script with SHACL validation and Jena TDB2 loading. [#VERSION]
 - Add FastAPI-based SPARQL query service for TDB2 data. [#VERSION]
 - Add analytics ReportsGenerator module for SPARQL-based aggregate reporting. [#VERSION]
+- Add CLI for fetching analytics reports via FastAPI service. [#VERSION]
