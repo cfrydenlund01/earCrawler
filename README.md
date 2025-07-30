@@ -23,6 +23,8 @@ python -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install -r requirements.txt
 cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<YOUR_API_KEY>
+REM Optional modules used by tests and examples
+python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper
 ```
 
 ## Repository Structure
