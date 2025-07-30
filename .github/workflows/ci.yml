@@ -19,19 +19,13 @@ jobs:
         run: pip install rdflib pyshacl
       - name: Install service deps
         run: pip install fastapi "uvicorn[standard]" SPARQLWrapper
-      - name: Install analytics deps
-        run: pip install SPARQLWrapper
       - name: Lint
         run: |
           pip install flake8
           flake8 earCrawler/core/crawler.py earCrawler/service/sparql_service.py
-      - name: Lint analytics
-        run: python -m flake8 earCrawler/analytics
       - name: Run pytest
         run: pytest --maxfail=1 --disable-warnings
       - name: Run ingest tests
         run: python -m pytest tests/ingestion
       - name: Run service tests
         run: python -m pytest tests/service
-      - name: Run analytics tests
-        run: python -m pytest tests/analytics

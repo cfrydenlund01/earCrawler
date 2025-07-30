@@ -9,4 +9,3 @@
 - Add core crawler orchestration to fetch entities and documents for ingestion. [#VERSION]
 - Add ETL ingestion script with SHACL validation and Jena TDB2 loading. [#VERSION]
 - Add FastAPI-based SPARQL query service for TDB2 data. [#VERSION]
-- Add analytics ReportsGenerator module for SPARQL-based aggregate reporting. [#VERSION]
