@@ -114,7 +114,9 @@ print(reports.get_document_count_for_entity("ENTITY123"))
 
 ## CLI
 ```bash
+cd C:\Projects\earCrawler
 pip install .
+earCrawler --help
 export ANALYTICS_SERVICE_URL=http://localhost:8000
 earCrawler reports entities-by-country
 earCrawler reports documents-by-year

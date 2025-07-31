@@ -8,6 +8,7 @@ from typing import Dict, Any
 import click
 import requests
 from tabulate import tabulate
+from earCrawler import __version__
 
 
 def _get_service_url() -> str:
@@ -21,6 +22,7 @@ def _get_service_url() -> str:
 
 
 @click.group()
+@click.version_option(__version__)
 def reports() -> None:
     """Fetch analytics reports from the FastAPI service."""
 
@@ -128,5 +130,10 @@ def document_count(entity_id: str) -> None:
 # Read service URL from env; do not hard-code.
 # Validate CLI args to prevent injection or misuse.
 # Do not log or expose sensitive URLs.
-if __name__ == "__main__":
+def main() -> None:
+    """Entry point for the earCrawler console script."""
     reports()
+
+
+if __name__ == "__main__":
+    main()
