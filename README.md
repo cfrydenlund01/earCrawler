@@ -27,6 +27,13 @@ REM Optional modules used by tests and examples
 python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper
 ```
 
+## Installation
+```powershell
+cd C:\Projects\earCrawler
+pip install .
+earCrawler --help
+```
+
 ## Repository Structure
 - `api_clients/` – clients for Trade.gov and Federal Register APIs.
 - `tests/` – unit tests covering success and failure scenarios.
@@ -110,6 +117,13 @@ reports = ReportsGenerator()
 print(reports.count_entities_by_country())
 print(reports.count_documents_by_year())
 print(reports.get_document_count_for_entity("ENTITY123"))
+```
+
+## CLI Usage
+```powershell
+earCrawler reports entities-by-country
+earCrawler reports documents-by-year
+earCrawler reports document-count ENTITY123
 ```
 
 
