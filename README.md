@@ -95,6 +95,12 @@ ingestor = Ingestor(
 ingestor.run("emerging technology")
 ```
 ## RAG
+To use the Retriever you must install the optional packages
+`sentence-transformers` and `faiss-cpu`:
+
+```bash
+pip install sentence-transformers faiss-cpu
+```
 ```python
 from pathlib import Path
 from earCrawler.rag.retriever import Retriever
