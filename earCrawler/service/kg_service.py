@@ -18,7 +18,8 @@ from pyshacl import validate
 
 logger = logging.getLogger(__name__)
 
-# Load SPARQL_ENDPOINT_URL & SHAPES_FILE_PATH from env or credential store.
+# Load SPARQL_ENDPOINT_URL & SHAPES_FILE_PATH from env or Windows
+# Credential Store.
 ENDPOINT_URL = os.getenv("SPARQL_ENDPOINT_URL")
 SHAPES_PATH = os.getenv("SHAPES_FILE_PATH")
 if not ENDPOINT_URL:
