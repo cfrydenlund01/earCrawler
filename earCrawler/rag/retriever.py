@@ -57,6 +57,27 @@ class Retriever:
 
     # ------------------------------------------------------------------
     def _retry(self, func, *args, **kwargs):
+        """Execute ``func`` with retries and exponential backoff.
+
+        Parameters
+        ----------
+        func:
+            Callable to run.
+        *args:
+            Positional arguments forwarded to ``func``.
+        **kwargs:
+            Keyword arguments forwarded to ``func``.
+
+        Returns
+        -------
+        Any
+            The return value of ``func`` if it succeeds.
+
+        Notes
+        -----
+        The callable is attempted up to three times with delays of
+        1, 2 and 4 seconds between tries.
+        """
         attempts = 3
         delay = 1.0
         for attempt in range(attempts):
