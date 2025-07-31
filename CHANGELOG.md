@@ -13,3 +13,4 @@
 - Add CLI for fetching analytics reports via FastAPI service. [#VERSION]
 - Package earCrawler as installable CLI with console-script entry-point (v0.1.0).
 - Implement RAG Retriever using all-MiniLM-L12-v2 and FAISS. [#VERSION]
+- Add FastAPI KG service with safe SPARQL query and SHACL-validated inserts. [#VERSION]

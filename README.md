@@ -124,6 +124,26 @@ from earCrawler.service.sparql_service import app
 # run with: uvicorn earCrawler.service.sparql_service:app --reload
 ```
 
+## Knowledge Graph Service
+Use the KG service to run safe SPARQL queries and insert validated triples.
+
+```bash
+curl -X POST http://localhost:8000/kg/query -H "Content-Type: application/json" \
+  -d "{\"sparql\": \"SELECT * WHERE {?s ?p ?o} LIMIT 1\"}"
+
+curl -X POST http://localhost:8000/kg/insert -H "Content-Type: application/json" \
+  -d "{\"ttl\": \"<a> <b> <c>.\"}"
+```
+
+```python
+from fastapi.testclient import TestClient
+from earCrawler.service.kg_service import app
+
+client = TestClient(app)
+resp = client.post("/kg/query", json={"sparql": "SELECT * WHERE {}"})
+print(resp.json())
+```
+
 ## Analytics
 ```python
 from earCrawler.analytics.reports import ReportsGenerator
