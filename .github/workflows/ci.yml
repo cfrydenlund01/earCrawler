@@ -23,12 +23,16 @@ jobs:
         run: pip install SPARQLWrapper
       - name: Install CLI deps
         run: pip install click requests tabulate
+      - name: Install RAG deps
+        run: pip install sentence-transformers faiss-cpu
       - name: Lint
         run: |
           pip install flake8
           flake8 earCrawler/core/crawler.py earCrawler/service/sparql_service.py
       - name: Lint analytics
         run: python -m flake8 earCrawler/analytics
+      - name: Lint RAG code
+        run: python -m flake8 earCrawler/rag
       - name: Lint CLI
         run: python -m flake8 earCrawler/cli/reports_cli.py
       - name: Run pytest
@@ -39,5 +43,7 @@ jobs:
         run: python -m pytest tests/service
       - name: Run analytics tests
         run: python -m pytest tests/analytics
+      - name: Run RAG tests
+        run: python -m pytest tests/rag
       - name: Run CLI tests
         run: python -m pytest tests/cli/test_reports_cli.py
