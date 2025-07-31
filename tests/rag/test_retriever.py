@@ -112,7 +112,7 @@ def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
     r = retriever.Retriever(
         SimpleNamespace(),
         SimpleNamespace(),
-        index_path=Path(tmp_path / 'idx.faiss'),
+        index_path=tmp_path / 'idx.faiss',
     )
     return r, model, index, faiss_mod
 
