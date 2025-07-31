@@ -114,6 +114,8 @@ print(reports.count_documents_by_year())
 print(reports.get_document_count_for_entity("ENTITY123"))
 ```
 
+## [v0.2.0] – 2025-07-31
+### Added
 ## CLI Usage
 Run the same reports from the command line:
 ```powershell
@@ -122,6 +124,16 @@ earCrawler years
 earCrawler entity-docs ENTITY123
 ```
 
+## [v0.2.0] – 2025-07-31
+### Added
+## CLI
+```bash
+pip install .
+export ANALYTICS_SERVICE_URL=http://localhost:8000
+earCrawler reports entities-by-country
+earCrawler reports documents-by-year
+earCrawler reports document-count ENTITY123
+```
 
 ## Testing
 Run the test suite with:
