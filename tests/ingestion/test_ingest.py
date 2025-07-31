@@ -7,8 +7,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from rdflib import Graph
 
-import pytest
-
 root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root))
 
@@ -31,18 +29,26 @@ class StubClient(SimpleNamespace):
     pass
 
 
-def setup_ingestor(monkeypatch, tmp_path, validate_return=(True, None, ""), loader_exc=None):
+def setup_ingestor(
+    monkeypatch,
+    tmp_path,
+    validate_return=(True, None, ""),
+    loader_exc=None,
+) -> tuple:
     Ingestor = _import_ingestor()
     tg = StubClient()
     fr = StubClient()
     tg.search_entities = lambda q: [{"id": "1"}]
     fr.search_documents = lambda eid: [{"id": "d1"}]
 
-    ing = Ingestor(tg, fr, Path(tmp_path / "tdb"))
+    ing = Ingestor(tg, fr, tmp_path / "tdb")
 
     monkeypatch.setattr(ing, "map_entity_to_triples", lambda e: Graph())
     monkeypatch.setattr(ing, "map_document_to_triples", lambda d: Graph())
-    monkeypatch.setattr("earCrawler.ingestion.ingest.validate", lambda **kw: validate_return)
+    monkeypatch.setattr(
+        "earCrawler.ingestion.ingest.validate",
+        lambda **_kw: validate_return,
+    )
 
     calls = []
 
@@ -65,7 +71,11 @@ def test_ingest_success(monkeypatch, tmp_path):
 
 def test_shacl_failure(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    ing, calls = setup_ingestor(monkeypatch, tmp_path, validate_return=(False, None, "bad"))
+    ing, calls = setup_ingestor(
+        monkeypatch,
+        tmp_path,
+        validate_return=(False, None, "bad"),
+    )
     ing.run("foo")
     assert (tmp_path / "generated-triples.ttl").exists()
     assert calls == []
