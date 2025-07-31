@@ -24,7 +24,7 @@ python -m venv .venv
 python -m pip install -r requirements.txt
 cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<YOUR_API_KEY>
 REM Optional modules used by tests and examples
-python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper
+python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper sentence-transformers faiss-cpu
 ```
 
 ## Repository Structure
@@ -146,6 +146,7 @@ Run the test suite with:
 ```cmd
 pytest
 ```
+The ingestion, service, and RAG tests rely on optional dependencies installed in the setup instructions. Ensure that `rdflib`, `pyshacl`, `fastapi`, `uvicorn[standard]`, `SPARQLWrapper`, `sentence-transformers`, and `faiss-cpu` are available.
 
 ## CI/CD
 Continuous integration runs on GitHub Actions using the `windows-latest` image.
