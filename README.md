@@ -15,13 +15,15 @@ a RAG (Retrieval Augmented Generation) approach.
 
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be
-cloned to `C:\Users\cfrydenlund\Projects\earCrawler`.
+cloned to `C:\Projects\earCrawler`.
 
 ```cmd
-cd C:\Users\cfrydenlund\Projects\earCrawler
+cd C:\Projects\earCrawler
 python -m venv .venv
 .\.venv\Scripts\activate
 python -m pip install -r requirements.txt
+pip install .
+earCrawler --help
 cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<YOUR_API_KEY>
 REM Optional modules used by tests and examples
 python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper
@@ -110,6 +112,14 @@ reports = ReportsGenerator()
 print(reports.count_entities_by_country())
 print(reports.count_documents_by_year())
 print(reports.get_document_count_for_entity("ENTITY123"))
+```
+
+## CLI Usage
+Run the same reports from the command line:
+```powershell
+earCrawler countries
+earCrawler years
+earCrawler entity-docs ENTITY123
 ```
 
 
