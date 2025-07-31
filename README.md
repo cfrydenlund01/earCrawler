@@ -94,6 +94,22 @@ ingestor = Ingestor(
 )
 ingestor.run("emerging technology")
 ```
+## RAG
+```python
+from pathlib import Path
+from earCrawler.rag.retriever import Retriever
+from earCrawler.api_clients.tradegov_client import TradeGovClient
+from earCrawler.api_clients.federalregister_client import FederalRegisterClient
+
+retriever = Retriever(
+    TradeGovClient(),
+    FederalRegisterClient(),
+    model_name="all-MiniLM-L12-v2",
+    index_path=Path(r"C:\\Projects\\earCrawler\\data\\faiss\\index.faiss")
+)
+retriever.add_documents(docs)
+results = retriever.query("export control regulations", k=5)
+```
 ## Service
 ```python
 from fastapi import FastAPI
