@@ -166,15 +166,6 @@ earCrawler reports document-count ENTITY123
 ```
 
 
-## Models
-Install additional model dependencies and run the Legal-BERT training script:
-
-```cmd
-pip install transformers peft accelerate
-python models\legalbert\train.py --do_train --do_eval
-```
-The PEFT/LoRA adapters are saved to `models\legalbert\lora_pretrained` and `models\legalbert\lora_classification`.
-
 
 ## Testing
 Run the test suite with:

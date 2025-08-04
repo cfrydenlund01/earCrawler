@@ -27,10 +27,6 @@ jobs:
         run: pip install click requests tabulate
       - name: Install RAG deps
         run: pip install sentence-transformers faiss-cpu
-      - name: Install model deps
-        run: pip install transformers peft accelerate
-      - name: Train Legal-BERT adapters
-        run: python earCrawler/models/legalbert/train.py --do_train --do_eval
       - name: Lint
         run: |
           pip install flake8
