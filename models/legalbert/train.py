@@ -87,7 +87,9 @@ def run_pretraining(tokenizer, output_dir: Path, do_train: bool, do_eval: bool) 
     data_collator = DataCollatorForLanguageModeling(
         tokenizer=tokenizer, mlm=True, mlm_probability=0.15
     )
+
     args_kwargs = dict(
+    args = TrainingArguments(
         output_dir=str(output_dir),
         overwrite_output_dir=True,
         per_device_train_batch_size=16,
@@ -99,6 +101,10 @@ def run_pretraining(tokenizer, output_dir: Path, do_train: bool, do_eval: bool) 
     if "evaluation_strategy" in TrainingArguments.__init__.__code__.co_varnames:
         args_kwargs["evaluation_strategy"] = "epoch" if do_eval else "no"
     args = TrainingArguments(**args_kwargs)
+        save_strategy="no",
+        evaluation_strategy="epoch" if do_eval else "no",
+    )
+
     trainer = Trainer(
         model=model,
         args=args,
@@ -138,6 +144,7 @@ def run_classification(
         for param in model.classifier.parameters():
             param.requires_grad = True
     args_kwargs = dict(
+    args = TrainingArguments(
         output_dir=str(output_dir),
         overwrite_output_dir=True,
         per_device_train_batch_size=16,
@@ -149,6 +156,9 @@ def run_classification(
     if "evaluation_strategy" in TrainingArguments.__init__.__code__.co_varnames:
         args_kwargs["evaluation_strategy"] = "epoch" if do_eval else "no"
     args = TrainingArguments(**args_kwargs)
+        save_strategy="no",
+        evaluation_strategy="epoch" if do_eval else "no",
+    )
     trainer = Trainer(
         model=model,
         args=args,
