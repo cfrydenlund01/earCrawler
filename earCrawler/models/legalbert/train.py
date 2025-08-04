@@ -130,6 +130,7 @@ def run_pretraining(tokenizer: AutoTokenizer, do_train: bool, do_eval: bool) -> 
         overwrite_output_dir=True,
         report_to=[],
         dataloader_pin_memory=False,
+        label_names=["labels"],
     )
 
     trainer = Trainer(
@@ -138,7 +139,6 @@ def run_pretraining(tokenizer: AutoTokenizer, do_train: bool, do_eval: bool) -> 
         train_dataset=dataset,
         eval_dataset=dataset,
         data_collator=data_collator,
-        label_names=["labels"],
     )
 
     if do_train:
@@ -176,6 +176,7 @@ def run_classification(tokenizer: AutoTokenizer, do_train: bool, do_eval: bool) 
         overwrite_output_dir=True,
         report_to=[],
         dataloader_pin_memory=False,
+        label_names=["labels"],
     )
 
     trainer = Trainer(
@@ -184,7 +185,6 @@ def run_classification(tokenizer: AutoTokenizer, do_train: bool, do_eval: bool) 
         train_dataset=dataset,
         eval_dataset=dataset,
         data_collator=default_data_collator,
-        label_names=["labels"],
     )
 
     if do_train:
