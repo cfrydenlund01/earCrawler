@@ -173,7 +173,13 @@ earCrawler reports documents-by-year
 earCrawler reports document-count ENTITY123
 ```
 
+## Models
+Install the optional dependencies and run the Legal-BERT training script:
 
+```cmd
+pip install transformers peft accelerate
+python earCrawler\models\legalbert\train.py --do_train --do_eval
+```
 
 ## Testing
 Run the test suite with:
