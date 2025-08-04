@@ -96,8 +96,6 @@ def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
         fr_mod,
     )
     monkeypatch.setitem(sys.modules, 'api_clients', pkg_mod)
-    import pathlib
-    monkeypatch.setattr(pathlib, 'WindowsPath', Path, raising=False)
     import earCrawler.rag.retriever as retriever
     importlib.reload(retriever)
     monkeypatch.setattr(

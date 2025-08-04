@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import pickle
 import time
-from pathlib import WindowsPath
+from pathlib import Path
 from typing import List
 
 import faiss
@@ -44,14 +44,12 @@ class Retriever:
         tradegov_client: TradeGovClient,
         fedreg_client: FederalRegisterClient,
         model_name: str = "all-MiniLM-L12-v2",
-        index_path: WindowsPath = WindowsPath(
-            r"C:\Projects\earCrawler\data\faiss\index.faiss"
-        ),
+        index_path: Path = Path("data/faiss/index.faiss"),
     ) -> None:
         self.tradegov_client = tradegov_client
         self.fedreg_client = fedreg_client
         self.model = SentenceTransformer(model_name)
-        self.index_path = WindowsPath(index_path)
+        self.index_path = Path(index_path)
         self.meta_path = self.index_path.with_suffix(".pkl")
         self.logger = logging.getLogger(__name__)
 
