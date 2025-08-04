@@ -25,10 +25,14 @@ jobs:
         run: pip install click requests tabulate
       - name: Install RAG deps
         run: pip install sentence-transformers faiss-cpu
+      - name: Install KG service deps
+        run: pip install fastapi SPARQLWrapper pyshacl
       - name: Lint
         run: |
           pip install flake8
           flake8 earCrawler/core/crawler.py earCrawler/service/sparql_service.py
+      - name: Lint KG service
+        run: python -m flake8 earCrawler/service/kg_service.py
       - name: Lint analytics
         run: python -m flake8 earCrawler/analytics
       - name: Lint RAG code
@@ -40,7 +44,9 @@ jobs:
       - name: Run ingest tests
         run: python -m pytest tests/ingestion
       - name: Run service tests
-        run: python -m pytest tests/service
+        run: python -m pytest tests/service/test_sparql_service.py
+      - name: Run KG service tests
+        run: python -m pytest tests/service/test_kg_service.py
       - name: Run analytics tests
         run: python -m pytest tests/analytics
       - name: Run RAG tests

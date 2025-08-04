@@ -124,6 +124,34 @@ from earCrawler.service.sparql_service import app
 # run with: uvicorn earCrawler.service.sparql_service:app --reload
 ```
 
+## Knowledge Graph Service
+Start the service after setting environment variables for the SPARQL endpoint
+and SHACL shapes file:
+
+```cmd
+set SPARQL_ENDPOINT_URL=http://localhost:3030/ds
+set SHAPES_FILE_PATH=C:\path\to\shapes.ttl
+uvicorn earCrawler.service.kg_service:app --reload
+```
+
+Query the knowledge graph via ``curl``:
+
+```bash
+curl -X POST http://localhost:8000/kg/query \
+  -H "Content-Type: application/json" \
+  -d "{\"sparql\": \"SELECT * WHERE { ?s ?p ?o } LIMIT 1\"}"
+```
+
+Insert triples from Python:
+
+```python
+from fastapi.testclient import TestClient
+from earCrawler.service.kg_service import app
+
+client = TestClient(app)
+client.post("/kg/insert", json={"ttl": "<a> <b> <c> ."})
+```
+
 ## Analytics
 ```python
 from earCrawler.analytics.reports import ReportsGenerator
