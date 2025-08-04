@@ -9,7 +9,22 @@ sys.path.insert(0, str(root))
 import importlib  # noqa: E402
 import pickle  # noqa: E402
 from types import SimpleNamespace  # noqa: E402
-import numpy as np  # noqa: E402
+try:  # pragma: no cover - provide lightweight numpy fallback
+    import numpy as np  # type: ignore
+except ModuleNotFoundError:  # pragma: no cover - used in CI without numpy
+    def _ones(shape, dtype=None):
+        return [[1.0] * shape[1] for _ in range(shape[0])]
+
+    def _zeros(shape, dtype=None):
+        return [[0.0] * shape[1] for _ in range(shape[0])]
+
+    def _array(data, dtype=None):
+        try:
+            return [list(row) for row in data]
+        except TypeError:
+            return list(data)
+
+    np = SimpleNamespace(ones=_ones, zeros=_zeros, array=_array)
 
 
 class DummyModel:
@@ -79,6 +94,33 @@ def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
     index = StubIndex()
     faiss_mod = StubFaiss(index)
     monkeypatch.setitem(sys.modules, 'faiss', faiss_mod)
+
+    class _Array(list):
+        @property
+        def shape(self):
+            if self and isinstance(self[0], list):
+                return (len(self), len(self[0]))
+            return (len(self),)
+
+        def astype(self, _dt):
+            return self
+
+    numpy_stub = SimpleNamespace(
+        ones=lambda shape, dtype=None: _Array(
+            [[1.0] * shape[1] for _ in range(shape[0])]
+        ),
+        zeros=lambda shape, dtype=None: _Array(
+            [[0.0] * shape[1] for _ in range(shape[0])]
+        ),
+        array=lambda data, dtype=None: _Array([list(row) for row in data]),
+        asarray=lambda data, dtype=None: _Array([list(row) for row in data]),
+        arange=lambda start, stop=None: (
+            list(range(start, stop))
+            if stop is not None
+            else list(range(start))
+        ),
+    )
+    monkeypatch.setitem(sys.modules, 'numpy', numpy_stub)
     st_mod = SimpleNamespace(SentenceTransformer=lambda name: DummyModel(name))
     monkeypatch.setitem(sys.modules, 'sentence_transformers', st_mod)
     tg_mod = SimpleNamespace(TradeGovClient=object)
@@ -96,8 +138,10 @@ def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
         fr_mod,
     )
     monkeypatch.setitem(sys.modules, 'api_clients', pkg_mod)
+    import os
     import pathlib
-    monkeypatch.setattr(pathlib, 'WindowsPath', Path, raising=False)
+    if os.name != 'nt':
+        monkeypatch.setattr(pathlib, 'WindowsPath', Path, raising=False)
     import earCrawler.rag.retriever as retriever
     importlib.reload(retriever)
     monkeypatch.setattr(
@@ -112,7 +156,7 @@ def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
     r = retriever.Retriever(
         SimpleNamespace(),
         SimpleNamespace(),
-        index_path=Path(tmp_path / 'idx.faiss'),
+        index_path=tmp_path / 'idx.faiss',
     )
     return r, model, index, faiss_mod
 
