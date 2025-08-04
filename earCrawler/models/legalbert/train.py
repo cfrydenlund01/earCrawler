@@ -160,7 +160,10 @@ def run_classification(tokenizer: AutoTokenizer, do_train: bool, do_eval: bool) 
     adapter_path = Path("models") / "legalbert" / "lora_pretrained"
     if adapter_path.exists():
         model.load_adapter(str(adapter_path), adapter_name="pretrained", is_trainable=True)
-        model.set_active_adapters("pretrained")
+        # ``set_active_adapters`` was removed in favour of ``set_adapter`` in
+        # recent versions of ``peft``. Using the newer API avoids an
+        # AttributeError during fine-tuning.
+        model.set_adapter("pretrained")
 
     dataset = load_classification_dataset(tokenizer)
     output_dir = Path("models") / "legalbert" / "lora_classification"
