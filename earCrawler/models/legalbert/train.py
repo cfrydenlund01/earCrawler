@@ -173,8 +173,6 @@ def run_classification(tokenizer: AutoTokenizer, do_train: bool, do_eval: bool) 
         num_train_epochs=2,
         per_device_train_batch_size=16,
         save_strategy="epoch",
-        evaluation_strategy="epoch",
-        load_best_model_at_end=True,
         logging_steps=1,
         overwrite_output_dir=True,
         report_to=[],
