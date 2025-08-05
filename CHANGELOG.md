@@ -15,3 +15,4 @@
 - Implement RAG Retriever using all-MiniLM-L12-v2 and FAISS. [#VERSION]
 - Add FastAPI KG service with safe SPARQL query and SHACL-validated inserts. [#VERSION]
 - Add Legal-BERT fine-tuning using PEFT/LoRA adapters. [#VERSION]
+- Add Mistral-7B QLoRA instruction-tuned agent with LoRA adapters. [#VERSION]

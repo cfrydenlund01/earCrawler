@@ -1,0 +1,140 @@
+"""Mistral QLoRA agent."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import List, Optional
+
+import bitsandbytes as bnb  # type: ignore
+
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    BitsAndBytesConfig,
+    Trainer,
+    TrainingArguments,
+)
+from datasets import Dataset
+from peft import LoraConfig, get_peft_model
+
+
+DEFAULT_MODEL = "mistralai/Mistral-7B-v0.1"
+ADAPTER_DIR = Path("models/mistral7b/qlora_adapter")
+
+
+def load_mistral_with_lora(
+    model_name: str = DEFAULT_MODEL,
+    use_4bit: bool = True,
+):
+    """Load Mistral-7B in 4-bit and attach a LoRA adapter.
+
+    Parameters
+    ----------
+    model_name:
+        Base model name on the Hugging Face hub.
+    use_4bit:
+        Whether to enable 4-bit quantization via ``bnb.QuantLinear``.
+    """
+    quant_config = None
+    if use_4bit:
+        quant_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
+
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        quantization_config=quant_config,
+        device_map="auto" if use_4bit else None,
+    )
+
+    lora_config = LoraConfig(
+        r=8,
+        lora_alpha=16,
+        target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
+        lora_dropout=0.05,
+        bias="none",
+        task_type="CAUSAL_LM",
+    )
+    model = get_peft_model(model, lora_config)
+    return tokenizer, model
+
+
+def train_qlora_adapter(
+    model_name: str = DEFAULT_MODEL,
+    output_dir: Path = ADAPTER_DIR,
+    use_4bit: bool = True,
+    trainer_cls=Trainer,
+) -> None:
+    """Fine-tune the adapter weights using a small EAR dataset."""
+    tokenizer, model = load_mistral_with_lora(model_name, use_4bit=use_4bit)
+
+    data = Dataset.from_dict(
+        {
+            "prompt": [
+                "What does EAR regulate?",
+                "Who enforces EAR?",
+            ],
+            "completion": [
+                "EAR regulates the export of dual-use items.",
+                "The U.S. Department of Commerce enforces EAR.",
+            ],
+        }
+    )
+
+    def _format(example):
+        text = example["prompt"] + "\n" + example["completion"]
+        tokens = tokenizer(text, truncation=True)
+        tokens["labels"] = tokens["input_ids"].copy()
+        return tokens
+
+    train_ds = data.map(_format)
+
+    args = TrainingArguments(
+        output_dir=str(output_dir),
+        per_device_train_batch_size=1,
+        num_train_epochs=1,
+        logging_steps=1,
+        learning_rate=2e-4,
+        report_to=[],
+    )
+    trainer = trainer_cls(model=model, train_dataset=train_ds, args=args)
+    trainer.train()
+    model.save_pretrained(str(output_dir))
+    tokenizer.save_pretrained(str(output_dir))
+
+
+@dataclass
+class Agent:
+    """Retrieval-augmented generation agent using a QLoRA Mistral model."""
+
+    retriever: "Retriever"
+    legalbert: Optional["LegalBERT"] = None
+    model: Optional[object] = None
+    tokenizer: Optional[object] = None
+
+    def __post_init__(self) -> None:
+        if self.model is None or self.tokenizer is None:
+            self.tokenizer, self.model = load_mistral_with_lora()
+
+    def _build_prompt(self, query: str, contexts: List[str]) -> str:
+        context_block = "\n".join(contexts)
+        system = (
+            "You are an expert on Export Administration Regulations and answer"
+            " user questions using the provided context."
+        )
+        user = f"Context:\n{context_block}\n\nQuestion: {query}\nAnswer:"
+        return system + "\n\n" + user
+
+    def answer(self, query: str, k: int = 5) -> str:
+        contexts = self.retriever.query(query, k=k)
+        if self.legalbert is not None:
+            contexts = self.legalbert.filter(query, contexts)
+        prompt = self._build_prompt(query, contexts)
+        inputs = self.tokenizer(prompt, return_tensors="pt")
+        outputs = self.model.generate(**inputs, max_new_tokens=128)
+        text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return text
