@@ -4,19 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import importlib
 import sys
 import types
-sys.modules.setdefault("bitsandbytes", types.SimpleNamespace(nn=types.SimpleNamespace(Linear4bit=object)))
-sys.modules.setdefault("transformers", types.SimpleNamespace(AutoModelForCausalLM=object, AutoTokenizer=object, BitsAndBytesConfig=object, Trainer=object, TrainingArguments=object))
-sys.modules.setdefault("datasets", types.SimpleNamespace(Dataset=object))
-sys.modules.setdefault("peft", types.SimpleNamespace(LoraConfig=object, get_peft_model=lambda *a, **k: object()))
+
+
 root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root))
-
-
-
-from earCrawler.agent import mistral_agent
-from earCrawler.agent.mistral_agent import Agent
 
 
 class DummyRetriever:
@@ -74,7 +68,40 @@ class DummyTrainer:
         pass
 
 
-def test_agent_answer_returns_string() -> None:
+def _import_agent(monkeypatch):
+    """Import the mistral agent with heavy deps stubbed."""
+    monkeypatch.setitem(
+        sys.modules,
+        "bitsandbytes",
+        types.SimpleNamespace(nn=types.SimpleNamespace(Linear4bit=object)),
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "transformers",
+        types.SimpleNamespace(
+            AutoModelForCausalLM=object,
+            AutoTokenizer=object,
+            BitsAndBytesConfig=object,
+            Trainer=object,
+            TrainingArguments=object,
+        ),
+    )
+    monkeypatch.setitem(sys.modules, "datasets", types.SimpleNamespace(Dataset=object))
+    monkeypatch.setitem(
+        sys.modules,
+        "peft",
+        types.SimpleNamespace(
+            LoraConfig=object, get_peft_model=lambda *a, **k: object()
+        ),
+    )
+    mistral_agent = importlib.import_module("earCrawler.agent.mistral_agent")
+    importlib.reload(mistral_agent)
+    return mistral_agent
+
+
+def test_agent_answer_returns_string(monkeypatch) -> None:
+    mistral_agent = _import_agent(monkeypatch)
+    Agent = mistral_agent.Agent
     retriever = DummyRetriever()
     agent = Agent(
         retriever=retriever,
@@ -86,6 +113,8 @@ def test_agent_answer_returns_string() -> None:
 
 
 def test_train_qlora_adapter_runs(tmp_path, monkeypatch) -> None:
+    mistral_agent = _import_agent(monkeypatch)
+
     def fake_loader(*_a, **_k):
         return DummyTokenizer(), DummyModel()
 
