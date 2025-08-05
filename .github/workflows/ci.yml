@@ -59,3 +59,7 @@ jobs:
         run: python -m pytest tests/agent
       - name: Run CLI tests
         run: python -m pytest tests/cli/test_reports_cli.py
+      - name: Install benchmark deps
+        run: pip install sentence-transformers faiss-cpu peft bitsandbytes
+      - name: Run benchmark script
+        run: python scripts/benchmark.py --queries scripts/benchmark_queries.json

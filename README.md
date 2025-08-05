@@ -201,6 +201,15 @@ agent = Agent(retriever)
 print(agent.answer("What does EAR regulate?"))
 ```
 
+## Benchmarking
+Run the end-to-end benchmark to measure retrieval, classification, and
+generation latency. The script spins up the internal FastAPI services using
+``TestClient`` and writes metrics to ``reports/benchmark_results.csv``.
+
+```cmd
+python scripts/benchmark.py --queries scripts/benchmark_queries.json
+```
+
 ## Testing
 Run the test suite with:
 ```cmd
