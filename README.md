@@ -13,6 +13,13 @@ a RAG (Retrieval Augmented Generation) approach.
 - **Trade.gov API key**
 - **Docker Desktop**
 
+## Installation
+Install earCrawler version 0.2.0 from PyPI:
+
+```bash
+pip install earCrawler==0.2.0
+```
+
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be
 cloned to `C:\Users\cfrydenlund\Projects\earCrawler`.
