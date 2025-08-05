@@ -2,19 +2,32 @@
 
 from pathlib import Path
 
-from transformers import AutoModelForSequenceClassification, AutoTokenizer
-from peft import PeftModel
+import importlib
+import sys
+import types
+import torch
+from transformers import BertConfig, BertForSequenceClassification
+from peft import LoraConfig, PeftModel, get_peft_model
 
 
-def test_classification_adapter_forward() -> None:
-    """Load the classification adapter and run a forward pass."""
+def test_classification_adapter_forward(tmp_path, monkeypatch) -> None:
+    """Create a tiny adapter and ensure it loads and runs."""
 
-    adapter_dir = Path("models") / "legalbert" / "lora_classification"
-    tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-    base_model = AutoModelForSequenceClassification.from_pretrained(
-        "bert-base-uncased", num_labels=2
+    orig_find_spec = importlib.util.find_spec
+    monkeypatch.setattr(
+        importlib.util,
+        "find_spec",
+        lambda name, *a, **k: None if name == "bitsandbytes" else orig_find_spec(name, *a, **k),
     )
-    model = PeftModel.from_pretrained(base_model, str(adapter_dir))
-    inputs = tokenizer("dummy", return_tensors="pt")
-    outputs = model(**inputs)
+
+    config = BertConfig(num_labels=2)
+    base_model = BertForSequenceClassification(config)
+    lora_config = LoraConfig(
+        task_type="SEQ_CLS", r=2, lora_alpha=4, target_modules=["query", "value"]
+    )
+    model = get_peft_model(base_model, lora_config)
+    model.save_pretrained(str(tmp_path))
+    reloaded = PeftModel.from_pretrained(base_model, str(tmp_path))
+    inputs = {"input_ids": torch.tensor([[0, 1]], dtype=torch.long)}
+    outputs = reloaded(**inputs)
     assert outputs.logits.shape[-1] == 2

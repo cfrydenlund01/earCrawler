@@ -181,6 +181,26 @@ pip install transformers peft accelerate
 python earCrawler\models\legalbert\train.py --do_train --do_eval
 ```
 
+
+## Agent
+Fine-tune a quantized Mistral-7B model with QLoRA and run the agent:
+
+```cmd
+pip install bitsandbytes peft transformers datasets
+python -m earCrawler.agent.mistral_agent  # runs small adapter training
+```
+
+Use the trained adapter at `models/mistral7b/qlora_adapter` with the `Agent` class:
+
+```python
+from earCrawler.agent.mistral_agent import Agent
+from earCrawler.rag.retriever import Retriever
+
+retriever = Retriever(...)
+agent = Agent(retriever)
+print(agent.answer("What does EAR regulate?"))
+```
+
 ## Testing
 Run the test suite with:
 ```cmd
