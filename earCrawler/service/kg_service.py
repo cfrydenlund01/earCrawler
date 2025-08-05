@@ -20,10 +20,12 @@ from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
 from pyshacl import validate
 from urllib.error import HTTPError, URLError
 
+from .utils import get_secret
+
 # Load SPARQL_ENDPOINT_URL & SHAPES_FILE_PATH from env or
 # Windows Credential Store.
 # Enforce operation whitelisting to prevent injection.
-ENDPOINT_URL = os.getenv("SPARQL_ENDPOINT_URL")
+ENDPOINT_URL = get_secret("SPARQL_ENDPOINT_URL")
 SHAPES_FILE_PATH = os.getenv("SHAPES_FILE_PATH")
 if not ENDPOINT_URL or not SHAPES_FILE_PATH:
     raise RuntimeError("SPARQL_ENDPOINT_URL and SHAPES_FILE_PATH must be set")
@@ -186,3 +188,9 @@ def kg_insert(body: InsertRequest) -> InsertResponse:
         ) from exc
 
     return InsertResponse(inserted=True)
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Basic health check endpoint."""
+    return {"status": "ok"}

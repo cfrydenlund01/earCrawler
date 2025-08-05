@@ -17,3 +17,4 @@
 - Add Legal-BERT fine-tuning using PEFT/LoRA adapters. [#VERSION]
 - Add Mistral-7B QLoRA instruction-tuned agent with LoRA adapters. [#VERSION]
 - Add end-to-end benchmark script integrating LoRA and QLoRA components. [#VERSION]
+- Finalize production Docker images and monitoring for LoRA/QLoRA pipeline. [#VERSION]

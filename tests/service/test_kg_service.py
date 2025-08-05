@@ -88,3 +88,10 @@ def test_insert_http_error(monkeypatch, tmp_path):
     client = _load_app(monkeypatch, _HttpErrorWrapper, validate_ok, tmp_path)
     resp = client.post("/kg/insert", json={"ttl": "<a> <b> <c> ."})
     assert resp.status_code == 502
+
+
+def test_health(monkeypatch, tmp_path):
+    client = _load_app(monkeypatch, _GoodWrapper, lambda **_: (True, None, ""), tmp_path)
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}

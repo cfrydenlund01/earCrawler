@@ -67,3 +67,10 @@ def test_invalid_query(monkeypatch):
     client = _load_app(monkeypatch, _GoodWrapper)
     resp = client.get("/query", params={"sparql": "CONSTRUCT {}"})
     assert resp.status_code == 400
+
+
+def test_health(monkeypatch):
+    client = _load_app(monkeypatch, _GoodWrapper)
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json() == {"status": "ok"}

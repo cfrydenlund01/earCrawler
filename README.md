@@ -27,6 +27,12 @@ REM Optional modules used by tests and examples
 python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper sentence-transformers faiss-cpu
 ```
 
+## Secret Management
+- Store API keys and SPARQL URLs in the Windows Credential Manager or as
+  environment variables. Never commit secrets to source control.
+- Rotate credentials with `cmdkey /delete:<NAME>` followed by a new `cmdkey`
+  command. See `RUNBOOK.md` for detailed procedures.
+
 ## Repository Structure
 - `api_clients/` – clients for Trade.gov and Federal Register APIs.
 - `tests/` – unit tests covering success and failure scenarios.

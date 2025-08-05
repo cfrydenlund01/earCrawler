@@ -1,6 +1,10 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
 
 jobs:
   build-and-test:
@@ -63,3 +67,31 @@ jobs:
         run: pip install sentence-transformers faiss-cpu peft bitsandbytes
       - name: Run benchmark script
         run: python scripts/benchmark.py --queries scripts/benchmark_queries.json
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build-and-test
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build API image
+        run: docker build -f docker/api.Dockerfile -t ghcr.io/${{ github.repository }}/api:${{ github.ref_name }} .
+      - name: Push API image
+        run: docker push ghcr.io/${{ github.repository }}/api:${{ github.ref_name }}
+      - name: Build RAG image
+        run: docker build -f docker/rag.Dockerfile -t ghcr.io/${{ github.repository }}/rag:${{ github.ref_name }} .
+      - name: Push RAG image
+        run: docker push ghcr.io/${{ github.repository }}/rag:${{ github.ref_name }}
+      - name: Build agent image
+        run: docker build -f docker/mistral.Dockerfile -t ghcr.io/${{ github.repository }}/agent:${{ github.ref_name }} .
+      - name: Push agent image
+        run: docker push ghcr.io/${{ github.repository }}/agent:${{ github.ref_name }}
+      - name: Run monitor against staging
+        shell: pwsh
+        run: ./monitor.ps1 -Services @('https://staging/api/health','https://staging/kg/health','https://staging/agent/health')
