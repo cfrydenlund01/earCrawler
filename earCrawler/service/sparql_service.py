@@ -3,21 +3,22 @@ from __future__ import annotations
 """FastAPI service for executing SPARQL SELECT queries."""
 
 import logging
-import os
 from typing import Any, List
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from SPARQLWrapper import SPARQLWrapper, JSON
+from SPARQLWrapper import JSON, SPARQLWrapper
 from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
 from urllib.error import HTTPError, URLError
 
+from .utils import get_secret
+
 logger = logging.getLogger(__name__)
 
-ENDPOINT_URL = os.getenv("SPARQL_ENDPOINT_URL")
+ENDPOINT_URL = get_secret("SPARQL_ENDPOINT_URL")
 if not ENDPOINT_URL:
-    raise RuntimeError("SPARQL_ENDPOINT_URL environment variable not set")
+    raise RuntimeError("SPARQL_ENDPOINT_URL not configured")
 
 app = FastAPI(title="SPARQL Service")
 app.add_middleware(
@@ -78,3 +79,9 @@ def run_query(
 
     bindings = data.get("results", {}).get("bindings", [])
     return QueryResponse(results=bindings)
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    """Basic health check endpoint."""
+    return {"status": "ok"}
