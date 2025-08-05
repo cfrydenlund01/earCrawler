@@ -1,0 +1,4 @@
+[
+  {"query": "What does EAR regulate?", "expected": "dual-use items"},
+  {"query": "Who enforces EAR?", "expected": "Department of Commerce"}
+]
