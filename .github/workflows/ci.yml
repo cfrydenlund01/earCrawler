@@ -66,6 +66,30 @@ jobs:
       - name: Tests
         run: pytest -m gpu
 
+  benchmark:
+    runs-on: windows-gpu-t4
+    needs: gpu
+    env:
+      TRADEGOV_API_KEY: ${{ secrets.TRADEGOV_API_KEY }}
+      FEDREG_API_KEY: ${{ secrets.FEDREG_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-gpu.txt
+      - name: Run benchmark
+        run: bash eval/collect_benchmark.sh
+      - name: Upload benchmark
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark
+          path: benchmark.md
+
   validate-container:
     runs-on: ubuntu-latest
     steps:
