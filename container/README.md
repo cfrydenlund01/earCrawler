@@ -3,9 +3,11 @@
 ## Installation
 
 Apptainer can be installed on Ubuntu or within Windows Subsystem for Linux (WSL2).
+The package is not available in some default repositories. If `apt` cannot
+find `apptainer`, install it via Snap:
 
 ```bash
-sudo apt-get update && sudo apt-get install -y apptainer
+sudo snap install apptainer --classic
 ```
 
 ## Build the Container
