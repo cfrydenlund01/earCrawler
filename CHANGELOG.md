@@ -18,3 +18,7 @@
 - Add Mistral-7B QLoRA instruction-tuned agent with LoRA adapters. [#VERSION]
 - Add end-to-end benchmark script integrating LoRA and QLoRA components. [#VERSION]
 - Finalize production Docker images and monitoring for LoRA/QLoRA pipeline. [#VERSION]
+
+## [0.2.0]
+### Added
+- CI hardening: lint, coverage threshold, GPU matrix, secrets management.
