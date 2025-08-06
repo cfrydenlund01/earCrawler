@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EAR QA Item",
+  "type": "object",
+  "properties": {
+    "id": {"type": "string"},
+    "question": {"type": "string"},
+    "ground_truth": {"type": "string"},
+    "answer_start": {"type": "integer"},
+    "answer_end": {"type": "integer"}
+  },
+  "required": ["id", "question", "ground_truth", "answer_start", "answer_end"],
+  "additionalProperties": false
+}
