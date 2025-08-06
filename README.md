@@ -249,6 +249,17 @@ The ingestion, service, and RAG tests rely on optional dependencies installed in
 Continuous integration runs on GitHub Actions using the `windows-latest` image.
 See `.github/workflows/ci.yml` for details.
 
+## Containerized Builds
+An Apptainer definition file is available at `container/earcrawler.def` for GPU-aware runs.
+Build a writable sandbox and execute commands inside the container:
+
+```bash
+apptainer build --sandbox earcrawler_sandbox container/earcrawler.def
+apptainer exec --nv earcrawler_sandbox python train.py --config <config_path>
+```
+
+See [`container/README.md`](container/README.md) for installation and usage details.
+
 ## Contributing
 Pull requests are welcome. For major changes, please open an issue first to
 discuss what you would like to change.

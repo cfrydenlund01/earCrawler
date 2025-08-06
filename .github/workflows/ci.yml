@@ -66,6 +66,15 @@ jobs:
       - name: Tests
         run: pytest -m gpu
 
+  validate-container:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Apptainer
+        run: sudo apt-get update && sudo apt-get install -y apptainer
+      - name: Lint container def
+        run: apptainer inspect container/earcrawler.def
+
   release:
     if: startsWith(github.ref, 'refs/tags/')
     needs: cpu
