@@ -1,0 +1,25 @@
+Bootstrap: docker
+From: nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
+
+%post
+    apt-get update && apt-get install -y \
+        python3 python3-pip git curl build-essential \
+        libglib2.0-0 libsm6 libxext6 libxrender-dev
+    pip3 install -r /workspace/requirements-gpu.txt
+
+%files
+    ../requirements-gpu.txt /workspace/requirements-gpu.txt
+
+%environment
+    export HF_HOME=/workspace/.cache/huggingface
+    export PYTHONUNBUFFERED=1
+    export PYTHONPATH=/workspace
+    export CUDA_VISIBLE_DEVICES=0
+
+%labels
+    Author cfrydenlund01
+    Version v0.2.0
+
+%runscript
+    echo "$@"
+    exec "$@"
