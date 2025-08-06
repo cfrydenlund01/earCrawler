@@ -1,4 +1,6 @@
 # earCrawler
+[![CI](https://github.com/cfrydenlund01/earCrawler/actions/workflows/ci.yml/badge.svg)](https://github.com/cfrydenlund01/earCrawler/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/cfrydenlund01/earCrawler/branch/main/graph/badge.svg)](https://codecov.io/gh/cfrydenlund01/earCrawler)
 
 ## Project Overview
 EarCrawler is a retrieval-augmented crawler used by the EAR-QA system to gather
@@ -39,6 +41,19 @@ python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper s
   environment variables. Never commit secrets to source control.
 - Rotate credentials with `cmdkey /delete:<NAME>` followed by a new `cmdkey`
   command. See `RUNBOOK.md` for detailed procedures.
+
+## Testing
+Run the CPU test suite:
+
+```bash
+pytest -m "not gpu"
+```
+
+Run the GPU tests:
+
+```bash
+pytest -m gpu
+```
 
 ## Repository Structure
 - `api_clients/` – clients for Trade.gov and Federal Register APIs.
