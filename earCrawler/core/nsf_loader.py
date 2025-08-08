@@ -26,3 +26,14 @@ class NSFLoader(CorpusLoader):
                     "text": para,
                     "identifier": f"{case_number}:{idx}",
                 }
+
+    def run(
+        self,
+        fixtures_dir: Path | None = None,
+        live: bool = False,
+        output_dir: str | None = None,
+    ) -> list[Dict[str, object]]:
+        """Return all paragraphs; parameters kept for API parity."""
+        if fixtures_dir is not None:
+            self.fixtures_dir = fixtures_dir
+        return list(self.iterate_paragraphs())

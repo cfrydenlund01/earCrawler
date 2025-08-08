@@ -21,6 +21,7 @@ def test_search_documents_no_key(requests_mock):
     m = requests_mock.get(
         "https://api.federalregister.gov/v1/documents",
         json=resp,
+        headers={"Content-Type": "application/json"},
     )
     client = fr.FederalRegisterClient()
     results = list(client.search_documents("foo"))
@@ -34,6 +35,7 @@ def test_get_document(requests_mock):
     m = requests_mock.get(
         "https://api.federalregister.gov/v1/documents/1",
         json={"id": 1},
+        headers={"Content-Type": "application/json"},
     )
     client = fr.FederalRegisterClient()
     result = client.get_document("1")
