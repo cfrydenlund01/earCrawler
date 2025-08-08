@@ -159,6 +159,23 @@ def report(
                 click.echo(f"{name}\t{count}")
 
 
+@cli.command(name="kg-export")
+@click.option("--data-dir", default="data", help="Crawl JSONL directory.")
+@click.option("--out-ttl", default="kg/ear_triples.ttl", help="Output TTL file.")
+@click.option(
+    "--live/--offline",
+    default=False,
+    help="If --live, verify Java env before exporting TTL.",
+)
+def kg_export(data_dir: str, out_ttl: str, live: bool) -> None:
+    """Export paragraphs & entities to Turtle for Jena TDB2."""
+    from pathlib import Path
+    from earCrawler.kg.triples import export_triples
+
+    export_triples(Path(data_dir), Path(out_ttl), live=live)
+    click.echo(f"Written triples to {out_ttl}")
+
+
 def main() -> None:  # pragma: no cover - CLI entrypoint
     cli()
 

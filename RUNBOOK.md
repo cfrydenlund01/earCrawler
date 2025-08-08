@@ -55,3 +55,13 @@ python -m earCrawler.cli report --sources ear nsf --type top-entities --entity O
 ```
 
 Use `--out report.json` to save the results to a file.
+
+## Phase B: Knowledge Graph
+- `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
+- `python -m earCrawler.cli kg-export`: Export TTL triples.
+- Load with: `tdb2.tdbloader --loc db/ kg/ear_triples.ttl`
+- Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
+
+**Troubleshooting on Windows:**
+- If port 3030 is in use, start Fuseki with `--port 3031`.
+- Exclude your `db\` directory from Windows Defender to avoid file locks.

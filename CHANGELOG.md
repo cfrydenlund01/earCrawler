@@ -1,6 +1,8 @@
 ## [0.5.0]
 ### Added
 - feat(analytics): add cross-corpus reporting CLI and analytics module
+- feat(kg): add TTL exporter, ontology skeleton, and kg-export CLI command
+- chore(windows): add Jena env checker script and Java live-export pre-check
 
 ## [0.4.0]
 ### Added
