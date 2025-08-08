@@ -1,3 +1,7 @@
+## [0.5.0]
+### Added
+- feat(analytics): add cross-corpus reporting CLI and analytics module
+
 ## [0.4.0]
 ### Added
 - Offline NSF/ORI case parser with deterministic hashing and entity extraction.

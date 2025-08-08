@@ -1,0 +1,3 @@
+{"paragraph": "Alice works at OpenAI.", "entities": {"PERSON": ["Alice"], "ORG": ["OpenAI"], "GRANT": []}}
+{"paragraph": "Bob and Alice founded Acme Corp.", "entities": {"PERSON": ["Bob", "Alice"], "ORG": ["Acme Corp"], "GRANT": []}}
+{"paragraph": "OpenAI collaborated with Acme Corp and OpenAI won grant XYZ.", "entities": {"PERSON": [], "ORG": ["OpenAI", "Acme Corp"], "GRANT": ["XYZ"]}}

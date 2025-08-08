@@ -46,3 +46,12 @@ python -m earCrawler.cli crawl --sources ear nsf
 ```
 
 Only the Trade.gov API key is required; the Federal Register API is public.
+
+## Reporting
+Generate analytics over stored corpora:
+
+```cmd
+python -m earCrawler.cli report --sources ear nsf --type top-entities --entity ORG
+```
+
+Use `--out report.json` to save the results to a file.
