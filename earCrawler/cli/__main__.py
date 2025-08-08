@@ -162,29 +162,35 @@ def report(
 @cli.command(name="kg-export")
 @click.option("--data-dir", default="data", help="Crawl JSONL directory.")
 @click.option("--out-ttl", default="kg/ear_triples.ttl", help="Output TTL file.")
-@click.option(
-    "--live/--offline",
-    default=False,
-    help="If --live, verify Java env before exporting TTL.",
-)
-def kg_export(data_dir: str, out_ttl: str, live: bool) -> None:
+def kg_export(data_dir: str, out_ttl: str) -> None:
     """Export paragraphs & entities to Turtle for Jena TDB2."""
     from pathlib import Path
     from earCrawler.kg.triples import export_triples
 
-    export_triples(Path(data_dir), Path(out_ttl), live=live)
+    export_triples(Path(data_dir), Path(out_ttl))
     click.echo(f"Written triples to {out_ttl}")
 
 
 @click.command()
 @click.option("--ttl", "-t", default="kg/ear_triples.ttl", help="Turtle file to load.")
 @click.option("--db", "-d", default="db", help="TDB2 DB directory.")
-def kg_load(ttl: str, db: str) -> None:
-    """Load Turtle into Jena TDB2 store."""
+@click.option(
+    "--no-auto-install",
+    is_flag=True,
+    default=False,
+    help="Disable auto-download of Apache Jena; fail if not present.",
+)
+def kg_load(ttl: str, db: str, no_auto_install: bool) -> None:
+    """Load Turtle into a local TDB2 store.
+
+    Example (PowerShell)::
+
+        python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
+    """
     from pathlib import Path
     from earCrawler.kg.loader import load_tdb
 
-    load_tdb(Path(ttl), Path(db))
+    load_tdb(Path(ttl), Path(db), auto_install=not no_auto_install)
     click.echo(f"Loaded {ttl} into TDB2 at {db}")
 
 
