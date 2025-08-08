@@ -3,9 +3,13 @@ $java = Get-Command java -ErrorAction SilentlyContinue
 if (-not $java) {
   Write-Output "Java: WARN not found on PATH"
 } else {
-  $ver = & java -version 2>&1
+  $ver = (& java -version 2>&1 | Out-String)
   $is64 = $ver -match "64-Bit"
-  if ($ver -match '"(\d+)' ) { $major = [int]$matches[1] } else { $major = 0 }
+  if ($ver -match '"(?<major>\d+)') {
+      $major = [int]$Matches.major
+  } else {
+      $major = 0
+  }
   if ($major -ge 11 -and $is64) {
     Write-Output "Java: OK"
   } else {
