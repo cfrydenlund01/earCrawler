@@ -136,6 +136,21 @@ Write the results to a JSON file instead of stdout:
 python -m earCrawler.cli report --sources ear --type term-frequency --n 10 --out report.json
 ```
 
+## Knowledge Graph
+- `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
+- `python -m earCrawler.cli kg-export`: Export TTL triples.
+- Load with: `tdb2.tdbloader --loc db/ kg/ear_triples.ttl`
+- Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
+
+### Windows 11 Setup for Jena
+Verify your environment before exporting triples:
+
+```powershell
+pwsh -File scripts/check_jena_env.ps1
+```
+Ensure a 64-bit Java ≥ 11 is installed, `apache-jena\bat` is on `PATH`,
+and run `git config --global core.longpaths true`.
+
 ## Core
 Combine both clients using the ``Crawler`` orchestration layer:
 
