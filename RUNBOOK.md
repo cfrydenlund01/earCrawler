@@ -26,3 +26,14 @@
 ## Monitoring
 Execute `./monitor.ps1 -Services @('http://localhost:8000/health')` to poll services.
 Failures are written to `monitor.log` and the Windows Event Log under source `EARMonitor`.
+
+## NSF Case Parsing
+Use offline fixtures to parse ORI misconduct cases. Live mode is disabled by
+default to keep CI deterministic.
+
+```cmd
+python -m earCrawler.cli nsf-parse --fixtures tests/fixtures --out data --live false
+```
+
+The command writes one JSON file per case into the `data` directory. Supply
+`--live` to fetch fresh listings when networking is permitted.
