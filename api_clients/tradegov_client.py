@@ -1,25 +1,30 @@
 """Client for the Trade.gov Data API.
 
-This module provides :class:`TradeGovClient` for querying the Trade.gov
+This module provides :class:`TradeGovEntityClient` for querying the Trade.gov
 entities endpoint. The API key should be stored in the Windows Credential
-Manager under the target name ``TRADEGOV_API_KEY`` (or another secure vault)
-**never hard-coded in source code**.
+Manager under the target name ``TRADEGOV_API_KEY`` or supplied via the
+``TRADEGOV_API_KEY`` environment variable—never hard-coded in source code.
 """
 
 from __future__ import annotations
 
+import os
 import time
 from typing import Iterator
 
 import requests
-import win32cred
+
+try:  # pragma: no cover - optional on non-Windows
+    import win32cred  # type: ignore
+except Exception:  # pragma: no cover - non-Windows fallback
+    win32cred = None
 
 
 class TradeGovError(Exception):
     """Raised for Trade.gov client errors or invalid responses."""
 
 
-class TradeGovClient:
+class TradeGovEntityClient:
     """Simple Trade.gov API client."""
 
     BASE_URL = "https://api.trade.gov/v1"
@@ -30,18 +35,23 @@ class TradeGovClient:
 
     @staticmethod
     def _load_api_key() -> str:
-        """Load the API key from Windows Credential Manager."""
-        try:
-            cred = win32cred.CredRead(
-                "TRADEGOV_API_KEY",
-                win32cred.CRED_TYPE_GENERIC,
-                0,
-            )
-            return cred["CredentialBlob"].decode("utf-16")
-        except Exception as exc:  # pragma: no cover - platform specific
-            raise RuntimeError(
-                "TRADEGOV_API_KEY not found in Windows Credential Manager"
-            ) from exc
+        """Load the API key from env var or Windows Credential Manager."""
+        env_key = os.getenv("TRADEGOV_API_KEY")
+        if env_key:
+            return env_key
+        if win32cred is not None:  # pragma: no cover - platform specific
+            try:
+                cred = win32cred.CredRead(
+                    "TRADEGOV_API_KEY",
+                    win32cred.CRED_TYPE_GENERIC,
+                    0,
+                )
+                return cred["CredentialBlob"].decode("utf-16")
+            except Exception:  # pragma: no cover - platform specific
+                pass
+        raise RuntimeError(
+            "TRADEGOV_API_KEY not found in environment or Windows Credential Manager",
+        )
 
     def list_countries(self) -> dict:
         """Return a list of countries from Trade.gov."""
@@ -86,13 +96,19 @@ class TradeGovClient:
                         continue
                     if 400 <= status < 500:
                         message = getattr(exc.response, "text", str(status))
-                        raise TradeGovError(f"Trade.gov client error: {message}") from exc
-                    raise TradeGovError(f"Trade.gov request failed: {status}") from exc
+                        raise TradeGovError(
+                            f"Trade.gov client error: {message}"
+                        ) from exc
+                    raise TradeGovError(
+                        f"Trade.gov request failed: {status}"
+                    ) from exc
                 except requests.RequestException as exc:
                     if attempt < attempts - 1:
                         time.sleep(2 ** attempt)
                         continue
-                    raise TradeGovError(f"Trade.gov request error: {exc}") from exc
+                    raise TradeGovError(
+                        f"Trade.gov request error: {exc}"
+                    ) from exc
             results = data.get("results", [])
             for item in results:
                 yield item
@@ -100,3 +116,7 @@ class TradeGovClient:
             if not next_page:
                 break
             page = next_page
+
+
+# Backwards compatibility alias
+TradeGovClient = TradeGovEntityClient

@@ -4,6 +4,9 @@
 - CLI ``nsf-parse`` command and ORI client scaffold.
 - Unit tests with offline HTML fixtures.
 - Documentation updates and Windows CI workflow running ``pytest``.
+- Unified ``CorpusLoader`` with EAR and NSF loaders and ``crawl`` CLI command.
+- Federal Register client no longer requires an API key.
+- Trade.gov client can read API key from environment variables.
 
 ## [0.2.0]
 ### Added

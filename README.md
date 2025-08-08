@@ -96,6 +96,8 @@ for doc in client.search_documents("export controls", per_page=50):
     print(doc["document_number"])
 ```
 
+The Federal Register API is public and requires no API key.
+
 ## NSF Case Parser
 Parse NSF/ORI misconduct cases from offline HTML. The parser extracts
 paragraphs, entities, and a deterministic hash for each case. Use the CLI:
@@ -104,15 +106,22 @@ paragraphs, entities, and a deterministic hash for each case. Use the CLI:
 python -m earCrawler.cli nsf-parse --fixtures tests/fixtures --out data --live false
 ```
 
-Each case is written as a JSON file under `data`. Store Trade.gov and Federal
-Register API keys in the Windows Credential Manager:
+Each case is written as a JSON file under `data`. Store the Trade.gov API key in
+the Windows Credential Manager:
 
 ```cmd
 cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<YOUR_API_KEY>
-cmdkey /generic:FEDREGISTER_API_KEY /user:ignored /pass:<YOUR_API_KEY>
 ```
 
 An ORI client scaffold is included for future live crawling.
+
+## Unified Corpus Loader
+Use the ``CorpusLoader`` abstraction to consume paragraphs from different
+sources. The CLI can load multiple corpora at once:
+
+```cmd
+python -m earCrawler.cli crawl --sources ear nsf
+```
 
 ## Core
 Combine both clients using the ``Crawler`` orchestration layer:

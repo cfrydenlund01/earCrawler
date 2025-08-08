@@ -37,3 +37,12 @@ python -m earCrawler.cli nsf-parse --fixtures tests/fixtures --out data --live f
 
 The command writes one JSON file per case into the `data` directory. Supply
 `--live` to fetch fresh listings when networking is permitted.
+
+## Unified Crawl
+Run the corpus loaders via the CLI:
+
+```cmd
+python -m earCrawler.cli crawl --sources ear nsf
+```
+
+Only the Trade.gov API key is required; the Federal Register API is public.
