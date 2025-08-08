@@ -1,3 +1,7 @@
+## [0.6.0]
+### Added
+- feat(kg): add kg-load CLI and loader module for Jena TDB2 import
+
 ## [0.5.0]
 ### Added
 - feat(analytics): add cross-corpus reporting CLI and analytics module
