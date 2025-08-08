@@ -46,6 +46,43 @@ def nsf_parse(fixtures: Path, out: Path, live: bool) -> None:
 cli.add_command(reports_cli.reports, name="reports")
 
 
+@cli.command(name="crawl")
+@click.option(
+    "--sources",
+    multiple=True,
+    required=True,
+    type=click.Choice(["ear", "nsf"]),
+    help="Corpus sources to load.",
+)
+@click.option(
+    "--fixtures",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("tests/fixtures"),
+    show_default=True,
+    help="Fixture directory for NSF loader.",
+)
+def crawl(sources: tuple[str], fixtures: Path) -> None:
+    """Load paragraphs from selected sources and print counts."""
+    from api_clients.federalregister_client import FederalRegisterClient
+    from earCrawler.core.ear_loader import EARLoader
+    from earCrawler.core.nsf_loader import NSFLoader
+
+    total = 0
+    if "ear" in sources:
+        client = FederalRegisterClient()
+        loader = EARLoader(client, query="export administration regulations")
+        count = len(loader.load_paragraphs())
+        click.echo(f"ear: {count} paragraphs")
+        total += count
+    if "nsf" in sources:
+        parser = NSFCaseParser()
+        loader = NSFLoader(parser, fixtures)
+        count = len(loader.load_paragraphs())
+        click.echo(f"nsf: {count} paragraphs")
+        total += count
+    click.echo(f"total: {total} paragraphs")
+
+
 def main() -> None:  # pragma: no cover - CLI entrypoint
     cli()
 

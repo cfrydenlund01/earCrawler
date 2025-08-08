@@ -50,7 +50,7 @@ class NSFCaseParser:
 
     def paragraphs(self, html: str) -> List[str]:
         """Return normalized paragraphs with minimum length."""
-        soup = BeautifulSoup(html, "lxml")
+        soup = BeautifulSoup(html, "html.parser")
         paras: List[str] = []
         for p in soup.find_all("p"):
             text = self.normalize(p.get_text(" "))
@@ -60,7 +60,7 @@ class NSFCaseParser:
 
     def parse_from_html(self, html: str, url: str) -> Dict[str, object]:
         """Parse a case detail page HTML."""
-        soup = BeautifulSoup(html, "lxml")
+        soup = BeautifulSoup(html, "html.parser")
         title_tag = soup.find("h1")
         title = self.normalize(title_tag.get_text(" ")) if title_tag else ""
         match = re.search(r"Case Number\s*(\S+)", title)
@@ -88,7 +88,7 @@ class NSFCaseParser:
         if live:
             client = ORIClient()
             listing_html = client.get_listing_html()
-            listing = BeautifulSoup(listing_html, "lxml")
+            listing = BeautifulSoup(listing_html, "html.parser")
             links = [a["href"] for a in listing.select("a[href]")]
             for link in links:
                 url = link if link.startswith("http") else f"{client.BASE_URL}{link}"
@@ -97,7 +97,7 @@ class NSFCaseParser:
         else:
             fixtures_dir = Path(fixtures_dir)
             listing_html = (fixtures_dir / "ori_case_listing.html").read_text(encoding="utf-8")
-            listing = BeautifulSoup(listing_html, "lxml")
+            listing = BeautifulSoup(listing_html, "html.parser")
             links = [a["href"] for a in listing.select("a[href]")]
             for link in links:
                 case_path = fixtures_dir / link

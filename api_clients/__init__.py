@@ -5,8 +5,13 @@ when the optional dependencies are missing.
 """
 
 try:  # pragma: no cover - platform specific
-    from .tradegov_client import TradeGovClient, TradeGovError
+    from .tradegov_client import (
+        TradeGovEntityClient,
+        TradeGovClient,
+        TradeGovError,
+    )
 except Exception:  # pragma: no cover - optional on non-Windows
+    TradeGovEntityClient = None  # type: ignore
     TradeGovClient = None  # type: ignore
     TradeGovError = Exception  # type: ignore
 
