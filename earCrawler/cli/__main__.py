@@ -49,10 +49,19 @@ cli.add_command(reports_cli.reports, name="reports")
 @cli.command(name="crawl")
 @click.option(
     "--sources",
+    "-s",
     multiple=True,
+    metavar="[SOURCE1 [SOURCE2]...]",
     required=True,
-    type=click.Choice(["ear", "nsf"]),
-    help="Corpus sources to load.",
+    help="Which corpus loaders to run (ear, nsf, ...).",
+)
+@click.option(
+    "--out",
+    "-o",
+    type=str,
+    default="data",
+    show_default=True,
+    help="Output directory for JSONL/index files.",
 )
 @click.option(
     "--fixtures",
@@ -61,7 +70,8 @@ cli.add_command(reports_cli.reports, name="reports")
     show_default=True,
     help="Fixture directory for NSF loader.",
 )
-def crawl(sources: tuple[str], fixtures: Path) -> None:
+@click.option("--live", is_flag=True, default=False, help="Enable live HTTP fetching (disabled by default).")
+def crawl(sources: tuple[str, ...], out: str, fixtures: Path, live: bool) -> None:
     """Load paragraphs from selected sources and print counts."""
     from api_clients.federalregister_client import FederalRegisterClient
     from earCrawler.core.ear_loader import EARLoader
@@ -71,13 +81,13 @@ def crawl(sources: tuple[str], fixtures: Path) -> None:
     if "ear" in sources:
         client = FederalRegisterClient()
         loader = EARLoader(client, query="export administration regulations")
-        count = len(loader.load_paragraphs())
+        count = len(loader.run(fixtures_dir=fixtures, live=live, output_dir=out))
         click.echo(f"ear: {count} paragraphs")
         total += count
     if "nsf" in sources:
         parser = NSFCaseParser()
         loader = NSFLoader(parser, fixtures)
-        count = len(loader.load_paragraphs())
+        count = len(loader.run(fixtures_dir=fixtures, live=live, output_dir=out))
         click.echo(f"nsf: {count} paragraphs")
         total += count
     click.echo(f"total: {total} paragraphs")

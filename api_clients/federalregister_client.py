@@ -30,6 +30,12 @@ class FederalRegisterClient:
             try:
                 response = self.session.get(url, params=params, timeout=10)
                 response.raise_for_status()
+                if "application/json" not in response.headers.get(
+                    "Content-Type", ""
+                ):
+                    raise FederalRegisterError(
+                        f"Non-JSON response from FR at {url}?{response.request.path_url}"
+                    )
                 try:
                     return response.json()
                 except ValueError as exc:
