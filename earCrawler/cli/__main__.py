@@ -176,6 +176,21 @@ def kg_export(data_dir: str, out_ttl: str, live: bool) -> None:
     click.echo(f"Written triples to {out_ttl}")
 
 
+@click.command()
+@click.option("--ttl", "-t", default="kg/ear_triples.ttl", help="Turtle file to load.")
+@click.option("--db", "-d", default="db", help="TDB2 DB directory.")
+def kg_load(ttl: str, db: str) -> None:
+    """Load Turtle into Jena TDB2 store."""
+    from pathlib import Path
+    from earCrawler.kg.loader import load_tdb
+
+    load_tdb(Path(ttl), Path(db))
+    click.echo(f"Loaded {ttl} into TDB2 at {db}")
+
+
+cli.add_command(kg_load, name="kg-load")
+
+
 def main() -> None:  # pragma: no cover - CLI entrypoint
     cli()
 

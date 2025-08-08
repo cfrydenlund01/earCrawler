@@ -139,8 +139,11 @@ python -m earCrawler.cli report --sources ear --type term-frequency --n 10 --out
 ## Knowledge Graph
 - `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
 - `python -m earCrawler.cli kg-export`: Export TTL triples.
-- Load with: `tdb2.tdbloader --loc db/ kg/ear_triples.ttl`
 - Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
+
+### Loading into TDB2
+After exporting TTL:
+  python -m earCrawler.cli kg-load -t kg/ear_triples.ttl -d db/
 
 ### Windows 11 Setup for Jena
 Verify your environment before exporting triples:
