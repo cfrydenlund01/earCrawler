@@ -9,6 +9,7 @@ import click
 
 from earCrawler.core.nsf_case_parser import NSFCaseParser
 from . import reports_cli
+from earCrawler.analytics import reports as analytics_reports
 
 
 @click.group()
@@ -91,6 +92,71 @@ def crawl(sources: tuple[str, ...], out: str, fixtures: Path, live: bool) -> Non
         click.echo(f"nsf: {count} paragraphs")
         total += count
     click.echo(f"total: {total} paragraphs")
+
+
+@cli.command(name="report")
+@click.option(
+    "--sources",
+    "-s",
+    multiple=True,
+    required=True,
+    help="Sources to analyze (ear, nsf, ...).",
+)
+@click.option(
+    "--type",
+    "report_type",
+    type=click.Choice(["top-entities", "term-frequency", "cooccurrence"]),
+    required=True,
+    help="Type of report to generate.",
+)
+@click.option(
+    "--entity",
+    "entity_type",
+    type=click.Choice(["ORG", "PERSON", "GRANT"]),
+    required=False,
+    help="Entity type (for top-entities and cooccurrence reports).",
+)
+@click.option("--n", default=10, show_default=True, help="Top n entries to return.")
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write JSON output to file instead of stdout.",
+)
+def report(
+    sources: tuple[str, ...],
+    report_type: str,
+    entity_type: str | None,
+    n: int,
+    out: Path | None,
+) -> None:
+    """Generate analytics reports over stored corpora."""
+    results: dict[str, object] = {}
+    for src in sources:
+        if report_type == "top-entities":
+            if entity_type is None:
+                raise click.UsageError("--entity required for top-entities")
+            results[src] = analytics_reports.top_entities(src, entity_type, n)
+        elif report_type == "term-frequency":
+            results[src] = analytics_reports.term_frequency(src, n)
+        elif report_type == "cooccurrence":
+            if entity_type is None:
+                raise click.UsageError("--entity required for cooccurrence")
+            mapping = analytics_reports.cooccurrence(src, entity_type)
+            results[src] = {k: sorted(v) for k, v in mapping.items()}
+
+    if out:
+        out.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+        return
+
+    for src, data in results.items():
+        click.echo(f"## {src}")
+        if report_type == "cooccurrence":
+            for name, others in data.items():
+                click.echo(f"{name}\t{', '.join(others)}")
+        else:
+            for name, count in data:
+                click.echo(f"{name}\t{count}")
 
 
 def main() -> None:  # pragma: no cover - CLI entrypoint

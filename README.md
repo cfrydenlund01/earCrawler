@@ -123,6 +123,19 @@ sources. The CLI can load multiple corpora at once:
 python -m earCrawler.cli crawl --sources ear nsf
 ```
 
+## Reporting
+Generate analytics across saved corpora:
+
+```bash
+python -m earCrawler.cli report --sources ear nsf --type top-entities --entity ORG --n 5
+```
+
+Write the results to a JSON file instead of stdout:
+
+```bash
+python -m earCrawler.cli report --sources ear --type term-frequency --n 10 --out report.json
+```
+
 ## Core
 Combine both clients using the ``Crawler`` orchestration layer:
 
