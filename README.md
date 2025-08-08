@@ -96,6 +96,24 @@ for doc in client.search_documents("export controls", per_page=50):
     print(doc["document_number"])
 ```
 
+## NSF Case Parser
+Parse NSF/ORI misconduct cases from offline HTML. The parser extracts
+paragraphs, entities, and a deterministic hash for each case. Use the CLI:
+
+```cmd
+python -m earCrawler.cli nsf-parse --fixtures tests/fixtures --out data --live false
+```
+
+Each case is written as a JSON file under `data`. Store Trade.gov and Federal
+Register API keys in the Windows Credential Manager:
+
+```cmd
+cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<YOUR_API_KEY>
+cmdkey /generic:FEDREGISTER_API_KEY /user:ignored /pass:<YOUR_API_KEY>
+```
+
+An ORI client scaffold is included for future live crawling.
+
 ## Core
 Combine both clients using the ``Crawler`` orchestration layer:
 

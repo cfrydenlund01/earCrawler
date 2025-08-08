@@ -1,3 +1,14 @@
+## [0.4.0]
+### Added
+- Offline NSF/ORI case parser with deterministic hashing and entity extraction.
+- CLI ``nsf-parse`` command and ORI client scaffold.
+- Unit tests with offline HTML fixtures.
+- Documentation updates and Windows CI workflow running ``pytest``.
+
+## [0.2.0]
+### Added
+- CI hardening: lint, coverage threshold, GPU matrix, secrets management.
+
 ## [0.1.0] – 2025-06-25
 ### Added
 - Scaffolded `api_clients` modules for Trade.gov and Federal Register APIs.
@@ -18,7 +29,3 @@
 - Add Mistral-7B QLoRA instruction-tuned agent with LoRA adapters. [#VERSION]
 - Add end-to-end benchmark script integrating LoRA and QLoRA components. [#VERSION]
 - Finalize production Docker images and monitoring for LoRA/QLoRA pipeline. [#VERSION]
-
-## [0.2.0]
-### Added
-- CI hardening: lint, coverage threshold, GPU matrix, secrets management.
