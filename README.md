@@ -140,19 +140,15 @@ python -m earCrawler.cli report --sources ear --type term-frequency --n 10 --out
 - `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
 - `python -m earCrawler.cli kg-export`: Export TTL triples.
 - Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
-
-### Loading into TDB2
-After exporting TTL:
-  python -m earCrawler.cli kg-load -t kg/ear_triples.ttl -d db/
-
-### Windows 11 Setup for Jena
-Verify your environment before exporting triples:
-
-```powershell
-pwsh -File scripts/check_jena_env.ps1
+### Load triples without installing Jena
 ```
-Ensure a 64-bit Java ≥ 11 is installed, `apache-jena\bat` is on `PATH`,
-and run `git config --global core.longpaths true`.
+# Export TTL
+python -m earCrawler.cli kg-export
+
+# Load into a local TDB2 store; earCrawler will auto-download Jena to .\tools\jena
+python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
+```
+To disable auto-download, add `--no-auto-install`. By default, Jena is fetched once and cached in `tools\jena`.
 
 ## Core
 Combine both clients using the ``Crawler`` orchestration layer:

@@ -64,7 +64,8 @@ Use `--out report.json` to save the results to a file.
 **Troubleshooting on Windows:**
 - If port 3030 is in use, start Fuseki with `--port 3031`.
 - Exclude your `db\` directory from Windows Defender to avoid file locks.
+- FileNotFoundError -> earCrawler now auto-installs Jena; ensure your session has network access on first run.
+- If Defender blocks extraction, try running PowerShell as Administrator or exclude the repo folder temporarily.
 
 # Phase B.2
-Use `kg-load` to ingest triples into TDB2.  
-Ensure `tdb2.tdbloader` is on PATH (Jena’s bat\ folder).
+Use `kg-load` to ingest triples into TDB2.
