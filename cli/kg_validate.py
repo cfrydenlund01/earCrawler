@@ -15,7 +15,8 @@ from importlib import resources
 from earCrawler.kg.validate import validate_files
 
 
-@click.command()
+@click.command(context_settings={"allow_extra_args": True})
+@click.pass_context
 @click.option(
     "--ttl",
     "ttls",
@@ -27,7 +28,8 @@ from earCrawler.kg.validate import validate_files
     "--glob",
     "glob_pattern",
     type=str,
-    help="Glob pattern for TTL files.",
+    help="Glob pattern for TTL files. On Windows the shell may expand"
+    " wildcards; extra paths are captured automatically.",
 )
 @click.option(
     "--shapes",
@@ -44,6 +46,7 @@ from earCrawler.kg.validate import validate_files
     help="What violations trigger a non-zero exit code.",
 )
 def main(
+    ctx: click.Context,
     ttls: tuple[Path, ...],
     glob_pattern: str | None,
     shapes: Path | None,
@@ -53,10 +56,16 @@ def main(
 
     paths: List[str] = []
     if glob_pattern:
-        pattern_path = Path(glob_pattern)
-        paths.extend(
-            str(p) for p in pattern_path.parent.glob(pattern_path.name)
-        )
+        if ctx.args:
+            # ``glob_pattern`` is the first expanded file; remaining files are
+            # stored in ``ctx.args`` when the shell performs wildcard expansion
+            # (common on Windows).  Treat them all as direct file paths.
+            paths.extend([glob_pattern, *ctx.args])
+        else:
+            pattern_path = Path(glob_pattern)
+            paths.extend(
+                str(p) for p in pattern_path.parent.glob(pattern_path.name)
+            )
     paths.extend(str(p) for p in ttls)
 
     if shapes is None:
