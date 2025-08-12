@@ -1,3 +1,7 @@
+## [0.8.0]
+### Added
+- feat(kg): ontology + TTL emitters for EAR/NSF with deterministic output; CLI `kg-emit`
+
 ## [0.7.0]
 ### Added
 - feat(kg): add Fuseki serve (kg-serve) and SPARQL query (kg-query) commands

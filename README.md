@@ -136,6 +136,15 @@ Write the results to a JSON file instead of stdout:
 python -m earCrawler.cli report --sources ear --type term-frequency --n 10 --out report.json
 ```
 
+## Ontology & TTL Emitters
+Generate deterministic RDF/Turtle for the EAR and NSF corpora:
+
+```cmd
+python -m earCrawler.cli kg-emit -s ear -s nsf -i data -o data\\kg
+```
+
+Outputs `data\\kg\\ear.ttl` and `data\\kg\\nsf.ttl`. Re-running the command without input changes produces byte-identical files.
+
 ## Knowledge Graph
 - `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
 - `python -m earCrawler.cli kg-export`: Export TTL triples.
