@@ -19,7 +19,8 @@ def export_triples(
                 rec = json.loads(line)
                 pid = rec["identifier"].replace(":", "_")
                 f.write(f"\nex:paragraph_{pid} a ex:Paragraph ;\n")
-                f.write(f'    ex:hasText """{rec["text"].replace("\"", "\\\"")}""" ;\n')
+                escaped_text = rec["text"].replace('"', '\\"')
+                f.write(f'    ex:hasText """{escaped_text}""" ;\n')
                 if source == "ear":
                     part = rec["identifier"].split(":")[0]
                     f.write(f'    ex:part "{part}" ;\n')
