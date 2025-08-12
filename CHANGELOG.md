@@ -1,3 +1,8 @@
+## [0.9.0] - 2025-08-12
+### Added
+- SPARQL sanity checks and SHACL validation (`kg-validate`) for EAR/NSF TTLs.
+- Windows-first CI smoke tests for emit + validate.
+
 ## [0.8.0]
 ### Added
 - feat(kg): ontology + TTL emitters for EAR/NSF with deterministic output; CLI `kg-emit`

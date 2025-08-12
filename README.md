@@ -55,6 +55,14 @@ Run the GPU tests:
 pytest -m gpu
 ```
 
+## Validation
+Run sanity checks on emitted Turtle before using them.
+
+```powershell
+python -m cli.kg_emit --sources ear --sources nsf --in data --out data\kg
+python -m cli.kg_validate --glob "data\kg\*.ttl"
+```
+
 ## Repository Structure
 - `api_clients/` – clients for Trade.gov and Federal Register APIs.
 - `tests/` – unit tests covering success and failure scenarios.

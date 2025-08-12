@@ -16,7 +16,7 @@ from .ontology import (
     DCT,
     PROV,
     graph_with_prefixes,
-    iri_for_paragraph,
+    iri_for_paragraph, iri_for_section,
     safe_literal,
 )
 
@@ -60,6 +60,8 @@ def emit_nsf(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
     out_path = out_dir / "nsf.ttl"
 
     g = graph_with_prefixes()
+    reg_iri = EAR_NS["reg"]
+    g.add((reg_iri, RDF.type, EAR_NS.Reg))
 
     with in_path.open("r", encoding="utf-8") as f:
         for line in f:
@@ -71,6 +73,11 @@ def emit_nsf(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
                 continue
             para_iri = iri_for_paragraph(para_hash)
             g.add((para_iri, RDF.type, EAR_NS.Paragraph))
+            sec_id = rec.get("section") or rec.get("id")
+            sec_iri = iri_for_section(str(sec_id))
+            g.add((sec_iri, RDF.type, EAR_NS.Section))
+            g.add((reg_iri, EAR_NS.hasSection, sec_iri))
+            g.add((sec_iri, EAR_NS.hasParagraph, para_iri))
             source = rec.get("source_url")
             if source:
                 if _is_url(source):
