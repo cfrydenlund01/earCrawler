@@ -101,3 +101,10 @@ python -m earCrawler.cli kg-query --form construct -q "CONSTRUCT WHERE { ?s ?p ?
 
 Stop the server with `Ctrl+C` in the console. For programmatic use, the
 ``running_fuseki`` context manager in ``earCrawler.kg.fuseki`` ensures cleanup.
+
+## Validation Troubleshooting
+
+| Violation | Fix |
+| --- | --- |
+| missing_provenance | Ensure the source JSONL has `source_url`, `prov:wasDerivedFrom`, and `date` fields. |
+| entity_mentions_without_type | Regenerate TTL ensuring each entity node is typed `ent:Entity`. |

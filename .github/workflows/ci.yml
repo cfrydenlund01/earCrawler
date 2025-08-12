@@ -32,6 +32,18 @@ jobs:
       - name: Tests
         run: pytest -q --disable-warnings --maxfail=1
 
+      - name: Smoke test emit and validate
+        shell: pwsh
+        run: |
+          python -m cli.kg_emit --sources ear --sources nsf --in tests\kg\fixtures --out tests\kg\artifacts
+          python -m cli.kg_validate --glob "tests\kg\artifacts\*.ttl"
+          python - <<'PY'
+          import glob
+          from rdflib import Graph
+          for p in glob.glob(r"tests\kg\artifacts\*.ttl"):
+              Graph().parse(p, format="turtle")
+          PY
+
   gpu:
     runs-on: ubuntu-latest
     continue-on-error: true
