@@ -57,11 +57,26 @@ python -m earCrawler.cli report --sources ear nsf --type top-entities --entity O
 Use `--out report.json` to save the results to a file.
 
 ## Phase B: Knowledge Graph
-- `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
-- `python -m earCrawler.cli kg-export`: Export TTL triples.
-- Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
 
-**Troubleshooting on Windows:**
+### Ontology
+Classes: `ear:Reg`, `ear:Section`, `ear:Paragraph`, `ear:Citation`, `ent:Entity`
+
+Properties: `ear:hasSection`, `ear:hasParagraph`, `ear:cites`, `dct:source`, `dct:issued`, `prov:wasDerivedFrom`
+
+```
+Reg --hasSection--> Section --hasParagraph--> Paragraph
+Paragraph --cites--> Citation
+Paragraph <-prov:wasDerivedFrom- Entity
+```
+
+### End-to-end (offline)
+```cmd
+python -m earCrawler.cli crawl --sources ear nsf
+python -m earCrawler.cli kg-emit -s ear -s nsf -i data -o data\kg
+python -m earCrawler.cli kg-load --ttl data\kg\ear.ttl --db db
+```
+
+### Troubleshooting on Windows
 - If port 3030 is in use, start Fuseki with `--port 3031`.
 - Exclude your `db\` directory from Windows Defender to avoid file locks.
 - FileNotFoundError -> earCrawler now auto-installs Jena; ensure your session has network access on first run.
@@ -69,7 +84,6 @@ Use `--out report.json` to save the results to a file.
 
 # Phase B.2
 Use `kg-load` to ingest triples into TDB2.
-
 ## Phase B.3 — Serve & Query
 ```cmd
 # Serve (foreground)

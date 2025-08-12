@@ -12,6 +12,7 @@ from . import reports_cli
 from earCrawler.analytics import reports as analytics_reports
 from earCrawler.kg import fuseki
 from earCrawler.kg.sparql import SPARQLClient
+from earCrawler.kg import emit_ear, emit_nsf
 
 
 @click.group()
@@ -291,6 +292,50 @@ def kg_query(endpoint, file, sparql, form, out):
 
 
 cli.add_command(kg_query, name="kg-query")
+
+
+@cli.command(name="kg-emit")
+@click.option(
+    "--sources",
+    "-s",
+    multiple=True,
+    type=click.Choice(["ear", "nsf"]),
+    required=True,
+    help="Repeatable: e.g., -s ear -s nsf",
+)
+@click.option(
+    "--in",
+    "in_dir",
+    "-i",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("data"),
+    show_default=True,
+    help="Input data directory.",
+)
+@click.option(
+    "--out",
+    "out_dir",
+    "-o",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("data") / "kg",
+    show_default=True,
+    help="Output directory for TTL files.",
+)
+def kg_emit(sources: tuple[str, ...], in_dir: Path, out_dir: Path) -> None:
+    """Emit RDF/Turtle for selected sources."""
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for src in sources:
+        try:
+            if src == "ear":
+                out_path, count = emit_ear(in_dir, out_dir)
+            elif src == "nsf":
+                out_path, count = emit_nsf(in_dir, out_dir)
+            else:
+                raise click.ClickException(f"Unknown source: {src}")
+            click.echo(f"{src}: {count} triples -> {out_path}")
+        except Exception as exc:
+            raise click.ClickException(str(exc))
 
 
 def main() -> None:  # pragma: no cover - CLI entrypoint
