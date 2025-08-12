@@ -6,7 +6,6 @@ API keys for external services must be stored in Windows Credential Manager or
 provided via environment variables; never embed secrets in code or tests.
 """
 
-from glob import glob
 from pathlib import Path
 from typing import List
 
@@ -54,7 +53,10 @@ def main(
 
     paths: List[str] = []
     if glob_pattern:
-        paths.extend(glob(glob_pattern))
+        pattern_path = Path(glob_pattern)
+        paths.extend(
+            str(p) for p in pattern_path.parent.glob(pattern_path.name)
+        )
     paths.extend(str(p) for p in ttls)
 
     if shapes is None:
