@@ -150,6 +150,27 @@ python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
 ```
 To disable auto-download, add `--no-auto-install`. By default, Jena is fetched once and cached in `tools\jena`.
 
+### Phase B.3 — Serve & Query
+
+```powershell
+# Serve (foreground)
+python -m earCrawler.cli kg-serve -d db -p 3030 --dataset /ear
+
+# Dry run (print command)
+python -m earCrawler.cli kg-serve --dry-run
+
+# Query (SELECT)
+python -m earCrawler.cli kg-query --sparql "SELECT * WHERE { ?s ?p ?o } LIMIT 5" -o data\rows.json
+
+# Query (CONSTRUCT)
+python -m earCrawler.cli kg-query --form construct -q "CONSTRUCT WHERE { ?s ?p ?o } LIMIT 10" -o data\graph.nt
+```
+
+**Troubleshooting:**
+- If port 3030 is in use, specify a free one with `-p 3031`.
+- On first run, Jena auto-downloads to `.\tools\jena`; no PATH changes required.
+
+
 ## Core
 Combine both clients using the ``Crawler`` orchestration layer:
 

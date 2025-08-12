@@ -69,3 +69,21 @@ Use `--out report.json` to save the results to a file.
 
 # Phase B.2
 Use `kg-load` to ingest triples into TDB2.
+
+## Phase B.3 — Serve & Query
+```cmd
+# Serve (foreground)
+python -m earCrawler.cli kg-serve -d db -p 3030 --dataset /ear
+
+# Dry run (print command)
+python -m earCrawler.cli kg-serve --dry-run
+
+# Query (SELECT)
+python -m earCrawler.cli kg-query --sparql "SELECT * WHERE { ?s ?p ?o } LIMIT 5" -o data\rows.json
+
+# Query (CONSTRUCT)
+python -m earCrawler.cli kg-query --form construct -q "CONSTRUCT WHERE { ?s ?p ?o } LIMIT 10" -o data\graph.nt
+```
+
+Stop the server with `Ctrl+C` in the console. For programmatic use, the
+``running_fuseki`` context manager in ``earCrawler.kg.fuseki`` ensures cleanup.
