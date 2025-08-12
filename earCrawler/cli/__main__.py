@@ -10,6 +10,8 @@ import click
 from earCrawler.core.nsf_case_parser import NSFCaseParser
 from . import reports_cli
 from earCrawler.analytics import reports as analytics_reports
+from earCrawler.kg import fuseki
+from earCrawler.kg.sparql import SPARQLClient
 
 
 @click.group()
@@ -195,6 +197,100 @@ def kg_load(ttl: str, db: str, no_auto_install: bool) -> None:
 
 
 cli.add_command(kg_load, name="kg-load")
+
+
+@click.command()
+@click.option("--db", "-d", default="db", help="Path to TDB2 database directory.")
+@click.option(
+    "--dataset",
+    default="/ear",
+    show_default=True,
+    help="Dataset name (must start with '/').",
+)
+@click.option("--port", "-p", default=3030, show_default=True, type=int, help="Fuseki port.")
+@click.option("--java-opts", default=None, help="Extra JVM opts (e.g., '-Xms1g -Xmx2g').")
+@click.option("--no-wait", is_flag=True, help="Do not wait for server health check; start and return immediately.")
+@click.option("--dry-run", is_flag=True, help="Print the command and exit without launching.")
+def kg_serve(db, dataset, port, java_opts, no_wait, dry_run):
+    """
+    Serve the local TDB2 store with Fuseki.
+    Windows-first: Jena is auto-downloaded to .\\tools\\jena on first run.
+    """
+
+    if not dataset.startswith("/"):
+        raise click.BadParameter("dataset must start with '/'")
+    cmd = fuseki.build_fuseki_cmd(Path(db), dataset, port, java_opts)
+    if dry_run:
+        click.echo(" ".join(cmd))
+        return
+    try:
+        proc = fuseki.start_fuseki(
+            Path(db), dataset=dataset, port=port, wait=not no_wait, java_opts=java_opts
+        )
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc))
+    click.echo(f"Fuseki running at http://localhost:{port}{dataset}/sparql")
+    if no_wait:
+        return
+    try:
+        proc.wait()
+    except KeyboardInterrupt:
+        click.echo("Stopping Fuseki...")
+        proc.terminate()
+
+
+cli.add_command(kg_serve, name="kg-serve")
+
+
+@click.command()
+@click.option("--endpoint", default="http://localhost:3030/ear/sparql", show_default=True)
+@click.option("--file", "-f", type=click.Path(exists=True), help="SPARQL query file (.rq)")
+@click.option("--sparql", "-q", help="Inline SPARQL query string")
+@click.option(
+    "--form",
+    type=click.Choice(["select", "ask", "construct"]),
+    default="select",
+    show_default=True,
+)
+@click.option(
+    "--out",
+    "-o",
+    type=click.Path(),
+    default="data/query_results.json",
+    show_default=True,
+    help="Output file (.json for SELECT/ASK; .nt for CONSTRUCT)",
+)
+def kg_query(endpoint, file, sparql, form, out):
+    """
+    Run a SPARQL query against the Fuseki endpoint and write results to .\\data\\.
+    """
+
+    if bool(file) == bool(sparql):
+        raise click.UsageError("Provide exactly one of --file or --sparql")
+    query = Path(file).read_text(encoding="utf-8") if file else sparql
+    if form == "construct" and out == "data/query_results.json":
+        out = "data/construct.nt"
+    out_path = Path(out)
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    client = SPARQLClient(endpoint)
+    try:
+        if form == "select":
+            data = client.select(query)
+            out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            click.echo(f"{len(data.get('results', {}).get('bindings', []))} rows")
+        elif form == "ask":
+            boolean = client.ask(query)
+            out_path.write_text(json.dumps({"boolean": boolean}), encoding="utf-8")
+            click.echo(str(boolean))
+        else:  # construct
+            text = client.construct(query)
+            out_path.write_text(text, encoding="utf-8")
+            click.echo(f"Wrote {out_path}")
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc))
+
+
+cli.add_command(kg_query, name="kg-query")
 
 
 def main() -> None:  # pragma: no cover - CLI entrypoint

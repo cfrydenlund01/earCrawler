@@ -1,3 +1,10 @@
+## [0.7.0]
+### Added
+- feat(kg): add Fuseki serve (kg-serve) and SPARQL query (kg-query) commands
+- feat(kg): Windows-first absolute invocation of local Jena (auto-download)
+- test(kg): offline tests for Fuseki launcher and SPARQL client
+- docs(kg): README/RUNBOOK updates with Windows examples
+
 ## [0.6.1]
 ### Added
 - feat(kg): auto-install Apache Jena into tools/jena and invoke TDB2 loader by absolute path on Windows
