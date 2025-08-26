@@ -1,0 +1,41 @@
+name: kg-ci
+
+on:
+  push:
+    paths:
+      - 'kg/**'
+      - '.github/workflows/kg-ci.yml'
+  pull_request:
+    paths:
+      - 'kg/**'
+      - '.github/workflows/kg-ci.yml'
+
+jobs:
+  roundtrip:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Apache Jena and Fuseki
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          Invoke-WebRequest -Uri https://dlcdn.apache.org/jena/binaries/apache-jena-5.3.0.zip -OutFile jena.zip
+          Expand-Archive jena.zip -DestinationPath tools
+          Move-Item tools/apache-jena-5.3.0 tools/jena
+          Invoke-WebRequest -Uri https://dlcdn.apache.org/jena/binaries/apache-jena-fuseki-5.3.0.zip -OutFile fuseki.zip
+          Expand-Archive fuseki.zip -DestinationPath tools
+          Move-Item tools/apache-jena-fuseki-5.3.0 tools/fuseki
+      - name: Run round-trip and query snapshots
+        shell: pwsh
+        run: kg/scripts/ci-roundtrip.ps1
+      - name: Upload SPARQL snapshots
+        if: ${{ success() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: sparql-snapshots
+          path: kg/snapshots/*.srj

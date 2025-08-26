@@ -95,3 +95,8 @@ class FederalRegisterClient:
                 "Invalid JSON structure from Federal Register"
             )
         return data
+
+    def get_ear_text(self, citation: str) -> str:
+        """Retrieve the EAR body HTML for a Federal Register citation."""
+        data = self.get_document(citation)
+        return data.get("body_html", "")
