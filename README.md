@@ -358,3 +358,14 @@ discuss what you would like to change.
 
 ## License
 This project is licensed under the MIT License.
+
+## B.6 (Windows)
+The `kg/scripts/ci-roundtrip.ps1` script validates Turtle files with RIOT,
+round-trips them through a fresh TDB2 store, snapshots deterministic SPARQL
+queries to `kg/snapshots/*.srj`, and performs a Fuseki smoke query.
+
+Run locally:
+
+```powershell
+pwsh kg/scripts/ci-roundtrip.ps1
+```

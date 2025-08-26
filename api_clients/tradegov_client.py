@@ -118,5 +118,9 @@ class TradeGovEntityClient:
             page = next_page
 
 
+    def lookup_entity(self, query: str) -> dict:
+        """Return the first entity matching ``query`` or an empty dict if none."""
+        return next(self.search_entities(query, page_size=1), {})
+
 # Backwards compatibility alias
 TradeGovClient = TradeGovEntityClient

@@ -108,3 +108,12 @@ Stop the server with `Ctrl+C` in the console. For programmatic use, the
 | --- | --- |
 | missing_provenance | Ensure the source JSONL has `source_url`, `prov:wasDerivedFrom`, and `date` fields. |
 | entity_mentions_without_type | Regenerate TTL ensuring each entity node is typed `ent:Entity`. |
+
+## B.6 Round-trip CI
+- `.github/workflows/kg-ci.yml` runs `kg/scripts/ci-roundtrip.ps1` on Windows to
+  validate TTL, round-trip through TDB2, capture SPARQL snapshots, and smoke-test
+  Fuseki.
+- If a snapshot diff fails, inspect the `.srj.actual` file, update the expected
+  snapshot under `kg/snapshots`, and re-run the script.
+- The isomorphism fallback is implemented in `kg/tools/GraphIsoCheck.java` and
+  is compiled on-the-fly when a textual diff is detected.

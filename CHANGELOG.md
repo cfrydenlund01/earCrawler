@@ -63,3 +63,5 @@
 - Add Mistral-7B QLoRA instruction-tuned agent with LoRA adapters. [#VERSION]
 - Add end-to-end benchmark script integrating LoRA and QLoRA components. [#VERSION]
 - Finalize production Docker images and monitoring for LoRA/QLoRA pipeline. [#VERSION]
+
+v0.6.0 – B.6: RIOT validation, TDB2 round-trip with isomorphism fallback, deterministic SPARQL snapshots, Fuseki smoke query, Windows CI, and pytest smoke tests.
