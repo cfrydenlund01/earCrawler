@@ -1,0 +1,13 @@
+@prefix ex: <http://example.com/reasoner-smoke#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+ex:Child rdfs:subClassOf ex:Parent .
+ex:instance1 a ex:Child .
+
+ex:prop rdfs:domain ex:DomainClass ;
+        rdfs:range ex:RangeClass .
+ex:subject ex:prop ex:object .
+
+ex:ClassA owl:equivalentClass ex:ClassB .
+ex:eqInstance a ex:ClassA .

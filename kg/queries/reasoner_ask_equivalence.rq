@@ -1,0 +1,2 @@
+PREFIX ex: <http://example.com/reasoner-smoke#>
+ASK { ex:eqInstance a ex:ClassB . }

@@ -65,3 +65,4 @@
 - Finalize production Docker images and monitoring for LoRA/QLoRA pipeline. [#VERSION]
 
 v0.6.0 – B.6: RIOT validation, TDB2 round-trip with isomorphism fallback, deterministic SPARQL snapshots, Fuseki smoke query, Windows CI, and pytest smoke tests.
+v0.7.0 – B.7: SHACL validation, OWL reasoner smoke checks, Windows CI job, and pytest coverage.

@@ -369,3 +369,19 @@ Run locally:
 ```powershell
 pwsh kg/scripts/ci-roundtrip.ps1
 ```
+
+## B.7 SHACL/OWL smoke (Windows)
+The `kg/scripts/ci-shacl-owl.ps1` script validates ontology TTL files against SHACL shapes and runs lightweight OWL reasoner ASK checks.
+
+Run locally:
+
+```powershell
+pwsh kg/scripts/ci-shacl-owl.ps1
+```
+
+Artifacts are written to `kg/reports/`:
+- `shacl-report.ttl` and `shacl-report.json`
+- `shacl-conforms.txt` with `true` or `false`
+- `owl-smoke.json` summarizing three ASK checks
+
+Failures indicate SHACL non-conformance or missing OWL entailments. Review the report files to diagnose issues.
