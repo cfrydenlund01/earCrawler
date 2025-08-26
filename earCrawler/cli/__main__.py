@@ -184,12 +184,12 @@ def kg_export(data_dir: str, out_ttl: str) -> None:
     help="Disable auto-download of Apache Jena; fail if not present.",
 )
 def kg_load(ttl: str, db: str, no_auto_install: bool) -> None:
-    """Load Turtle into a local TDB2 store.
-
-    Example (PowerShell)::
-
-        python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
-    """
+#    """Load Turtle into a local TDB2 store.
+#
+#    Example (PowerShell)::
+#
+#        python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
+#    """
     from pathlib import Path
     from earCrawler.kg.loader import load_tdb
 
