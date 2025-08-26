@@ -1,0 +1,5 @@
+PREFIX ex: <http://example.com/reasoner-smoke#>
+ASK {
+  ex:subject a ex:DomainClass .
+  ex:object a ex:RangeClass .
+}

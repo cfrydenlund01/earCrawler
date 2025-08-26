@@ -39,3 +39,33 @@ jobs:
         with:
           name: sparql-snapshots
           path: kg/snapshots/*.srj
+  shacl-owl-smoke:
+    needs: roundtrip
+    if: always()
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Apache Jena and Fuseki
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          Invoke-WebRequest -Uri https://dlcdn.apache.org/jena/binaries/apache-jena-5.3.0.zip -OutFile jena.zip
+          Expand-Archive jena.zip -DestinationPath tools
+          Move-Item tools/apache-jena-5.3.0 tools/jena
+          Invoke-WebRequest -Uri https://dlcdn.apache.org/jena/binaries/apache-jena-fuseki-5.3.0.zip -OutFile fuseki.zip
+          Expand-Archive fuseki.zip -DestinationPath tools
+          Move-Item tools/apache-jena-fuseki-5.3.0 tools/fuseki
+      - name: Run SHACL and OWL smoke tests
+        shell: pwsh
+        run: kg/scripts/ci-shacl-owl.ps1
+      - name: Upload SHACL/OWL reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shacl-owl-reports
+          path: kg/reports/*

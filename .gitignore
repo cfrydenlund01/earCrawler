@@ -1,3 +1,5 @@
 __pycache__/
-tools/
+/tools/
 !tools/.gitkeep
+kg/reports/
+kg/shapes.ttl

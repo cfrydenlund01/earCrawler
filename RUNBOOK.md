@@ -117,3 +117,9 @@ Stop the server with `Ctrl+C` in the console. For programmatic use, the
   snapshot under `kg/snapshots`, and re-run the script.
 - The isomorphism fallback is implemented in `kg/tools/GraphIsoCheck.java` and
   is compiled on-the-fly when a textual diff is detected.
+## B.7 SHACL/OWL smoke
+- `kg/scripts/ci-shacl-owl.ps1` runs SHACL validation against `kg/shapes.ttl` and executes three OWL reasoner ASK queries.
+- Reports are written to `kg/reports/`.
+- `shacl-conforms.txt` of `false` indicates shape violations; inspect `shacl-report.ttl` or `.json`.
+- Failed OWL checks appear in `owl-smoke.json` with `passed: false`.
+- CI job `shacl-owl-smoke` runs after the round-trip step and uploads reports even on failure.
