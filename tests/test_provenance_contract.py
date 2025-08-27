@@ -19,6 +19,8 @@ from earCrawler.kg.emit_ear import emit_ear
 from earCrawler.kg.triples import emit_tradegov_entities
 from earCrawler.kg.prov import new_prov_graph, write_prov_files
 
+# Requires SHACL/OWL tooling; see README.md#setup-for-shaclowl-validation.
+
 KG_DIR = pathlib.Path('kg')
 SCRIPT_SHACL = KG_DIR / 'scripts' / 'ci-shacl-owl.ps1'
 SCRIPT_PROV = KG_DIR / 'scripts' / 'ci-provenance.ps1'
