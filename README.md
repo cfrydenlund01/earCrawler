@@ -167,7 +167,10 @@ Outputs `data\\kg\\ear.ttl` and `data\\kg\\nsf.ttl`. Re-running the command with
    python -m earCrawler.utils.jena_tools
    pwsh scripts/check_jena_env.ps1
    ```
-3. Download Apache Jena Fuseki or use an existing installation.
+3. Download Apache Jena Fuseki or use an existing installation and verify:
+   ```powershell
+   fuseki-server --version
+   ```
 
 ### Load triples without installing Jena
 ```
