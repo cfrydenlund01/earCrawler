@@ -1,0 +1,11 @@
+PREFIX prov: <http://www.w3.org/ns/prov#>
+SELECT (COUNT(*) AS ?cnt)
+WHERE {
+  ?s a prov:Entity .
+  FILTER EXISTS { ?s prov:wasGeneratedBy ?act }
+  FILTER (
+    !EXISTS { ?s prov:wasDerivedFrom ?src } ||
+    !EXISTS { ?s prov:wasAttributedTo ?agent } ||
+    !EXISTS { ?s prov:generatedAtTime ?t }
+  )
+}

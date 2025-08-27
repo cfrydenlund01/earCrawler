@@ -6,6 +6,12 @@
 - VCR recorded fixtures and offline API contract tests.
 - KG enrichment helpers and CLI commands.
 
+## [0.10.0]
+### Added
+- PROV-O provenance for API data with deterministic IRIs.
+- SHACL shapes enforcing minimal provenance.
+- Lineage SPARQL checks wired into Windows CI.
+
 ## [0.8.0]
 ### Added
 - feat(kg): ontology + TTL emitters for EAR/NSF with deterministic output; CLI `kg-emit`

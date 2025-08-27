@@ -16,11 +16,16 @@ New-Item -ItemType Directory -Force -Path $reportsDir | Out-Null
 
 # Ensure shapes.ttl
 $shapeDest = Join-Path $kgDir 'shapes.ttl'
+$shapeProvDest = Join-Path $kgDir 'shapes_prov.ttl'
 $shapesCopied = $false
 if (-not (Test-Path $shapeDest)) {
     $shapeSrc = Join-Path $repoRoot 'earCrawler/kg/shapes.ttl'
     Copy-Item $shapeSrc $shapeDest
     $shapesCopied = $true
+}
+if (-not (Test-Path $shapeProvDest)) {
+    $shapeProvSrc = Join-Path $repoRoot 'kg/shapes_prov.ttl'
+    Copy-Item $shapeProvSrc $shapeProvDest
 }
 
 # Collect data TTLs (excluding shapes)
@@ -32,13 +37,14 @@ $dataArgs = @()
 foreach ($ttl in $ttlFiles) { $dataArgs += @('--data', $ttl.FullName) }
 $shaclTtl = Join-Path $reportsDir 'shacl-report.ttl'
 $shaclJson = Join-Path $reportsDir 'shacl-report.json'
-& $shacl validate --shapes $shapeDest @dataArgs --report $shaclTtl --report-json $shaclJson | Out-Null
+& $shacl validate --shapes $shapeDest --shapes $shapeProvDest @dataArgs --report $shaclTtl --report-json $shaclJson | Out-Null
 $shaclExit = $LASTEXITCODE
 $shaclInfo = Get-Content -Raw $shaclJson | ConvertFrom-Json
 $conf = $shaclInfo.conforms
 Set-Content -Path (Join-Path $reportsDir 'shacl-conforms.txt') -Value ($conf.ToString().ToLowerInvariant())
 if ($shaclExit -ne 0 -or -not $conf) {
     if ($shapesCopied) { Remove-Item $shapeDest -Force }
+    Remove-Item $shapeProvDest -Force
     Write-Error 'SHACL validation failed'
     exit 1
 }
@@ -77,6 +83,7 @@ foreach ($q in $queries) {
 $results | ConvertTo-Json | Set-Content (Join-Path $reportsDir 'owl-smoke.json')
 
 if ($shapesCopied) { Remove-Item $shapeDest -Force }
+Remove-Item $shapeProvDest -Force
 
 if ($fail) {
     Write-Error 'OWL smoke checks failed'
