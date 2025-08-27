@@ -396,3 +396,26 @@ Artifacts are written to `kg/reports/`:
 - `owl-smoke.json` summarizing three ASK checks
 
 Failures indicate SHACL non-conformance or missing OWL entailments. Review the report files to diagnose issues.
+
+## B.8 Inference service (Windows)
+Use the assembler configs under `kg/assembler/` to expose an inference-enabled dataset at `/ds-inf`.
+
+```powershell
+fuseki-server.bat --config kg/assembler/tdb2-inference-rdfs.ttl
+# or
+fuseki-server.bat --config kg/assembler/tdb2-inference-owlmini.ttl
+```
+
+Run the smoke script to validate remote ASK queries and capture a SELECT report:
+
+```powershell
+pwsh kg/scripts/ci-inference-smoke.ps1 -Mode rdfs
+pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
+```
+
+Artifacts are written to `kg/reports/`:
+- `inference-<mode>.json` summary of ASK checks
+- `inference-<mode>.txt` one-line status
+- `inference-<mode>-select.srj` SELECT snapshot
+
+All ASK checks must pass for the script to exit 0. Use the `.srj` file for manual inspection of inferred bindings.
