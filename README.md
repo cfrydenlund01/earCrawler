@@ -157,6 +157,18 @@ Outputs `data\\kg\\ear.ttl` and `data\\kg\\nsf.ttl`. Re-running the command with
 - `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
 - `python -m earCrawler.cli kg-export`: Export TTL triples.
 - Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
+### Setup for SHACL/OWL validation
+1. Install Java 11+ and verify the installation:
+   ```powershell
+   java -version
+   ```
+2. Bootstrap the Jena tools:
+   ```powershell
+   python -m earCrawler.utils.jena_tools
+   pwsh scripts/check_jena_env.ps1
+   ```
+3. Download Apache Jena Fuseki or use an existing installation.
+
 ### Load triples without installing Jena
 ```
 # Export TTL
