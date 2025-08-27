@@ -44,10 +44,16 @@ class HTTPCache:
             resp._content = cached["body"].encode("utf-8")
             resp.status_code = 200
             return resp
-        data = {
-            "etag": resp.headers.get("ETag"),
-            "last_modified": resp.headers.get("Last-Modified"),
-            "body": resp.text,
-        }
-        path.write_text(json.dumps(data, ensure_ascii=False, sort_keys=True), encoding="utf-8")
+
+        content_type = resp.headers.get("Content-Type", "")
+        if content_type.startswith("application/json"):
+            data = {
+                "etag": resp.headers.get("ETag"),
+                "last_modified": resp.headers.get("Last-Modified"),
+                "body": str(resp.text) if resp.text is not None else "",
+            }
+            path.write_text(
+                json.dumps(data, ensure_ascii=False, sort_keys=True),
+                encoding="utf-8",
+            )
         return resp
