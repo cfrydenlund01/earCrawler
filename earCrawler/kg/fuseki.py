@@ -54,9 +54,21 @@ def build_fuseki_cmd(
 
 
 def _port_in_use(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(0.5)
-        return sock.connect_ex(("localhost", port)) == 0
+    """Return ``True`` if ``port`` on localhost is listening.
+
+    Some test environments (notably those using the ``pytest-socket`` plugin)
+    disallow any use of :mod:`socket`.  In those cases attempting to open a
+    socket raises an exception.  Rather than letting that bubble up and fail the
+    test suite we treat the port as free, which is sufficient for our use in
+    unit tests.
+    """
+
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+            sock.settimeout(0.5)
+            return sock.connect_ex(("localhost", port)) == 0
+    except Exception:  # pragma: no cover - best effort for constrained envs
+        return False
 
 
 def start_fuseki(

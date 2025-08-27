@@ -102,22 +102,25 @@ def write_prov_files(graph: Graph, out_dir) -> None:
     nq_path = out_dir / "prov.nq"
 
     prefixes = sorted(graph.namespace_manager.namespaces(), key=lambda x: x[0])
-    lines = []
     nm = graph.namespace_manager
+    ttl_lines = []
+    nq_lines = []
+    ctx = PROV_GRAPH_IRI.n3(nm)
     for s, p, o in graph:
-        lines.append(f"{s.n3(nm)} {p.n3(nm)} {o.n3(nm)} .")
-    lines.sort()
+        ttl_lines.append(f"{s.n3(nm)} {p.n3(nm)} {o.n3(nm)} .")
+        nq_lines.append(f"{s.n3(nm)} {p.n3(nm)} {o.n3(nm)} {ctx} .")
+    ttl_lines.sort()
+    nq_lines.sort()
+
     with ttl_path.open("w", encoding="utf-8") as f:
         for prefix, ns in prefixes:
             f.write(f"@prefix {prefix}: <{ns}> .\n")
         f.write("\n")
-        for line in lines:
+        for line in ttl_lines:
             f.write(line + "\n")
 
-    nquads = [q.strip() for q in graph.serialize(format="nquads").splitlines() if q.strip()]
-    nquads.sort()
     with nq_path.open("w", encoding="utf-8") as f:
-        for line in nquads:
+        for line in nq_lines:
             f.write(line + "\n")
 
 __all__ = [
