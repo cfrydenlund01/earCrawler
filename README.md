@@ -157,6 +157,9 @@ Outputs `data\\kg\\ear.ttl` and `data\\kg\\nsf.ttl`. Re-running the command with
 - `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
 - `python -m earCrawler.cli kg-export`: Export TTL triples.
 - Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
+- The PowerShell scripts under `kg/scripts` require `pwsh` (PowerShell 7) and
+  will auto-download Apache Jena and Fuseki into `tools/jena` and `tools/fuseki`
+  when missing.
 ### Load triples without installing Jena
 ```
 # Export TTL
