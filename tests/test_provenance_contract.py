@@ -1,6 +1,7 @@
 """Integration test for provenance contract.
 
-Requires PowerShell 7 (``pwsh``) to be installed and on the PATH.
+Requires PowerShell 7 (``pwsh``) and a Java runtime to be installed and on
+the PATH. The Apache Jena and Fuseki tools are downloaded on demand.
 """
 
 import json
@@ -10,8 +11,8 @@ import shutil
 
 import pytest
 
-if shutil.which("pwsh") is None:
-    pytest.skip("PowerShell 7 not found", allow_module_level=True)
+if shutil.which("pwsh") is None or shutil.which("java") is None:
+    pytest.skip("PowerShell 7 and Java are required", allow_module_level=True)
 
 from rdflib import ConjunctiveGraph
 

@@ -8,6 +8,8 @@ $jena = Join-Path $repoRoot 'tools/jena'
 $fuseki = Join-Path $repoRoot 'tools/fuseki'
 if (-not (Test-Path $jena)) { throw 'Jena not found at tools/jena' }
 if (-not (Test-Path $fuseki)) { throw 'Fuseki not found at tools/fuseki' }
+$env:JENA_HOME = $jena
+$env:FUSEKI_HOME = $fuseki
 $batDir = Join-Path $jena 'bat'
 $env:PATH = "$batDir;$env:PATH"
 

@@ -1,12 +1,22 @@
+"""Round-trip tests for KG build pipeline using Apache Jena tools.
+
+These tests execute PowerShell scripts that require the Java Development Kit
+and are only run on Windows platforms.
+"""
+
 import pathlib
 import subprocess
 import sys
+import shutil
 
 import pytest
 
 SCRIPT = pathlib.Path(__file__).resolve().parents[1] / 'kg' / 'scripts' / 'ci-roundtrip.ps1'
 JENA_DIR = pathlib.Path('tools') / 'jena'
 FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
+
+if shutil.which("pwsh") is None or shutil.which("javac") is None:
+    pytest.skip("PowerShell 7 and a JDK with javac are required", allow_module_level=True)
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
