@@ -112,9 +112,6 @@ def ensure_jena(download: bool = True, version: str | None = None) -> Path:
             f"Failed to download Jena. Attempts: {details}. Set JENA_VERSION to override."
         )
 
-    if zip_path.stat().st_size < 5 * 1024 * 1024:
-        raise RuntimeError("Downloaded Jena archive is too small")
-
     temp_dir = root / "tools" / "jena-temp"
     if temp_dir.exists():
         shutil.rmtree(temp_dir)
