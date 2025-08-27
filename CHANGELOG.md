@@ -18,6 +18,8 @@
 ### Added
 - feat(kg): auto-install Apache Jena into tools/jena and invoke TDB2 loader by absolute path on Windows
 - docs(kg): update README/RUNBOOK for zero-setup loading
+### Fixed
+- fix(bootstrap): archive-first Jena 5.3.0 download with Windows bat validation and unified version pin
 
 ## [0.6.0]
 ### Added

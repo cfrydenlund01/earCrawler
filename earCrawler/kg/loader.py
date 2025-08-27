@@ -7,7 +7,7 @@ import os
 import shutil
 import subprocess
 
-from earCrawler.utils.jena_tools import ensure_jena, find_tdbloader, get_jena_home
+from earCrawler.utils.jena_tools import ensure_jena, find_tdbloader
 
 
 def load_tdb(ttl_path: Path, db_dir: Path = Path("db"), auto_install: bool = True) -> None:
@@ -32,17 +32,20 @@ def load_tdb(ttl_path: Path, db_dir: Path = Path("db"), auto_install: bool = Tru
         ensure_jena(download=True)
         loader = find_tdbloader()
     else:
-        jena_home = get_jena_home(Path(".").resolve())
-        loader = (
-            jena_home / ("bat" if os.name == "nt" else "bin") / (
-                "tdb2.tdbloader.bat" if os.name == "nt" else "tdb2.tdbloader"
-            )
-        )
+        loader = find_tdbloader()
         if not loader.exists():
-            candidate = shutil.which("tdb2.tdbloader.bat" if os.name == "nt" else "tdb2.tdbloader")
-            if candidate:
-                loader = Path(candidate)
-            else:
+            names = (
+                ["tdb2_tdbloader.bat", "tdb2.tdbloader.bat"]
+                if os.name == "nt"
+                else ["tdb2.tdbloader", "tdb2_tdbloader"]
+            )
+            candidate = None
+            for name in names:
+                candidate = shutil.which(name)
+                if candidate:
+                    loader = Path(candidate)
+                    break
+            if not candidate:
                 raise RuntimeError(
                     "Apache Jena TDB2 not found. Rerun without --no-auto-install to fetch a local copy."
                 )

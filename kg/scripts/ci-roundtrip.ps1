@@ -5,6 +5,14 @@ Set-StrictMode -Version Latest
 $repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
 $jena = Join-Path $repoRoot 'tools/jena'
 $fuseki = Join-Path $repoRoot 'tools/fuseki'
+$batDir = Join-Path $jena 'bat'
+$env:PATH = "$batDir;$env:PATH"
+$tdbLoader = Join-Path $batDir 'tdb2_tdbloader.bat'
+if (-not (Test-Path $tdbLoader)) { $tdbLoader = Join-Path $batDir 'tdb2.tdbloader.bat' }
+if (-not (Test-Path $tdbLoader)) { throw 'TDB2 loader script not found' }
+$tdbQuery = Join-Path $batDir 'tdb2_tdbquery.bat'
+if (-not (Test-Path $tdbQuery)) { $tdbQuery = Join-Path $batDir 'tdb2.tdbquery.bat' }
+if (-not (Test-Path $tdbQuery)) { throw 'TDB2 query script not found' }
 $kgDir = Join-Path $repoRoot 'kg'
 $targetDir = Join-Path $kgDir 'target'
 $tdbDir = Join-Path $targetDir 'tdb2'
@@ -14,22 +22,22 @@ New-Item -ItemType Directory -Path $tdbDir | Out-Null
 
 $ttlFiles = Get-ChildItem -Path (Join-Path $kgDir '*.ttl')
 foreach ($ttl in $ttlFiles) {
-    & (Join-Path $jena 'bin/riot.bat') --validate $ttl.FullName
+    & (Join-Path $jena 'bat/riot.bat') --validate $ttl.FullName
     if ($LASTEXITCODE -ne 0) { throw "RIOT validation failed for $($ttl.Name)" }
 }
 
 foreach ($ttl in $ttlFiles) {
-    & (Join-Path $jena 'bin/tdb2_tdbloader.bat') --loc $tdbDir $ttl.FullName
+    & $tdbLoader --loc $tdbDir $ttl.FullName
     if ($LASTEXITCODE -ne 0) { throw "TDB2 load failed for $($ttl.Name)" }
 }
 
 $dumpNq = Join-Path $targetDir 'dump.nq'
-& (Join-Path $jena 'bin/tdb2_tdbdump.bat') --loc $tdbDir | Out-File -FilePath $dumpNq -Encoding utf8
+& (Join-Path $jena 'bat/tdb2_tdbdump.bat') --loc $tdbDir | Out-File -FilePath $dumpNq -Encoding utf8
 if ($LASTEXITCODE -ne 0) { throw 'TDB2 dump failed' }
 
 $origNq = Join-Path $targetDir 'orig.nq'
 foreach ($ttl in $ttlFiles) {
-    & (Join-Path $jena 'bin/riot.bat') --output=NQUADS $ttl.FullName | Out-File -FilePath $origNq -Encoding utf8 -Append
+    & (Join-Path $jena 'bat/riot.bat') --output=NQUADS $ttl.FullName | Out-File -FilePath $origNq -Encoding utf8 -Append
     if ($LASTEXITCODE -ne 0) { throw "Canonicalization failed for $($ttl.Name)" }
 }
 
@@ -57,7 +65,7 @@ $queries = Get-ChildItem -Path $queryDir -Filter *.rq
 foreach ($q in $queries) {
     $name = [System.IO.Path]::GetFileNameWithoutExtension($q.Name)
     $actual = Join-Path $snapDir ($name + '.srj.actual')
-    & (Join-Path $jena 'bin/tdb2_tdbquery.bat') --loc $tdbDir --results=JSON $q.FullName | Out-File -FilePath $actual -Encoding utf8
+    & $tdbQuery --loc $tdbDir --results=JSON $q.FullName | Out-File -FilePath $actual -Encoding utf8
     if ($LASTEXITCODE -ne 0) { throw "Query failed for $($q.Name)" }
     $snap = Join-Path $snapDir ($name + '.srj')
     if (Test-Path $snap) {
@@ -77,7 +85,7 @@ $smokeQuery = Join-Path $queryDir 'smoke.rq'
 $fusekiProc = Start-Process -FilePath (Join-Path $fuseki 'fuseki-server.bat') -ArgumentList @('--loc', $tdbDir, '/ds') -PassThru -WindowStyle Hidden
 try {
     Start-Sleep -Seconds 5
-    & (Join-Path $jena 'bin/arq.bat') --query $smokeQuery --service http://localhost:3030/ds/sparql | Out-Null
+    & (Join-Path $jena 'bat/arq.bat') --query $smokeQuery --service http://localhost:3030/ds/sparql | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Remote query failed' }
 } finally {
     if ($fusekiProc -and !$fusekiProc.HasExited) {

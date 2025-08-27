@@ -18,6 +18,9 @@ jobs:
       FEDREG_API_KEY: ${{ secrets.FEDREG_API_KEY }}
     steps:
       - uses: actions/checkout@v4
+      - name: Guard versions
+        shell: pwsh
+        run: python scripts/check_versions.py
       - name: Set up Python
         uses: actions/setup-python@v4
         with:

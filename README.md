@@ -168,6 +168,16 @@ python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
 To disable auto-download, add `--no-auto-install`. By default, Jena is fetched once and cached in `tools\jena`.
 Local bootstrap uses the Apache archive for pinned Jena 5.3.0; set `JENA_VERSION` to override.
 
+### Jena bootstrap
+
+The repository pins Apache Jena to version **5.3.0** via `tools/versions.json`.
+Running any command that needs Jena will download the Windows binary
+distribution to `tools\jena`, preferring the Apache archive and falling back to
+the live mirror if required. The extracted layout must contain `bat\` scripts
+like `riot.bat`, `arq.bat`, and either `tdb2_tdbloader.bat` or
+`tdb2.tdbloader.bat`. Override the version by setting the `JENA_VERSION`
+environment variable.
+
 ### Phase B.3 — Serve & Query
 
 ```powershell

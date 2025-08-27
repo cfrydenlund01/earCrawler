@@ -7,6 +7,8 @@ $jena = Join-Path $repoRoot 'tools/jena'
 $fuseki = Join-Path $repoRoot 'tools/fuseki'
 if (-not (Test-Path $jena)) { throw 'Jena not found at tools/jena' }
 if (-not (Test-Path $fuseki)) { throw 'Fuseki not found at tools/fuseki' }
+$batDir = Join-Path $jena 'bat'
+$env:PATH = "$batDir;$env:PATH"
 
 $kgDir = Join-Path $repoRoot 'kg'
 $reportsDir = Join-Path $kgDir 'reports'
@@ -25,7 +27,7 @@ if (-not (Test-Path $shapeDest)) {
 $ttlFiles = Get-ChildItem -Path $kgDir -Filter *.ttl | Where-Object { $_.Name -ne 'shapes.ttl' }
 
 # --- SHACL validation ---
-$shacl = Join-Path $jena 'bin/shacl.bat'
+$shacl = Join-Path $jena 'bat/shacl.bat'
 $dataArgs = @()
 foreach ($ttl in $ttlFiles) { $dataArgs += @('--data', $ttl.FullName) }
 $shaclTtl = Join-Path $reportsDir 'shacl-report.ttl'
