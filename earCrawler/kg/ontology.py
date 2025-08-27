@@ -15,10 +15,17 @@ PROV = Namespace("http://www.w3.org/ns/prov#")
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 
 
-def graph_with_prefixes() -> Graph:
-    """Return a graph pre-bound with common prefixes."""
+def graph_with_prefixes(*, identifier: rdflib.term.Identifier | None = None) -> Graph:
+    """Return a graph pre-bound with common prefixes.
 
-    g = Graph()
+    Parameters
+    ----------
+    identifier:
+        Optional identifier for the graph. When provided the returned
+        :class:`~rdflib.Graph` will use this value as its named graph IRI.
+    """
+
+    g = Graph(identifier=identifier)
     g.bind("ear", EAR_NS)
     g.bind("ent", ENT_NS)
     g.bind("dct", DCT)
