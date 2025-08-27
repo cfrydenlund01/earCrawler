@@ -20,6 +20,7 @@ from .ontology import (
     iri_for_section,
     safe_literal,
 )
+from .prov import add_provenance
 
 
 
@@ -66,7 +67,7 @@ def _write_sorted_ttl(graph: Graph, out_path: Path) -> None:
             f.write(line + "\n")
 
 
-def emit_ear(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
+def emit_ear(in_dir: Path, out_dir: Path, prov_graph: Graph | None = None) -> tuple[Path, int]:
     """Emit EAR JSONL from ``in_dir`` to Turtle in ``out_dir``.
 
     Returns a tuple of output path and triple count.
@@ -91,12 +92,22 @@ def emit_ear(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
             para_iri = iri_for_paragraph(para_hash)
             g.add((para_iri, RDF.type, EAR_NS.Paragraph))
             source = rec.get("source_url")
+            date_str = rec.get("date")
             if source:
                 if _is_url(source):
                     g.add((para_iri, DCT.source, URIRef(source)))
                 else:
                     g.add((para_iri, DCT.source, safe_literal(source)))
-            date_str = rec.get("date")
+                if prov_graph is not None:
+                    add_provenance(
+                        prov_graph,
+                        para_iri,
+                        source_url=source,
+                        provider_domain="federalregister.gov",
+                        request_url=source,
+                        generated_at=date_str,
+                        response_sha256=para_hash,
+                    )
             if date_str:
                 try:
                     d = date.fromisoformat(date_str)

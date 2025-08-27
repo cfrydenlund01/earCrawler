@@ -1,0 +1,8 @@
+PREFIX prov: <http://www.w3.org/ns/prov#>
+ASK {
+  ?act a prov:Activity .
+  FILTER(
+    !EXISTS { ?ent prov:wasGeneratedBy ?act } ||
+    !EXISTS { ?act prov:wasAssociatedWith ?agent }
+  )
+}

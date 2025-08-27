@@ -162,3 +162,11 @@ pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
 - Commit updated cassette files after verifying fields.
 - If contract tests drift, compare failing cassettes with live responses and
   adjust normalization logic or update fixtures.
+
+## Provenance checks
+- `kg/scripts/ci-provenance.ps1` validates `kg/prov/prov.ttl`, loads the domain
+  and provenance graphs into TDB2, and executes lineage SPARQL queries.
+- Reports under `kg/reports/lineage-*.{srj,txt}` summarise missing provenance and
+  activity integrity.
+- A non-zero count or `true` ASK result indicates broken lineage links. Re-run
+  emitters with `new_prov_graph()` to regenerate provenance.

@@ -1,0 +1,10 @@
+PREFIX prov: <http://www.w3.org/ns/prov#>
+PREFIX dct: <http://purl.org/dc/terms/>
+SELECT ?entity ?activity ?agent ?src
+WHERE {
+  ?entity prov:wasGeneratedBy ?activity ;
+          prov:wasAttributedTo ?agent ;
+          prov:wasDerivedFrom ?src .
+}
+ORDER BY ?entity ?activity ?agent
+LIMIT 10

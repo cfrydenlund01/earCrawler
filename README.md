@@ -430,3 +430,18 @@ same names override stored secrets. Responses are cached on disk under
 Contract tests ship with [VCR](https://github.com/kevin1024/vcrpy) cassettes so
 CI runs completely offline. To refresh recordings locally set
 `VCR_RECORD_MODE=once` and run the tests; commit the updated files afterwards.
+
+## B.10 Provenance (PROV-O)
+
+API-sourced triples now carry W3C PROV-O lineage. Domain data remains in the
+default graph while provenance quads are written to the named graph
+`urn:graph:prov` under `kg/prov/`. Deterministic IRIs connect
+`prov:Entity` resources to their generating `prov:Activity` and responsible
+`prov:Agent`. Run the lineage checks:
+
+```powershell
+pwsh kg/scripts/ci-provenance.ps1
+```
+
+Reports appear in `kg/reports/` and include counts of missing provenance,
+activity integrity, and a sample SELECT for manual review.

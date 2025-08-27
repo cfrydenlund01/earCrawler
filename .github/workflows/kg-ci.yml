@@ -163,3 +163,66 @@ jobs:
         with:
           name: cassettes
           path: tests/fixtures/cassettes/*.yaml
+
+  provenance-checks:
+    needs: api-contract-tests
+    runs-on: windows-latest
+    env:
+      VCR_RECORD_MODE: none
+      PYTEST_ALLOW_NETWORK: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard versions
+        shell: pwsh
+        run: python scripts/check_versions.py
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Apache Jena and Fuseki
+        shell: pwsh
+        run: |
+          $v = Get-Content tools/versions.json | ConvertFrom-Json
+          $jenaVer = $v.jena
+          $fusekiVer = $v.fuseki
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
+          $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
+          try { Invoke-WebRequest -Uri $jenaArchive -OutFile jena.zip -ErrorAction Stop } catch { Invoke-WebRequest -Uri $jenaMirror -OutFile jena.zip }
+          Expand-Archive jena.zip -DestinationPath tools
+          Move-Item tools/apache-jena-$jenaVer tools/jena
+          $fusekiArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-fuseki-$fusekiVer.zip"
+          $fusekiMirror = "https://downloads.apache.org/jena/binaries/apache-jena-fuseki-$fusekiVer.zip"
+          try { Invoke-WebRequest -Uri $fusekiArchive -OutFile fuseki.zip -ErrorAction Stop } catch { Invoke-WebRequest -Uri $fusekiMirror -OutFile fuseki.zip }
+          Expand-Archive fuseki.zip -DestinationPath tools
+          Move-Item tools/apache-jena-fuseki-$fusekiVer tools/fuseki
+          Test-Path (Join-Path tools/jena 'bat/riot.bat') | Out-Null
+          Test-Path (Join-Path tools/jena 'bat/arq.bat') | Out-Null
+      - name: Export KG with provenance
+        shell: pwsh
+        run: |
+          python - <<'PY'
+from earCrawler.kg.emit_ear import emit_ear
+from earCrawler.kg.triples import emit_tradegov_entities
+from earCrawler.kg.prov import new_prov_graph, write_prov_files
+from pathlib import Path
+g = new_prov_graph()
+fixture = Path('tests/kg/fixtures')
+emit_ear(fixture, Path('kg'), prov_graph=g)
+recs = [{'id':'acme','name':'ACME Corp','country':'US','source_url':'https://trade.gov/api/acme','date':'2024-01-01','sha256':'0'*64}]
+emit_tradegov_entities(recs, Path('kg'), prov_graph=g)
+write_prov_files(g, Path('kg')/'prov')
+with open('kg/ear_triples.ttl','w',encoding='utf-8') as f:
+    f.write(Path('kg/ear.ttl').read_text())
+    f.write(Path('kg/tradegov.ttl').read_text())
+PY
+      - name: Run provenance checks
+        shell: pwsh
+        run: kg/scripts/ci-provenance.ps1
+      - name: Upload provenance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: provenance-reports
+          path: kg/reports/*

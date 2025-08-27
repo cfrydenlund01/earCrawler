@@ -3,6 +3,7 @@ import json
 from rdflib import RDF, Graph, URIRef
 from rdflib.namespace import RDFS
 from .ontology import EAR_NS, DCT, graph_with_prefixes, safe_literal
+from .prov import add_provenance
 
 
 def export_triples(
@@ -35,7 +36,9 @@ def export_triples(
 
 
 
-def emit_tradegov_entities(records: list[dict[str, str]], out_dir: Path) -> tuple[Path, int]:
+def emit_tradegov_entities(
+    records: list[dict[str, str]], out_dir: Path, prov_graph: Graph | None = None
+) -> tuple[Path, int]:
     """Write Trade.gov entity records to Turtle in ``out_dir``."""
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / "tradegov.ttl"
@@ -50,6 +53,16 @@ def emit_tradegov_entities(records: list[dict[str, str]], out_dir: Path) -> tupl
         src = rec.get("source_url")
         if src:
             g.add((ent_iri, DCT.source, URIRef(src)))
+            if prov_graph is not None:
+                add_provenance(
+                    prov_graph,
+                    ent_iri,
+                    source_url=src,
+                    provider_domain="trade.gov",
+                    request_url=src,
+                    generated_at=rec.get("date"),
+                    response_sha256=rec.get("sha256"),
+                )
     _write_sorted_ttl(g, out_path)
     return out_path, len(g)
 
