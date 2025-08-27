@@ -80,6 +80,14 @@ python -m earCrawler.cli kg-load --ttl data\kg\ear.ttl --db db
 - If port 3030 is in use, start Fuseki with `--port 3031`.
 - Exclude your `db\` directory from Windows Defender to avoid file locks.
 - FileNotFoundError -> earCrawler now auto-installs Jena; ensure your session has network access on first run.
+
+## Jena bootstrap
+
+Local commands download the Apache Jena **5.3.0** Windows binary distribution to
+`tools\jena` on first use. The bootstrap prefers the Apache archive and falls
+back to the live mirror. Set `JENA_VERSION` to override the pin. The extracted
+folder must contain `bat\` scripts such as `riot.bat`, `arq.bat`, and one of
+`tdb2_tdbloader.bat`/`tdb2.tdbloader.bat`.
 - If Defender blocks extraction, try running PowerShell as Administrator or exclude the repo folder temporarily.
 
 # Phase B.2

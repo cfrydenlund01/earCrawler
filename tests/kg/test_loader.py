@@ -3,6 +3,7 @@ import subprocess
 import urllib.request
 import zipfile
 from pathlib import Path
+import json
 
 from earCrawler.kg.loader import load_tdb
 from earCrawler.utils import jena_tools
@@ -10,9 +11,6 @@ from earCrawler.utils import jena_tools
 
 def test_load_tdb_autoinstall_downloads_once(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(
-        jena_tools, "_tdbloader_path", lambda home: home / "bat" / "tdb2.tdbloader.bat"
-    )
     monkeypatch.delenv("JENA_VERSION", raising=False)
 
     ttl = Path("foo.ttl")
@@ -22,9 +20,14 @@ def test_load_tdb_autoinstall_downloads_once(tmp_path, monkeypatch):
 
     def fake_urlretrieve(url, filename):
         downloads.append(url)
-        version = os.environ.get("JENA_VERSION", "5.3.0")
+        versions = json.loads((Path(__file__).resolve().parents[2] / "tools/versions.json").read_text())
+        version = os.environ.get("JENA_VERSION", versions["jena"])
         with zipfile.ZipFile(filename, "w") as zf:
-            zf.writestr(f"apache-jena-{version}/bat/tdb2.tdbloader.bat", "")
+            base = f"apache-jena-{version}/bat"
+            zf.writestr(f"{base}/riot.bat", "")
+            zf.writestr(f"{base}/arq.bat", "")
+            zf.writestr(f"{base}/tdb2.tdbloader.bat", "")
+            zf.writestr(f"{base}/tdb2_tdbquery.bat", "")
             zf.writestr("payload.bin", os.urandom(6 * 1024 * 1024))
 
     monkeypatch.setattr(urllib.request, "urlretrieve", fake_urlretrieve)
@@ -39,7 +42,7 @@ def test_load_tdb_autoinstall_downloads_once(tmp_path, monkeypatch):
 
     load_tdb(ttl, Path("mydb"))
     jena_home = Path("tools/jena")
-    loader = jena_home / "bat" / "tdb2.tdbloader.bat"
+    loader = jena_tools.find_tdbloader()
     assert loader.is_file()
     assert calls and Path(calls[0][0]) == loader.resolve()
     assert len(downloads) == 1
