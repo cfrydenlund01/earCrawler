@@ -11,6 +11,7 @@ a RAG (Retrieval Augmented Generation) approach.
 ## Prerequisites
 - **Python 3.11**
 - **Windows 11**
+- **PowerShell 7** (`pwsh`) on the PATH
 - **Git**
 - **Trade.gov API key**
 - **Docker Desktop**
@@ -157,6 +158,7 @@ Outputs `data\\kg\\ear.ttl` and `data\\kg\\nsf.ttl`. Re-running the command with
 - `kg/ear_ontology.ttl`: RDF schema for paragraphs & entities.
 - `python -m earCrawler.cli kg-export`: Export TTL triples.
 - Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
+
 ### Setup for SHACL/OWL validation
 1. Install Java 11+ and verify the installation:
    ```powershell
@@ -171,6 +173,10 @@ Outputs `data\\kg\\ear.ttl` and `data\\kg\\nsf.ttl`. Re-running the command with
    ```powershell
    fuseki-server --version
    ```
+   
+- The PowerShell scripts under `kg/scripts` require `pwsh` (PowerShell 7) and
+  will auto-download Apache Jena and Fuseki into `tools/jena` and `tools/fuseki`
+  when missing.
 
 ### Load triples without installing Jena
 ```
