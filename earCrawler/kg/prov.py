@@ -21,8 +21,7 @@ def _hash(text: str) -> str:
 
 def new_prov_graph() -> Graph:
     """Return a graph for provenance quads in ``urn:graph:prov``."""
-    g = graph_with_prefixes()
-    g.identifier = PROV_GRAPH_IRI
+    g = graph_with_prefixes(identifier=PROV_GRAPH_IRI)
     g.bind("foaf", FOAF)
     return g
 
