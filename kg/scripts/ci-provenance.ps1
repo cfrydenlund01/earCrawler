@@ -1,8 +1,8 @@
 param()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-
-$repoRoot = Resolve-Path (Join-Path $PSScriptRoot '..')
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
+& python -c "import pathlib, importlib.util; repo = pathlib.Path(r'$repoRoot'); spec = importlib.util.spec_from_file_location('jena_tools', repo / 'earCrawler/utils/jena_tools.py'); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); mod.ensure_jena(); mod.ensure_fuseki()" | Out-Null
 $jena = Join-Path $repoRoot 'tools/jena'
 $batDir = Join-Path $jena 'bat'
 $env:PATH = "$batDir;$env:PATH"

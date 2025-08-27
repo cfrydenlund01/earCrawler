@@ -16,6 +16,11 @@ def get_jena_home(root: Path = Path(".")) -> Path:
     return root / "tools" / "jena"
 
 
+def get_fuseki_home(root: Path = Path(".")) -> Path:
+    """Return the repository-scoped Fuseki home directory."""
+    return root / "tools" / "fuseki"
+
+
 
 def _script_dir(jena_home: Path) -> str:
     """Return the subdirectory containing executables."""
@@ -129,6 +134,71 @@ def ensure_jena(download: bool = True, version: str | None = None) -> Path:
         )
 
     return jena_home
+
+
+def _valid_fuseki_install(fuseki_home: Path) -> bool:
+    exe = fuseki_home / ("fuseki-server.bat" if os.name == "nt" else "fuseki-server")
+    return exe.is_file()
+
+
+def ensure_fuseki(download: bool = True, version: str | None = None) -> Path:
+    """Ensure Apache Jena Fuseki exists under ``tools/fuseki``."""
+
+    root = Path(".").resolve()
+    versions = _load_versions(root)
+    version = version or os.getenv("FUSEKI_VERSION") or versions.get("fuseki", "5.3.0")
+    fuseki_home = get_fuseki_home(root)
+
+    if _valid_fuseki_install(fuseki_home):
+        return fuseki_home
+    if fuseki_home.exists():
+        shutil.rmtree(fuseki_home)
+    if not download:
+        raise RuntimeError("Fuseki not installed and download disabled")
+
+    download_dir = root / "tools" / "fuseki-download"
+    download_dir.mkdir(parents=True, exist_ok=True)
+    zip_path = download_dir / f"fuseki-{version}.zip"
+    archive_url = f"https://archive.apache.org/dist/jena/binaries/apache-jena-fuseki-{version}.zip"
+    mirror_url = f"https://downloads.apache.org/jena/binaries/apache-jena-fuseki-{version}.zip"
+    attempts = [(archive_url, None), (mirror_url, None)]
+
+    for idx, (url, _) in enumerate(attempts):
+        try:
+            urllib.request.urlretrieve(url, zip_path)
+            attempts[idx] = (url, None)
+            break
+        except HTTPError as exc:
+            attempts[idx] = (url, exc)
+            if exc.code != 404 or url == mirror_url:
+                break
+        except Exception as exc:  # pragma: no cover - network errors
+            attempts[idx] = (url, exc)
+            break
+    else:  # pragma: no cover - all attempts failed
+        pass
+
+    if not zip_path.exists():
+        details = "; ".join(f"{u}: {e}" for u, e in attempts if e)
+        raise RuntimeError(
+            f"Failed to download Fuseki. Attempts: {details}. Set FUSEKI_VERSION to override."
+        )
+
+    temp_dir = root / "tools" / "fuseki-temp"
+    if temp_dir.exists():
+        shutil.rmtree(temp_dir)
+    with zipfile.ZipFile(zip_path) as zf:
+        zf.extractall(temp_dir)
+    extracted = temp_dir / f"apache-jena-fuseki-{version}"
+    if not extracted.exists():
+        raise RuntimeError("Downloaded Fuseki archive missing expected folder")
+    shutil.move(str(extracted), fuseki_home)
+    shutil.rmtree(temp_dir, ignore_errors=True)
+
+    if not _valid_fuseki_install(fuseki_home):
+        raise RuntimeError("Fuseki archive missing fuseki-server script")
+
+    return fuseki_home
 
 
 def find_tdbloader() -> Path:
