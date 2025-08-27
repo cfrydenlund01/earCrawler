@@ -419,3 +419,14 @@ Artifacts are written to `kg/reports/`:
 - `inference-<mode>-select.srj` SELECT snapshot
 
 All ASK checks must pass for the script to exit 0. Use the `.srj` file for manual inspection of inferred bindings.
+
+## B.9 API integrations
+
+The Trade.gov and Federal Register clients use `keyring` to load API keys and
+user agents from the Windows Credential Manager. Environment variables with the
+same names override stored secrets. Responses are cached on disk under
+`.cache/api/` with ETag support so subsequent runs are deterministic.
+
+Contract tests ship with [VCR](https://github.com/kevin1024/vcrpy) cassettes so
+CI runs completely offline. To refresh recordings locally set
+`VCR_RECORD_MODE=once` and run the tests; commit the updated files afterwards.

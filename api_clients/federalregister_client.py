@@ -1,14 +1,16 @@
-"""Federal Register API client for EAR text retrieval.
-
-The Federal Register API is public and does not require authentication.
-"""
-
+"""Federal Register API client for EAR text retrieval."""
 from __future__ import annotations
 
-import time
-from typing import Iterator
+import re
+from html import unescape
+from pathlib import Path
+from typing import Dict, List
 
 import requests
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
+from earCrawler.utils.secure_store import get_secret
+from earCrawler.utils.http_cache import HTTPCache
 
 
 class FederalRegisterError(Exception):
@@ -16,87 +18,75 @@ class FederalRegisterError(Exception):
 
 
 class FederalRegisterClient:
-    """Simple client for the Federal Register API."""
+    """Client for the Federal Register API."""
 
     BASE_URL = "https://api.federalregister.gov/v1"
 
-    def __init__(self) -> None:
-        self.session = requests.Session()
+    def __init__(self, *, session: requests.Session | None = None, cache_dir: Path | None = None) -> None:
+        self.session = session or requests.Session()
+        self.session.trust_env = False
+        self.user_agent = get_secret("FEDERALREGISTER_USER_AGENT", fallback="earCrawler/0.9")
+        self.cache = HTTPCache(cache_dir or Path(".cache/api/federalregister"))
 
-    def _get_json(self, url: str, params: dict) -> dict:
-        """Send GET request with retry and return parsed JSON."""
-        attempts = 3
-        for attempt in range(attempts):
-            try:
-                response = self.session.get(url, params=params, timeout=10)
-                response.raise_for_status()
-                if "application/json" not in response.headers.get(
-                    "Content-Type", ""
-                ):
-                    raise FederalRegisterError(
-                        f"Non-JSON response from FR at {url}?{response.request.path_url}"
-                    )
-                try:
-                    return response.json()
-                except ValueError as exc:
-                    raise FederalRegisterError(
-                        "Invalid JSON from Federal Register"
-                    ) from exc
-            except requests.HTTPError as exc:
-                status = getattr(exc.response, "status_code", 0)
-                if 500 <= status < 600 and attempt < attempts - 1:
-                    time.sleep(2 ** attempt)
-                    continue
-                if 400 <= status < 500:
-                    message = getattr(exc.response, "text", str(status))
-                    raise FederalRegisterError(
-                        f"Federal Register client error: {message}"
-                    ) from exc
-                raise FederalRegisterError(
-                    f"Federal Register request failed: {status}"
-                ) from exc
-            except requests.RequestException as exc:
-                if attempt < attempts - 1:
-                    time.sleep(2 ** attempt)
-                    continue
-                raise FederalRegisterError(
-                    f"Federal Register request error: {exc}"
-                ) from exc
-        raise FederalRegisterError("Federal Register request failed after retries")
+    @retry(
+        reraise=True,
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=1),
+        retry=retry_if_exception_type(requests.RequestException),
+    )
+    def _get_json(self, url: str, params: dict[str, str]) -> dict:
+        headers = {"User-Agent": self.user_agent, "Accept": "application/json"}
+        resp = self.cache.get(self.session, url, params, headers=headers)
+        resp.raise_for_status()
+        if "application/json" not in resp.headers.get("Content-Type", ""):
+            raise FederalRegisterError(f"Non-JSON response from FR at {resp.url}")
+        try:
+            return resp.json()
+        except ValueError as exc:  # pragma: no cover
+            raise FederalRegisterError("Invalid JSON from Federal Register") from exc
 
-    def search_documents(self, query: str, per_page: int = 100) -> Iterator[dict]:
-        """Search for documents matching ``query``."""
+    def get_ear_articles(self, term: str, *, per_page: int = 5) -> List[Dict[str, str]]:
+        """Return normalized EAR article records for ``term``."""
         url = f"{self.BASE_URL}/documents"
-        page = 1
-        while True:
-            params = {
-                "conditions[any]": query,
-                "per_page": per_page,
-                "page": page,
-            }
-            data = self._get_json(url, params)
-            documents = data.get("results", [])
-            if not isinstance(documents, list):
-                raise FederalRegisterError(
-                    "Invalid JSON structure from Federal Register"
-                )
-            for doc in documents:
-                yield doc
-            if len(documents) < per_page:
-                break
-            page += 1
-
-    def get_document(self, doc_number: str) -> dict:
-        """Fetch a document by its ``document_number``."""
-        url = f"{self.BASE_URL}/documents/{doc_number}"
-        data = self._get_json(url, params={})
-        if not isinstance(data, dict):
-            raise FederalRegisterError(
-                "Invalid JSON structure from Federal Register"
+        params = {"per_page": str(per_page), "conditions[term]": term}
+        data = self._get_json(url, params)
+        results: List[Dict[str, str]] = []
+        for doc in data.get("results", []):
+            text = self._clean_text(doc.get("body_html") or doc.get("body_text") or "")
+            results.append(
+                {
+                    "id": str(doc.get("document_number") or doc.get("id") or ""),
+                    "title": doc.get("title", ""),
+                    "publication_date": doc.get("publication_date", ""),
+                    "source_url": doc.get("html_url") or doc.get("url") or "",
+                    "text": text,
+                }
             )
-        return data
+        return results
+
+    def get_article_text(self, doc_id: str) -> str:
+        """Return cleaned text for a Federal Register document."""
+        url = f"{self.BASE_URL}/documents/{doc_id}"
+        data = self._get_json(url, params={})
+        return self._clean_text(data.get("body_html") or data.get("body_text") or "")
+
+    # Backwards compatible wrappers
+    def search_documents(self, query: str, per_page: int = 100):
+        url = f"{self.BASE_URL}/documents"
+        params = {"conditions[any]": query, "per_page": str(per_page)}
+        data = self._get_json(url, params)
+        return data.get("results", [])
+
+    def get_document(self, doc_number: str):
+        url = f"{self.BASE_URL}/documents/{doc_number}"
+        return self._get_json(url, params={})
 
     def get_ear_text(self, citation: str) -> str:
-        """Retrieve the EAR body HTML for a Federal Register citation."""
         data = self.get_document(citation)
         return data.get("body_html", "")
+
+    @staticmethod
+    def _clean_text(html: str) -> str:
+        text = re.sub("<[^>]+>", " ", html)
+        text = unescape(text)
+        return " ".join(text.split())

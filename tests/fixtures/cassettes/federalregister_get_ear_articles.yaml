@@ -1,0 +1,21 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json
+      User-Agent:
+      - earCrawler/0.9
+    method: GET
+    uri: https://api.federalregister.gov/v1/documents?per_page=1&conditions%5Bterm%5D=export
+  response:
+    body:
+      string: '{"results": [{"document_number": "2023-12345", "title": "Export Administration Regulations Update", "publication_date": "2023-09-01", "body_html": "<p>Hello world.</p>", "html_url": "https://www.federalregister.gov/documents/2023-12345"}]}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+    url: https://api.federalregister.gov/v1/documents?per_page=1&conditions%5Bterm%5D=export
+version: 1

@@ -155,3 +155,10 @@ pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
 - **Server won't start:** ensure `tools/jena` and `tools/fuseki` exist and no other process is using port 3030.
 - **ASK check fails:** verify all TTL files (excluding `shapes.ttl`) and the `testdata/reasoner_smoke.ttl` fixture loaded into `kg/target/tdb2`.
 - **Empty SELECT report:** check that inference mode matches expectations and queries reference the correct namespace.
+
+## API contract tests
+- Cassettes live under `tests/fixtures/cassettes`. To refresh them, run tests with
+  `VCR_RECORD_MODE=once` so new HTTP interactions are recorded.
+- Commit updated cassette files after verifying fields.
+- If contract tests drift, compare failing cassettes with live responses and
+  adjust normalization logic or update fixtures.

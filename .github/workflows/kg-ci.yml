@@ -138,3 +138,28 @@ jobs:
         with:
           name: inference-reports
           path: kg/reports/*
+  api-contract-tests:
+    needs: inference-smoke
+    runs-on: windows-latest
+    env:
+      VCR_RECORD_MODE: none
+      PYTEST_ALLOW_NETWORK: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard versions
+        shell: pwsh
+        run: python scripts/check_versions.py
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements-win.txt
+      - name: Run API contract tests
+        run: pytest tests/clients tests/kg/test_ingest_contract.py
+      - name: Upload cassettes
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cassettes
+          path: tests/fixtures/cassettes/*.yaml

@@ -6,6 +6,8 @@ import json
 from datetime import date
 from pathlib import Path
 from urllib.parse import urlparse
+import hashlib
+from api_clients.federalregister_client import FederalRegisterClient
 
 from rdflib import RDF, Graph, URIRef
 
@@ -19,6 +21,27 @@ from .ontology import (
     safe_literal,
 )
 
+
+
+
+def fetch_ear_corpus(term_or_citation: str, client: FederalRegisterClient | None = None, out_dir: Path = Path("kg/source/ear")) -> Path:
+    """Fetch EAR articles and write normalized JSONL."""
+    client = client or FederalRegisterClient()
+    articles = client.get_ear_articles(term_or_citation, per_page=1)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / "ear_corpus.jsonl"
+    with out_path.open("w", encoding="utf-8") as fh:
+        for art in articles:
+            sha = hashlib.sha256(art["text"].encode("utf-8")).hexdigest()
+            rec = {
+                "sha256": sha,
+                "source_url": art["source_url"],
+                "date": art["publication_date"],
+                "id": art["id"],
+                "section": "1",
+            }
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    return out_path
 
 def _is_url(value: str) -> bool:
     try:

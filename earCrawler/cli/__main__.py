@@ -8,6 +8,7 @@ from pathlib import Path
 import click
 
 from earCrawler.core.nsf_case_parser import NSFCaseParser
+from .ear_fetch import fetch_entities, fetch_ear, warm_cache
 from . import reports_cli
 from earCrawler.analytics import reports as analytics_reports
 from earCrawler.kg import fuseki
@@ -48,6 +49,9 @@ def nsf_parse(fixtures: Path, out: Path, live: bool) -> None:
 
 # Expose existing reports commands under "reports" group
 cli.add_command(reports_cli.reports, name="reports")
+cli.add_command(fetch_entities)
+cli.add_command(fetch_ear)
+cli.add_command(warm_cache)
 
 
 @cli.command(name="crawl")
