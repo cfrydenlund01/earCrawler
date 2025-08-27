@@ -4,7 +4,17 @@ import importlib
 from typing import Any
 from urllib.error import HTTPError
 
+import pytest
 from fastapi.testclient import TestClient
+from pytest_socket import disable_socket, enable_socket, socket_allow_hosts
+
+
+@pytest.fixture(autouse=True)
+def _allow_socket():
+    socket_allow_hosts(["testserver", "localhost"])
+    enable_socket()
+    yield
+    disable_socket()
 
 
 class _GoodWrapper:
