@@ -59,9 +59,9 @@ class TradeGovClient:
             )
         return results
 
-    def lookup_entity(self, name: str) -> Dict[str, str]:
-        """Return the first entity result for ``name`` or an empty dict."""
-        results = self.search(name, limit=1)
+    def lookup_entity(self, query: str) -> Dict[str, str]:
+        """Return the first entity result for ``query`` or an empty dict."""
+        results = self.search(query, limit=1)
         return results[0] if results else {}
 
     # Backwards compatibility aliases
