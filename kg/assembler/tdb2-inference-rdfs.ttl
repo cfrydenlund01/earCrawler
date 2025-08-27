@@ -1,0 +1,23 @@
+@prefix : <#> .
+@prefix tdb2: <http://jena.apache.org/2016/tdb#> .
+@prefix ja: <http://jena.hpl.hp.com/2005/11/Assembler#> .
+@prefix fuseki: <http://jena.apache.org/fuseki#> .
+
+[] a fuseki:Server ;
+   fuseki:services ( <#service> ) .
+
+<#dataset> a tdb2:DatasetTDB2 ;
+    tdb2:location "kg/target/tdb2" .
+
+<#rdfsReasoner> a ja:ReasonerFactory ;
+    ja:reasonerClass "org.apache.jena.reasoner.rulesys.RDFSRuleReasonerFactory" .
+
+<#inf> a ja:InfModel ;
+    ja:baseDataset <#dataset> ;
+    ja:reasoner <#rdfsReasoner> .
+
+<#service> a fuseki:Service ;
+    fuseki:name "ds-inf" ;
+    fuseki:serviceQuery "sparql" ;
+    fuseki:dataset <#inf> ;
+    fuseki:allowUpdate false .

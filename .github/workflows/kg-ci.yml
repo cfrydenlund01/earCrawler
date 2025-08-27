@@ -93,3 +93,48 @@ jobs:
         with:
           name: shacl-owl-reports
           path: kg/reports/*
+  inference-smoke:
+    needs: [roundtrip, shacl-owl-smoke]
+    if: always()
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard versions
+        shell: pwsh
+        run: python scripts/check_versions.py
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Apache Jena and Fuseki
+        shell: pwsh
+        run: |
+          $v = Get-Content tools/versions.json | ConvertFrom-Json
+          $jenaVer = $v.jena
+          $fusekiVer = $v.fuseki
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
+          $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
+          try { Invoke-WebRequest -Uri $jenaArchive -OutFile jena.zip -ErrorAction Stop } catch { Invoke-WebRequest -Uri $jenaMirror -OutFile jena.zip }
+          Expand-Archive jena.zip -DestinationPath tools
+          Move-Item tools/apache-jena-$jenaVer tools/jena
+          $fusekiArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-fuseki-$fusekiVer.zip"
+          $fusekiMirror = "https://downloads.apache.org/jena/binaries/apache-jena-fuseki-$fusekiVer.zip"
+          try { Invoke-WebRequest -Uri $fusekiArchive -OutFile fuseki.zip -ErrorAction Stop } catch { Invoke-WebRequest -Uri $fusekiMirror -OutFile fuseki.zip }
+          Expand-Archive fuseki.zip -DestinationPath tools
+          Move-Item tools/apache-jena-fuseki-$fusekiVer tools/fuseki
+          Test-Path (Join-Path tools/jena 'bat/riot.bat') | Out-Null
+          Test-Path (Join-Path tools/jena 'bat/arq.bat') | Out-Null
+      - name: Run inference smoke (RDFS)
+        shell: pwsh
+        run: kg/scripts/ci-inference-smoke.ps1 -Mode rdfs
+      - name: Run inference smoke (OWL Mini)
+        shell: pwsh
+        run: kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
+      - name: Upload inference reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: inference-reports
+          path: kg/reports/*

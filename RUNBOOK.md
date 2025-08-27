@@ -131,3 +131,27 @@ Stop the server with `Ctrl+C` in the console. For programmatic use, the
 - `shacl-conforms.txt` of `false` indicates shape violations; inspect `shacl-report.ttl` or `.json`.
 - Failed OWL checks appear in `owl-smoke.json` with `passed: false`.
 - CI job `shacl-owl-smoke` runs after the round-trip step and uploads reports even on failure.
+
+## B.8 Inference service
+### Assembler anatomy
+`kg/assembler/tdb2-inference-*.ttl` wraps a TDB2 dataset under `kg/target/tdb2` with a `ja:InfModel` and publishes a Fuseki service `/ds-inf` with a `/sparql` endpoint. The RDFS config uses `RDFSRuleReasonerFactory` while the OWL Mini variant uses `OWLMiniReasonerFactory`.
+
+### Switching modes
+Start Fuseki with the desired assembler:
+
+```powershell
+fuseki-server.bat --config kg/assembler/tdb2-inference-rdfs.ttl   # RDFS
+fuseki-server.bat --config kg/assembler/tdb2-inference-owlmini.ttl # OWL Mini
+```
+
+Run the smoke script to load TTLs, boot the server, and execute remote queries:
+
+```powershell
+pwsh kg/scripts/ci-inference-smoke.ps1 -Mode rdfs
+pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
+```
+
+### Troubleshooting
+- **Server won't start:** ensure `tools/jena` and `tools/fuseki` exist and no other process is using port 3030.
+- **ASK check fails:** verify all TTL files (excluding `shapes.ttl`) and the `testdata/reasoner_smoke.ttl` fixture loaded into `kg/target/tdb2`.
+- **Empty SELECT report:** check that inference mode matches expectations and queries reference the correct namespace.
