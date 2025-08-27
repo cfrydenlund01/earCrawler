@@ -2,6 +2,9 @@
 ### Added
 - SPARQL sanity checks and SHACL validation (`kg-validate`) for EAR/NSF TTLs.
 - Windows-first CI smoke tests for emit + validate.
+- Trade.gov and Federal Register clients with HTTP caching.
+- VCR recorded fixtures and offline API contract tests.
+- KG enrichment helpers and CLI commands.
 
 ## [0.8.0]
 ### Added

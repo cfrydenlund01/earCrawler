@@ -60,3 +60,19 @@ def load_tdb(ttl_path: Path, db_dir: Path = Path("db"), auto_install: bool = Tru
             msg += f": {err}"
         raise RuntimeError(msg) from exc
 
+
+
+def enrich_entities_with_tradegov(records, client=None):
+    """Enrich entity ``records`` using the Trade.gov API."""
+    from api_clients.tradegov_client import TradeGovClient
+
+    tg = client or TradeGovClient()
+    enriched = []
+    for rec in records:
+        name = rec.get("name") if isinstance(rec, dict) else None
+        if not name:
+            continue
+        info = tg.lookup_entity(name)
+        if info:
+            enriched.append(info)
+    return enriched

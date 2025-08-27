@@ -1,0 +1,21 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json
+      User-Agent:
+      - earCrawler/0.9
+    method: GET
+    uri: https://api.trade.gov/v1/entities/search?api_key=DUMMY&q=ACME&size=2
+  response:
+    body:
+      string: '{"results": [{"id": "E1", "name": "Acme Alpha", "country": "US", "url": "https://example.com/alpha"}, {"id": "E2", "name": "Acme Beta", "country": "CA", "url": "https://example.com/beta"}]}'
+    headers:
+      Content-Type:
+      - application/json
+    status:
+      code: 200
+      message: OK
+    url: https://api.trade.gov/v1/entities/search?api_key=DUMMY&q=ACME&size=2
+version: 1

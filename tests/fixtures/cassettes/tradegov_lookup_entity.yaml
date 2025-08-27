@@ -1,0 +1,25 @@
+interactions:
+- request:
+    body: null
+    headers:
+      Accept:
+      - application/json
+      User-Agent:
+      - earCrawler/0.9
+    method: GET
+    uri: https://api.trade.gov/v1/entities/search?api_key=DUMMY&q=ACME+Corp&size=1
+  response:
+    body:
+      string: '{"results": [{"id": "E123", "name": "Acme Corp", "country": "US", "url": "https://example.com/acme"}]}'
+    headers:
+      Content-Type:
+      - application/json
+      ETag:
+      - '"etag123"'
+      Last-Modified:
+      - Mon, 01 Jan 2024 00:00:00 GMT
+    status:
+      code: 200
+      message: OK
+    url: https://api.trade.gov/v1/entities/search?api_key=DUMMY&q=ACME+Corp&size=1
+version: 1
