@@ -11,6 +11,7 @@ a RAG (Retrieval Augmented Generation) approach.
 ## Prerequisites
 - **Python 3.11**
 - **Windows 11**
+- **PowerShell 7** (`pwsh`) on the PATH
 - **Git**
 - **Trade.gov API key**
 - **Docker Desktop**

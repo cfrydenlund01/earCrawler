@@ -1,9 +1,18 @@
+"""Integration test for provenance contract.
+
+Requires PowerShell 7 (``pwsh``) to be installed and on the PATH.
+"""
+
 import json
 import pathlib
 import subprocess
-import sys
+import shutil
 
 import pytest
+
+if shutil.which("pwsh") is None:
+    pytest.skip("PowerShell 7 not found", allow_module_level=True)
+
 from rdflib import ConjunctiveGraph
 
 from earCrawler.kg.emit_ear import emit_ear
@@ -15,7 +24,6 @@ SCRIPT_SHACL = KG_DIR / 'scripts' / 'ci-shacl-owl.ps1'
 SCRIPT_PROV = KG_DIR / 'scripts' / 'ci-provenance.ps1'
 
 
-@pytest.mark.skipif(sys.platform != 'win32', reason='Windows-only')
 def test_provenance_contract(tmp_path):
     prov_g = new_prov_graph()
     fixture_dir = pathlib.Path('tests/kg/fixtures')
