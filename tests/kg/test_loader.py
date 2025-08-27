@@ -13,6 +13,7 @@ def test_load_tdb_autoinstall_downloads_once(tmp_path, monkeypatch):
     monkeypatch.setattr(
         jena_tools, "_tdbloader_path", lambda home: home / "bat" / "tdb2.tdbloader.bat"
     )
+    monkeypatch.delenv("JENA_VERSION", raising=False)
 
     ttl = Path("foo.ttl")
     ttl.write_text("")
@@ -21,8 +22,9 @@ def test_load_tdb_autoinstall_downloads_once(tmp_path, monkeypatch):
 
     def fake_urlretrieve(url, filename):
         downloads.append(url)
+        version = os.environ.get("JENA_VERSION", "5.3.0")
         with zipfile.ZipFile(filename, "w") as zf:
-            zf.writestr("apache-jena-4.10.0/bat/tdb2.tdbloader.bat", "")
+            zf.writestr(f"apache-jena-{version}/bat/tdb2.tdbloader.bat", "")
             zf.writestr("payload.bin", os.urandom(6 * 1024 * 1024))
 
     monkeypatch.setattr(urllib.request, "urlretrieve", fake_urlretrieve)

@@ -7,6 +7,7 @@ import os
 import shutil
 import zipfile
 import urllib.request
+from urllib.error import HTTPError
 
 
 def get_jena_home(root: Path = Path(".")) -> Path:
@@ -20,13 +21,16 @@ def _tdbloader_path(jena_home: Path) -> Path:
     return jena_home / "bin" / "tdb2.tdbloader"
 
 
-def ensure_jena(download: bool = True, version: str = "4.10.0") -> Path:
-    """Ensure Apache Jena exists under tools/jena.
+def ensure_jena(download: bool = True, version: str | None = None) -> Path:
+    """Ensure Apache Jena exists under ``tools/jena``.
 
-    If the TDB2 loader is missing and ``download`` is True, the archive is
-    retrieved and extracted into the tools directory.
+    The default version is taken from ``JENA_VERSION`` or falls back to
+    ``5.3.0``. The binary archive is fetched from the Apache archive and falls
+    back to the live download mirror if the requested version is only available
+    there.
     """
 
+    version = version or os.getenv("JENA_VERSION", "5.3.0")
     root = Path(".").resolve()
     jena_home = get_jena_home(root)
     loader = _tdbloader_path(jena_home)
@@ -38,13 +42,36 @@ def ensure_jena(download: bool = True, version: str = "4.10.0") -> Path:
     download_dir = root / "tools" / "jena-download"
     download_dir.mkdir(parents=True, exist_ok=True)
     zip_path = download_dir / f"jena-{version}.zip"
-    url = (
-        f"https://downloads.apache.org/jena/binaries/apache-jena-{version}.zip"
+    archive_url = (
+        f"https://archive.apache.org/dist/jena/binaries/apache-jena-{version}.zip"
     )
+    urls = [archive_url]
+
     try:
-        urllib.request.urlretrieve(url, zip_path)
+        urllib.request.urlretrieve(archive_url, zip_path)
+    except HTTPError as exc:
+        if exc.code != 404:
+            raise RuntimeError(
+                f"Failed to download Jena from {archive_url}: {exc}. "
+                "Set JENA_VERSION to override."
+            ) from exc
+        mirror_url = (
+            f"https://downloads.apache.org/jena/binaries/apache-jena-{version}.zip"
+        )
+        urls.append(mirror_url)
+        try:
+            urllib.request.urlretrieve(mirror_url, zip_path)
+        except Exception as exc2:  # pragma: no cover - network errors
+            raise RuntimeError(
+                "Failed to download Jena from {}. Set JENA_VERSION to override.".format(
+                    ", ".join(urls)
+                )
+            ) from exc2
     except Exception as exc:  # pragma: no cover - network errors
-        raise RuntimeError(f"Failed to download Jena: {exc}") from exc
+        raise RuntimeError(
+            f"Failed to download Jena from {archive_url}: {exc}. "
+            "Set JENA_VERSION to override."
+        ) from exc
 
     if zip_path.stat().st_size < 5 * 1024 * 1024:
         raise RuntimeError("Downloaded Jena archive is too small")
@@ -61,6 +88,8 @@ def ensure_jena(download: bool = True, version: str = "4.10.0") -> Path:
         shutil.rmtree(jena_home)
     shutil.move(str(extracted), jena_home)
     shutil.rmtree(temp_dir, ignore_errors=True)
+    if not (jena_home / "bat" / "tdb2.tdbloader.bat").exists():
+        raise RuntimeError("Jena archive missing Windows TDB2 loader script")
     return jena_home
 
 

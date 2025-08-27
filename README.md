@@ -166,6 +166,7 @@ python -m earCrawler.cli kg-export
 python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
 ```
 To disable auto-download, add `--no-auto-install`. By default, Jena is fetched once and cached in `tools\jena`.
+Local bootstrap uses the Apache archive for pinned Jena 5.3.0; set `JENA_VERSION` to override.
 
 ### Phase B.3 — Serve & Query
 
