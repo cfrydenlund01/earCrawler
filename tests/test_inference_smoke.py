@@ -1,3 +1,9 @@
+"""Smoke tests for inference scripts using Apache Jena and Fuseki.
+
+These tests require PowerShell, a Java runtime, and network access to
+download the tools on demand. They are only executed on Windows systems.
+"""
+
 import json
 import pathlib
 import subprocess
@@ -10,6 +16,9 @@ SCRIPT = pathlib.Path('kg/scripts/ci-inference-smoke.ps1')
 JENA_DIR = pathlib.Path('tools') / 'jena'
 FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
 REPORTS_DIR = pathlib.Path('kg') / 'reports'
+
+if shutil.which("pwsh") is None or shutil.which("java") is None:
+    pytest.skip("PowerShell 7 and Java are required", allow_module_level=True)
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")

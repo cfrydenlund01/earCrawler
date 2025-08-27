@@ -9,6 +9,7 @@ bitsandbytes==0.43.1
 peft==0.11.1
 transformers==4.39.3
 fastapi==0.116.1
+rdflib==6.3.2
 pyshacl==0.25.0
 SPARQLWrapper==2.0.0
 
