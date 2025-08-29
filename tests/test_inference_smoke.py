@@ -5,6 +5,7 @@ download the tools on demand. They are only executed on Windows systems.
 """
 
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -32,12 +33,17 @@ def test_inference_rdfs_smoke_when_tools_present():
         pytest.skip("Jena or Fuseki tools missing")
     if REPORTS_DIR.exists():
         shutil.rmtree(REPORTS_DIR)
+    env = {
+        **os.environ,
+        "JENA_HOME": str(JENA_DIR),
+        "FUSEKI_HOME": str(FUSEKI_DIR),
+    }
     result = subprocess.run([
         "pwsh",
         str(SCRIPT),
         "-Mode",
         "rdfs",
-    ], capture_output=True, text=True)
+    ], capture_output=True, text=True, env=env)
     assert result.returncode == 0, result.stdout + result.stderr
     json_path = REPORTS_DIR / "inference-rdfs.json"
     select_path = REPORTS_DIR / "inference-rdfs-select.srj"
@@ -52,12 +58,17 @@ def test_inference_rdfs_smoke_when_tools_present():
 def test_inference_owlmini_smoke_when_tools_present():
     if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
         pytest.skip("Jena or Fuseki tools missing")
+    env = {
+        **os.environ,
+        "JENA_HOME": str(JENA_DIR),
+        "FUSEKI_HOME": str(FUSEKI_DIR),
+    }
     result = subprocess.run([
         "pwsh",
         str(SCRIPT),
         "-Mode",
         "owlmini",
-    ], capture_output=True, text=True)
+    ], capture_output=True, text=True, env=env)
     assert result.returncode == 0, result.stdout + result.stderr
     json_path = REPORTS_DIR / "inference-owlmini.json"
     select_path = REPORTS_DIR / "inference-owlmini-select.srj"
