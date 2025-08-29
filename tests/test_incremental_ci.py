@@ -11,8 +11,18 @@ MANIFEST = Path('kg/.kgstate/manifest.json')
 STATUS = Path('kg/reports/incremental-status.json')
 NOOP = Path('kg/reports/incremental-noop.txt')
 SNAPSHOT = Path('kg/snapshots/smoke.srj')
+INC_TOUCH = Path('kg/testdata/inc_touch.ttl')
 
 run = pytest.mark.skipif(sys.platform != 'win32', reason='Windows-only')
+
+
+@pytest.fixture(autouse=True)
+def cleanup_inc_touch():
+    if INC_TOUCH.exists():
+        INC_TOUCH.unlink()
+    yield
+    if INC_TOUCH.exists():
+        INC_TOUCH.unlink()
 
 
 def _run_script():
@@ -43,8 +53,7 @@ def test_incremental_second_run_noop():
 
 @run
 def test_incremental_detects_touch(tmp_path):
-    target = Path('kg/testdata/inc_touch.ttl')
-    target.write_text('test')
+    INC_TOUCH.write_text('test')
     status = _run_script()
     assert status['changed'] is True
     assert 'kg/testdata/inc_touch.ttl' in status['paths']
