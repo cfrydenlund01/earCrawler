@@ -11,7 +11,33 @@ on:
       - '.github/workflows/kg-ci.yml'
 
 jobs:
-  roundtrip:
+  incremental-scan:
+    runs-on: windows-latest
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard versions
+        shell: pwsh
+        run: python scripts/check_versions.py
+      - name: Run incremental scan
+        shell: pwsh
+        run: kg/scripts/ci-incremental.ps1
+      - id: detect
+        shell: pwsh
+        run: |
+          $status = Get-Content kg/reports/incremental-status.json | ConvertFrom-Json
+          Write-Output "changed=$($status.changed)" | Out-File -FilePath $Env:GITHUB_OUTPUT -Encoding utf8 -Append
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: incremental-reports
+          path: kg/reports/*
+
+  roundtrip-and-snapshots:
+    needs: incremental-scan
+    if: needs.incremental-scan.outputs.changed == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,8 +78,8 @@ jobs:
           name: sparql-snapshots
           path: kg/snapshots/*.srj
   shacl-owl-smoke:
-    needs: roundtrip
-    if: always()
+    needs: [incremental-scan, roundtrip-and-snapshots]
+    if: needs.incremental-scan.outputs.changed == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -94,8 +120,8 @@ jobs:
           name: shacl-owl-reports
           path: kg/reports/*
   inference-smoke:
-    needs: [roundtrip, shacl-owl-smoke]
-    if: always()
+    needs: [incremental-scan, roundtrip-and-snapshots, shacl-owl-smoke]
+    if: needs.incremental-scan.outputs.changed == 'true'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -139,7 +165,8 @@ jobs:
           name: inference-reports
           path: kg/reports/*
   api-contract-tests:
-    needs: inference-smoke
+    needs: [incremental-scan, inference-smoke]
+    if: needs.incremental-scan.outputs.changed == 'true'
     runs-on: windows-latest
     env:
       VCR_RECORD_MODE: none
@@ -165,7 +192,8 @@ jobs:
           path: tests/fixtures/cassettes/*.yaml
 
   provenance-checks:
-    needs: api-contract-tests
+    needs: [incremental-scan, api-contract-tests]
+    if: needs.incremental-scan.outputs.changed == 'true'
     runs-on: windows-latest
     env:
       VCR_RECORD_MODE: none

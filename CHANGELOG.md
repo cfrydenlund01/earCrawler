@@ -1,3 +1,13 @@
+## [0.11.0]
+### Added
+- Incremental KG builds with content hashing, change detection, and diff snapshots.
+
+## [0.10.0]
+### Added
+- PROV-O provenance for API data with deterministic IRIs.
+- SHACL shapes enforcing minimal provenance.
+- Lineage SPARQL checks wired into Windows CI.
+
 ## [0.9.0] - 2025-08-12
 ### Added
 - SPARQL sanity checks and SHACL validation (`kg-validate`) for EAR/NSF TTLs.
@@ -5,12 +15,6 @@
 - Trade.gov and Federal Register clients with HTTP caching.
 - VCR recorded fixtures and offline API contract tests.
 - KG enrichment helpers and CLI commands.
-
-## [0.10.0]
-### Added
-- PROV-O provenance for API data with deterministic IRIs.
-- SHACL shapes enforcing minimal provenance.
-- Lineage SPARQL checks wired into Windows CI.
 
 ## [0.8.0]
 ### Added

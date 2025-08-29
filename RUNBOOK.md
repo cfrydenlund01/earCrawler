@@ -167,6 +167,15 @@ pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
 - `kg/scripts/ci-provenance.ps1` validates `kg/prov/prov.ttl`, loads the domain
   and provenance graphs into TDB2, and executes lineage SPARQL queries.
 - Reports under `kg/reports/lineage-*.{srj,txt}` summarise missing provenance and
-  activity integrity.
+activity integrity.
 - A non-zero count or `true` ASK result indicates broken lineage links. Re-run
-  emitters with `new_prov_graph()` to regenerate provenance.
+emitters with `new_prov_graph()` to regenerate provenance.
+
+## Incremental KG builds
+- The first run of `kg/scripts/ci-incremental.ps1` creates a manifest of hashed
+  inputs. Subsequent runs compare hashes and skip rebuilds when unchanged.
+- To force a rebuild, delete `kg/.kgstate/manifest.json` or run with
+  `STRICT_SNAPSHOT=1`.
+- Review `kg/reports/diff-summary.txt` for a human-friendly list of snapshot
+  diffs. Ordering issues typically stem from missing `ORDER BY` clauses in
+  queries.
