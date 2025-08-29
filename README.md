@@ -160,7 +160,7 @@ Outputs `data\\kg\\ear.ttl` and `data\\kg\\nsf.ttl`. Re-running the command with
 - Start Fuseki: `fuseki-server --config config/fuseki-config.ttl`
 
 ### Setup for SHACL/OWL validation
-1. Install Java 11+ and verify the installation:
+1. Install Java 17+ and verify the installation:
    ```powershell
    java -version
    ```

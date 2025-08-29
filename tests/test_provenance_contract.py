@@ -12,8 +12,12 @@ import shutil
 
 import pytest
 
-if shutil.which("pwsh") is None or shutil.which("java") is None:
-    pytest.skip("PowerShell 7 and Java are required", allow_module_level=True)
+from .java_utils import JAVA_VERSION_OK
+
+if shutil.which("pwsh") is None or not JAVA_VERSION_OK:
+    pytest.skip(
+        "PowerShell 7 and Java 17+ are required", allow_module_level=True
+    )
 
 from rdflib import ConjunctiveGraph
 
