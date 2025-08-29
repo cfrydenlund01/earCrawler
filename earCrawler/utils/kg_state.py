@@ -36,26 +36,23 @@ def _hash_file(path: Path) -> str:
 
 
 def _iter_files(root: Path) -> Iterable[Path]:
-    seen = set()
+    seen: set[Path] = set()
     for pattern in INCLUDE_GLOBS:
         for p in root.glob(pattern):
             if p.is_file():
-                skip = False
-                for ex in EXCLUDE_GLOBS:
-                    if p.match(ex):
-                        skip = True
-                        break
-                if not skip:
-                    rp = p.relative_to(root)
-                    if rp not in seen:
-                        seen.add(rp)
-                        yield p
+                if any(p.match(ex) for ex in EXCLUDE_GLOBS):
+                    continue
+                rp = p.relative_to(root)
+                if rp not in seen:
+                    seen.add(rp)
+                    yield rp
 
 
 def build_manifest(root: Path) -> Dict[str, str]:
-    files = {}
-    for p in _iter_files(root):
-        files[p.as_posix().replace("\\", "/")] = _hash_file(p)
+    files: Dict[str, str] = {}
+    for rp in _iter_files(root):
+        key = rp.as_posix().replace("\\", "/")
+        files[key] = _hash_file(root / rp)
     digest = hashlib.sha256(
         "".join(f"{k}:{files[k]}" for k in sorted(files)).encode("utf-8")
     ).hexdigest()
