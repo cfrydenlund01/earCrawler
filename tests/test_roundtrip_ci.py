@@ -12,6 +12,8 @@ import shutil
 
 import pytest
 
+from .java_utils import JAVA_VERSION_OK
+
 SCRIPT = (
     pathlib.Path(__file__).resolve().parents[1]
     / 'kg'
@@ -21,9 +23,13 @@ SCRIPT = (
 JENA_DIR = pathlib.Path('tools') / 'jena'
 FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
 
-if shutil.which("pwsh") is None or shutil.which("javac") is None:
+if (
+    shutil.which("pwsh") is None
+    or shutil.which("javac") is None
+    or not JAVA_VERSION_OK
+):
     pytest.skip(
-        "PowerShell 7 and a JDK with javac are required",
+        "PowerShell 7 and a JDK 17+ with javac are required",
         allow_module_level=True,
     )
 

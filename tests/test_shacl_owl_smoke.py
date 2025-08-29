@@ -14,13 +14,17 @@ import shutil
 
 import pytest
 
+from .java_utils import JAVA_VERSION_OK
+
 SCRIPT = pathlib.Path('kg/scripts/ci-shacl-owl.ps1')
 JENA_DIR = pathlib.Path('tools') / 'jena'
 FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
 REPORTS_DIR = pathlib.Path('kg') / 'reports'
 
-if shutil.which("pwsh") is None or shutil.which("java") is None:
-    pytest.skip("PowerShell 7 and Java are required", allow_module_level=True)
+if shutil.which("pwsh") is None or not JAVA_VERSION_OK:
+    pytest.skip(
+        "PowerShell 7 and Java 17+ are required", allow_module_level=True
+    )
 
 
 @pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
