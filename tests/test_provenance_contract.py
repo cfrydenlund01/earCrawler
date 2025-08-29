@@ -5,6 +5,7 @@ the PATH. The Apache Jena and Fuseki tools are downloaded on demand.
 """
 
 import json
+import os
 import pathlib
 import subprocess
 import shutil
@@ -25,9 +26,13 @@ from earCrawler.kg.prov import new_prov_graph, write_prov_files
 KG_DIR = pathlib.Path('kg')
 SCRIPT_SHACL = KG_DIR / 'scripts' / 'ci-shacl-owl.ps1'
 SCRIPT_PROV = KG_DIR / 'scripts' / 'ci-provenance.ps1'
+JENA_DIR = pathlib.Path('tools') / 'jena'
+FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
 
 
 def test_provenance_contract(tmp_path):
+    if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
+        pytest.skip("Jena or Fuseki tools missing")
     prov_g = new_prov_graph()
     fixture_dir = pathlib.Path('tests/kg/fixtures')
     emit_ear(fixture_dir, KG_DIR, prov_graph=prov_g)
@@ -49,16 +54,27 @@ def test_provenance_contract(tmp_path):
         out.write((KG_DIR / 'ear.ttl').read_text())
         out.write((KG_DIR / 'tradegov.ttl').read_text())
 
-    subprocess.run(['pwsh', str(SCRIPT_SHACL)], check=True)
+    env = {
+        **os.environ,
+        "JENA_HOME": str(JENA_DIR),
+        "FUSEKI_HOME": str(FUSEKI_DIR),
+    }
+    subprocess.run(['pwsh', str(SCRIPT_SHACL)], check=True, env=env)
     conf = (KG_DIR / 'reports' / 'shacl-conforms.txt').read_text().strip()
     assert conf == 'true'
 
-    subprocess.run(['pwsh', str(SCRIPT_PROV)], check=True)
-    info = json.loads((KG_DIR / 'reports' / 'lineage-min-required.srj').read_text())
+    subprocess.run(['pwsh', str(SCRIPT_PROV)], check=True, env=env)
+    info = json.loads(
+        (KG_DIR / 'reports' / 'lineage-min-required.srj').read_text()
+    )
     assert int(info['results']['bindings'][0]['cnt']['value']) == 0
-    info2 = json.loads((KG_DIR / 'reports' / 'lineage-activity-integrity.srj').read_text())
+    info2 = json.loads(
+        (KG_DIR / 'reports' / 'lineage-activity-integrity.srj').read_text()
+    )
     assert info2['boolean'] is False
-    sample = json.loads((KG_DIR / 'reports' / 'lineage-source-consistency.srj').read_text())
+    sample = json.loads(
+        (KG_DIR / 'reports' / 'lineage-source-consistency.srj').read_text()
+    )
     assert sample['results']['bindings'], 'expect sample rows'
 
     g = ConjunctiveGraph()

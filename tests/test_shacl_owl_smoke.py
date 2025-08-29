@@ -6,6 +6,7 @@ Windows environments.
 """
 
 import json
+import os
 import pathlib
 import subprocess
 import sys
@@ -33,7 +34,14 @@ def test_shacl_report_artifacts_when_tools_present():
         pytest.skip("Jena or Fuseki tools missing")
     if REPORTS_DIR.exists():
         shutil.rmtree(REPORTS_DIR)
-    result = subprocess.run(["pwsh", str(SCRIPT)], capture_output=True, text=True)
+    env = {
+        **os.environ,
+        "JENA_HOME": str(JENA_DIR),
+        "FUSEKI_HOME": str(FUSEKI_DIR),
+    }
+    result = subprocess.run(
+        ["pwsh", str(SCRIPT)], capture_output=True, text=True, env=env
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     conforms_path = REPORTS_DIR / "shacl-conforms.txt"
     assert conforms_path.exists()
