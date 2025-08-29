@@ -466,3 +466,12 @@ pwsh kg/scripts/ci-provenance.ps1
 
 Reports appear in `kg/reports/` and include counts of missing provenance,
 activity integrity, and a sample SELECT for manual review.
+
+## B.11 Incremental builds
+
+`kg/scripts/ci-incremental.ps1` hashes all KG inputs and stores a manifest
+under `kg/.kgstate/manifest.json`. A subsequent run compares hashes to detect
+changes. When nothing changed the script writes
+`kg/reports/incremental-noop.txt` and exits quickly. When inputs differ it
+re-runs the round-trip, SHACL/OWL, inference, and provenance steps, then writes
+diffs for canonical N-Quads and SPARQL snapshots to `kg/reports/`.
