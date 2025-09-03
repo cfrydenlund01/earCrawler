@@ -75,7 +75,12 @@ def _iter_files(base: Path) -> Iterable[Path]:
 
 
 def _evaluate(base: Path, policy: RetentionPolicy) -> Tuple[List[dict], int]:
-    files = sorted(_iter_files(base), key=lambda p: p.stat().st_mtime, reverse=True)
+    files = sorted(
+        _iter_files(base),
+        key=lambda p: (p.stat().st_mtime, p.as_posix()),
+        reverse=True,
+    )
+  
     protected = set(files[: policy.keep_last_n]) if policy.keep_last_n > 0 else set()
     now = _now().timestamp()
     candidates: List[dict] = []
@@ -147,7 +152,6 @@ def gc_paths(
             report_dir.mkdir(parents=True, exist_ok=True)
             safe_ts = ts.replace(":", "-")
             audit_path = report_dir / f"gc-audit-{safe_ts}.json"
-
             with audit_path.open("w", encoding="utf-8") as fh:
                 json.dump({"timestamp": ts, "deleted": deleted}, fh, indent=2)
     return {"candidates": candidates, "errors": errors, "deleted": deleted}
