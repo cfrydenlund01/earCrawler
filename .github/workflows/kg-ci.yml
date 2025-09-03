@@ -286,3 +286,25 @@ PY
         with:
           name: earctl-exe
           path: dist/earctl-*-win64.exe
+
+  telemetry-tests:
+    runs-on: windows-latest
+    env:
+      EAR_NO_TELEM_HTTP: '1'
+      PYTEST_ALLOW_NETWORK: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install deps
+        run: pip install -r requirements-win.txt
+      - name: Run telemetry tests
+        run: pytest tests/telemetry
+      - name: Upload spool
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telemetry-spool
+          path: '${{ env.APPDATA }}\\EarCrawler\\spool'

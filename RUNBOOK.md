@@ -33,6 +33,13 @@
   2. `cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<NEW_VALUE>`
 - For environment variables, update deployment configuration and restart containers.
 
+## Telemetry Operations
+- Enable or disable with `earctl telemetry enable|disable`.
+- Change the upload endpoint by editing `%APPDATA%\EarCrawler\telemetry.json`.
+- Rotate the HTTP auth token stored in the Windows Credential Manager under the name specified by `auth_secret_name` in the config.
+- Force garbage collection of the spool by deleting old `events-*.jsonl.gz` files or running `scripts/telemetry-gc.ps1`.
+- To share data with support, run `scripts/telemetry-export.ps1` which bundles recent events into `dist/telemetry_bundle.jsonl.gz` after an additional redaction pass.
+
 ## Monitoring
 Execute `./monitor.ps1 -Services @('http://localhost:8000/health')` to poll services.
 Failures are written to `monitor.log` and the Windows Event Log under source `EARMonitor`.
