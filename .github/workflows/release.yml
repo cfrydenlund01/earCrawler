@@ -39,6 +39,27 @@ jobs:
       - name: SBOM
         shell: pwsh
         run: scripts/sbom.ps1
+      - name: Canonical freeze
+        shell: pwsh
+        run: kg/scripts/canonical-freeze.ps1
+      - name: Canonical ZIP
+        shell: pwsh
+        run: scripts/make-canonical-zip.ps1 -Version ${{ github.ref_name }}
+      - name: Manifest
+        shell: pwsh
+        run: scripts/make-manifest.ps1
+      - name: Sign manifest
+        shell: pwsh
+        run: scripts/sign-manifest.ps1
+      - name: Provenance attestation
+        shell: pwsh
+        run: scripts/provenance-attest.ps1
+      - name: Determinism check
+        shell: pwsh
+        run: scripts/rebuild-compare.ps1 -Version ${{ github.ref_name }}
+      - name: Update changelog
+        shell: pwsh
+        run: scripts/changelog-update.ps1 -NextVersion ${{ github.ref_name }}
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
@@ -48,5 +69,11 @@ jobs:
             dist/earcrawler-setup-*.exe
             dist/checksums.sha256
             dist/sbom.spdx.json
+            kg/canonical/manifest.json
+            kg/canonical/provenance.json
+            kg/canonical/release_notes.md
+            kg/canonical/checksums.sha256
+            dist/*.zip
+            scripts/verify-release.ps1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

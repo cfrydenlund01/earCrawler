@@ -1,3 +1,7 @@
+## [0.16.0]
+### Added
+- Reproducible KG snapshot releases with signed manifest and provenance.
+
 ## [0.15.0]
 ### Added
 - Hermetic toolchain with Jena/Fuseki checksum verification.
