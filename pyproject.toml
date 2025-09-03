@@ -1,6 +1,6 @@
 [project]
 name = "earCrawler"
-version = "0.9.0"
+version = "0.12.0"
 description = "EAR AI ingestion, RAG, and analytics pipeline"
 authors = [{ name = "Your Name", email = "you@example.com" }]
 license = { text = "MIT" }
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-earCrawler = "earCrawler.cli.__main__:main"
+earctl = "earCrawler.cli:main"
 kg-validate = "cli.kg_validate:main"
 
 [tool.setuptools]

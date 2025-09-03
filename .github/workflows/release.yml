@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install build pyinstaller pip-licenses
+      - name: Build wheel
+        shell: pwsh
+        run: scripts/build-wheel.ps1
+      - name: Build exe
+        shell: pwsh
+        run: scripts/build-exe.ps1
+      - name: Make installer
+        shell: pwsh
+        run: scripts/make-installer.ps1
+      - name: Sign artifacts
+        shell: pwsh
+        run: scripts/sign-artifacts.ps1
+      - name: Verify signatures
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -Filter *.exe | ForEach-Object { signtool verify /pa $_.FullName }
+      - name: Checksums
+        shell: pwsh
+        run: scripts/checksums.ps1
+      - name: SBOM
+        shell: pwsh
+        run: scripts/sbom.ps1
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.whl
+            dist/earctl-*-win64.exe
+            dist/earcrawler-setup-*.exe
+            dist/checksums.sha256
+            dist/sbom.spdx.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

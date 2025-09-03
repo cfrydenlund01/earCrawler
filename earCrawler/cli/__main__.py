@@ -3,10 +3,13 @@ from __future__ import annotations
 """Top-level CLI exposing NSF parser and reports commands."""
 
 import json
+import platform
+import sys
 from pathlib import Path
 
 import click
 
+from earCrawler import __version__
 from earCrawler.core.nsf_case_parser import NSFCaseParser
 from .ear_fetch import fetch_entities, fetch_ear, warm_cache
 from . import reports_cli
@@ -17,8 +20,20 @@ from earCrawler.kg import emit_ear, emit_nsf
 
 
 @click.group()
+@click.version_option(__version__)
 def cli() -> None:  # pragma: no cover - simple wrapper
     """earCrawler command line."""
+
+
+@cli.command()
+def diagnose() -> None:
+    """Print deterministic diagnostic information."""
+    info = {
+        "python": sys.version.split()[0],
+        "platform": platform.platform(),
+        "earCrawler": __version__,
+    }
+    click.echo(json.dumps(info, sort_keys=True, indent=2))
 
 
 @cli.command(name="nsf-parse")
