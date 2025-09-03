@@ -17,7 +17,7 @@ def test_ensure_jena_bootstrap(tmp_path, monkeypatch):
     versions = json.loads((Path(__file__).resolve().parents[1] / "tools/versions.json").read_text())
     def fake_urlretrieve(url, filename):
         with zipfile.ZipFile(filename, "w") as zf:
-            base = f"apache-jena-{versions['jena']}/bat"
+            base = f"apache-jena-{versions['jena']['version']}/bat"
             zf.writestr(f"{base}/riot.bat", "")
             zf.writestr(f"{base}/arq.bat", "")
             zf.writestr(f"{base}/tdb2_tdbloader.bat", "")
@@ -50,7 +50,7 @@ def test_ensure_jena_missing_scripts(tmp_path, monkeypatch):
     versions = json.loads((Path(__file__).resolve().parents[1] / "tools/versions.json").read_text())
     def fake_urlretrieve(url, filename):
         with zipfile.ZipFile(filename, "w") as zf:
-            zf.writestr(f"apache-jena-{versions['jena']}/README.txt", "")
+            zf.writestr(f"apache-jena-{versions['jena']['version']}/README.txt", "")
 
     monkeypatch.setattr(urllib.request, "urlretrieve", fake_urlretrieve)
 
