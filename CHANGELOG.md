@@ -1,3 +1,7 @@
+## [0.12.0]
+### Added
+- Windows packaging: CLI entrypoint `earctl`, PyInstaller executable, Inno Setup installer, signed artifacts, checksums, SBOM, and release workflow.
+
 ## [0.11.0]
 ### Added
 - Incremental KG builds with content hashing, change detection, and diff snapshots.

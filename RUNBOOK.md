@@ -1,5 +1,15 @@
 # Runbook
 
+## Release packaging
+1. Bump version in `pyproject.toml` and commit.
+2. Tag `vX.Y.Z` and push.
+3. Ensure signing secrets `SIGNING_CERT_PFX_BASE64` and `SIGNING_CERT_PASSWORD` are available when signing.
+4. Run `pwsh scripts/build-wheel.ps1`, `pwsh scripts/build-exe.ps1`, and `pwsh scripts/make-installer.ps1`.
+5. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
+6. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
+7. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
+8. Create a GitHub release and upload the wheel, EXE, installer, checksum, and SBOM files.
+
 ## Deploying LoRA/QLoRA Models
 1. Tag a release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 2. GitHub Actions builds and pushes `api`, `rag`, and `agent` images to GHCR.
