@@ -1,3 +1,9 @@
+## [0.14.0]
+### Added
+- Centralised retention GC for telemetry, caches, and KG artifacts.
+- Telemetry timestamps now use timezone-aware UTC with ISO-8601 `Z`.
+- CI job runs GC in dry-run mode and uploads reports.
+
 ## [0.12.0]
 ### Added
 - Windows packaging: CLI entrypoint `earctl`, PyInstaller executable, Inno Setup installer, signed artifacts, checksums, SBOM, and release workflow.

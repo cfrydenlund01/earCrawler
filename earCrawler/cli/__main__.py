@@ -19,6 +19,7 @@ from earCrawler.kg.sparql import SPARQLClient
 from earCrawler.kg import emit_ear, emit_nsf
 from earCrawler.telemetry.hooks import install as install_telem
 from .telemetry import telemetry, crash_test
+from .gc import gc
 
 install_telem()
 
@@ -80,6 +81,7 @@ cli.add_command(fetch_ear)
 cli.add_command(warm_cache)
 cli.add_command(telemetry)
 cli.add_command(crash_test)
+cli.add_command(gc)
 
 
 @cli.command(name="crawl")

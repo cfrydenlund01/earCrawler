@@ -3,7 +3,7 @@ from __future__ import annotations
 import gzip
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Any
 
@@ -31,7 +31,7 @@ class FileSink:
         return self.current
 
     def _rotate(self) -> None:
-        ts = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
         dest = self.dir / f"events-{ts}.jsonl"
         self.current.replace(dest)
         gz = dest.with_suffix(dest.suffix + ".gz")
@@ -41,12 +41,18 @@ class FileSink:
         self.current = self.dir / "current.jsonl"
 
     def _gc(self) -> None:
-        max_total = self.cfg.max_spool_mb * 1024 * 1024
         files = sorted(self.dir.glob("events-*.jsonl.gz"), key=lambda p: p.stat().st_mtime)
+        if self.cfg.keep_last_n > 0:
+            files = files[:-self.cfg.keep_last_n]
+        max_total = self.cfg.max_spool_mb * 1024 * 1024
         total = sum(p.stat().st_size for p in files)
         now = time.time()
         for p in files:
-            if total > max_total or now - p.stat().st_mtime > 7 * 86400:
+            if (
+                total > max_total
+                or now - p.stat().st_mtime > self.cfg.max_age_days * 86400
+                or p.stat().st_size > self.cfg.max_file_mb * 1024 * 1024
+            ):
                 total -= p.stat().st_size
                 p.unlink(missing_ok=True)
 
@@ -61,3 +67,13 @@ class FileSink:
                 except json.JSONDecodeError:
                     continue
         return events
+
+    def compact(self) -> None:
+        """Truncate empty files and gzip any stray rotated logs."""
+        if self.current.exists() and self.current.stat().st_size == 0:
+            self.current.unlink()
+        for p in self.dir.glob("events-*.jsonl"):
+            gz = p.with_suffix(p.suffix + ".gz")
+            with p.open("rb") as f_in, gzip.open(gz, "wb") as f_out:
+                f_out.writelines(f_in)
+            p.unlink(missing_ok=True)
