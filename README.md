@@ -31,6 +31,16 @@ earctl --help
 earctl diagnose
 ```
 
+### B.18 Reconciliation
+The reconciliation engine merges duplicate entities across sources using
+deterministic rules.  Example usage:
+
+```cmd
+earctl reconcile run
+earctl reconcile report
+earctl reconcile explain s1 s2
+```
+
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be
 cloned to `C:\Users\cfrydenlund\Projects\earCrawler`.
