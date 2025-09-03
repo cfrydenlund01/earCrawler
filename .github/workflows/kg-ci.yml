@@ -358,10 +358,35 @@ PY
       - name: Upload GC reports
         if: always()
         uses: actions/upload-artifact@v4
-        with:
-          name: gc-reports
-          path: kg/reports/*
 
+     with:
+        name: gc-reports
+        path: kg/reports/*
+
+  reconcile-checks:
+    needs: [provenance-checks, telemetry-tests]
+    runs-on: windows-latest
+    env:
+      VCR_RECORD_MODE: none
+      PYTEST_ALLOW_NETWORK: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard versions
+        shell: pwsh
+        run: python scripts/check_versions.py
+      - name: Run reconciliation checks
+        shell: pwsh
+        run: kg/scripts/ci-reconcile.ps1
+      - name: Upload reconciliation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconcile-reports
+          path: |
+            kg/reports/reconcile-summary.json
+            kg/reports/reconcile-conflicts.json
+            kg/reports/reconcile-ci.txt
+            
   repro-smoke:
     runs-on: windows-latest
     steps:
