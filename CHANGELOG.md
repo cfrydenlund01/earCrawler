@@ -1,3 +1,9 @@
+## [0.15.0]
+### Added
+- Hermetic toolchain with Jena/Fuseki checksum verification.
+- Hash-locked Python dependencies and offline wheelhouse installer.
+- CycloneDX SBOM generation and attestation script.
+
 ## [0.14.0]
 ### Added
 - Centralised retention GC for telemetry, caches, and KG artifacts.

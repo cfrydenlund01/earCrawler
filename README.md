@@ -508,3 +508,12 @@ earctl gc --dry-run --target all
 
 Run with `--apply --yes` to delete and record an audit log under
 `kg/reports/`.
+
+## B.15 Hermetic toolchain
+
+Build and install dependencies from the pre-verified wheelhouse:
+
+```powershell
+pwsh -File .\scripts\build-wheelhouse.ps1
+pwsh -File .\scripts\install-from-wheelhouse.ps1
+```
