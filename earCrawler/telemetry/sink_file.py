@@ -42,19 +42,26 @@ class FileSink:
 
     def _gc(self) -> None:
         files = sorted(self.dir.glob("events-*.jsonl.gz"), key=lambda p: p.stat().st_mtime)
-        if self.cfg.keep_last_n > 0:
-            files = files[:-self.cfg.keep_last_n]
         max_total = self.cfg.max_spool_mb * 1024 * 1024
         total = sum(p.stat().st_size for p in files)
         now = time.time()
-        for p in files:
-            if (
-                total > max_total
-                or now - p.stat().st_mtime > self.cfg.max_age_days * 86400
-                or p.stat().st_size > self.cfg.max_file_mb * 1024 * 1024
-            ):
+        max_age = self.cfg.max_age_days * 86400
+        max_size = self.cfg.max_file_mb * 1024 * 1024
+
+        # Remove files violating age or size limits if over quotas
+        for p in list(files):
+            if total <= max_total and len(files) <= self.cfg.keep_last_n:
+                break
+            if now - p.stat().st_mtime > max_age or p.stat().st_size > max_size:
                 total -= p.stat().st_size
+                files.remove(p)
                 p.unlink(missing_ok=True)
+
+        # Enforce total size and keep_last_n (oldest first)
+        while (total > max_total or len(files) > self.cfg.keep_last_n) and files:
+            p = files.pop(0)
+            total -= p.stat().st_size
+            p.unlink(missing_ok=True)
 
     def tail(self, n: int = 5) -> list[dict[str, Any]]:
         events: list[dict[str, Any]] = []

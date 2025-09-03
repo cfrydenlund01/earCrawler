@@ -21,7 +21,7 @@ def test_load_tdb_autoinstall_downloads_once(tmp_path, monkeypatch):
     def fake_urlretrieve(url, filename):
         downloads.append(url)
         versions = json.loads((Path(__file__).resolve().parents[2] / "tools/versions.json").read_text())
-        version = os.environ.get("JENA_VERSION", versions["jena"])
+        version = os.environ.get("JENA_VERSION", versions["jena"]["version"])
         with zipfile.ZipFile(filename, "w") as zf:
             base = f"apache-jena-{version}/bat"
             zf.writestr(f"{base}/riot.bat", "")
