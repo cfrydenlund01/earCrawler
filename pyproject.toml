@@ -24,3 +24,6 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "earCrawler.kg" = ["shapes.ttl"]
+
+[tool.setuptools.data-files]
+"docs/privacy" = ["docs/privacy/telemetry_policy.md", "docs/privacy/redaction_rules.md"]

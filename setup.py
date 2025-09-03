@@ -7,6 +7,7 @@ setup(
     author="Your Name",
     author_email="you@example.com",
     packages=find_packages(),
+    package_data={"": ["docs/privacy/telemetry_policy.md", "docs/privacy/redaction_rules.md"]},
     install_requires=[
         "click>=8.0",
         "requests>=2.31.0",

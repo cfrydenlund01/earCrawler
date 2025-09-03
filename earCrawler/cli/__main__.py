@@ -17,6 +17,10 @@ from earCrawler.analytics import reports as analytics_reports
 from earCrawler.kg import fuseki
 from earCrawler.kg.sparql import SPARQLClient
 from earCrawler.kg import emit_ear, emit_nsf
+from earCrawler.telemetry.hooks import install as install_telem
+from .telemetry import telemetry, crash_test
+
+install_telem()
 
 
 @click.group()
@@ -28,10 +32,17 @@ def cli() -> None:  # pragma: no cover - simple wrapper
 @cli.command()
 def diagnose() -> None:
     """Print deterministic diagnostic information."""
+    from earCrawler.telemetry import config as tconfig
+    cfg = tconfig.load_config()
     info = {
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "earCrawler": __version__,
+        "telemetry": {
+            "enabled": cfg.enabled,
+            "spool_dir": cfg.spool_dir,
+            "files": len(list(Path(cfg.spool_dir).glob('*'))) if cfg.enabled else 0,
+        },
     }
     click.echo(json.dumps(info, sort_keys=True, indent=2))
 
@@ -67,6 +78,8 @@ cli.add_command(reports_cli.reports, name="reports")
 cli.add_command(fetch_entities)
 cli.add_command(fetch_ear)
 cli.add_command(warm_cache)
+cli.add_command(telemetry)
+cli.add_command(crash_test)
 
 
 @cli.command(name="crawl")

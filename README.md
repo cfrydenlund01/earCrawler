@@ -51,6 +51,19 @@ python -m pip install rdflib pyshacl fastapi "uvicorn[standard]" SPARQLWrapper s
 - Rotate credentials with `cmdkey /delete:<NAME>` followed by a new `cmdkey`
   command. See `RUNBOOK.md` for detailed procedures.
 
+## Telemetry (opt-in)
+Telemetry and crash reporting are disabled by default. Enable only if you wish to share anonymous usage statistics.
+
+```cmd
+earctl telemetry status
+earctl telemetry enable
+earctl telemetry disable
+earctl telemetry test
+earctl crash-test  # writes a crash report to the spool
+```
+
+See `docs/privacy/telemetry_policy.md` for details and how to purge data.
+
 ## Testing
 Run the CPU test suite:
 
