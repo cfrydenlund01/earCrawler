@@ -41,8 +41,10 @@ class TelemetryConfig:
     sample_rate: float = 1.0
     endpoint: str | None = None
     spool_dir: str = _default_spool_dir()
-    max_spool_mb: int = 10
-    max_file_mb: int = 1
+    max_spool_mb: int = 256
+    max_file_mb: int = 8
+    max_age_days: int = 30
+    keep_last_n: int = 10
     device_id: str = uuid.uuid4().hex
     auth_secret_name: str | None = None
 

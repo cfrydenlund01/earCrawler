@@ -22,7 +22,7 @@ import logging
 import re
 import time
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, Iterator, List, Optional
 
@@ -155,7 +155,9 @@ class EARCrawler:
                     text=text,
                     sha256=sha,
                     citations=citations,
-                    scraped_at=datetime.utcnow().isoformat(sep="T", timespec="seconds") + "Z",
+                    scraped_at=datetime.now(timezone.utc)
+                    .isoformat(timespec="milliseconds")
+                    .replace("+00:00", "Z"),
                     version=version,
                 )
                 new_records.append(record)
