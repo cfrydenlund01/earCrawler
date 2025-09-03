@@ -361,3 +361,39 @@ PY
         with:
           name: gc-reports
           path: kg/reports/*
+
+  repro-smoke:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Canonical freeze
+        shell: pwsh
+        run: kg/scripts/canonical-freeze.ps1
+      - name: Manifest
+        shell: pwsh
+        run: scripts/make-manifest.ps1
+      - name: Validate manifest schema
+        run: |
+          python - <<'PY'
+import json, re
+m=json.load(open('kg/canonical/manifest.json'))
+assert 'files' in m
+for f in m['files']:
+    assert set(f.keys())=={'path','size','sha256'}
+    assert re.fullmatch(r'[0-9a-f]{64}', f['sha256'])
+PY
+      - name: Rebuild and compare
+        shell: pwsh
+        run: |
+          Copy-Item kg/canonical/dataset.nq dataset1.nq
+          $snapHashes = @{}
+          Get-ChildItem kg/canonical/snapshots -Filter *.srj | ForEach-Object { $snapHashes[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash; Copy-Item $_.FullName ("orig-" + $_.Name) }
+          Remove-Item -Recurse -Force kg/canonical
+          kg/scripts/canonical-freeze.ps1
+          $hash1 = (Get-FileHash dataset1.nq -Algorithm SHA256).Hash
+          $hash2 = (Get-FileHash kg/canonical/dataset.nq -Algorithm SHA256).Hash
+          if ($hash1 -ne $hash2) { fc /b dataset1.nq kg/canonical/dataset.nq > dist/determinism-diff.txt; exit 1 }
+          foreach ($k in $snapHashes.Keys) {
+            $newHash = (Get-FileHash (Join-Path kg/canonical/snapshots $k) -Algorithm SHA256).Hash
+            if ($snapHashes[$k] -ne $newHash) { fc /b ("orig-"+$k) (Join-Path kg/canonical/snapshots $k) > dist/determinism-diff.txt; exit 1 }
+          }
