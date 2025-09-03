@@ -145,7 +145,9 @@ def gc_paths(
             ts = _iso(_now())
             report_dir = Path("kg/reports")
             report_dir.mkdir(parents=True, exist_ok=True)
-            audit_path = report_dir / f"gc-audit-{ts}.json"
+            safe_ts = ts.replace(":", "-")
+            audit_path = report_dir / f"gc-audit-{safe_ts}.json"
+
             with audit_path.open("w", encoding="utf-8") as fh:
                 json.dump({"timestamp": ts, "deleted": deleted}, fh, indent=2)
     return {"candidates": candidates, "errors": errors, "deleted": deleted}
