@@ -17,6 +17,36 @@ on:
       - '.github/workflows/kg-ci.yml'
 
 jobs:
+  hermetic-setup:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pip-tools
+        run: pip install pip-tools
+      - name: Verify Java tools
+        shell: pwsh
+        run: scripts/verify-java-tools.ps1
+      - name: Build wheelhouse
+        shell: pwsh
+        run: |
+          pip-compile --generate-hashes requirements.in -o requirements-lock.txt
+          pip-compile --generate-hashes requirements-win.in -o requirements-win-lock.txt
+          scripts/build-wheelhouse.ps1
+      - name: Generate SBOM
+        shell: pwsh
+        run: scripts/sbom-cyclonedx.ps1
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: hermetic-artifacts
+          path: |
+            dist/sbom.cdx.json
+            tools/versions.json
+            .wheelhouse/manifest.json
+
   incremental-scan:
     runs-on: windows-latest
     outputs:
@@ -288,6 +318,7 @@ PY
           path: dist/earctl-*-win64.exe
 
   telemetry-tests:
+    needs: hermetic-setup
     runs-on: windows-latest
     env:
       EAR_NO_TELEM_HTTP: '1'
@@ -299,7 +330,8 @@ PY
         with:
           python-version: '3.11'
       - name: Install deps
-        run: pip install -r requirements-win.txt
+        shell: pwsh
+        run: scripts/install-from-wheelhouse.ps1
       - name: Run telemetry tests
         run: pytest tests/telemetry
       - name: Upload spool

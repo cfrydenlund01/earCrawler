@@ -38,6 +38,18 @@
 - Change the upload endpoint by editing `%APPDATA%\EarCrawler\telemetry.json`.
 - Rotate the HTTP auth token stored in the Windows Credential Manager under the name specified by `auth_secret_name` in the config.
 - Force garbage collection of the spool by deleting old `events-*.jsonl.gz` files or running `scripts/telemetry-gc.ps1`.
+
+## Toolchain maintenance
+
+### Rotating Jena/Fuseki versions
+1. Update `tools/versions.json` with the new version and SHA512 from the official `.sha512` files.
+2. Run `pwsh scripts/verify-java-tools.ps1` to download and verify the archives.
+
+### Regenerating lockfiles with hashes
+1. Modify `requirements.in` or `requirements-win.in` as needed.
+2. `pip-compile --generate-hashes requirements.in -o requirements-lock.txt`
+3. `pip-compile --generate-hashes requirements-win.in -o requirements-win-lock.txt`
+4. Rebuild the wheelhouse: `pwsh scripts/build-wheelhouse.ps1`
 - To share data with support, run `scripts/telemetry-export.ps1` which bundles recent events into `dist/telemetry_bundle.jsonl.gz` after an additional redaction pass.
 
 ## Monitoring
