@@ -397,3 +397,18 @@ PY
             $newHash = (Get-FileHash (Join-Path kg/canonical/snapshots $k) -Algorithm SHA256).Hash
             if ($snapHashes[$k] -ne $newHash) { fc /b ("orig-"+$k) (Join-Path kg/canonical/snapshots $k) > dist/determinism-diff.txt; exit 1 }
           }
+  delta-summary:
+    if: startsWith(github.head_ref, 'auto/delta/')
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Post delta summary
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const files = fs.readdirSync('kg/reports').filter(f => f.startsWith('delta-summary'));
+            if (files.length) {
+              const body = fs.readFileSync(`kg/reports/${files[0]}`, 'utf8');
+              github.rest.issues.createComment({issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body: '```json\n'+body+'\n```'});
+            }

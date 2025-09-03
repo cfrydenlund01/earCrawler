@@ -517,3 +517,12 @@ Build and install dependencies from the pre-verified wheelhouse:
 pwsh -File .\scripts\build-wheelhouse.ps1
 pwsh -File .\scripts\install-from-wheelhouse.ps1
 ```
+
+## B.17 Monitoring & Delta Ingest
+
+A scheduled job runs on weekdays at 08:15 America/Chicago to check watchlisted
+Trade.gov and Federal Register sources. Results are normalized and hashed to
+detect changes. When upstream content changes, the job writes dated delta files
+under `monitor/`, converts them to Turtle and regenerates only the impacted
+SPARQL snapshots. An automated pull request is then opened with the updated
+artifacts.
