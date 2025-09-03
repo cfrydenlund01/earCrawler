@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 
 import click
 
@@ -51,6 +52,22 @@ def test() -> None:
     ev = cli_run("telemetry-test", 0, 0)
     path = sink.write(ev)
     click.echo(str(path))
+
+
+@telemetry.command()
+@click.option("--yes", is_flag=True, help="Skip confirmation.")
+def purge(yes: bool) -> None:
+    cfg = tconfig.load_config()
+    path = Path(cfg.spool_dir)
+    if not yes and not click.confirm(f"Delete telemetry spool at {path}?"):
+        click.echo("Aborted")
+        return
+    for p in path.glob("*"):
+        if p.is_file():
+            p.unlink(missing_ok=True)
+        elif p.is_dir():
+            shutil.rmtree(p, ignore_errors=True)
+    click.echo("Telemetry spool cleared")
 
 
 @click.command(name="crash-test")

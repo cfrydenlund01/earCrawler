@@ -496,3 +496,15 @@ changes. When nothing changed the script writes
 `kg/reports/incremental-noop.txt` and exits quickly. When inputs differ it
 re-runs the round-trip, SHACL/OWL, inference, and provenance steps, then writes
 diffs for canonical N-Quads and SPARQL snapshots to `kg/reports/`.
+
+## B.14 Retention & GC
+
+Centralised retention policies govern telemetry spools, API caches, and KG
+artifacts. Preview actions with:
+
+```powershell
+earctl gc --dry-run --target all
+```
+
+Run with `--apply --yes` to delete and record an audit log under
+`kg/reports/`.

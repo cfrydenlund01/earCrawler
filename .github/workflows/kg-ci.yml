@@ -308,3 +308,24 @@ PY
         with:
           name: telemetry-spool
           path: '${{ env.APPDATA }}\\EarCrawler\\spool'
+
+  gc-dry-run:
+    needs: [provenance-checks, telemetry-tests]
+    runs-on: windows-latest
+    env:
+      VCR_RECORD_MODE: none
+      PYTEST_ALLOW_NETWORK: '0'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard versions
+        shell: pwsh
+        run: python scripts/check_versions.py
+      - name: Run GC dry-run
+        shell: pwsh
+        run: kg/scripts/ci-gc.ps1
+      - name: Upload GC reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gc-reports
+          path: kg/reports/*

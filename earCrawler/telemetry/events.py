@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import platform
-import time
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from earCrawler import __version__
@@ -12,7 +12,9 @@ def _base(event: str) -> Dict[str, Any]:
     cfg = load_config()
     return {
         "event": event,
-        "ts": int(time.time()),
+        "ts": datetime.now(timezone.utc)
+        .isoformat(timespec="milliseconds")
+        .replace("+00:00", "Z"),
         "version": __version__,
         "os": platform.platform(),
         "python": platform.python_version(),

@@ -3,7 +3,7 @@ from __future__ import annotations
 """Helpers for PROV-O provenance with deterministic IRIs."""
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from hashlib import sha256
 from typing import Dict, Optional
 
@@ -71,7 +71,8 @@ def add_provenance(
     if isinstance(generated_at, str):
         ts = generated_at
     else:
-        ts = (generated_at or datetime.utcnow()).isoformat()
+        gtime = (generated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        ts = gtime.isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
     g.add((entity_iri, RDF.type, PROV.Entity))
     g.add((entity_iri, PROV.wasDerivedFrom, URIRef(source_url)))
