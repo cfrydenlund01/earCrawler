@@ -106,3 +106,4 @@
 v0.6.0 – B.6: RIOT validation, TDB2 round-trip with isomorphism fallback, deterministic SPARQL snapshots, Fuseki smoke query, Windows CI, and pytest smoke tests.
 v0.7.0 – B.7: SHACL validation, OWL reasoner smoke checks, Windows CI job, and pytest coverage.
 v0.8.0 – B.8: Fuseki assembler inference service, RDFS/OWL Mini modes, Windows CI smoke, and tests.
+v0.18.0 – Deterministic reconciliation with thresholds, conflict reports, and CI gates.
