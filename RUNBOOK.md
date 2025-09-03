@@ -196,3 +196,13 @@ emitters with `new_prov_graph()` to regenerate provenance.
 - Review `kg/reports/diff-summary.txt` for a human-friendly list of snapshot
   diffs. Ordering issues typically stem from missing `ORDER BY` clauses in
   queries.
+
+## Retention and GC
+- Preview deletions with `earctl gc --dry-run --target all`.
+- Apply with `earctl gc --apply --target all --yes`; audit logs appear under
+  `kg/reports/`.
+- Schedule automatic weekly GC via `scripts/schedule-gc.ps1`, which registers
+  a Task Scheduler job named `EarCrawler-GC`.
+- Adjust defaults in `earCrawler/telemetry/config.py` or override with CLI
+  flags.
+- Inspect `kg/reports/gc-report.json` to review results.
