@@ -1,3 +1,7 @@
+## [0.17.0]
+### Added
+- Scheduled monitoring and delta ingest with automated pull requests.
+
 ## [0.16.0]
 ### Added
 - Reproducible KG snapshot releases with signed manifest and provenance.

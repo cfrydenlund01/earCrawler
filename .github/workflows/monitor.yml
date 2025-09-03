@@ -1,0 +1,24 @@
+name: monitor
+
+on:
+  schedule:
+    - cron: '15 8 * * 1-5'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run monitor
+        shell: pwsh
+        run: scripts/monitor-deltas.ps1
+      - name: Refresh cassettes
+        shell: pwsh
+        run: scripts/refresh-cassettes.ps1
+      - name: Auto PR
+        shell: pwsh
+        run: scripts/auto-pr.ps1
