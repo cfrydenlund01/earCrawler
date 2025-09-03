@@ -80,6 +80,7 @@ def _evaluate(base: Path, policy: RetentionPolicy) -> Tuple[List[dict], int]:
         key=lambda p: (p.stat().st_mtime, p.as_posix()),
         reverse=True,
     )
+  
     protected = set(files[: policy.keep_last_n]) if policy.keep_last_n > 0 else set()
     now = _now().timestamp()
     candidates: List[dict] = []
