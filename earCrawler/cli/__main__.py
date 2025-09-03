@@ -20,6 +20,7 @@ from earCrawler.kg import emit_ear, emit_nsf
 from earCrawler.telemetry.hooks import install as install_telem
 from .telemetry import telemetry, crash_test
 from .gc import gc
+from . import reconcile_cmd
 
 install_telem()
 
@@ -82,7 +83,7 @@ cli.add_command(warm_cache)
 cli.add_command(telemetry)
 cli.add_command(crash_test)
 cli.add_command(gc)
-
+cli.add_command(reconcile_cmd.reconcile, name="reconcile")
 
 @cli.command(name="crawl")
 @click.option(
