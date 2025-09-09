@@ -42,6 +42,16 @@ earctl reconcile explain s1 s2
 earctl reconcile rollback --canonical-id s1
 ```
 
+### B.20 Performance
+Deterministic synthetic datasets, warmed caches and regression gates keep
+Fuseki performance within fixed budgets.
+
+```cmd
+earctl perf synth --scale S
+earctl perf run --scale S --cold --warm
+earctl perf gate --baseline perf/baselines/baseline_S.json --budgets perf/config/perf_budgets.yml
+```
+
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be
 cloned to `C:\Users\cfrydenlund\Projects\earCrawler`.

@@ -1,3 +1,7 @@
+## [0.20.0]
+### Added
+- Performance tuning, query budgets, cache warmers, and regression gates.
+
 ## [0.19.0]
 ### Added
 - RBAC and tamper-evident audit ledger with Windows Credential Manager enforcement.

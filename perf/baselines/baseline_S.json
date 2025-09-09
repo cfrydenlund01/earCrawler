@@ -1,0 +1,10 @@
+{
+  "scale": "S",
+  "groups": {
+    "lookup": {"p95_ms": 15, "p99_ms": 20},
+    "aggregation": {"p95_ms": 30, "p99_ms": 40},
+    "join": {"p95_ms": 50, "p99_ms": 60}
+  },
+  "error_rate": 0,
+  "timeouts": 0
+}

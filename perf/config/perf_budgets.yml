@@ -1,0 +1,35 @@
+# Performance budgets for query groups at different dataset scales.
+# These budgets are enforced by perf-gate.ps1 and perf_report.
+# Values are in milliseconds unless noted otherwise.
+scales:
+  S:
+    default: true
+    timeout_ms: 10000
+    concurrency: 1
+    cpu_time_s: 600
+    memory_mb: 1024
+    query_groups:
+      lookup:
+        p95_ms: 1000
+        p99_ms: 1500
+      aggregation:
+        p95_ms: 2000
+        p99_ms: 2500
+      join:
+        p95_ms: 3000
+        p99_ms: 3500
+  M:
+    timeout_ms: 20000
+    concurrency: 2
+    cpu_time_s: 1200
+    memory_mb: 2048
+    query_groups:
+      lookup:
+        p95_ms: 2000
+        p99_ms: 2500
+      aggregation:
+        p95_ms: 4000
+        p99_ms: 4500
+      join:
+        p95_ms: 6000
+        p99_ms: 6500

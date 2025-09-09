@@ -1,0 +1,4 @@
+Generate flamegraphs locally:
+  perf record -F 99 -p <pid> -g -- sleep 30
+  perf script | stackcollapse-perf.pl | flamegraph.pl > flame.svg
+Do not commit flamegraphs.

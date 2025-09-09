@@ -386,6 +386,57 @@ PY
             kg/reports/reconcile-summary.json
             kg/reports/reconcile-conflicts.json
             kg/reports/reconcile-ci.txt
+
+  perf-regression:
+    needs: reconcile-checks
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Guard versions
+        shell: pwsh
+        run: python scripts/check_versions.py
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Apache Jena and Fuseki
+        shell: pwsh
+        run: |
+          $v = Get-Content tools/versions.json | ConvertFrom-Json
+          $jenaVer = $v.jena
+          $fusekiVer = $v.fuseki
+          New-Item -ItemType Directory -Force -Path tools | Out-Null
+          $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
+          $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
+          try { Invoke-WebRequest -Uri $jenaArchive -OutFile jena.zip -ErrorAction Stop } catch { Invoke-WebRequest -Uri $jenaMirror -OutFile jena.zip }
+          Expand-Archive jena.zip -DestinationPath tools
+          Move-Item tools/apache-jena-$jenaVer tools/jena
+          $fusekiArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-fuseki-$fusekiVer.zip"
+          $fusekiMirror = "https://downloads.apache.org/jena/binaries/apache-jena-fuseki-$fusekiVer.zip"
+          try { Invoke-WebRequest -Uri $fusekiArchive -OutFile fuseki.zip -ErrorAction Stop } catch { Invoke-WebRequest -Uri $fusekiMirror -OutFile fuseki.zip }
+          Expand-Archive fuseki.zip -DestinationPath tools
+          Move-Item tools/apache-jena-fuseki-$fusekiVer tools/fuseki
+      - name: Generate synthetic dataset
+        shell: pwsh
+        run: |
+          python - <<'PY'
+from perf.synth.generator import generate
+from pathlib import Path
+generate('S', Path('perf/synth/out'))
+PY
+      - name: Run perf suite
+        shell: pwsh
+        run: kg/scripts/perf-run.ps1 -Scale S -Cold -Warm
+      - name: Run perf gate
+        shell: pwsh
+        run: kg/scripts/perf-gate.ps1 -Scale S
+      - name: Upload perf reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-reports
+          path: kg/reports/*
             
   repro-smoke:
     runs-on: windows-latest
