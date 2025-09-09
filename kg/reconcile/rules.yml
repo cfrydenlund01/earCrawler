@@ -1,0 +1,16 @@
+weights:
+  name_exact: 5
+  token_jaccard: 3
+  jaro_winkler: 3
+  prefix_overlap: 1
+  suffix_overlap: 1
+  country_match: 2
+  id_equal: 4
+  url_host: 1
+  source_bonus: 1
+thresholds:
+  high: 15
+  low: 5
+sources:
+  tradegov: 0.5
+  federalregister: 0.5

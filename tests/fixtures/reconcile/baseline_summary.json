@@ -1,0 +1,13 @@
+{
+  "feature_avgs": {
+    "country_match": 1.0,
+    "id_equal": 0.3333333333333333,
+    "jaro_winkler": 0.8962962962962964,
+    "name_exact": 0.3333333333333333,
+    "prefix_overlap": 0.48148148148148157,
+    "source_bonus": 1.0,
+    "suffix_overlap": 0.3333333333333333,
+    "token_jaccard": 0.6666666666666666,
+    "url_host": 0.3333333333333333
+  }
+}

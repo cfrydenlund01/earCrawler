@@ -1,0 +1,7 @@
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT ?s WHERE {
+  ?s owl:sameAs ?o .
+  ?o owl:sameAs ?s2 .
+  FILTER(?s != ?s2)
+}
+ORDER BY ?s

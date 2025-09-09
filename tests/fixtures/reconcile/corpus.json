@@ -1,0 +1,6 @@
+[
+  {"id": "s1", "name": "Acme Corp", "country": "US", "source": "tradegov", "duns": "123", "url": "http://acme.com"},
+  {"id": "s2", "name": "ACME Corporation", "country": "US", "source": "federalregister", "duns": "123", "url": "https://acme.com"},
+  {"id": "s3", "name": "Acme International", "country": "US", "source": "tradegov", "duns": "456", "url": "http://acmeintl.com"},
+  {"id": "s4", "name": "ACME International", "country": "US", "source": "federalregister", "duns": "456", "url": "http://acmeintl.com"}
+]

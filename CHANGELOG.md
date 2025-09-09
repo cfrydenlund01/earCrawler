@@ -1,3 +1,7 @@
+## [0.18.0]
+### Added
+- Deterministic reconciliation with thresholds, conflict reports and CI gates.
+
 ## [0.17.0]
 ### Added
 - Scheduled monitoring and delta ingest with automated pull requests.
