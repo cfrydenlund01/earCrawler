@@ -1,0 +1,7 @@
+PREFIX owl: <http://www.w3.org/2002/07/owl#>
+SELECT ?src WHERE {
+  ?c owl:sameAs ?src .
+  ?c2 owl:sameAs ?src .
+  FILTER(?c != ?c2)
+}
+ORDER BY ?src

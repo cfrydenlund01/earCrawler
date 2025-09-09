@@ -437,3 +437,21 @@ PY
               const body = fs.readFileSync(`kg/reports/${files[0]}`, 'utf8');
               github.rest.issues.createComment({issue_number: context.issue.number, owner: context.repo.owner, repo: context.repo.repo, body: '```json\n'+body+'\n```'});
             }
+
+  reconcile-checks:
+    needs: hermetic-setup
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run reconciliation checks
+        shell: pwsh
+        run: kg/scripts/ci-reconcile.ps1
+      - name: Upload reconciliation reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reconcile-reports
+          path: |
+            kg/reports/reconcile-summary.json
+            kg/reports/reconcile-conflicts.json
+            kg/reports/reconcile-ci.txt

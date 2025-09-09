@@ -1,0 +1,5 @@
+[
+  {"left": "s1", "right": "s2", "decision": "auto_merge", "reason": "whitelist"},
+  {"left": "s1", "right": "s3", "decision": "review", "reason": "name similarity"},
+  {"left": "s3", "right": "s4", "decision": "reject", "reason": "blacklist"}
+]

@@ -39,6 +39,7 @@ deterministic rules.  Example usage:
 earctl reconcile run
 earctl reconcile report
 earctl reconcile explain s1 s2
+earctl reconcile rollback --canonical-id s1
 ```
 
 ## Setup

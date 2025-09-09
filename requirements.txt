@@ -12,6 +12,7 @@ fastapi==0.116.1
 rdflib==6.3.2
 pyshacl==0.25.0
 SPARQLWrapper==2.0.0
+rapidfuzz==3.6.1
 
 black==24.4.2
 flake8==7.1.0
