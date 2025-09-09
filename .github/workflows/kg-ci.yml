@@ -455,3 +455,21 @@ PY
             kg/reports/reconcile-summary.json
             kg/reports/reconcile-conflicts.json
             kg/reports/reconcile-ci.txt
+
+  access-audit:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Access audit
+        shell: pwsh
+        env:
+          EARCTL_TELEMETRY_DISABLE: '1'
+        run: kg/scripts/ci-access-audit.ps1
+      - name: Upload access artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: access-audit
+          path: |
+            kg/reports/access-audit.txt
+            ${{ env.PROGRAMDATA }}\EarCrawler\audit\*.jsonl

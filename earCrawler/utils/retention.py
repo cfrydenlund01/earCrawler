@@ -161,6 +161,7 @@ DEFAULT_POLICIES = {
     "telemetry": RetentionPolicy(max_days=30, max_total_mb=256, max_file_mb=8, keep_last_n=10),
     "cache": RetentionPolicy(max_days=30, max_total_mb=512, max_file_mb=64, keep_last_n=10),
     "kg": RetentionPolicy(max_days=30, max_total_mb=1024, max_file_mb=256, keep_last_n=10),
+    "audit": RetentionPolicy(max_days=30, max_total_mb=256, max_file_mb=8, keep_last_n=10),
 }
 
 
@@ -172,7 +173,7 @@ def run_gc(
     max_file_mb: int | None = None,
     keep_last_n: int | None = None,
 ) -> dict:
-    targets = ["telemetry", "cache", "kg"] if target == "all" else [target]
+    targets = ["telemetry", "cache", "kg", "audit"] if target == "all" else [target]
     all_candidates: List[dict] = []
     errors: List[str] = []
     policies: dict[str, dict] = {}
@@ -195,6 +196,10 @@ def run_gc(
             Path("kg/.kgstate"),
             Path("kg/target/tdb2"),
             Path("kg/prov"),
+        ],
+        "audit": [
+            Path(os.getenv("APPDATA") or str(Path.home())) / "EarCrawler" / "audit",
+            Path(os.getenv("PROGRAMDATA") or (os.getenv("APPDATA") or str(Path.home()))) / "EarCrawler" / "audit",
         ],
     }
 

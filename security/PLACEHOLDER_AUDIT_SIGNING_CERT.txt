@@ -1,0 +1,2 @@
+This is a placeholder for the audit signing certificate.
+Replace with an actual certificate file during deployment.
