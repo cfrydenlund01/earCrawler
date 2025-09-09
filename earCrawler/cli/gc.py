@@ -6,15 +6,18 @@ from pathlib import Path
 import click
 
 from earCrawler.utils import retention
+from earCrawler.security import policy
 
 
 @click.command()
+@policy.require_role("operator")
+@policy.enforce
 @click.option("--dry-run", "dry_run", is_flag=True, default=False, help="Preview without deleting.")
 @click.option("--apply", "apply", is_flag=True, default=False, help="Delete files.")
 @click.option("--yes", is_flag=True, help="Confirm deletions without prompt.")
 @click.option(
     "--target",
-    type=click.Choice(["telemetry", "cache", "kg", "all"]),
+    type=click.Choice(["telemetry", "cache", "kg", "audit", "all"]),
     default="all",
 )
 @click.option("--max-age", type=int, default=None, help="Override max age in days.")

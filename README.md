@@ -75,6 +75,18 @@ earctl crash-test  # writes a crash report to the spool
 
 See `docs/privacy/telemetry_policy.md` for details and how to purge data.
 
+## Access & Audit
+
+RBAC and audit logging protect sensitive operations. Check your roles and verify
+ledger integrity:
+
+```cmd
+earctl policy whoami
+earctl audit verify
+```
+
+See `docs/ops/access_control.md` and `docs/ops/audit_ledger.md` for details.
+
 ## Testing
 Run the CPU test suite:
 

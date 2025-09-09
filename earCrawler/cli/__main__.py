@@ -20,7 +20,14 @@ from earCrawler.kg import emit_ear, emit_nsf
 from earCrawler.telemetry.hooks import install as install_telem
 from .telemetry import telemetry, crash_test
 from .gc import gc
-from . import reconcile_cmd
+try:  # optional
+    from . import reconcile_cmd
+except Exception:  # pragma: no cover
+    reconcile_cmd = None
+from earCrawler.security import policy
+from .auth import auth
+from .policy_cmd import policy_cmd
+from .audit import audit
 
 install_telem()
 
@@ -32,6 +39,8 @@ def cli() -> None:  # pragma: no cover - simple wrapper
 
 
 @cli.command()
+@policy.require_role("reader")
+@policy.enforce
 def diagnose() -> None:
     """Print deterministic diagnostic information."""
     from earCrawler.telemetry import config as tconfig
@@ -83,7 +92,11 @@ cli.add_command(warm_cache)
 cli.add_command(telemetry)
 cli.add_command(crash_test)
 cli.add_command(gc)
-cli.add_command(reconcile_cmd.reconcile, name="reconcile")
+if reconcile_cmd is not None:
+    cli.add_command(reconcile_cmd.reconcile, name="reconcile")
+cli.add_command(auth)
+cli.add_command(policy_cmd, name="policy")
+cli.add_command(audit)
 
 @cli.command(name="crawl")
 @click.option(

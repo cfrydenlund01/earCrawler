@@ -1,3 +1,7 @@
+## [0.19.0]
+### Added
+- RBAC and tamper-evident audit ledger with Windows Credential Manager enforcement.
+
 ## [0.18.0]
 ### Added
 - Deterministic reconciliation with thresholds, conflict reports and CI gates.

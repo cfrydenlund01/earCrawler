@@ -1,0 +1,29 @@
+roles:
+  admin: ["*"]
+  maintainer: ["build", "reconcile", "release", "provenance", "monitor"]
+  operator: ["run-ci", "snapshots", "inference", "gc"]
+  reader: ["status", "diagnose", "query", "export"]
+commands:
+  diagnose: ["reader"]
+  gc: ["operator"]
+  reconcile: ["maintainer"]
+  policy: ["reader"]
+  auth: ["admin"]
+  audit: ["operator", "admin"]
+  crawl: ["operator"]
+  report: ["reader"]
+  telemetry: ["operator"]
+  fetch-entities: ["operator"]
+  fetch-ear: ["operator"]
+  warm-cache: ["operator"]
+overrides:
+  test_admin:
+    roles: ["admin"]
+  test_reader:
+    roles: ["reader"]
+  test_operator:
+    roles: ["operator"]
+  test_maintainer:
+    roles: ["maintainer"]
+  ci_user:
+    roles: ["reader"]
