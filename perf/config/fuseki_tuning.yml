@@ -1,0 +1,12 @@
+# JVM and Fuseki tuning for Windows runners.
+# These values are referenced by perf-run.ps1 when starting Fuseki.
+# Heap sizes are conservative to avoid OOM on GitHub's windows-latest machines.
+windows:
+  jvm_heap: "-Xms1g -Xmx1g"
+  gc: "-XX:+UseG1GC"
+  fuseki_timeout_ms: 10000  # --timeout
+  threads: 4
+  tdb2:
+    read_ahead: 16
+    page_size: 8
+    notes: "TDB2 defaults tuned for small synthetic datasets"

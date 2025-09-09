@@ -1,0 +1,22 @@
+{
+  "S": {
+    "seed": 12345,
+    "scale": "S",
+    "nodes": 10,
+    "triples": 30,
+    "hashes": {
+      "ttl": "51b346bb4f7e2c0af84156c9d48a3479d434956ecf977debb819805a6d171e44",
+      "nq": "df16b266815107758b87fd9cd323bbf2e17d5fa64c03b1056e6cbf16a9a96998"
+    }
+  },
+  "M": {
+    "seed": 12345,
+    "scale": "M",
+    "nodes": 100,
+    "triples": 300,
+    "hashes": {
+      "ttl": "695f7eb50f4abded331fa671f829bbce234e9c3fe29af3e2cbf077a146251e8b",
+      "nq": "6b7fb2bc3c7e4b6144f3ec65369a8889a1e8c18468c0a443032969ed9642b624"
+    }
+  }
+}

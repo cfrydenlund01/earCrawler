@@ -28,6 +28,7 @@ from earCrawler.security import policy
 from .auth import auth
 from .policy_cmd import policy_cmd
 from .audit import audit
+from . import perf
 
 install_telem()
 
@@ -97,6 +98,7 @@ if reconcile_cmd is not None:
 cli.add_command(auth)
 cli.add_command(policy_cmd, name="policy")
 cli.add_command(audit)
+cli.add_command(perf.perf, name="perf")
 
 @cli.command(name="crawl")
 @click.option(

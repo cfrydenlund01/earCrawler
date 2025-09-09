@@ -3,3 +3,4 @@ __pycache__/
 !tools/.gitkeep
 kg/reports/
 kg/shapes.ttl
+perf/synth/out/

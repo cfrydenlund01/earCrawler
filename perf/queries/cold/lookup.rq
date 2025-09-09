@@ -1,0 +1,2 @@
+# @group: lookup
+SELECT ?s WHERE { ?s ?p ?o } LIMIT 1

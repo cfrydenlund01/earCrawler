@@ -1,0 +1,3 @@
+Record Java Flight Recorder sessions locally:
+  jcmd <pid> JFR.start name=kgperf settings=profile delay=10s filename=kg.jfr
+Do not commit recordings.
