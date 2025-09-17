@@ -27,3 +27,5 @@ overrides:
     roles: ["maintainer"]
   ci_user:
     roles: ["reader"]
+  default:
+    roles: ["reader"]
