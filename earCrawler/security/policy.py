@@ -30,6 +30,8 @@ class Policy:
         base: Set[str] = set()
         if user in self.overrides and self.overrides[user].get("roles"):
             base.update(self.overrides[user]["roles"])
+        elif "default" in self.overrides and self.overrides["default"].get("roles"):
+            base.update(self.overrides["default"]["roles"])
         return base
 
     def required_roles_for(self, command: str) -> List[str]:
@@ -83,11 +85,25 @@ def enforce(fn: Callable) -> Callable:
     def wrapper(*args, **kwargs):
         ctx = click.get_current_context()
         parts = ctx.command_path.split()
-        cmd = parts[1] if len(parts) > 1 else parts[0]
+        cmd = None
+        if parts:
+            for part in parts[1:]:
+                if part == "-m":
+                    continue
+                if any(sep in part for sep in (".", "/", "\\")):
+                    continue
+                cmd = part
+                break
+            if cmd is None:
+                cmd = parts[-1]
+        if not cmd and ctx.command is not None:
+            cmd = ctx.command.name or ""
         from . import identity
         ident = identity.whoami()
         pol = load_policy()
         required = getattr(fn, "required_roles", None)
+        if required is None and ctx.command is not None:
+            required = getattr(ctx.command.callback, "required_roles", None)
         allowed, msg = pol.check_access(ident["user"], cmd, required)
         args_sanitized = str(redaction.redact(" ".join(sys.argv[1:])))
         if not allowed:
