@@ -74,6 +74,10 @@ jobs:
             kg/canonical/release_notes.md
             kg/canonical/checksums.sha256
             dist/*.zip
+            dist/offline_bundle/**
             scripts/verify-release.ps1
+          body: |
+            Offline bundle directory (text only) is published as dist/offline_bundle/.
+            Replace offline_bundle.zip.PLACEHOLDER.txt with a deterministic ZIP (set SOURCE_DATE_EPOCH) before distributing binaries.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

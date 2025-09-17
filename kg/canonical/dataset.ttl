@@ -1,0 +1,5 @@
+@prefix ex: <http://example.org/> .
+@prefix dcterms: <http://purl.org/dc/terms/> .
+
+ex:bundle ex:contains ex:dataset .
+ex:dataset dcterms:title "Sample canonical dataset" .

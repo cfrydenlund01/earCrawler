@@ -1,0 +1,10 @@
+{
+  "version": "0.20.0",
+  "source": "sample",
+  "artifacts": [
+    {
+      "path": "dataset.ttl",
+      "hash": "dummy"
+    }
+  ]
+}

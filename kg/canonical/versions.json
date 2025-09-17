@@ -1,0 +1,7 @@
+{
+  "tools": {
+    "jena": "5.3.0",
+    "fuseki": "5.3.0"
+  },
+  "tools_sha256": "placeholder"
+}

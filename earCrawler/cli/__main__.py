@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Top-level CLI exposing NSF parser and reports commands."""
 
+import importlib
 import json
 import platform
 import sys
@@ -99,6 +100,8 @@ cli.add_command(auth)
 cli.add_command(policy_cmd, name="policy")
 cli.add_command(audit)
 cli.add_command(perf.perf, name="perf")
+bundle_cli = importlib.import_module("earCrawler.cli.bundle")
+cli.add_command(bundle_cli.bundle, name="bundle")
 
 @cli.command(name="crawl")
 @click.option(

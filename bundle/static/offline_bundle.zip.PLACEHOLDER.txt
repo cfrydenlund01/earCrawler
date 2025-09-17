@@ -1,0 +1,4 @@
+Binary ZIP archive omitted from source control. Create using a deterministic
+archiver (e.g., `powershell Compress-Archive` with pre-normalized timestamps) and
+replace this placeholder before publishing the release artifact. Ensure
+`SOURCE_DATE_EPOCH` is set so timestamps remain stable.
