@@ -1,0 +1,7 @@
+This file is a placeholder for the detached signature of `manifest.json` and
+`checksums.sha256`. Generate a real signature on the release machine:
+
+1. Ensure the release key is available in the local key store.
+2. Run `gpg --detach-sign --armor --output manifest.sig manifest.json`.
+3. Replace this placeholder with the resulting ASCII-armored signature before
+   distributing the bundle.

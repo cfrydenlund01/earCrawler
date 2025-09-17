@@ -1,0 +1,16 @@
+version: 1
+fuseki:
+  host: 127.0.0.1
+  port: 3030
+  timeout_seconds: 120
+  jvm_opts: "-Xms512m -Xmx1024m"
+  log_dir: fuseki/logs
+  health_query: "SELECT (COUNT(*) AS ?count) WHERE { ?s ?p ?o } LIMIT 1"
+dataset:
+  assembler: fuseki/tdb2-readonly.ttl
+  location: fuseki/databases/tdb2
+  source:
+    nq: kg/dataset.nq
+    ttl: kg/dataset.ttl
+bootstrap:
+  first_run_marker: fuseki/databases/first_run.ok

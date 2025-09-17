@@ -17,7 +17,7 @@ from earCrawler.security import policy
 @click.option("--yes", is_flag=True, help="Confirm deletions without prompt.")
 @click.option(
     "--target",
-    type=click.Choice(["telemetry", "cache", "kg", "audit", "all"]),
+    type=click.Choice(["telemetry", "cache", "kg", "audit", "bundle", "all"]),
     default="all",
 )
 @click.option("--max-age", type=int, default=None, help="Override max age in days.")

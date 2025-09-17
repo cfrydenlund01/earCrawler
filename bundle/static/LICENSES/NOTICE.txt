@@ -1,0 +1,7 @@
+EarCrawler Offline Bundle incorporates the following third-party projects:
+
+- Apache Jena (Apache-2.0)
+- Apache Jena Fuseki (Apache-2.0)
+- PowerShell scripts authored by the EarCrawler team (MIT)
+
+Refer to the main repository LICENSE file for project licensing details.
