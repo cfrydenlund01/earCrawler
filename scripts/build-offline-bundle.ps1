@@ -41,8 +41,10 @@ function Copy-Tree([string]$from, [string]$to) {
 Copy-Tree -from $canonicalPath -to (Join-Path $bundleRoot 'kg')
 
 # Copy Fuseki assembler and config
+$fusekiRoot = Join-Path $bundleRoot 'fuseki'
+New-Item -ItemType Directory -Path $fusekiRoot -Force | Out-Null
 Copy-Item -Path (Join-Path $repoRoot 'bundle/assembler/tdb2-readonly.ttl') `
-    -Destination (Join-Path $bundleRoot 'fuseki/tdb2-readonly.ttl') -Force
+    -Destination (Join-Path $fusekiRoot 'tdb2-readonly.ttl') -Force
 Copy-Tree -from (Join-Path $repoRoot 'bundle/config') -to (Join-Path $bundleRoot 'config')
 
 # Copy scripts

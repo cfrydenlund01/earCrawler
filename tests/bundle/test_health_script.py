@@ -10,6 +10,12 @@ from pathlib import Path
 
 import pytest
 
+try:
+    from pytest_socket import SocketBlockedError as _SocketBlockedError
+except Exception:  # pragma: no cover - pytest_socket may be unavailable
+    _SocketBlockedError = None
+
+
 ROOT = Path(__file__).resolve().parents[2]
 HEALTH_SCRIPT = ROOT / "bundle" / "scripts" / "bundle-health.ps1"
 
@@ -17,9 +23,14 @@ pytestmark = pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell
 
 
 def _free_port() -> int:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", 0))
+            return s.getsockname()[1]
+    except OSError as exc:  # pragma: no cover - depends on environment
+        if _SocketBlockedError and isinstance(exc, _SocketBlockedError):
+            pytest.skip("Sockets are disabled by pytest-socket")
+        raise
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -54,7 +65,12 @@ class _Handler(BaseHTTPRequestHandler):
 
 def _start_server(port: int, ok: bool = True) -> ThreadingHTTPServer:
     _Handler.ok = ok
-    server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
+    except OSError as exc:  # pragma: no cover - depends on environment
+        if _SocketBlockedError and isinstance(exc, _SocketBlockedError):
+            pytest.skip("Sockets are disabled by pytest-socket")
+        raise
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     return server
