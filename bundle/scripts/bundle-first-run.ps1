@@ -10,6 +10,7 @@ if (-not (Test-Path $configPath)) {
     throw "Missing bundle_config.yml"
 }
 . (Join-Path $PSScriptRoot 'bundle-config.ps1')
+. (Join-Path $PSScriptRoot 'bundle-process.ps1')
 $config = Import-BundleConfig -Path $configPath
 
 Write-Host 'Running bundle verification'

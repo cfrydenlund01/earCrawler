@@ -10,6 +10,7 @@ if (-not (Test-Path $configPath)) {
     throw "Missing bundle_config.yml"
 }
 . (Join-Path $PSScriptRoot 'bundle-config.ps1')
+. (Join-Path $PSScriptRoot 'bundle-process.ps1')
 $config = Import-BundleConfig -Path $configPath
 $fusekiHost = $config.fuseki.host
 $port = $config.fuseki.port
@@ -41,14 +42,10 @@ function Start-FusekiProcess {
         [string]$Executable,
         [string[]]$Arguments
     )
-    $startInfo = @{
-        FilePath = $Executable
-        ArgumentList = $Arguments
-        WorkingDirectory = $bundleRoot
-        PassThru = $true
-        RedirectStandardOutput = Join-Path $logDir 'fuseki.out.log'
-        RedirectStandardError = Join-Path $logDir 'fuseki.err.log'
-    }
+    $startInfo = Get-BundleProcessStartParameters -Executable $Executable -Arguments $Arguments -WorkingDirectory $bundleRoot
+    $startInfo.PassThru = $true
+    $startInfo.RedirectStandardOutput = Join-Path $logDir 'fuseki.out.log'
+    $startInfo.RedirectStandardError = Join-Path $logDir 'fuseki.err.log'
     return Start-Process @startInfo
 }
 
