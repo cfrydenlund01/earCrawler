@@ -102,6 +102,7 @@ Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     $files.Add([pscustomobject]@{ File = $_; Relative = $relative }) | Out-Null
 }
 $files.Sort([RelativePathComparer]::new())
+
 $manifestEntries = @()
 $checksumLines = @()
 foreach ($entry in $files) {
