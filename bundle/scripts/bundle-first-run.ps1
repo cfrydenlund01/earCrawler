@@ -35,6 +35,39 @@ if (-not (Test-Path $fusekiHome)) {
     throw 'Apache Jena Fuseki not found under tools/fuseki'
 }
 
+function Invoke-ProcessStrict {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory = $bundleRoot
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.UseShellExecute = $false
+    if ($WorkingDirectory) {
+        $startInfo.WorkingDirectory = $WorkingDirectory
+    }
+    if ($Arguments) {
+        foreach ($argument in $Arguments) {
+            if ($null -ne $argument) {
+                [void]$startInfo.ArgumentList.Add([string]$argument)
+            }
+        }
+    }
+
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if (-not $process) {
+        throw "Failed to start process '$FilePath'"
+    }
+    try {
+        $process.WaitForExit()
+        return $process.ExitCode
+    } finally {
+        $process.Dispose()
+    }
+}
+
 function Invoke-BundleProcess {
     param(
         [Parameter(Mandatory = $true)][string]$Executable,
@@ -43,8 +76,7 @@ function Invoke-BundleProcess {
     )
 
     try {
-        $proc = Start-Process -FilePath $Executable -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -PassThru -Wait -NoNewWindow -ErrorAction Stop
-        return $proc.ExitCode
+        return Invoke-ProcessStrict -FilePath $Executable -Arguments $Arguments -WorkingDirectory $WorkingDirectory
     } catch {
         $originalError = $_
         if (-not $IsWindows) {
@@ -104,9 +136,8 @@ function Invoke-BundleProcess {
         if ($cmdArgs) { $allArgs += $cmdArgs }
         $allArgs += $Executable
         if ($Arguments) { $allArgs += $Arguments }
-
-        $proc = Start-Process -FilePath $cmd -ArgumentList $allArgs -WorkingDirectory $WorkingDirectory -PassThru -Wait -NoNewWindow -ErrorAction Stop
-        return $proc.ExitCode
+        
+        return Invoke-ProcessStrict -FilePath $cmd -Arguments $allArgs -WorkingDirectory $WorkingDirectory
     }
 }
 
