@@ -88,10 +88,13 @@ $timestamp = [DateTimeOffset]::FromUnixTimeSeconds([int64]$sourceEpoch).UtcDateT
 $files = Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     $relative = [IO.Path]::GetRelativePath($bundleRoot, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, [char]'/' )
     [pscustomobject]@{ File = $_; Relative = $relative }
-} | Sort-Object -Property Relative
+}
+[string[]]$relativeKeys = $files | ForEach-Object { $_.Relative }
+$fileItems = @($files)
+[Array]::Sort($relativeKeys, $fileItems, [System.StringComparer]::Ordinal)
 $manifestEntries = @()
 $checksumLines = @()
-foreach ($entry in $files) {
+foreach ($entry in $fileItems) {
     $file = $entry.File
     $relative = $entry.Relative
     $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLower()
@@ -110,7 +113,8 @@ $manifest = [ordered]@{
     files = $manifestEntries
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $bundleRoot 'manifest.json') -Encoding utf8
-$checksumLines | Set-Content -Path (Join-Path $bundleRoot 'checksums.sha256') -Encoding ascii
+$sortedChecksumLines = $checksumLines | Sort-Object
+$sortedChecksumLines | Set-Content -Path (Join-Path $bundleRoot 'checksums.sha256') -Encoding ascii
 
 # Ensure signature placeholder exists
 $signaturePath = Join-Path $bundleRoot 'manifest.sig.PLACEHOLDER.txt'
