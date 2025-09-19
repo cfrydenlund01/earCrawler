@@ -85,11 +85,15 @@ $sourceEpoch = $env:SOURCE_DATE_EPOCH
 if (-not $sourceEpoch) { $sourceEpoch = 946684800 }
 $timestamp = [DateTimeOffset]::FromUnixTimeSeconds([int64]$sourceEpoch).UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ')
 
-$files = Get-ChildItem -Path $bundleRoot -Recurse -File | Sort-Object { $_.FullName }
+$files = Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
+    $relative = [IO.Path]::GetRelativePath($bundleRoot, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, [char]'/' )
+    [pscustomobject]@{ File = $_; Relative = $relative }
+} | Sort-Object -Property Relative
 $manifestEntries = @()
 $checksumLines = @()
-foreach ($file in $files) {
-    $relative = [IO.Path]::GetRelativePath($bundleRoot, $file.FullName).Replace('\\', '/')
+foreach ($entry in $files) {
+    $file = $entry.File
+    $relative = $entry.Relative
     $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLower()
     $manifestEntries += [ordered]@{
         path = $relative

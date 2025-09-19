@@ -27,9 +27,11 @@ def _free_port() -> int:
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             s.bind(("127.0.0.1", 0))
             return s.getsockname()[1]
-    except OSError as exc:  # pragma: no cover - depends on environment
+    except Exception as exc:  # pragma: no cover - depends on environment
         if _SocketBlockedError and isinstance(exc, _SocketBlockedError):
             pytest.skip("Sockets are disabled by pytest-socket")
+        if isinstance(exc, OSError):
+            raise
         raise
 
 
