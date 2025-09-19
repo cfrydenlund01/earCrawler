@@ -36,6 +36,112 @@ if (-not (Test-Path $fusekiHome)) {
     throw 'Apache Jena Fuseki not found under tools/fuseki'
 }
 
+function Invoke-ProcessStrict {
+    param(
+        [Parameter(Mandatory = $true)][string]$FilePath,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory = $bundleRoot
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.UseShellExecute = $false
+    if ($WorkingDirectory) {
+        $startInfo.WorkingDirectory = $WorkingDirectory
+    }
+    if ($Arguments) {
+        foreach ($argument in $Arguments) {
+            if ($null -ne $argument) {
+                [void]$startInfo.ArgumentList.Add([string]$argument)
+            }
+        }
+    }
+
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if (-not $process) {
+        throw "Failed to start process '$FilePath'"
+    }
+    try {
+        $process.WaitForExit()
+        return $process.ExitCode
+    } finally {
+        $process.Dispose()
+    }
+}
+
+function Invoke-BundleProcess {
+    param(
+        [Parameter(Mandatory = $true)][string]$Executable,
+        [string[]]$Arguments = @(),
+        [string]$WorkingDirectory = $bundleRoot
+    )
+
+    try {
+        return Invoke-ProcessStrict -FilePath $Executable -Arguments $Arguments -WorkingDirectory $WorkingDirectory
+    } catch {
+        $originalError = $_
+        if (-not $IsWindows) {
+            throw $originalError
+        }
+
+        $shebangLine = $null
+        try {
+            $shebangLine = Get-Content -Path $Executable -TotalCount 1 -ErrorAction Stop
+        } catch {
+            $shebangLine = $null
+        }
+
+        if (-not $shebangLine) {
+            throw $originalError
+        }
+        if ($shebangLine -notmatch '^#!\s*(.+)$') {
+            throw $originalError
+        }
+
+        $commandLine = $Matches[1].Trim()
+        if (-not $commandLine) {
+            throw $originalError
+        }
+
+        $tokens = @($commandLine -split '\s+')
+        if (-not $tokens -or $tokens.Count -eq 0) {
+            throw $originalError
+        }
+
+        $cmd = $tokens[0]
+        $cmdArgs = @()
+        if ($tokens.Count -gt 1) {
+            $cmdArgs = $tokens[1..($tokens.Count - 1)]
+        }
+
+        if ([System.IO.Path]::GetFileName($cmd) -eq 'env' -and $cmdArgs.Count -ge 1) {
+            $cmd = $cmdArgs[0]
+            if ($cmdArgs.Count -gt 1) {
+                $cmdArgs = $cmdArgs[1..($cmdArgs.Count - 1)]
+            } else {
+                $cmdArgs = @()
+            }
+        }
+
+        if ($cmd -eq 'python3' -and -not (Get-Command 'python3' -ErrorAction SilentlyContinue)) {
+            if (Get-Command 'python' -ErrorAction SilentlyContinue) {
+                $cmd = 'python'
+            }
+        }
+
+        if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
+            throw "Interpreter '$cmd' not found for loader '$Executable'"
+        }
+
+        $allArgs = @()
+        if ($cmdArgs) { $allArgs += $cmdArgs }
+        $allArgs += $Executable
+        if ($Arguments) { $allArgs += $Arguments }
+
+        return Invoke-ProcessStrict -FilePath $cmd -Arguments $allArgs -WorkingDirectory $WorkingDirectory
+    }
+}
+
 $loaderCandidates = @(
     (Join-Path $jenaHome 'bat/tdb2_tdbloader.bat'),
     (Join-Path $jenaHome 'bat/tdb2.tdbloader.bat'),
