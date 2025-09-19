@@ -10,13 +10,14 @@ if (-not (Test-Path $configPath)) {
     throw "Missing bundle_config.yml"
 }
 . (Join-Path $PSScriptRoot 'bundle-config.ps1')
+. (Join-Path $PSScriptRoot 'bundle-process.ps1')
 $config = Import-BundleConfig -Path $configPath
-$host = $config.fuseki.host
+$fusekiHost = $config.fuseki.host
 $port = $config.fuseki.port
 $timeout = $config.fuseki.timeout_seconds
 $jvmOpts = $config.fuseki.jvm_opts
 $logDirRel = $config.fuseki.log_dir
-if (-not $host) { $host = '127.0.0.1' }
+if (-not $fusekiHost) { $fusekiHost = '127.0.0.1' }
 if (-not $port) { $port = 3030 }
 if (-not $timeout) { $timeout = 120 }
 if (-not $logDirRel) { $logDirRel = 'fuseki/logs' }
@@ -41,14 +42,10 @@ function Start-FusekiProcess {
         [string]$Executable,
         [string[]]$Arguments
     )
-    $startInfo = @{
-        FilePath = $Executable
-        ArgumentList = $Arguments
-        WorkingDirectory = $bundleRoot
-        PassThru = $true
-        RedirectStandardOutput = Join-Path $logDir 'fuseki.out.log'
-        RedirectStandardError = Join-Path $logDir 'fuseki.err.log'
-    }
+    $startInfo = Get-BundleProcessStartParameters -Executable $Executable -Arguments $Arguments -WorkingDirectory $bundleRoot
+    $startInfo.PassThru = $true
+    $startInfo.RedirectStandardOutput = Join-Path $logDir 'fuseki.out.log'
+    $startInfo.RedirectStandardError = Join-Path $logDir 'fuseki.err.log'
     return Start-Process @startInfo
 }
 
@@ -100,5 +97,5 @@ if (-not $NoWait) {
         & (Join-Path $bundleRoot 'scripts/bundle-stop.ps1') -Path $bundleRoot | Out-Null
         exit 1
     }
-    Write-Host "Fuseki ready at http://$host:$port/ds"
+    Write-Host ("Fuseki ready at http://{0}:{1}/ds" -f $fusekiHost, $port)
 }

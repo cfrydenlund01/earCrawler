@@ -10,6 +10,7 @@ if (-not (Test-Path $configPath)) {
     throw "Missing bundle_config.yml"
 }
 . (Join-Path $PSScriptRoot 'bundle-config.ps1')
+. (Join-Path $PSScriptRoot 'bundle-process.ps1')
 $config = Import-BundleConfig -Path $configPath
 
 Write-Host 'Running bundle verification'
@@ -99,9 +100,9 @@ if ($needsLoad) {
             $loaderArgs = $env:EAR_BUNDLE_TDBLOADER_ARGS -split '\s+'
         }
     }
-    $proc = Start-Process -FilePath $loader -ArgumentList $loaderArgs -WorkingDirectory $bundleRoot -PassThru -Wait
-    if ($proc.ExitCode -ne 0) {
-        throw "TDB loader exited with code $($proc.ExitCode)"
+    $exitCode = Invoke-BundleProcess -Executable $loader -Arguments $loaderArgs -WorkingDirectory $bundleRoot
+    if ($exitCode -ne 0) {
+        throw "TDB loader exited with code $exitCode"
     }
     Write-Host 'Dataset load completed'
 } else {
