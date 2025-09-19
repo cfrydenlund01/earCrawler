@@ -88,7 +88,7 @@ $timestamp = [DateTimeOffset]::FromUnixTimeSeconds([int64]$sourceEpoch).UtcDateT
 $files = Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     $relative = [IO.Path]::GetRelativePath($bundleRoot, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, [char]'/' )
     [pscustomobject]@{ File = $_; Relative = $relative }
-} | Sort-Object -Property Relative
+} | Sort-Object -Property Relative -CaseSensitive
 $manifestEntries = @()
 $checksumLines = @()
 foreach ($entry in $files) {
