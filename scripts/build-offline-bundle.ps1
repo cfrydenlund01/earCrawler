@@ -99,12 +99,14 @@ class RelativePathComparer : System.Collections.IComparer {
 $files = [System.Collections.ArrayList]::new()
 Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     $relative = [IO.Path]::GetRelativePath($bundleRoot, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, [char]'/' )
-    $files.Add([pscustomobject]@{ File = $_; Relative = $relative }) | Out-Null
+    [pscustomobject]@{ File = $_; Relative = $relative }
 }
-$files.Sort([RelativePathComparer]::new())
+[string[]]$relativeKeys = $files | ForEach-Object { $_.Relative }
+$fileItems = @($files)
+[Array]::Sort($relativeKeys, $fileItems, [System.StringComparer]::Ordinal)
 $manifestEntries = @()
 $checksumLines = @()
-foreach ($entry in $files) {
+foreach ($entry in $fileItems) {
     $file = $entry.File
     $relative = $entry.Relative
     $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLower()

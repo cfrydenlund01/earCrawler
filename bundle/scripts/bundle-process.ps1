@@ -134,6 +134,34 @@ function Resolve-BundleCommand {
     }
 }
 
+function Format-BundleArgumentList {
+    param(
+        [string[]]$Arguments = @()
+    )
+
+    if (-not $Arguments -or $Arguments.Count -eq 0) {
+        return $null
+    }
+
+    $quoted = @()
+    foreach ($argument in $Arguments) {
+        if ($null -eq $argument) { continue }
+        $stringArgument = [string]$argument
+        try {
+            $quoted += [System.Management.Automation.Language.CodeGeneration]::QuoteArgument($stringArgument)
+        } catch {
+            $escaped = $stringArgument.Replace('"', '\"')
+            $quoted += '"' + $escaped + '"'
+        }
+    }
+
+    if ($quoted.Count -eq 0) {
+        return $null
+    }
+
+    return ($quoted -join ' ')
+}
+
 function Invoke-BundleProcess {
     param(
         [Parameter(Mandatory = $true)][string]$Executable,
@@ -172,12 +200,16 @@ function Get-BundleProcessStartParameters {
     )
 
     $launch = Resolve-BundleCommand -Executable $Executable -Arguments $Arguments -WorkingDirectory $WorkingDirectory
-    $params = @{
-        FilePath     = $launch.FilePath
-        ArgumentList = $launch.ArgumentList
+    $argumentArray = @($launch.ArgumentList)
+    $argumentString = Format-BundleArgumentList -Arguments $argumentArray
+    $result = [pscustomobject]@{
+        FilePath           = $launch.FilePath
+        WorkingDirectory   = $WorkingDirectory
+        ArgumentList       = $argumentArray
+        ArgumentListString = $argumentString
     }
-    if ($WorkingDirectory) {
-        $params.WorkingDirectory = $WorkingDirectory
+    if (-not $WorkingDirectory) {
+        $result.PSObject.Properties.Remove('WorkingDirectory') | Out-Null
     }
-    return $params
+    return $result
 }

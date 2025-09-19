@@ -42,11 +42,20 @@ function Start-FusekiProcess {
         [string]$Executable,
         [string[]]$Arguments
     )
-    $startInfo = Get-BundleProcessStartParameters -Executable $Executable -Arguments $Arguments -WorkingDirectory $bundleRoot
-    $startInfo.PassThru = $true
-    $startInfo.RedirectStandardOutput = Join-Path $logDir 'fuseki.out.log'
-    $startInfo.RedirectStandardError = Join-Path $logDir 'fuseki.err.log'
-    return Start-Process @startInfo
+    $launch = Get-BundleProcessStartParameters -Executable $Executable -Arguments $Arguments -WorkingDirectory $bundleRoot
+    $params = @{
+        FilePath = $launch.FilePath
+        PassThru = $true
+        RedirectStandardOutput = Join-Path $logDir 'fuseki.out.log'
+        RedirectStandardError = Join-Path $logDir 'fuseki.err.log'
+    }
+    if ($launch.WorkingDirectory) {
+        $params.WorkingDirectory = $launch.WorkingDirectory
+    }
+    if ($launch.ArgumentList -and $launch.ArgumentList.Count -gt 0) {
+        $params.ArgumentList = $launch.ArgumentList
+    }
+    return Start-Process @params
 }
 
 $exe = $null
