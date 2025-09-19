@@ -85,10 +85,24 @@ $sourceEpoch = $env:SOURCE_DATE_EPOCH
 if (-not $sourceEpoch) { $sourceEpoch = 946684800 }
 $timestamp = [DateTimeOffset]::FromUnixTimeSeconds([int64]$sourceEpoch).UtcDateTime.ToString('yyyy-MM-ddTHH:mm:ssZ')
 
-$files = Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
+# Use an ordinal comparer so manifest ordering is deterministic across platforms
+class RelativePathComparer : System.Collections.IComparer {
+    [int] Compare([object]$x, [object]$y) {
+        if ($null -eq $x) { return ($null -eq $y) ? 0 : -1 }
+        if ($null -eq $y) { return 1 }
+        $a = $x.Relative
+        $b = $y.Relative
+        return [System.String]::CompareOrdinal($a, $b)
+    }
+}
+
+$files = [System.Collections.ArrayList]::new()
+Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     $relative = [IO.Path]::GetRelativePath($bundleRoot, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, [char]'/' )
-    [pscustomobject]@{ File = $_; Relative = $relative }
-} | Sort-Object -Property Relative -CaseSensitive
+    $files.Add([pscustomobject]@{ File = $_; Relative = $relative }) | Out-Null
+}
+$files.Sort([RelativePathComparer]::new())
+
 $manifestEntries = @()
 $checksumLines = @()
 foreach ($entry in $files) {

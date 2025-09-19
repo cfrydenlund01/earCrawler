@@ -136,7 +136,7 @@ function Invoke-BundleProcess {
         if ($cmdArgs) { $allArgs += $cmdArgs }
         $allArgs += $Executable
         if ($Arguments) { $allArgs += $Arguments }
-        
+
         return Invoke-ProcessStrict -FilePath $cmd -Arguments $allArgs -WorkingDirectory $WorkingDirectory
     }
 }
