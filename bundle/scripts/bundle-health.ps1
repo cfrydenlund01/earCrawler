@@ -10,11 +10,8 @@ $configPath = Join-Path $bundleRoot 'config/bundle_config.yml'
 if (-not (Test-Path $configPath)) {
     throw "Missing bundle_config.yml"
 }
-
-if (-not (Get-Command ConvertFrom-Yaml -ErrorAction SilentlyContinue)) {
-    throw 'PowerShell YAML support required (ConvertFrom-Yaml not available)'
-}
-$config = Get-Content $configPath -Raw | ConvertFrom-Yaml
+. (Join-Path $PSScriptRoot 'bundle-config.ps1')
+$config = Import-BundleConfig -Path $configPath
 $host = $config.fuseki.host
 $port = $config.fuseki.port
 $query = $config.fuseki.health_query
