@@ -102,7 +102,6 @@ Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     $files.Add([pscustomobject]@{ File = $_; Relative = $relative }) | Out-Null
 }
 $files.Sort([RelativePathComparer]::new())
-
 $manifestEntries = @()
 $checksumLines = @()
 foreach ($entry in $files) {
@@ -124,7 +123,8 @@ $manifest = [ordered]@{
     files = $manifestEntries
 }
 $manifest | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $bundleRoot 'manifest.json') -Encoding utf8
-$checksumLines | Set-Content -Path (Join-Path $bundleRoot 'checksums.sha256') -Encoding ascii
+$sortedChecksumLines = $checksumLines | Sort-Object
+$sortedChecksumLines | Set-Content -Path (Join-Path $bundleRoot 'checksums.sha256') -Encoding ascii
 
 # Ensure signature placeholder exists
 $signaturePath = Join-Path $bundleRoot 'manifest.sig.PLACEHOLDER.txt'
