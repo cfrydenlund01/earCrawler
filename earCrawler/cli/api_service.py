@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import platform
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Iterable
@@ -12,6 +14,31 @@ from earCrawler.security import policy
 SCRIPTS_ROOT = Path("scripts")
 
 
+def _resolve_powershell() -> list[str]:
+    """Return the PowerShell invocation to use on Windows.
+
+    Prefer PowerShell Core (``pwsh``) when available but gracefully fall back to
+    Windows PowerShell (``powershell``). Allow callers to override the
+    executable by setting ``EARCTL_POWERSHELL`` which is useful in testing
+    environments.
+    """
+
+    candidate = os.environ.get("EARCTL_POWERSHELL")
+    if candidate:
+        resolved = shutil.which(candidate) or candidate
+        return [resolved, "-NoProfile", "-File"]
+
+    for name in ("pwsh", "powershell"):
+        exe = shutil.which(name)
+        if exe:
+            return [exe, "-NoProfile", "-File"]
+
+    raise click.ClickException(
+        "PowerShell executable not found. Install PowerShell or set "
+        "EARCTL_POWERSHELL to the executable path."
+    )
+
+
 def _invoke(script: str, args: Iterable[str] = ()) -> None:
     script_path = SCRIPTS_ROOT / script
     if not script_path.exists():
@@ -19,7 +46,8 @@ def _invoke(script: str, args: Iterable[str] = ()) -> None:
     if platform.system() != "Windows":
         click.echo(f"[noop] {script_path} (Windows-only)")
         return
-    cmd = ["pwsh", "-NoProfile", "-File", str(script_path)]
+    cmd = _resolve_powershell()
+    cmd.append(str(script_path))
     cmd.extend(args)
     subprocess.run(cmd, check=True)
 
