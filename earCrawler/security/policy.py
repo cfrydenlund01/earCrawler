@@ -98,9 +98,22 @@ def enforce(fn: Callable) -> Callable:
                 cmd = parts[-1]
         if not cmd and ctx.command is not None:
             cmd = ctx.command.name or ""
+
+        # For nested commands Click will report the leaf command name in
+        # ``cmd`` (e.g. ``start``) which may not have a direct policy entry.
+        # Fall back to the nearest parent command that has a policy rule so
+        # that groups like ``api`` still enforce their access controls.
+        pol = load_policy()
+        if cmd and cmd not in pol.commands:
+            parent_ctx = ctx.parent
+            while parent_ctx is not None:
+                parent_name = parent_ctx.command.name if parent_ctx.command else ""
+                if parent_name and parent_name in pol.commands:
+                    cmd = parent_name
+                    break
+                parent_ctx = parent_ctx.parent
         from . import identity
         ident = identity.whoami()
-        pol = load_policy()
         required = getattr(fn, "required_roles", None)
         if required is None and ctx.command is not None:
             required = getattr(ctx.command.callback, "required_roles", None)
