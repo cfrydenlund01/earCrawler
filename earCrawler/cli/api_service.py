@@ -4,6 +4,7 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 from typing import Iterable
 
@@ -49,7 +50,9 @@ def _invoke(script: str, args: Iterable[str] = ()) -> None:
     cmd = _resolve_powershell()
     cmd.append(str(script_path))
     cmd.extend(args)
-    subprocess.run(cmd, check=True)
+    env = os.environ.copy()
+    env.setdefault("EARCTL_PYTHON", sys.executable)
+    subprocess.run(cmd, check=True, env=env)
 
 
 @click.group()
