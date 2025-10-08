@@ -27,6 +27,7 @@ except Exception:  # pragma: no cover
     reconcile_cmd = None
 from earCrawler.security import policy
 from .auth import auth
+from .api_service import api as api_cmd
 from .policy_cmd import policy_cmd
 from .audit import audit
 from . import perf
@@ -102,6 +103,7 @@ cli.add_command(audit)
 cli.add_command(perf.perf, name="perf")
 bundle_cli = importlib.import_module("earCrawler.cli.bundle")
 cli.add_command(bundle_cli.bundle, name="bundle")
+cli.add_command(api_cmd, name="api")
 
 @cli.command(name="crawl")
 @click.option(

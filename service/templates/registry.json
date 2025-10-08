@@ -1,0 +1,25 @@
+{
+  "entity_by_id": {
+    "file": "entity_by_id.rq",
+    "params": {
+      "id": {"type": "iri"}
+    },
+    "allow_in": ["entities", "sparql"]
+  },
+  "search_entities": {
+    "file": "search_entities.rq",
+    "params": {
+      "q": {"type": "string"},
+      "limit": {"type": "int", "default": 10},
+      "offset": {"type": "int", "default": 0}
+    },
+    "allow_in": ["search", "sparql"]
+  },
+  "lineage_by_id": {
+    "file": "lineage_by_id.rq",
+    "params": {
+      "id": {"type": "iri"}
+    },
+    "allow_in": ["lineage", "sparql"]
+  }
+}

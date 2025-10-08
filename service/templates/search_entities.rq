@@ -1,0 +1,11 @@
+PREFIX text: <http://jena.apache.org/text#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+SELECT ?entity ?label ?score ?snippet
+WHERE {
+  (?entity ?score ?snippet) text:query (rdfs:label {{q}}) .
+  OPTIONAL { ?entity rdfs:label ?label }
+}
+ORDER BY DESC(?score) ?label
+LIMIT {{limit}}
+OFFSET {{offset}}

@@ -1,3 +1,9 @@
+## [0.22.0]
+### Added
+- Read-only HTTP API facade with rate limiting, request budgets, and RBAC-aware start/stop commands.
+- OpenAPI 3.1 specification, templated SPARQL registry, and structured problem details.
+- Windows service wrapper documentation and smoke-test scripts for CI.
+
 ## [0.20.0]
 ### Added
 - Performance tuning, query budgets, cache warmers, and regression gates.
