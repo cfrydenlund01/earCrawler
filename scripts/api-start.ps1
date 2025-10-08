@@ -1,12 +1,20 @@
 param(
     [string]$Host = $env:EARCRAWLER_API_HOST,
-    [int]$Port = [int]($env:EARCRAWLER_API_PORT ?? 9001),
+    [int]$Port,
     [string]$FusekiUrl = $env:EARCRAWLER_FUSEKI_URL
 )
 
 $ErrorActionPreference = 'Stop'
 
 if (-not $Host) { $Host = '127.0.0.1' }
+
+if (-not $PSBoundParameters.ContainsKey('Port')) {
+    if ($env:EARCRAWLER_API_PORT) {
+        $Port = [int]$env:EARCRAWLER_API_PORT
+    } else {
+        $Port = 9001
+    }
+}
 
 $env:EARCRAWLER_API_HOST = $Host
 $env:EARCRAWLER_API_PORT = $Port
@@ -21,11 +29,11 @@ $python = (Get-Command python).Source
 $pidFile = Join-Path -Path 'kg/reports' -ChildPath 'api.pid'
 New-Item -ItemType Directory -Force -Path (Split-Path $pidFile) | Out-Null
 
-Write-Host "Starting EarCrawler API on $Host:$Port"
+Write-Host ("Starting EarCrawler API on {0}:{1}" -f $Host, $Port)
 $process = Start-Process -FilePath $python -ArgumentList '-m','uvicorn','service.api_server.server:app','--host',$Host,'--port',$Port -PassThru -WindowStyle Hidden
 $process.Id | Out-File -FilePath $pidFile -Encoding ascii
 
-$healthUrl = "http://$Host:$Port/health"
+$healthUrl = "http://{0}:{1}/health" -f $Host, $Port
 $deadline = (Get-Date).AddSeconds(20)
 while ((Get-Date) -lt $deadline) {
     try {
