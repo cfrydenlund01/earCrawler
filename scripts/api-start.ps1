@@ -26,7 +26,10 @@ if ($FusekiUrl) {
 }
 $env:EARCRAWLER_API_EMBEDDED_FIXTURE = '1'
 
-$python = (Get-Command python).Source
+$python = $env:EARCTL_PYTHON
+if (-not $python) {
+    $python = (Get-Command python).Source
+}
 $pidFile = Join-Path -Path 'kg/reports' -ChildPath 'api.pid'
 New-Item -ItemType Directory -Force -Path (Split-Path $pidFile) | Out-Null
 
