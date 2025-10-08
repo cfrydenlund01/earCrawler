@@ -1,10 +1,11 @@
 param(
-    [string]$Host = $env:EARCRAWLER_API_HOST ?? '127.0.0.1',
+    [Alias('Host')]
+    [string]$ApiHost = $env:EARCRAWLER_API_HOST ?? '127.0.0.1',
     [int]$Port = [int]($env:EARCRAWLER_API_PORT ?? 9001)
 )
 
 $ErrorActionPreference = 'Stop'
-$base = "http://$Host:$Port"
+$base = "http://$ApiHost:$Port"
 $reportDir = 'kg/reports'
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
 $reportFile = Join-Path $reportDir 'api-smoke.txt'
