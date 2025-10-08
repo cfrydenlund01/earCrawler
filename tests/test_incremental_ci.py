@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -28,8 +29,17 @@ def cleanup_inc_touch():
 def _run_script():
     env = os.environ.copy()
     env['INCREMENTAL_SCAN_ONLY'] = '1'
-    subprocess.run(['pwsh', str(SCRIPT)], check=True, env=env)
+    exe = _powershell_executable()
+    subprocess.run([exe, '-File', str(SCRIPT)], check=True, env=env)
     return json.loads(STATUS.read_text())
+
+
+def _powershell_executable():
+    for candidate in ('pwsh', 'pwsh.exe', 'powershell', 'powershell.exe'):
+        path = shutil.which(candidate)
+        if path:
+            return path
+    pytest.skip('No PowerShell executable available')
 
 
 @run
