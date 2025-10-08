@@ -47,6 +47,40 @@ jobs:
             tools/versions.json
             .wheelhouse/manifest.json
 
+  api-surface:
+    needs: hermetic-setup
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements-win.txt
+          python -m pip install "uvicorn[standard]"
+      - name: Run API unit tests
+        shell: pwsh
+        run: pytest tests/api
+      - name: Start API
+        shell: pwsh
+        env:
+          EARCRAWLER_API_EMBEDDED_FIXTURE: '1'
+        run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
+      - name: Smoke test
+        shell: pwsh
+        run: scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001
+      - name: Stop API
+        if: always()
+        shell: pwsh
+        run: scripts/api-stop.ps1
+      - name: Upload smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-smoke
+          path: kg/reports/api-smoke.txt
+
   incremental-scan:
     runs-on: windows-latest
     outputs:

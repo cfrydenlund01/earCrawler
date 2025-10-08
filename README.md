@@ -52,6 +52,23 @@ earctl perf run --scale S --cold --warm
 earctl perf gate --baseline perf/baselines/baseline_S.json --budgets perf/config/perf_budgets.yml
 ```
 
+### B.22 API Surface
+The read-only HTTP facade wraps Fuseki behind curated SPARQL templates. Start
+and stop the service from PowerShell or via the RBAC-aware CLI:
+
+```powershell
+earctl api start
+Invoke-WebRequest http://localhost:9001/health -UseBasicParsing
+earctl api smoke
+earctl api stop
+```
+
+* Rate limits: anonymous `30/min`, API key `120/min` (override with
+  `EARCRAWLER_API_*` variables).
+* OpenAPI specification: `service/openapi/openapi.yaml`.
+* Template registry: `service/templates/registry.json`.
+* Windows service guidance: `service/windows/` placeholders.
+
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be
 cloned to `C:\Users\cfrydenlund\Projects\earCrawler`.

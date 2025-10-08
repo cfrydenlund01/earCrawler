@@ -17,6 +17,7 @@ commands:
   fetch-ear: ["operator"]
   warm-cache: ["operator"]
   bundle: ["operator", "maintainer"]
+  api: ["operator", "maintainer"]
 overrides:
   test_admin:
     roles: ["admin"]
