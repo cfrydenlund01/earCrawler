@@ -13,3 +13,4 @@ pyshacl==0.30.1
 SPARQLWrapper==2.0.0
 torch==2.3.0
 accelerate
+uvicorn==0.31.1
