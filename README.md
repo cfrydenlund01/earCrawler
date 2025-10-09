@@ -69,6 +69,17 @@ earctl api stop
 * Template registry: `service/templates/registry.json`.
 * Windows service guidance: `service/windows/` placeholders.
 
+### B.23 Observability & Health
+
+* Request logging, budgets, and Event Log forwarding are configured in
+  `service/config/observability.yml`.
+* Health probes live under `scripts/health/` and write reports to
+  `kg/reports/health-*.txt`.
+* Canary execution uses `canary/config.yml` plus
+  `scripts/canary/run-canaries.ps1`.
+* The watchdog monitor writes summaries to `kg/reports/watchdog-*.txt` and
+  attempts to restart services when PIDs disappear.
+
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be
 cloned to `C:\Users\cfrydenlund\Projects\earCrawler`.

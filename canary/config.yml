@@ -1,0 +1,21 @@
+api:
+  base_url: http://127.0.0.1:9001
+  checks:
+    - name: health
+      path: /health
+      expect_status: 200
+      max_latency_ms: 800
+      min_results: 0
+    - name: search
+      path: /v1/search?q=health&limit=1
+      expect_status: 200
+      max_latency_ms: 1200
+      min_results: 0
+
+fuseki:
+  endpoint: http://127.0.0.1:3030/ds/query
+  checks:
+    - name: select
+      query: 'SELECT (1 AS ?ok) WHERE { } LIMIT 1'
+      expect_rows: 0
+      max_latency_ms: 1500

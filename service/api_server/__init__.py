@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import html
 import os
-import logging
 from pathlib import Path
 from typing import Optional
 
@@ -13,21 +12,18 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from earCrawler.observability import load_observability_config
+from earCrawler.utils.log_json import JsonLogger
+
 from .auth import ApiKeyResolver
 from .config import ApiSettings
 from .fuseki import FusekiClient, FusekiGateway, HttpFusekiClient, StubFusekiClient
 from .limits import RateLimiter
-from .middleware import BodyLimitMiddleware, ConcurrencyLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware
+from .logging_integration import ObservabilityMiddleware
+from .middleware import BodyLimitMiddleware, ConcurrencyLimitMiddleware, RequestContextMiddleware
 from .schemas import ProblemDetails
 from .templates import TemplateRegistry
 from .routers import build_router
-
-_LOGGER = logging.getLogger("earcrawler.api")
-if not _LOGGER.handlers:
-    handler = logging.StreamHandler()
-    handler.setFormatter(logging.Formatter("%(message)s"))
-    _LOGGER.addHandler(handler)
-_LOGGER.setLevel(logging.INFO)
 
 _DOCS_PATH = Path(__file__).resolve().parent.parent / "docs" / "index.md"
 _OPENAPI_PATH = Path(__file__).resolve().parent.parent / "openapi" / "openapi.yaml"
@@ -83,20 +79,31 @@ def create_app(
 
     app = FastAPI(
         title="EarCrawler API",
-        version="0.22.0",
+        version="0.23.0",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
         default_response_class=JSONResponse,
     )
+
+    observability = load_observability_config()
+    json_logger = JsonLogger(
+        "api",
+        eventlog_enabled=observability.eventlog_enabled,
+        max_details_bytes=observability.request_logging_max_details_bytes,
+        sample_rate=observability.request_logging_sample_rate,
+    )
+
+    app.add_middleware(ObservabilityMiddleware, logger=json_logger, config=observability)
     app.add_middleware(BodyLimitMiddleware, limit_bytes=settings.request_body_limit)
     app.add_middleware(ConcurrencyLimitMiddleware, limit=settings.concurrency_limit)
     app.add_middleware(RequestContextMiddleware, resolver=resolver, timeout_seconds=settings.request_timeout_seconds)
-    app.add_middleware(SecurityHeadersMiddleware)
 
     app.state.registry = registry
     app.state.gateway = gateway
     app.state.rate_limiter = rate_limiter
+    app.state.observability = observability
+    app.state.request_logger = json_logger
 
     router = build_router()
     app.include_router(router)
