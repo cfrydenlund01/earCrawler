@@ -3,8 +3,6 @@ from __future__ import annotations
 """Custom ASGI middleware for the API facade."""
 
 import asyncio
-import json
-import logging
 import time
 import uuid
 from typing import Awaitable, Callable
@@ -24,7 +22,6 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._resolver = resolver
         self._timeout = timeout_seconds
-        self._logger = logging.getLogger("earcrawler.api")
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
         trace_id = uuid.uuid4().hex
@@ -44,17 +41,6 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 detail="Rate limit exceeded",
                 instance=str(request.url),
                 trace_id=trace_id,
-            )
-            self._logger.warning(
-                json.dumps(
-                    {
-                        "event": "rate_limit",
-                        "trace_id": trace_id,
-                        "identity": identity.key,
-                        "scope": request.state.rate_scope,
-                        "retry_after": exc.retry_after,
-                    }
-                )
             )
             return _problem_response(
                 status=429,
@@ -77,16 +63,6 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 instance=str(request.url),
                 trace_id=trace_id,
             )
-            self._logger.error(
-                json.dumps(
-                    {
-                        "event": "timeout",
-                        "trace_id": trace_id,
-                        "identity": identity.key,
-                        "scope": request.state.rate_scope,
-                    }
-                )
-            )
             return _problem_response(
                 status=504,
                 problem=problem,
@@ -102,9 +78,6 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 instance=str(request.url),
                 trace_id=trace_id,
             )
-            self._logger.exception(
-                "Unhandled error", extra={"trace_id": trace_id, "identity": identity.key, "scope": request.state.rate_scope}
-            )
             return _problem_response(
                 status=500,
                 problem=problem,
@@ -113,20 +86,6 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             )
         duration = time.perf_counter() - start
         _inject_headers(response.headers, trace_id, identity, duration, request.state.rate_limit)
-        self._logger.info(
-            json.dumps(
-                {
-                    "event": "request",
-                    "trace_id": trace_id,
-                    "identity": identity.key,
-                    "path": request.url.path,
-                    "method": request.method,
-                    "status": response.status_code,
-                    "latency_ms": round(duration * 1000, 2),
-                    "rate_limit": request.state.rate_limit,
-                }
-            )
-        )
         return response
 
 

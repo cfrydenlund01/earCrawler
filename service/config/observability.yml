@@ -1,0 +1,14 @@
+request_logging:
+  enabled: true
+  sample_rate: 1.0
+  max_details_bytes: 4096
+
+health:
+  fuseki_ping_ms: 750
+  fuseki_select_ms: 1500
+  api_timeout_ms: 1000
+  disk_min_free_mb: 512
+  rate_limit_min_capacity: 10
+
+eventlog:
+  enabled: true

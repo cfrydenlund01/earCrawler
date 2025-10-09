@@ -1,3 +1,9 @@
+## [0.23.0]
+### Added
+- Health endpoints with readiness subchecks and Windows-focused probes.
+- Structured JSON request logging with optional Windows Event Log sink.
+- Canary scripts, watchdog restarts, and CI observability gating.
+
 ## [0.22.0]
 ### Added
 - Read-only HTTP API facade with rate limiting, request budgets, and RBAC-aware start/stop commands.
