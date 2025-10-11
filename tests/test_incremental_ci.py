@@ -39,7 +39,11 @@ def _powershell_executable():
         path = shutil.which(candidate)
         if path:
             return path
-    pytest.skip('No PowerShell executable available')
+    pytest.fail(
+        "No PowerShell executable was found on PATH. Install PowerShell 7 and "
+        "retry the incremental CI tests.",
+        pytrace=False,
+    )
 
 
 @run

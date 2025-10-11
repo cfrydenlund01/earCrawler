@@ -9,14 +9,27 @@ import os
 import pathlib
 import subprocess
 import shutil
+import sys
 
 import pytest
 
 from .java_utils import JAVA_VERSION_OK
 
-if shutil.which("pwsh") is None or not JAVA_VERSION_OK:
-    pytest.skip(
-        "PowerShell 7 and Java 17+ are required", allow_module_level=True
+if sys.platform != "win32":
+    pytest.skip("Windows-only", allow_module_level=True)
+
+if shutil.which("pwsh") is None:
+    pytest.fail(
+        "PowerShell 7 (pwsh) is required to run the provenance contract test. "
+        "Install pwsh and ensure it is on the PATH.",
+        pytrace=False,
+    )
+
+if not JAVA_VERSION_OK:
+    pytest.fail(
+        "Java 17 or newer is required to run the provenance contract test. "
+        "Update the installed Java runtime and try again.",
+        pytrace=False,
     )
 
 from rdflib import ConjunctiveGraph
@@ -36,7 +49,11 @@ FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
 
 def test_provenance_contract(tmp_path):
     if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
-        pytest.skip("Jena or Fuseki tools missing")
+        pytest.fail(
+            "The Apache Jena and Fuseki tools must be downloaded before running "
+            "the provenance contract test.",
+            pytrace=False,
+        )
     prov_g = new_prov_graph()
     fixture_dir = pathlib.Path('tests/kg/fixtures')
     emit_ear(fixture_dir, KG_DIR, prov_graph=prov_g)

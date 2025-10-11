@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 from pathlib import Path
 
@@ -11,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 BUILD_SCRIPT = ROOT / "scripts" / "build-offline-bundle.ps1"
 VERIFY_SCRIPT = ROOT / "dist" / "offline_bundle" / "scripts" / "bundle-verify.ps1"
 
-pytestmark = pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell required")
+pytestmark = pytest.mark.usefixtures("require_pwsh")
 
 
 def run_build(tmp_env: dict[str, str] | None = None) -> Path:
