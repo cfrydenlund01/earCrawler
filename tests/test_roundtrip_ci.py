@@ -23,26 +23,42 @@ SCRIPT = (
 JENA_DIR = pathlib.Path('tools') / 'jena'
 FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
 
-if (
-    shutil.which("pwsh") is None
-    or shutil.which("javac") is None
-    or not JAVA_VERSION_OK
-):
-    pytest.skip(
-        "PowerShell 7 and a JDK 17+ with javac are required",
-        allow_module_level=True,
+if sys.platform != "win32":
+    pytest.skip("Windows-only", allow_module_level=True)
+
+if shutil.which("pwsh") is None:
+    pytest.fail(
+        "PowerShell 7 (pwsh) is required to run the KG round-trip tests. "
+        "Install pwsh and ensure it is on the PATH.",
+        pytrace=False,
+    )
+
+if shutil.which("javac") is None:
+    pytest.fail(
+        "A Java 17+ JDK with the javac compiler is required to run the KG "
+        "round-trip tests. Install an appropriate JDK and rerun.",
+        pytrace=False,
+    )
+
+if not JAVA_VERSION_OK:
+    pytest.fail(
+        "Java 17 or newer is required to run the KG round-trip tests. Update "
+        "the installed Java runtime and try again.",
+        pytrace=False,
     )
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 def test_ci_roundtrip_script_exists():
     assert SCRIPT.exists()
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 def test_ci_roundtrip_runs_if_tools_present():
     if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
-        pytest.skip("Jena or Fuseki tools missing")
+        pytest.fail(
+            "The Apache Jena and Fuseki tools must be downloaded before running "
+            "the KG round-trip tests.",
+            pytrace=False,
+        )
     env = {
         **os.environ,
         "JENA_HOME": str(JENA_DIR),
@@ -54,7 +70,6 @@ def test_ci_roundtrip_runs_if_tools_present():
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 def test_snapshot_files_exist_after_ci():
     snap_dir = pathlib.Path('kg') / 'snapshots'
     assert snap_dir.exists()

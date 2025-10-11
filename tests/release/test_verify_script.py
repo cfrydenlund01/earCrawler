@@ -1,10 +1,9 @@
 import os
-import shutil
 import subprocess
 from pathlib import Path
 import pytest
 
-pytestmark = pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell required")
+pytestmark = pytest.mark.usefixtures("require_pwsh")
 
 ROOT = Path(__file__).resolve().parents[2]
 

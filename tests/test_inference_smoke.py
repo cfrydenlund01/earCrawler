@@ -20,21 +20,35 @@ JENA_DIR = pathlib.Path('tools') / 'jena'
 FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
 REPORTS_DIR = pathlib.Path('kg') / 'reports'
 
-if shutil.which("pwsh") is None or not JAVA_VERSION_OK:
-    pytest.skip(
-        "PowerShell 7 and Java 17+ are required", allow_module_level=True
+if sys.platform != "win32":
+    pytest.skip("Windows-only", allow_module_level=True)
+
+if shutil.which("pwsh") is None:
+    pytest.fail(
+        "PowerShell 7 (pwsh) is required to run the inference smoke tests. "
+        "Install pwsh and ensure it is on the PATH.",
+        pytrace=False,
+    )
+
+if not JAVA_VERSION_OK:
+    pytest.fail(
+        "Java 17 or newer is required to run the inference smoke tests. Update "
+        "the installed Java runtime and try again.",
+        pytrace=False,
     )
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 def test_inference_script_exists():
     assert SCRIPT.exists()
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 def test_inference_rdfs_smoke_when_tools_present():
     if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
-        pytest.skip("Jena or Fuseki tools missing")
+        pytest.fail(
+            "The Apache Jena and Fuseki tools must be downloaded before running "
+            "the inference smoke tests.",
+            pytrace=False,
+        )
     if REPORTS_DIR.exists():
         shutil.rmtree(REPORTS_DIR)
     env = {
@@ -58,10 +72,13 @@ def test_inference_rdfs_smoke_when_tools_present():
     assert select_path.stat().st_size > 0
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 def test_inference_owlmini_smoke_when_tools_present():
     if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
-        pytest.skip("Jena or Fuseki tools missing")
+        pytest.fail(
+            "The Apache Jena and Fuseki tools must be downloaded before running "
+            "the inference smoke tests.",
+            pytrace=False,
+        )
     env = {
         **os.environ,
         "JENA_HOME": str(JENA_DIR),

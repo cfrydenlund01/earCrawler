@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import shutil
 import socket
 import subprocess
 import threading
@@ -19,7 +18,7 @@ except Exception:  # pragma: no cover - pytest_socket may be unavailable
 ROOT = Path(__file__).resolve().parents[2]
 HEALTH_SCRIPT = ROOT / "bundle" / "scripts" / "bundle-health.ps1"
 
-pytestmark = pytest.mark.skipif(shutil.which("pwsh") is None, reason="PowerShell required")
+pytestmark = pytest.mark.usefixtures("require_pwsh")
 
 
 def _free_port() -> int:
@@ -29,7 +28,11 @@ def _free_port() -> int:
             return s.getsockname()[1]
     except Exception as exc:  # pragma: no cover - depends on environment
         if _SocketBlockedError and isinstance(exc, _SocketBlockedError):
-            pytest.skip("Sockets are disabled by pytest-socket")
+            pytest.fail(
+                "These health script tests require TCP sockets. Enable sockets in "
+                "pytest (remove pytest-socket restrictions) and rerun the suite.",
+                pytrace=False,
+            )
         if isinstance(exc, OSError):
             raise
         raise
@@ -71,7 +74,11 @@ def _start_server(port: int, ok: bool = True) -> ThreadingHTTPServer:
         server = ThreadingHTTPServer(("127.0.0.1", port), _Handler)
     except OSError as exc:  # pragma: no cover - depends on environment
         if _SocketBlockedError and isinstance(exc, _SocketBlockedError):
-            pytest.skip("Sockets are disabled by pytest-socket")
+            pytest.fail(
+                "These health script tests require TCP sockets. Enable sockets in "
+                "pytest (remove pytest-socket restrictions) and rerun the suite.",
+                pytrace=False,
+            )
         raise
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -23,3 +24,15 @@ def recorder() -> vcr.VCR:
         cassette_library_dir=str(cassette_dir),
         record_mode=os.getenv("VCR_RECORD_MODE", "none"),
     )
+
+
+@pytest.fixture(scope="session")
+def require_pwsh() -> None:
+    """Ensure that PowerShell 7 is available before running dependent tests."""
+
+    if shutil.which("pwsh") is None:
+        pytest.fail(
+            "PowerShell 7 (pwsh) is required to run these tests. Install pwsh and "
+            "ensure it is on the PATH before re-running the test suite.",
+            pytrace=False,
+        )
