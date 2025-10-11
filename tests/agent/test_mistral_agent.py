@@ -46,6 +46,20 @@ class DummyModel:
         Path(path).mkdir(parents=True, exist_ok=True)
 
 
+class DummyLongContextPipeline:
+    chunk_token_length = 5
+
+    def __init__(self) -> None:
+        self.calls = []
+
+    def count_long_document_tokens(self, text: str) -> int:
+        return 10
+
+    def summarize_long_document(self, text: str) -> str:
+        self.calls.append(text)
+        return f"summary:{text}"
+
+
 
 class DummyDataset:
     def __init__(self, data):
@@ -80,6 +94,7 @@ def _import_agent(monkeypatch):
         "transformers",
         types.SimpleNamespace(
             AutoModelForCausalLM=object,
+            AutoModelForSeq2SeqLM=object,
             AutoTokenizer=object,
             BitsAndBytesConfig=object,
             Trainer=object,
@@ -110,6 +125,30 @@ def test_agent_answer_returns_string(monkeypatch) -> None:
         tokenizer=DummyTokenizer(),
     )
     assert isinstance(agent.answer("q"), str)
+
+
+def test_agent_uses_long_context_pipeline(monkeypatch) -> None:
+    mistral_agent = _import_agent(monkeypatch)
+    captured_contexts = {}
+
+    def fake_build(self, query, contexts):
+        captured_contexts["contexts"] = contexts
+        return "prompt"
+
+    monkeypatch.setattr(mistral_agent.Agent, "_build_prompt", fake_build, raising=False)
+
+    pipeline = DummyLongContextPipeline()
+    agent = mistral_agent.Agent(
+        retriever=DummyRetriever(),
+        legalbert=DummyLegalBERT(),
+        model=DummyModel(),
+        tokenizer=DummyTokenizer(),
+        long_context_pipeline=pipeline,
+    )
+
+    agent.answer("q")
+    assert pipeline.calls == ["ctx1", "ctx2"]
+    assert captured_contexts["contexts"] == ["summary:ctx1", "summary:ctx2"]
 
 
 def test_train_qlora_adapter_runs(tmp_path, monkeypatch) -> None:
