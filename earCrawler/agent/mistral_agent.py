@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 import bitsandbytes as bnb  # type: ignore
 
@@ -17,6 +17,10 @@ from transformers import (
 )
 from datasets import Dataset
 from peft import LoraConfig, get_peft_model
+
+
+if TYPE_CHECKING:  # pragma: no cover - imported for type checkers only
+    from .long_context_pipeline import LongContextPipeline
 
 
 DEFAULT_MODEL = "mistralai/Mistral-7B-v0.1"
@@ -115,6 +119,7 @@ class Agent:
     legalbert: Optional["LegalBERT"] = None
     model: Optional[object] = None
     tokenizer: Optional[object] = None
+    long_context_pipeline: Optional["LongContextPipeline"] = None
 
     def __post_init__(self) -> None:
         if self.model is None or self.tokenizer is None:
@@ -129,10 +134,34 @@ class Agent:
         user = f"Context:\n{context_block}\n\nQuestion: {query}\nAnswer:"
         return system + "\n\n" + user
 
+    def _filter_contexts(self, query: str, contexts: List[str]) -> List[str]:
+        """Apply the LegalBERT filter when available."""
+
+        if self.legalbert is None:
+            return contexts
+        return self.legalbert.filter(query, contexts)
+
+    def _summarize_contexts(self, contexts: List[str]) -> List[str]:
+        """Summarize overly long contexts using the LED pipeline."""
+
+        pipeline = self.long_context_pipeline
+        if pipeline is None:
+            return contexts
+
+        summarized: List[str] = []
+        for context in contexts:
+            token_count = pipeline.count_long_document_tokens(context)
+            if token_count > pipeline.chunk_token_length:
+                summary = pipeline.summarize_long_document(context).strip()
+                summarized.append(summary or context)
+            else:
+                summarized.append(context)
+        return summarized
+
     def answer(self, query: str, k: int = 5) -> str:
         contexts = self.retriever.query(query, k=k)
-        if self.legalbert is not None:
-            contexts = self.legalbert.filter(query, contexts)
+        contexts = self._filter_contexts(query, contexts)
+        contexts = self._summarize_contexts(contexts)
         prompt = self._build_prompt(query, contexts)
         inputs = self.tokenizer(prompt, return_tensors="pt")
         outputs = self.model.generate(**inputs, max_new_tokens=128)
