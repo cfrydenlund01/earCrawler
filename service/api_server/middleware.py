@@ -3,6 +3,7 @@ from __future__ import annotations
 """Custom ASGI middleware for the API facade."""
 
 import asyncio
+import json
 import time
 import uuid
 from typing import Awaitable, Callable
