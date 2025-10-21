@@ -6,15 +6,26 @@ from pathlib import Path
 
 import pytest
 import vcr
-from pytest_socket import disable_socket, enable_socket
+
+try:
+    from pytest_socket import disable_socket, enable_socket, socket_allow_hosts
+except Exception:  # pragma: no cover - pytest_socket optional in some environments
+    disable_socket = enable_socket = None  # type: ignore[assignment]
+    socket_allow_hosts = None  # type: ignore[assignment]
 
 
 @pytest.fixture(autouse=True)
 def _disable_network():
-    if os.getenv("PYTEST_ALLOW_NETWORK", "0") != "1":
+    if os.getenv("PYTEST_ALLOW_NETWORK", "0") != "1" and disable_socket and enable_socket:
+        if socket_allow_hosts:
+            socket_allow_hosts(["127.0.0.1", "::1"])
         disable_socket()
-    yield
-    enable_socket()
+        try:
+            yield
+        finally:
+            enable_socket()
+    else:
+        yield
 
 
 @pytest.fixture

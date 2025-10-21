@@ -58,15 +58,16 @@ def _invoke(script: str, args: Iterable[str] = ()) -> None:
     script_path = SCRIPTS_ROOT / script
     if not script_path.exists():
         raise click.ClickException(f"Script not found: {script_path}")
-    if _is_test_mode():
-        click.echo(f"[test-noop] {script_path}")
-        return
     if platform.system() != "Windows":
         click.echo(f"[noop] {script_path} (Windows-only)")
         return
     cmd = _resolve_powershell()
     cmd.append(str(script_path))
     cmd.extend(args)
+    if _is_test_mode():
+        click.echo(f"[test-noop] {script_path}")
+        subprocess.run(cmd, check=True)
+        return
     env = os.environ.copy()
     env.setdefault("EARCTL_PYTHON", sys.executable)
     subprocess.run(cmd, check=True, env=env)

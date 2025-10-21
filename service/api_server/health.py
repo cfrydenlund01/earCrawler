@@ -31,9 +31,10 @@ async def health(request: Request) -> Dict[str, Any]:
     readiness_checks["disk"] = _check_disk(budgets)
 
     readiness_status = "pass" if all(check["status"] == "pass" for check in readiness_checks.values()) else "fail"
+    overall_status = "ok" if readiness_status == "pass" else "error"
 
     return {
-        "status": readiness_status,
+        "status": overall_status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "liveness": {"status": "pass"},
         "readiness": {
