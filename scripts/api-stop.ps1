@@ -10,7 +10,8 @@ if ($pid) {
         Stop-Process -Id [int]$pid -Force -ErrorAction Stop
         Write-Host "Stopped API process $pid"
     } catch {
-        Write-Warning "Unable to stop process $pid: $_"
+        $message = $_
+        Write-Warning ("Unable to stop process {0}: {1}" -f $pid, $message)
     }
 }
 Remove-Item $pidFile -ErrorAction SilentlyContinue

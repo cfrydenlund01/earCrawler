@@ -20,9 +20,22 @@ foreach ($file in $requiredFiles) {
 
 $bundleRoot = Join-Path $repoRoot $OutputDir
 if (Test-Path $bundleRoot) {
-    Remove-Item -Path $bundleRoot -Recurse -Force
+    try {
+        Remove-Item -Path $bundleRoot -Recurse -Force -ErrorAction Stop
+    } catch {
+        $errorMessage = $_.Exception.Message
+        Write-Warning ("Unable to remove existing bundle at {0}: {1}" -f $bundleRoot, $errorMessage)
+        Get-ChildItem -Path $bundleRoot -Force | ForEach-Object {
+            try {
+                Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop
+            } catch {
+                $itemError = $_.Exception.Message
+                Write-Warning ("Leaving existing file {0}: {1}" -f $_.FullName, $itemError)
+            }
+        }
+    }
 }
-New-Item -ItemType Directory -Path $bundleRoot | Out-Null
+New-Item -ItemType Directory -Path $bundleRoot -Force | Out-Null
 
 function Copy-Tree([string]$from, [string]$to) {
     if (-not (Test-Path $from)) { return }

@@ -18,7 +18,7 @@ except Exception:  # pragma: no cover - pytest_socket may be unavailable
 ROOT = Path(__file__).resolve().parents[2]
 HEALTH_SCRIPT = ROOT / "bundle" / "scripts" / "bundle-health.ps1"
 
-pytestmark = pytest.mark.usefixtures("require_pwsh")
+pytestmark = [pytest.mark.usefixtures("require_pwsh"), pytest.mark.enable_socket]
 
 
 def _free_port() -> int:

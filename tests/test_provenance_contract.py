@@ -14,6 +14,7 @@ import sys
 import pytest
 
 from .java_utils import JAVA_VERSION_OK
+from .tooling import require_jena_and_fuseki
 
 if sys.platform != "win32":
     pytest.skip("Windows-only", allow_module_level=True)
@@ -43,17 +44,14 @@ from earCrawler.kg.prov import new_prov_graph, write_prov_files
 KG_DIR = pathlib.Path('kg')
 SCRIPT_SHACL = KG_DIR / 'scripts' / 'ci-shacl-owl.ps1'
 SCRIPT_PROV = KG_DIR / 'scripts' / 'ci-provenance.ps1'
-JENA_DIR = pathlib.Path('tools') / 'jena'
-FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
+MISSING_TOOLS_MSG = (
+    "The Apache Jena and Fuseki tools must be downloaded before running "
+    "the provenance contract test."
+)
 
 
 def test_provenance_contract(tmp_path):
-    if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
-        pytest.fail(
-            "The Apache Jena and Fuseki tools must be downloaded before running "
-            "the provenance contract test.",
-            pytrace=False,
-        )
+    jena_dir, fuseki_dir = require_jena_and_fuseki(MISSING_TOOLS_MSG)
     prov_g = new_prov_graph()
     fixture_dir = pathlib.Path('tests/kg/fixtures')
     emit_ear(fixture_dir, KG_DIR, prov_graph=prov_g)
@@ -77,8 +75,8 @@ def test_provenance_contract(tmp_path):
 
     env = {
         **os.environ,
-        "JENA_HOME": str(JENA_DIR),
-        "FUSEKI_HOME": str(FUSEKI_DIR),
+        "JENA_HOME": str(jena_dir),
+        "FUSEKI_HOME": str(fuseki_dir),
     }
     subprocess.run(['pwsh', str(SCRIPT_SHACL)], check=True, env=env)
     conf = (KG_DIR / 'reports' / 'shacl-conforms.txt').read_text().strip()

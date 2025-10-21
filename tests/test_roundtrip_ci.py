@@ -13,6 +13,7 @@ import shutil
 import pytest
 
 from .java_utils import JAVA_VERSION_OK
+from .tooling import require_jena_and_fuseki
 
 SCRIPT = (
     pathlib.Path(__file__).resolve().parents[1]
@@ -20,8 +21,10 @@ SCRIPT = (
     / 'scripts'
     / 'ci-roundtrip.ps1'
 )
-JENA_DIR = pathlib.Path('tools') / 'jena'
-FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
+MISSING_TOOLS_MSG = (
+    "The Apache Jena and Fuseki tools must be downloaded before running "
+    "the KG round-trip tests."
+)
 
 if sys.platform != "win32":
     pytest.skip("Windows-only", allow_module_level=True)
@@ -53,16 +56,11 @@ def test_ci_roundtrip_script_exists():
 
 
 def test_ci_roundtrip_runs_if_tools_present():
-    if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
-        pytest.fail(
-            "The Apache Jena and Fuseki tools must be downloaded before running "
-            "the KG round-trip tests.",
-            pytrace=False,
-        )
+    jena_dir, fuseki_dir = require_jena_and_fuseki(MISSING_TOOLS_MSG)
     env = {
         **os.environ,
-        "JENA_HOME": str(JENA_DIR),
-        "FUSEKI_HOME": str(FUSEKI_DIR),
+        "JENA_HOME": str(jena_dir),
+        "FUSEKI_HOME": str(fuseki_dir),
     }
     result = subprocess.run(
         ["pwsh", str(SCRIPT)], capture_output=True, text=True, env=env
