@@ -12,14 +12,14 @@ if (-not (Test-Path $configPath)) {
 }
 . (Join-Path $PSScriptRoot 'bundle-config.ps1')
 $config = Import-BundleConfig -Path $configPath
-$host = $config.fuseki.host
+$fusekiHost = $config.fuseki.host
 $port = $config.fuseki.port
 $query = $config.fuseki.health_query
-if (-not $host) { $host = '127.0.0.1' }
+if (-not $fusekiHost) { $fusekiHost = '127.0.0.1' }
 if (-not $port) { $port = 3030 }
 if (-not $query) { $query = 'SELECT * WHERE { ?s ?p ?o } LIMIT 1' }
 
-$base = "http://${host}:${port}"
+$base = "http://${fusekiHost}:${port}"
 $ping = "$base/$/ping"
 $service = "$base/ds/sparql"
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
