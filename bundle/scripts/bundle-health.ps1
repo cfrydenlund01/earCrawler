@@ -19,7 +19,7 @@ if (-not $host) { $host = '127.0.0.1' }
 if (-not $port) { $port = 3030 }
 if (-not $query) { $query = 'SELECT * WHERE { ?s ?p ?o } LIMIT 1' }
 
-$base = "http://$host:$port"
+$base = "http://${host}:${port}"
 $ping = "$base/$/ping"
 $service = "$base/ds/sparql"
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
