@@ -14,11 +14,14 @@ import shutil
 import pytest
 
 from .java_utils import JAVA_VERSION_OK
+from .tooling import require_jena_and_fuseki
 
 SCRIPT = pathlib.Path('kg/scripts/ci-inference-smoke.ps1')
-JENA_DIR = pathlib.Path('tools') / 'jena'
-FUSEKI_DIR = pathlib.Path('tools') / 'fuseki'
 REPORTS_DIR = pathlib.Path('kg') / 'reports'
+MISSING_TOOLS_MSG = (
+    "The Apache Jena and Fuseki tools must be downloaded before running "
+    "the inference smoke tests."
+)
 
 if sys.platform != "win32":
     pytest.skip("Windows-only", allow_module_level=True)
@@ -43,18 +46,13 @@ def test_inference_script_exists():
 
 
 def test_inference_rdfs_smoke_when_tools_present():
-    if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
-        pytest.fail(
-            "The Apache Jena and Fuseki tools must be downloaded before running "
-            "the inference smoke tests.",
-            pytrace=False,
-        )
+    jena_dir, fuseki_dir = require_jena_and_fuseki(MISSING_TOOLS_MSG)
     if REPORTS_DIR.exists():
         shutil.rmtree(REPORTS_DIR)
     env = {
         **os.environ,
-        "JENA_HOME": str(JENA_DIR),
-        "FUSEKI_HOME": str(FUSEKI_DIR),
+        "JENA_HOME": str(jena_dir),
+        "FUSEKI_HOME": str(fuseki_dir),
     }
     result = subprocess.run([
         "pwsh",
@@ -73,16 +71,11 @@ def test_inference_rdfs_smoke_when_tools_present():
 
 
 def test_inference_owlmini_smoke_when_tools_present():
-    if not (JENA_DIR.exists() and FUSEKI_DIR.exists()):
-        pytest.fail(
-            "The Apache Jena and Fuseki tools must be downloaded before running "
-            "the inference smoke tests.",
-            pytrace=False,
-        )
+    jena_dir, fuseki_dir = require_jena_and_fuseki(MISSING_TOOLS_MSG)
     env = {
         **os.environ,
-        "JENA_HOME": str(JENA_DIR),
-        "FUSEKI_HOME": str(FUSEKI_DIR),
+        "JENA_HOME": str(jena_dir),
+        "FUSEKI_HOME": str(fuseki_dir),
     }
     result = subprocess.run([
         "pwsh",
