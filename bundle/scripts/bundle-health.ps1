@@ -19,9 +19,21 @@ if (-not $fusekiHost) { $fusekiHost = '127.0.0.1' }
 if (-not $port) { $port = 3030 }
 if (-not $query) { $query = 'SELECT * WHERE { ?s ?p ?o } LIMIT 1' }
 
-$base = "http://${fusekiHost}:${port}"
-$ping = "$base/$/ping"
-$service = "$base/ds/sparql"
+$baseBuilder = [System.UriBuilder]::new()
+$baseBuilder.Scheme = 'http'
+$baseBuilder.Host = $fusekiHost
+$baseBuilder.Port = $port
+$baseUri = $baseBuilder.Uri
+
+$pingBuilder = [System.UriBuilder]::new($baseUri)
+$pingBuilder.Path = '$/ping'
+$pingBuilder.Query = ''
+$pingUri = $pingBuilder.Uri
+
+$serviceBuilder = [System.UriBuilder]::new($baseUri)
+$serviceBuilder.Path = 'ds/sparql'
+$serviceBuilder.Query = ''
+$serviceUri = $serviceBuilder.Uri
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
 
 $handler = [System.Net.Http.HttpClientHandler]::new()
@@ -36,7 +48,7 @@ try {
             $cts = [System.Threading.CancellationTokenSource]::new()
             $cts.CancelAfter([TimeSpan]::FromSeconds(10))
             try {
-                $resp = $client.GetAsync($ping, $cts.Token).GetAwaiter().GetResult()
+                $resp = $client.GetAsync($pingUri, $cts.Token).GetAwaiter().GetResult()
                 try {
                     if ($resp.StatusCode -eq [System.Net.HttpStatusCode]::OK) {
                         $pingOk = $true
@@ -54,7 +66,7 @@ try {
     }
 
     if (-not $pingOk) {
-        Write-Error "Fuseki ping endpoint unavailable at $ping"
+        Write-Error "Fuseki ping endpoint unavailable at $($pingUri.AbsoluteUri)"
         exit 1
     }
 
@@ -66,7 +78,10 @@ try {
         $cts = [System.Threading.CancellationTokenSource]::new()
         $cts.CancelAfter([TimeSpan]::FromSeconds([Math]::Max(1, [Math]::Min($TimeoutSeconds, 30))))
         try {
-            $resp = $client.GetAsync("$service?query=$encodedQuery", $cts.Token).GetAwaiter().GetResult()
+            $serviceQueryBuilder = [System.UriBuilder]::new($serviceUri)
+            $serviceQueryBuilder.Query = "query=$encodedQuery"
+            $serviceQueryUri = $serviceQueryBuilder.Uri
+            $resp = $client.GetAsync($serviceQueryUri, $cts.Token).GetAwaiter().GetResult()
             try {
                 if (-not $resp.IsSuccessStatusCode) {
                     Write-Error "SPARQL query failed with status $([int]$resp.StatusCode)"
@@ -83,7 +98,7 @@ try {
         if (-not $message) {
             $message = $_.ToString()
         }
-        Write-Error "Failed to execute SPARQL query against $service`n$message"
+        Write-Error "Failed to execute SPARQL query against $($serviceUri.AbsoluteUri)`n$message"
         exit 1
     }
 } finally {
@@ -92,5 +107,5 @@ try {
 }
 
 if (-not $Quiet) {
-    Write-Host "Fuseki service healthy at $service"
+    Write-Host "Fuseki service healthy at $($serviceUri.AbsoluteUri)"
 }
