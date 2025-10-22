@@ -23,34 +23,72 @@ $base = "http://${fusekiHost}:${port}"
 $ping = "$base/$/ping"
 $service = "$base/ds/sparql"
 $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
-$pingOk = $false
-while ((Get-Date) -lt $deadline) {
-    try {
-        $resp = Invoke-WebRequest -Uri $ping -UseBasicParsing -TimeoutSec 10
-        if ($resp.StatusCode -eq 200) {
-            $pingOk = $true
-            break
-        }
-    } catch {
-        Start-Sleep -Seconds 1
-    }
-}
 
-if (-not $pingOk) {
-    Write-Error "Fuseki ping endpoint unavailable at $ping"
-    exit 1
-}
+$handler = [System.Net.Http.HttpClientHandler]::new()
+$handler.AutomaticDecompression = [System.Net.DecompressionMethods]::GZip -bor [System.Net.DecompressionMethods]::Deflate
+$handler.UseProxy = $false
+$client = [System.Net.Http.HttpClient]::new($handler)
 
-$encodedQuery = [System.Uri]::EscapeDataString($query)
 try {
-    $resp = Invoke-WebRequest -Uri "$service?query=$encodedQuery" -UseBasicParsing -TimeoutSec 30
-    if ($resp.StatusCode -ne 200) {
-        Write-Error "SPARQL query failed with status $($resp.StatusCode)"
+    $pingOk = $false
+    while ((Get-Date) -lt $deadline) {
+        try {
+            $cts = [System.Threading.CancellationTokenSource]::new()
+            $cts.CancelAfter([TimeSpan]::FromSeconds(10))
+            try {
+                $resp = $client.GetAsync($ping, $cts.Token).GetAwaiter().GetResult()
+                try {
+                    if ($resp.StatusCode -eq [System.Net.HttpStatusCode]::OK) {
+                        $pingOk = $true
+                        break
+                    }
+                } finally {
+                    $resp.Dispose()
+                }
+            } finally {
+                $cts.Dispose()
+            }
+        } catch {
+            Start-Sleep -Seconds 1
+        }
+    }
+
+    if (-not $pingOk) {
+        Write-Error "Fuseki ping endpoint unavailable at $ping"
         exit 1
     }
-} catch {
-    Write-Error "Failed to execute SPARQL query against $service"
-    exit 1
+
+    $client.DefaultRequestHeaders.Accept.Clear()
+    $client.DefaultRequestHeaders.Accept.Add([System.Net.Http.Headers.MediaTypeWithQualityHeaderValue]::new('application/sparql-results+json'))
+
+    $encodedQuery = [System.Uri]::EscapeDataString($query)
+    try {
+        $cts = [System.Threading.CancellationTokenSource]::new()
+        $cts.CancelAfter([TimeSpan]::FromSeconds([Math]::Max(1, [Math]::Min($TimeoutSeconds, 30))))
+        try {
+            $resp = $client.GetAsync("$service?query=$encodedQuery", $cts.Token).GetAwaiter().GetResult()
+            try {
+                if (-not $resp.IsSuccessStatusCode) {
+                    Write-Error "SPARQL query failed with status $([int]$resp.StatusCode)"
+                    exit 1
+                }
+            } finally {
+                $resp.Dispose()
+            }
+        } finally {
+            $cts.Dispose()
+        }
+    } catch {
+        $message = $_.Exception.Message
+        if (-not $message) {
+            $message = $_.ToString()
+        }
+        Write-Error "Failed to execute SPARQL query against $service`n$message"
+        exit 1
+    }
+} finally {
+    $client.Dispose()
+    $handler.Dispose()
 }
 
 if (-not $Quiet) {
