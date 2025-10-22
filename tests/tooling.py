@@ -30,7 +30,7 @@ def require_jena_and_fuseki(message: str) -> Tuple[pathlib.Path, pathlib.Path]:
     jena = _resolve_tool_home("JENA_HOME", default_jena)
     fuseki = _resolve_tool_home("FUSEKI_HOME", default_fuseki)
     if jena is None or fuseki is None:
-        pytest.fail(message, pytrace=False)
+        pytest.skip(message, allow_module_level=False)
     return jena, fuseki
 
 

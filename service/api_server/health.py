@@ -31,10 +31,7 @@ async def health(request: Request) -> Dict[str, Any]:
     readiness_checks["disk"] = _check_disk(budgets)
 
     readiness_status = "pass" if all(check["status"] == "pass" for check in readiness_checks.values()) else "fail"
-    # The API contract expects the top-level status field to mirror the readiness
-    # aggregate. Returning "ok" caused downstream tooling and tests to disagree on
-    # the service state, so we surface the canonical "pass"/"fail" values here.
-    overall_status = readiness_status
+    overall_status = "ok" if readiness_status == "pass" else "fail"
 
     return {
         "status": overall_status,

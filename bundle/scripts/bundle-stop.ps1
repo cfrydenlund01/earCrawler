@@ -15,13 +15,13 @@ if (-not [int]::TryParse($pidText, [ref]$pidValue)) {
     Remove-Item -Path $pidFile -Force
     throw "Invalid PID value: $pidText"
 }
-$pid = $pidValue
+$fusekiPid = $pidValue
 try {
-    $proc = Get-Process -Id $pid -ErrorAction Stop
-    Stop-Process -Id $pid -ErrorAction Stop
+    $proc = Get-Process -Id $fusekiPid -ErrorAction Stop
+    Stop-Process -Id $fusekiPid -ErrorAction Stop
     $proc.WaitForExit()
 } catch {
-    Write-Warning "Process $pid not running"
+    Write-Warning "Process $fusekiPid not running"
 }
 Remove-Item -Path $pidFile -Force
 Write-Host "Fuseki stopped"

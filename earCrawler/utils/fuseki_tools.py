@@ -40,6 +40,16 @@ def _valid_install(fuseki_home: Path) -> bool:
 
 def ensure_fuseki(download: bool = True, version: str | None = None) -> Path:
     root = Path(".").resolve()
+
+    env_override = os.getenv("FUSEKI_HOME")
+    if env_override:
+        env_home = Path(env_override).expanduser()
+        if _valid_install(env_home):
+            return env_home
+        raise RuntimeError(
+            "FUSEKI_HOME is set but does not look like a valid Apache Jena Fuseki installation"
+        )
+
     versions = _load_versions(root)
     info = versions.get("fuseki", {})
     version = version or os.getenv("FUSEKI_VERSION") or info.get("version", "5.3.0")
