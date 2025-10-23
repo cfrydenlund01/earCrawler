@@ -13,7 +13,7 @@ function Verify-Tool($name, $base) {
     $shaRef = (Invoke-WebRequest -Uri "$url.sha512").Content.Split()[0].ToLower()
     $actual = (Get-FileHash $zip -Algorithm SHA512).Hash.ToLower()
     if ($actual -ne $expected -or $actual -ne $shaRef) {
-        throw "SHA512 mismatch for $name: expected $expected, ref $shaRef, got $actual"
+        throw "SHA512 mismatch for ${name}: expected ${expected}, ref ${shaRef}, got ${actual}"
     }
 }
 

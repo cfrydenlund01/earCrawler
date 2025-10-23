@@ -1,3 +1,92 @@
+function Find-BundleExecutable {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Names
+    )
+
+    foreach ($name in $Names) {
+        if ([string]::IsNullOrWhiteSpace($name)) {
+            continue
+        }
+        $info = Get-Command $name -ErrorAction SilentlyContinue
+        if ($info) {
+            return $info.Source
+        }
+        try {
+            $output = & where.exe $name 2>$null
+            if ($LASTEXITCODE -eq 0 -and $output) {
+                $first = ($output -split "`r?`n" | Where-Object { $_ })[0]
+                if ($first) {
+                    return $first.Trim()
+                }
+            }
+        } catch {
+            continue
+        }
+    }
+    return $null
+}
+
+function Resolve-BundleInterpreter {
+    param(
+        [Parameter(Mandatory = $true)][string]$Command,
+        [Parameter(Mandatory = $true)][ref]$Arguments
+    )
+
+    $cmd = $Command
+    $args = @($Arguments.Value)
+    if ($args.Count -eq 1 -and $args[0] -eq $null) {
+        $args = @()
+    }
+
+    $normalized = [string]::IsNullOrWhiteSpace($cmd) ? '' : ([IO.Path]::GetFileName($cmd)).ToLowerInvariant()
+    if ($normalized -in @('python3', 'python3.exe')) {
+        $resolved = Find-BundleExecutable @('python3', 'python3.exe', 'python', 'python.exe')
+        if (-not $resolved) {
+            $pyResolved = Find-BundleExecutable @('py', 'py.exe')
+            if ($pyResolved) {
+                $resolved = $pyResolved
+                $args = @('-3') + $args
+            }
+        }
+        if (-not $resolved) {
+            $candidatePaths = @()
+            if ($env:VIRTUAL_ENV) {
+                $candidatePaths += Join-Path $env:VIRTUAL_ENV 'Scripts/python.exe'
+                $candidatePaths += Join-Path $env:VIRTUAL_ENV 'Scripts/python3.exe'
+                $candidatePaths += Join-Path $env:VIRTUAL_ENV 'bin/python3'
+                $candidatePaths += Join-Path $env:VIRTUAL_ENV 'bin/python'
+            }
+            if ($env:PYTHON_HOME) {
+                $candidatePaths += Join-Path $env:PYTHON_HOME 'python.exe'
+                $candidatePaths += Join-Path $env:PYTHON_HOME 'bin/python3'
+            }
+            foreach ($candidatePath in $candidatePaths) {
+                if ($candidatePath -and (Test-Path $candidatePath)) {
+                    $resolved = $candidatePath
+                    break
+                }
+            }
+        }
+        if ($resolved) {
+            $Arguments.Value = $args
+            return $resolved
+        }
+    }
+
+    if ($cmd -and (Test-Path $cmd)) {
+        $Arguments.Value = $args
+        return $cmd
+    }
+
+    $fallback = Find-BundleExecutable @($cmd)
+    if ($fallback) {
+        $Arguments.Value = $args
+        return $fallback
+    }
+
+    return $null
+}
+
 function Resolve-BundleCommand {
     param(
         [Parameter(Mandatory = $true)][string]$Executable,
@@ -113,13 +202,8 @@ function Resolve-BundleCommand {
         }
     }
 
-    if ($cmd -eq 'python3' -and -not (Get-Command 'python3' -ErrorAction SilentlyContinue)) {
-        if (Get-Command 'python' -ErrorAction SilentlyContinue) {
-            $cmd = 'python'
-        }
-    }
-
-    if (-not (Get-Command $cmd -ErrorAction SilentlyContinue)) {
+    $resolvedCmd = Resolve-BundleInterpreter -Command $cmd -Arguments ([ref]$cmdArgs)
+    if (-not $resolvedCmd) {
         throw "Interpreter '$cmd' not found for executable '$Executable'"
     }
 
@@ -128,8 +212,19 @@ function Resolve-BundleCommand {
     $mergedArgs += $resolvedExecutable
     if ($argumentList) { $mergedArgs += $argumentList }
 
+    $cmdFileName = [IO.Path]::GetFileName($resolvedCmd).ToLowerInvariant()
+    if ($cmdFileName -in @('py', 'py.exe')) {
+        $scriptIndex = $cmdArgs.Count
+        if ($mergedArgs.Count -gt $scriptIndex) {
+            $scriptArg = [string]$mergedArgs[$scriptIndex]
+            if ($scriptArg -and $scriptArg -notmatch '^".*"$') {
+                $mergedArgs[$scriptIndex] = '"' + $scriptArg.Replace('"', '\"') + '"'
+            }
+        }
+    }
+
     return [PSCustomObject]@{
-        FilePath     = $cmd
+        FilePath     = $resolvedCmd
         ArgumentList = @($mergedArgs | ForEach-Object { [string]$_ })
     }
 }

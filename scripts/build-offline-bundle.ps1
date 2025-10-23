@@ -20,9 +20,22 @@ foreach ($file in $requiredFiles) {
 
 $bundleRoot = Join-Path $repoRoot $OutputDir
 if (Test-Path $bundleRoot) {
-    Remove-Item -Path $bundleRoot -Recurse -Force
+    try {
+        Remove-Item -Path $bundleRoot -Recurse -Force -ErrorAction Stop
+    } catch {
+        $errorMessage = $_.Exception.Message
+        Write-Warning ("Unable to remove existing bundle at {0}: {1}" -f $bundleRoot, $errorMessage)
+        Get-ChildItem -Path $bundleRoot -Force | ForEach-Object {
+            try {
+                Remove-Item -Path $_.FullName -Recurse -Force -ErrorAction Stop
+            } catch {
+                $itemError = $_.Exception.Message
+                Write-Warning ("Leaving existing file {0}: {1}" -f $_.FullName, $itemError)
+            }
+        }
+    }
 }
-New-Item -ItemType Directory -Path $bundleRoot | Out-Null
+New-Item -ItemType Directory -Path $bundleRoot -Force | Out-Null
 
 function Copy-Tree([string]$from, [string]$to) {
     if (-not (Test-Path $from)) { return }
@@ -104,19 +117,26 @@ Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
 [string[]]$relativeKeys = $files | ForEach-Object { $_.Relative }
 $fileItems = @($files)
 [Array]::Sort($relativeKeys, $fileItems, [System.StringComparer]::Ordinal)
+$entryLookup = @{}
 $manifestEntries = @()
 $checksumLines = @()
 foreach ($entry in $fileItems) {
     $file = $entry.File
     $relative = $entry.Relative
     $hash = (Get-FileHash -Path $file.FullName -Algorithm SHA256).Hash.ToLower()
-    $manifestEntries += [ordered]@{
+    $record = [pscustomobject][ordered]@{
         path = $relative
         size = $file.Length
         sha256 = $hash
     }
+    $manifestEntries += $record
+    $entryLookup[$relative] = $record
     $checksumLines += "$hash  $relative"
 }
+
+$sortedRelatives = @($entryLookup.Keys)
+[Array]::Sort($sortedRelatives, [System.StringComparer]::Ordinal)
+$manifestEntries = foreach ($relative in $sortedRelatives) { $entryLookup[$relative] }
 
 $manifest = [ordered]@{
     version = $version

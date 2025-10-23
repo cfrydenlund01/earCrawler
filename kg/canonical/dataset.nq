@@ -1,2 +1,2 @@
-<http://example.org/bundle> <http://example.org/contains> <http://example.org/dataset> <http://example.org/graph> .
-<http://example.org/dataset> <http://purl.org/dc/terms/title> "Sample canonical dataset" <http://example.org/graph> .
+a .
+b .

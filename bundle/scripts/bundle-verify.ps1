@@ -19,6 +19,24 @@ foreach ($line in $lines) {
     }
 }
 
+function Get-FileHashWithRetry {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [int]$Retries = 5,
+        [int]$DelayMs = 100
+    )
+
+    for ($attempt = 0; $attempt -lt $Retries; $attempt++) {
+        try {
+            return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLower()
+        } catch [System.IO.IOException] {
+            if ($attempt -eq ($Retries - 1)) { throw }
+            Start-Sleep -Milliseconds $DelayMs
+        }
+    }
+}
+
 $errors = @()
 foreach ($entry in $expected.GetEnumerator()) {
     $rel = $entry.Key
@@ -28,7 +46,7 @@ foreach ($entry in $expected.GetEnumerator()) {
         $errors += "Missing file: $rel"
         continue
     }
-    $actual = (Get-FileHash -Path $full -Algorithm SHA256).Hash.ToLower()
+    $actual = Get-FileHashWithRetry -Path $full
     if ($actual -ne $hash) {
         $errors += "Hash mismatch for $rel"
     }

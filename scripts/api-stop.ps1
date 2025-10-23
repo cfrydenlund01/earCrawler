@@ -4,13 +4,15 @@ if (-not (Test-Path $pidFile)) {
     Write-Warning "PID file not found: $pidFile"
     return
 }
-$pid = Get-Content $pidFile | Select-Object -First 1
-if ($pid) {
+$apiPid = Get-Content $pidFile | Select-Object -First 1
+if ($apiPid) {
     try {
-        Stop-Process -Id [int]$pid -Force -ErrorAction Stop
-        Write-Host "Stopped API process $pid"
+        $pidValue = [int]$apiPid
+        Stop-Process -Id $pidValue -Force -ErrorAction Stop
+        Write-Host "Stopped API process $pidValue"
     } catch {
-        Write-Warning "Unable to stop process $pid: $_"
+        $message = $_
+        Write-Warning ("Unable to stop process {0}: {1}" -f $apiPid, $message)
     }
 }
 Remove-Item $pidFile -ErrorAction SilentlyContinue

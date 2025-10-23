@@ -53,8 +53,18 @@ def _verify_sha512(path: Path, expected: str) -> None:
 
 
 def ensure_jena(download: bool = True, version: str | None = None) -> Path:
-    """Ensure Apache Jena exists under ``tools/jena`` with checksum verification."""
+    """Ensure Apache Jena is available, honoring ``JENA_HOME`` overrides."""
+
     root = Path(".").resolve()
+    env_override = os.getenv("JENA_HOME")
+    if env_override:
+        env_home = Path(env_override).expanduser()
+        if _valid_install(env_home):
+            return env_home
+        raise RuntimeError(
+            "JENA_HOME is set but does not look like a valid Apache Jena installation"
+        )
+
     versions = _load_versions(root)
     jena_info = versions.get("jena", {})
     version = version or os.getenv("JENA_VERSION") or jena_info.get("version", "5.3.0")
@@ -109,21 +119,40 @@ def ensure_fuseki(*args, **kwargs):  # pragma: no cover - simple delegate
     return _fuseki_tools.ensure_fuseki(*args, **kwargs)
 
 
+def _candidate_jena_homes() -> list[Path]:
+    """Return possible Jena installation directories ordered by priority."""
+
+    homes: list[Path] = []
+    env_override = os.getenv("JENA_HOME")
+    if env_override:
+        env_home = Path(env_override).expanduser()
+        if env_home.exists():
+            homes.append(env_home)
+    repo_home = get_jena_home(Path(".").resolve())
+    if repo_home not in homes:
+        homes.append(repo_home)
+    return homes
+
+
 def find_tdbloader() -> Path:
-    jena_home = get_jena_home(Path(".").resolve())
-    for names in _expected_scripts(jena_home)[1:2]:
-        for n in names:
-            cand = jena_home / "bat" / n
-            if cand.exists():
-                return cand.resolve()
-    return jena_home / "bat" / "tdb2_tdbloader.bat"
+    homes = _candidate_jena_homes()
+    for home in homes:
+        for names in _expected_scripts(home)[1:2]:
+            for n in names:
+                cand = home / "bat" / n
+                if cand.exists():
+                    return cand.resolve()
+    home = homes[0]
+    return home / "bat" / "tdb2_tdbloader.bat"
 
 
 def find_tdbquery() -> Path:
-    jena_home = get_jena_home(Path(".").resolve())
-    for names in _expected_scripts(jena_home)[2:3]:
-        for n in names:
-            cand = jena_home / "bat" / n
-            if cand.exists():
-                return cand.resolve()
-    return jena_home / "bat" / "tdb2_tdbquery.bat"
+    homes = _candidate_jena_homes()
+    for home in homes:
+        for names in _expected_scripts(home)[2:3]:
+            for n in names:
+                cand = home / "bat" / n
+                if cand.exists():
+                    return cand.resolve()
+    home = homes[0]
+    return home / "bat" / "tdb2_tdbquery.bat"

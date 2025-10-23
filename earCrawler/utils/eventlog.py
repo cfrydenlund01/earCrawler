@@ -31,6 +31,26 @@ def write_event_log(message: str, *, level: str = "INFO", source: str = "EarCraw
         advapi = ctypes.windll.advapi32  # type: ignore[attr-defined]
     except AttributeError:  # pragma: no cover - defensive
         return
+    # Ensure ctypes knows about the signatures so handles are not truncated on 64-bit
+    # Python interpreters. Without these declarations, the default ``c_int`` return
+    # type will drop the upper bits of the Windows handle which in turn can trigger
+    # access violations inside ``ReportEventW`` when invoked from worker threads.
+    advapi.RegisterEventSourceW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR]  # type: ignore[attr-defined]
+    advapi.RegisterEventSourceW.restype = wintypes.HANDLE  # type: ignore[attr-defined]
+    advapi.ReportEventW.argtypes = [
+        wintypes.HANDLE,
+        wintypes.WORD,
+        wintypes.WORD,
+        wintypes.DWORD,
+        wintypes.LPVOID,
+        wintypes.WORD,
+        wintypes.DWORD,
+        ctypes.POINTER(wintypes.LPCWSTR),
+        ctypes.c_void_p,
+    ]  # type: ignore[attr-defined]
+    advapi.ReportEventW.restype = wintypes.BOOL  # type: ignore[attr-defined]
+    advapi.DeregisterEventSource.argtypes = [wintypes.HANDLE]  # type: ignore[attr-defined]
+    advapi.DeregisterEventSource.restype = wintypes.BOOL  # type: ignore[attr-defined]
     event_type = _EVENT_TYPES.get(level.upper(), _EVENT_TYPES["INFO"])
     handle = advapi.RegisterEventSourceW(None, wintypes.LPCWSTR(source))  # type: ignore[arg-type]
     if not handle:  # pragma: no cover - failure is logged silently

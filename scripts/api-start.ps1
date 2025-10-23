@@ -26,10 +26,42 @@ if ($FusekiUrl) {
 }
 $env:EARCRAWLER_API_EMBEDDED_FIXTURE = '1'
 
-$python = $env:EARCTL_PYTHON
-if (-not $python) {
-    $python = (Get-Command python).Source
+function Resolve-EarPython {
+    param()
+
+    if ($env:EARCTL_PYTHON -and (Test-Path $env:EARCTL_PYTHON)) {
+        return $env:EARCTL_PYTHON
+    }
+
+    foreach ($name in 'python', 'python.exe', 'python3', 'python3.exe') {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd) {
+            return $cmd.Source
+        }
+    }
+
+    $pyLauncher = Get-Command 'py' -ErrorAction SilentlyContinue
+    if ($pyLauncher) {
+        try {
+            $probe = & $pyLauncher.Source -3 -c "import sys; print(sys.executable)"
+            if ($LASTEXITCODE -eq 0 -and $probe) {
+                return $probe.Trim()
+            }
+        } catch {
+        }
+    }
+
+    if ($env:VIRTUAL_ENV) {
+        $candidate = Join-Path $env:VIRTUAL_ENV 'Scripts/python.exe'
+        if (Test-Path $candidate) { return $candidate }
+        $candidate = Join-Path $env:VIRTUAL_ENV 'bin/python3'
+        if (Test-Path $candidate) { return $candidate }
+    }
+
+    throw 'Unable to locate a Python interpreter. Set EARCTL_PYTHON or ensure python is on PATH.'
 }
+
+$python = Resolve-EarPython
 $pidFile = Join-Path -Path 'kg/reports' -ChildPath 'api.pid'
 New-Item -ItemType Directory -Force -Path (Split-Path $pidFile) | Out-Null
 

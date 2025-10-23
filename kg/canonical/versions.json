@@ -1,7 +1,17 @@
 {
   "tools": {
-    "jena": "5.3.0",
-    "fuseki": "5.3.0"
+    "jena": {
+      "version": "5.3.0",
+      "sha512": "7de6f930a83f73539e500fb664b81600df12a55ad33adb7b804f71b18f0660db783f4c5ffe852856e2806ee3820f47e622de37a27437028eee471b0b022bc8b2"
+    },
+    "fuseki": {
+      "version": "5.3.0",
+      "sha512": "2d84c7272f78d4f98abdcaab93996ed88a91a08efaaa0204bcf853487dbf9ab838f8fef09fa255f878a19577458c636f8fc09c469f472ed5412edbaf1fff5299"
+    },
+    "python": {
+      "lock": "requirements-lock.txt",
+      "win_lock": "requirements-win-lock.txt"
+    }
   },
-  "tools_sha256": "placeholder"
+  "tools_sha256": "f60abde0418f2c00144e3a319545c1102629ab022202de49da213ad1cf7d7694"
 }

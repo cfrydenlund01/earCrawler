@@ -8,7 +8,7 @@ pytestmark = pytest.mark.enable_socket
 def test_health_endpoint(app) -> None:
     res = app.get("/health")
     assert res.status_code == 200
-    assert res.json()["status"] == "ok"
+    assert res.json()["status"] == "pass"
 
 
 def test_entity_view_contract(app) -> None:

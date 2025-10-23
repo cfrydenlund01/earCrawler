@@ -74,3 +74,13 @@ def test_fuseki_missing_script(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     with pytest.raises(RuntimeError):
         fuseki_tools.ensure_fuseki()
+
+
+def test_fuseki_honors_env_override(tmp_path, monkeypatch):
+    home = tmp_path / 'fuseki'
+    home.mkdir()
+    (home / 'fuseki-server.bat').write_text('echo fuseki')
+    (home / 'fuseki-server').write_text('echo fuseki')
+
+    monkeypatch.setenv('FUSEKI_HOME', str(home))
+    assert fuseki_tools.ensure_fuseki(download=False) == home

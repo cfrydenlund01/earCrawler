@@ -57,3 +57,17 @@ def test_ensure_jena_missing_scripts(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError) as exc:
         jena_tools.ensure_jena()
     assert "Windows scripts" in str(exc.value)
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows-only")
+def test_ensure_jena_honors_env_override(tmp_path, monkeypatch):
+    home = tmp_path / "jena"
+    bat = home / "bat"
+    bat.mkdir(parents=True)
+    for name in ("riot.bat", "tdb2_tdbloader.bat", "tdb2_tdbquery.bat"):
+        (bat / name).write_text("@echo off\n")
+
+    monkeypatch.setenv("JENA_HOME", str(home))
+    assert jena_tools.ensure_jena(download=False) == home
+    assert jena_tools.find_tdbloader().resolve() == (bat / "tdb2_tdbloader.bat").resolve()
+    assert jena_tools.find_tdbquery().resolve() == (bat / "tdb2_tdbquery.bat").resolve()

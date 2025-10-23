@@ -5,7 +5,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-$base = "http://$ApiHost:$Port"
+$base = "http://{0}:{1}" -f $ApiHost, $Port
 $reportDir = 'kg/reports'
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
 $reportFile = Join-Path $reportDir 'api-smoke.txt'
