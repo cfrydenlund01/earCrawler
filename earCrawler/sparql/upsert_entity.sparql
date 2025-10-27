@@ -1,0 +1,12 @@
+@include prefixes.sparql
+DELETE { ent:__ID__ ear:name ?oldName . }
+INSERT {
+  ent:__ID__ a ear:Entity ;
+             ear:name "__NAME__" ;
+             ear:source "__SOURCE__" ;
+             ear:programs "__PROGRAMS__" ;
+             ear:country "__COUNTRY__" .
+}
+WHERE {
+  OPTIONAL { ent:__ID__ ear:name ?oldName . }
+}

@@ -1,0 +1,6 @@
+@include prefixes.sparql
+INSERT DATA {
+  part:__PARTNO__ a ear:Part ;
+                  skos:notation "__PARTNO__" ;
+                  dct:title "15 CFR Part __PARTNO__" .
+}

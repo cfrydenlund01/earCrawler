@@ -1,3 +1,9 @@
+## [0.25.0]
+### Added
+- B.25 loaders for CSL entities and EAR parts backed by Trade.gov and Federal Register clients.
+- SPARQL upsert templates plus a join example for Entities ↔ Parts relationships.
+- Transform unit tests and a skipped integration harness for local Fuseki validation.
+
 ## [0.24.0]
 ### Added
 - Windows-first plumbing for B.24: Trade.gov and Federal Register API clients wired with retry, caching, and Windows Credential Manager secrets.

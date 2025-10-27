@@ -90,6 +90,23 @@ earctl api stop
 * See `tests/clients/` and `tests/kg/test_sparql_client.py` for smoke tests that
   lock in API contract and Fuseki plumbing.
 
+### B.25 Loading
+
+1. Ensure Apache Jena Fuseki is running at `http://localhost:3030/ear`.
+2. Store Trade.gov API keys in Windows Credential Manager via `keyring`.
+3. Load CSL entities:
+   ```powershell
+   python -c "from earCrawler.loaders.csl_loader import load_csl_by_query; from earCrawler.kg.jena_client import JenaClient; print(load_csl_by_query('Huawei', limit=5, jena=JenaClient()))"
+   ```
+4. Seed EAR parts from the Federal Register:
+   ```powershell
+   python -c "from earCrawler.loaders.ear_parts_loader import load_parts_from_fr; from earCrawler.kg.jena_client import JenaClient; print(load_parts_from_fr('Export Administration Regulations', jena=JenaClient(), pages=1, per_page=10))"
+   ```
+5. Link demo entities to parts:
+   ```powershell
+   python -c "from earCrawler.loaders.ear_parts_loader import link_entities_to_parts_by_name_contains; from earCrawler.kg.jena_client import JenaClient; print(link_entities_to_parts_by_name_contains(JenaClient(), 'Huawei', ['744']))"
+   ```
+
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be
 cloned to `C:\Users\cfrydenlund\Projects\earCrawler`.
