@@ -16,15 +16,16 @@ class TradeGovError(Exception):
 
 
 class TradeGovClient:
-    """Client for the Trade.gov entity lookup API."""
+    """Client for the Trade.gov Consolidated Screening List gateway."""
 
-    BASE_URL = "https://api.trade.gov/v1"
+    BASE_URL = "https://data.trade.gov/consolidated_screening_list/v1"
+    SUBSCRIPTION_HEADER = "subscription-key"
 
     def __init__(self, *, session: requests.Session | None = None, cache_dir: Path | None = None) -> None:
         self.session = session or requests.Session()
         self.session.trust_env = False
         self.api_key = get_secret("TRADEGOV_API_KEY")
-        self.user_agent = get_secret("TRADEGOV_USER_AGENT", fallback="earCrawler/0.9")
+        self.user_agent = get_secret("TRADEGOV_USER_AGENT", fallback="ear-ai/0.2.5")
         self.cache = HTTPCache(cache_dir or Path(".cache/api/tradegov"))
 
     @retry(
@@ -35,10 +36,24 @@ class TradeGovClient:
     )
     def _get(self, endpoint: str, params: dict[str, str]) -> dict:
         url = f"{self.BASE_URL}{endpoint}"
-        params = {"api_key": self.api_key, **params}
-        headers = {"User-Agent": self.user_agent, "Accept": "application/json"}
+        headers = {
+            "User-Agent": self.user_agent,
+            "Accept": "application/json",
+            "Cache-Control": "no-cache",
+            self.SUBSCRIPTION_HEADER: self.api_key,
+        }
         resp = self.cache.get(self.session, url, params, headers=headers)
+        if resp.status_code in (301, 302) or any(h.status_code in (301, 302) for h in getattr(resp, "history", [])):
+            raise TradeGovError(
+                "Trade.gov redirected to developer portal. Confirm your CSL subscription and subscription-key header."
+            )
         resp.raise_for_status()
+        content_type = resp.headers.get("Content-Type", "")
+        if "application/json" not in content_type.lower():
+            snippet = (resp.text or "")[:200]
+            raise TradeGovError(
+                f"Unexpected content type '{content_type}' from Trade.gov: {snippet}"
+            )
         try:
             return resp.json()
         except ValueError as exc:  # pragma: no cover - invalid JSON
@@ -52,10 +67,10 @@ class TradeGovClient:
         sources: Optional[Iterable[str]] = None,
     ) -> List[Dict[str, str]]:
         """Search for entities matching ``query`` and return normalized records."""
-        params: dict[str, str] = {"q": query, "size": str(limit)}
+        params: dict[str, str] = {"name": query, "size": str(max(1, min(limit, 50)))}
         if sources:
             params["sources"] = ",".join(sources)
-        data = self._get("/entities/search", params)
+        data = self._get("/search", params)
         results: List[Dict[str, str]] = []
         for item in data.get("results", []):
             results.append(
