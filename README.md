@@ -93,7 +93,7 @@ earctl api stop
 ### B.25 Loading
 
 1. Ensure Apache Jena Fuseki is running at `http://localhost:3030/ear`.
-2. Store Trade.gov API keys in Windows Credential Manager via `keyring`.
+2. Store the Trade.gov subscription key in Credential Manager using `keyring.set_password("EAR_AI", "TRADEGOV_API_KEY", "<YOUR_KEY>")`. The CSL gateway now requires the `Ocp-Apim-Subscription-Key` header instead of the legacy `api_key` query string.
 3. Load CSL entities:
    ```powershell
    python -c "from earCrawler.loaders.csl_loader import load_csl_by_query; from earCrawler.kg.jena_client import JenaClient; print(load_csl_by_query('Huawei', limit=5, jena=JenaClient()))"
@@ -106,6 +106,12 @@ earctl api stop
    ```powershell
    python -c "from earCrawler.loaders.ear_parts_loader import link_entities_to_parts_by_name_contains; from earCrawler.kg.jena_client import JenaClient; print(link_entities_to_parts_by_name_contains(JenaClient(), 'Huawei', ['744']))"
    ```
+6. Verify the gateway is returning JSON (a 301 redirect means the subscription header is missing):
+   ```powershell
+   python -c "import requests, keyring; key = keyring.get_password('EAR_AI','TRADEGOV_API_KEY'); headers={'subscription-key': key, 'Accept': 'application/json', 'User-Agent': 'ear-ai/0.2.5'}; resp=requests.get('https://data.trade.gov/consolidated_screening_list/v1/search', params={'name':'Huawei','size':'1'}, headers=headers, timeout=30, allow_redirects=False); print(resp.status_code, resp.headers.get('Content-Type','')); print(resp.text[:120])"
+   ```
+
+> **Note:** ITA reports that CSL updates have lagged since 2025‑04‑21. If you need fresher data while the API catches up, pull the official CSV as a temporary fallback and switch back once the gateway resumes timely updates.
 
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be

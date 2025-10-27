@@ -1,3 +1,8 @@
+## [0.2.5]
+### Changed
+- Switched the CSL client to the Azure APIM subscription header (`Ocp-Apim-Subscription-Key`) and hardened JSON validation.
+- Documented the new Developer Portal workflow and potential CSL data lag.
+
 ## [0.25.0]
 ### Added
 - B.25 loaders for CSL entities and EAR parts backed by Trade.gov and Federal Register clients.

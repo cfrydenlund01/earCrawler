@@ -4,10 +4,14 @@ interactions:
     headers:
       Accept:
       - application/json
+      Cache-Control:
+      - no-cache
+      subscription-key:
+      - DUMMY
       User-Agent:
-      - earCrawler/0.9
+      - ear-ai/0.2.5
     method: GET
-    uri: https://api.trade.gov/v1/entities/search?api_key=DUMMY&q=ACME&size=2
+    uri: https://data.trade.gov/consolidated_screening_list/v1/search?name=ACME&size=2
   response:
     body:
       string: '{"results": [{"id": "E1", "name": "Acme Alpha", "country": "US", "url": "https://example.com/alpha"}, {"id": "E2", "name": "Acme Beta", "country": "CA", "url": "https://example.com/beta"}]}'
@@ -17,5 +21,5 @@ interactions:
     status:
       code: 200
       message: OK
-    url: https://api.trade.gov/v1/entities/search?api_key=DUMMY&q=ACME&size=2
+    url: https://data.trade.gov/consolidated_screening_list/v1/search?name=ACME&size=2
 version: 1

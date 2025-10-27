@@ -25,12 +25,13 @@ def get_secret(name: str, *, fallback: str | None = None) -> str:
     if env:
         return env
     if keyring is not None:  # pragma: no cover - platform specific
-        try:
-            value = keyring.get_password("earCrawler", name)
-            if value:
-                return value
-        except Exception:
-            pass
+        for service in ("earCrawler", "EAR_AI"):
+            try:
+                value = keyring.get_password(service, name)
+                if value:
+                    return value
+            except Exception:
+                continue
     if fallback is not None:
         return fallback
     raise RuntimeError(f"Secret {name} not found")
