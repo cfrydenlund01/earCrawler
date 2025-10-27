@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, Iterable, List, Optional
 
 import requests
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -44,9 +44,18 @@ class TradeGovClient:
         except ValueError as exc:  # pragma: no cover - invalid JSON
             raise TradeGovError("Invalid JSON response from Trade.gov") from exc
 
-    def search(self, query: str, *, limit: int = 10) -> List[Dict[str, str]]:
+    def search(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+        sources: Optional[Iterable[str]] = None,
+    ) -> List[Dict[str, str]]:
         """Search for entities matching ``query`` and return normalized records."""
-        data = self._get("/entities/search", {"q": query, "size": str(limit)})
+        params: dict[str, str] = {"q": query, "size": str(limit)}
+        if sources:
+            params["sources"] = ",".join(sources)
+        data = self._get("/entities/search", params)
         results: List[Dict[str, str]] = []
         for item in data.get("results", []):
             results.append(
@@ -71,3 +80,15 @@ class TradeGovClient:
 
 # Alias for legacy imports
 TradeGovEntityClient = TradeGovClient
+
+
+def search_entities(
+    query: str,
+    *,
+    size: int = 10,
+    sources: Optional[Iterable[str]] = None,
+) -> List[Dict[str, str]]:
+    """Convenience function mirroring :meth:`TradeGovClient.search`."""
+
+    client = TradeGovClient()
+    return client.search(query, limit=size, sources=sources)

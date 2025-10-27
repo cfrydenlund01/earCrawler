@@ -71,9 +71,16 @@ class FederalRegisterClient:
         return self._clean_text(data.get("body_html") or data.get("body_text") or "")
 
     # Backwards compatible wrappers
-    def search_documents(self, query: str, per_page: int = 100):
+    def search_documents(
+        self,
+        query: str,
+        per_page: int = 100,
+        page: int | None = None,
+    ) -> List[Dict]:
         url = f"{self.BASE_URL}/documents"
         params = {"conditions[any]": query, "per_page": str(per_page)}
+        if page is not None:
+            params["page"] = str(page)
         data = self._get_json(url, params)
         return data.get("results", [])
 
@@ -90,3 +97,16 @@ class FederalRegisterClient:
         text = re.sub("<[^>]+>", " ", html)
         text = unescape(text)
         return " ".join(text.split())
+
+
+def search_documents(
+    query: str,
+    *,
+    per_page: int = 100,
+    page: int | None = None,
+) -> dict:
+    """Convenience wrapper returning a JSON response payload."""
+
+    client = FederalRegisterClient()
+    results = client.search_documents(query, per_page=per_page, page=page)
+    return {"results": results}

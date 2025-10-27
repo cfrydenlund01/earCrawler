@@ -1,0 +1,7 @@
+@include prefixes.sparql
+SELECT ?entity ?name ?part
+WHERE {
+  ?entity a ear:Entity ; ear:name ?name .
+  ?entity ear:mentionedInPart ?part .
+}
+ORDER BY ?name
