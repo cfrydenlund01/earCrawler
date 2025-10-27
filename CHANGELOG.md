@@ -1,3 +1,9 @@
+## [0.24.0]
+### Added
+- Windows-first plumbing for B.24: Trade.gov and Federal Register API clients wired with retry, caching, and Windows Credential Manager secrets.
+- Minimal Fuseki SPARQL client update endpoint for local knowledge graph writes plus smoke tests.
+- Git push helper workflow to create feature branches and GitHub pull requests with optional GH CLI integration.
+
 ## [0.23.0]
 ### Added
 - Health endpoints with readiness subchecks and Windows-focused probes.

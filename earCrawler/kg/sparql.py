@@ -2,15 +2,24 @@ from __future__ import annotations
 
 """Minimal SPARQL HTTP client for local Fuseki use."""
 
-from typing import Dict, Any, Literal, Optional
+from typing import Any, Dict, Optional
+from urllib.parse import urlencode
+
 import requests
 
 
 class SPARQLClient:
     """Tiny wrapper around ``requests`` for talking to Fuseki."""
 
-    def __init__(self, endpoint: str = "http://localhost:3030/ear/sparql", timeout: int = 15):
+    def __init__(
+        self,
+        endpoint: str = "http://localhost:3030/ear/sparql",
+        *,
+        update_endpoint: Optional[str] = None,
+        timeout: int = 15,
+    ) -> None:
         self.endpoint = endpoint
+        self.update_endpoint = update_endpoint or self._derive_update_endpoint(endpoint)
         self.session = requests.Session()
         self.timeout = timeout
 
@@ -51,3 +60,23 @@ class SPARQLClient:
         if resp.status_code != 200:
             raise RuntimeError(f"SPARQL CONSTRUCT failed: {resp.status_code}")
         return resp.text
+
+    def update(self, query: str) -> None:
+        """Execute a SPARQL ``UPDATE`` statement via POST."""
+
+        if not self.update_endpoint:
+            raise RuntimeError("No update endpoint configured for SPARQL client")
+        resp = self.session.post(
+            self.update_endpoint,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data=urlencode({"update": query}),
+            timeout=self.timeout,
+        )
+        if resp.status_code not in (200, 204):
+            raise RuntimeError(f"SPARQL UPDATE failed: {resp.status_code}")
+
+    @staticmethod
+    def _derive_update_endpoint(endpoint: str) -> str:
+        if endpoint.endswith("/sparql"):
+            return endpoint[: -len("/sparql")] + "/update"
+        return endpoint + "/update"

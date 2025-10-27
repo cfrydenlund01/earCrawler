@@ -4,3 +4,12 @@ __pycache__/
 kg/reports/
 kg/shapes.ttl
 perf/synth/out/
+.cache/
+dist/
+kg/.kgstate/
+kg/canonical/
+kg/delta/
+kg/reconcile/decisions.jsonl.gz
+kg/reconcile/idmap.csv
+kg/snapshots/dataset.nq
+kg/snapshots/sample.srj

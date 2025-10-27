@@ -80,6 +80,16 @@ earctl api stop
 * The watchdog monitor writes summaries to `kg/reports/watchdog-*.txt` and
   attempts to restart services when PIDs disappear.
 
+### B.24 Plumbing
+
+* `api_clients.tradegov_client` and `api_clients.federalregister_client` provide
+  retry-aware, cached adapters that pull credentials from the Windows Credential Manager.
+* `earCrawler.kg.sparql.SPARQLClient` now supports `SELECT`, `ASK`, `CONSTRUCT`,
+  and `UPDATE` operations against a local Fuseki dataset.
+* `pushCommitsAndLFS.ps1` stages changes, pushes a feature branch, and can open a GitHub pull request via `gh`.
+* See `tests/clients/` and `tests/kg/test_sparql_client.py` for smoke tests that
+  lock in API contract and Fuseki plumbing.
+
 ## Setup
 Use the commands below from a Windows terminal. The repository is assumed to be
 cloned to `C:\Users\cfrydenlund\Projects\earCrawler`.
