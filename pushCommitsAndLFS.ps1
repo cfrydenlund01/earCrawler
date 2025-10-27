@@ -1,8 +1,12 @@
 param(
     [string]$Remote = "origin",
-    [string]$Branch = "",
+    [string]$BaseBranch = "main",
+    [string]$FeatureBranch = "",
     [int]$LfsThresholdMb = 100,
-    [string]$CommitMessage = ""
+    [string]$CommitMessage = "",
+    [string]$PrTitle = "",
+    [string]$PrBody = "",
+    [switch]$SkipPrCreation
 )
 
 $ErrorActionPreference = "Stop"
@@ -16,8 +20,16 @@ function Invoke-Git {
 
     $commandText = "git {0}" -f ($Arguments -join " ")
     Write-Host "> $commandText" -ForegroundColor Cyan
-    $output = & git @Arguments 2>&1
-    $exitCode = $LASTEXITCODE
+
+    $prevErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git @Arguments 2>&1
+        $exitCode = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $prevErrorAction
+    }
 
     foreach ($line in $output) {
         if ($null -ne $line -and $line.ToString().Length -gt 0) {
@@ -45,21 +57,46 @@ $repoRoot = $repoRoot.Trim()
 Set-Location -Path $repoRoot
 Write-Host "Repository root: $repoRoot"
 
-if ([string]::IsNullOrWhiteSpace($Branch)) {
-    $branchResult = Invoke-Git -Arguments @("rev-parse", "--abbrev-ref", "HEAD", "--") -IgnoreErrors
-    $Branch = ($branchResult.Output | Select-Object -First 1).Trim()
-    if ([string]::IsNullOrWhiteSpace($Branch)) {
-        throw "Unable to determine current branch. Please set -Branch explicitly."
-    }
+$currentBranchResult = Invoke-Git -Arguments @("rev-parse", "--abbrev-ref", "HEAD", "--") -IgnoreErrors
+$currentBranch = ($currentBranchResult.Output | Select-Object -First 1).Trim()
+if ([string]::IsNullOrWhiteSpace($currentBranch)) {
+    throw "Unable to determine current branch."
 }
 
-Write-Host "Target remote: $Remote"
-Write-Host "Target branch: $Branch"
+Write-Host "Active branch before processing: $currentBranch"
+Write-Host "Remote: $Remote"
+Write-Host "Base branch: $BaseBranch"
 
-$remotesResult = Invoke-Git -Arguments @("remote") -IgnoreErrors
-$remoteList = $remotesResult.Output | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | ForEach-Object { $_.Trim() }
-if (-not ($remoteList | Where-Object { $_ -eq $Remote })) {
-    throw "Remote '$Remote' does not exist. Configure the remote before running this script."
+Invoke-Git -Arguments @("fetch", $Remote, $BaseBranch) | Out-Null
+
+if ([string]::IsNullOrWhiteSpace($FeatureBranch)) {
+    if ($currentBranch -eq $BaseBranch) {
+        $FeatureBranch = "pr/{0}" -f (Get-Date -Format "yyyyMMdd-HHmmss")
+        Write-Host "Creating feature branch '$FeatureBranch' from '$BaseBranch'..."
+        Invoke-Git -Arguments @("checkout", "-b", $FeatureBranch) | Out-Null
+        $currentBranch = $FeatureBranch
+    }
+    else {
+        $FeatureBranch = $currentBranch
+        Write-Host "Using existing branch '$FeatureBranch' for pull request."
+    }
+}
+else {
+    if ($currentBranch -ne $FeatureBranch) {
+        $branchCheck = Invoke-Git -Arguments @("rev-parse", "--verify", "--quiet", $FeatureBranch) -IgnoreErrors
+        if ($branchCheck.ExitCode -eq 0) {
+            Write-Host "Checking out existing branch '$FeatureBranch'..."
+            Invoke-Git -Arguments @("checkout", $FeatureBranch) | Out-Null
+        }
+        else {
+            Write-Host "Creating branch '$FeatureBranch' from current HEAD..."
+            Invoke-Git -Arguments @("checkout", "-b", $FeatureBranch) | Out-Null
+        }
+        $currentBranch = $FeatureBranch
+    }
+    else {
+        Write-Host "Already on feature branch '$FeatureBranch'."
+    }
 }
 
 try {
@@ -111,7 +148,7 @@ Invoke-Git -Arguments @("add", "--all") | Out-Null
 
 $diffResult = Invoke-Git -Arguments @("diff", "--cached", "--quiet") -IgnoreErrors
 if ($diffResult.ExitCode -eq 0) {
-    Write-Host "Nothing to commit. Working tree is clean."
+    Write-Host "Nothing staged for commit."
 }
 else {
     if ([string]::IsNullOrWhiteSpace($CommitMessage)) {
@@ -122,8 +159,43 @@ else {
     Invoke-Git -Arguments @("commit", "-m", $CommitMessage) | Out-Null
 }
 
-Write-Host "Pushing to '$Remote/$Branch' with force-with-lease..."
-Invoke-Git -Arguments @("push", "--force-with-lease", $Remote, $Branch) | Out-Null
+Write-Host "Pushing branch '$currentBranch' to '$Remote'..."
+Invoke-Git -Arguments @("push", "-u", $Remote, $currentBranch) | Out-Null
 
-Write-Host "Push complete. Current status:"
-Invoke-Git -Arguments @("status", "-sb") | Out-Null
+if ($SkipPrCreation) {
+    Write-Host "Skipping pull request creation by request."
+    return
+}
+
+$ghCommand = Get-Command gh -ErrorAction SilentlyContinue
+if (-not $ghCommand) {
+    Write-Warning "GitHub CLI ('gh') not found. Install it from https://cli.github.com/ to enable automatic PR creation."
+    return
+}
+
+if ([string]::IsNullOrWhiteSpace($PrTitle)) {
+    $lastCommit = Invoke-Git -Arguments @("log", "-1", "--pretty=%s") -IgnoreErrors
+    $PrTitle = ($lastCommit.Output | Select-Object -First 1).Trim()
+    if ([string]::IsNullOrWhiteSpace($PrTitle)) {
+        $PrTitle = "Updates from $currentBranch"
+    }
+}
+
+$prArgs = @("pr", "create", "--base", $BaseBranch, "--head", $currentBranch, "--title", $PrTitle)
+if ([string]::IsNullOrWhiteSpace($PrBody)) {
+    $prArgs += "--fill"
+}
+else {
+    $prArgs += @("--body", $PrBody)
+}
+
+Write-Host "Creating pull request via GitHub CLI..."
+$prOutput = & gh @prArgs
+$prExitCode = $LASTEXITCODE
+
+if ($prExitCode -ne 0) {
+    throw "Failed to create pull request (exit code $prExitCode). Output: $prOutput"
+}
+
+Write-Host $prOutput
+Write-Host "Pull request created successfully."

@@ -1,0 +1,14 @@
+{
+  "head": {
+    "vars": ["s", "p", "o"]
+  },
+  "results": {
+    "bindings": [
+      {
+        "s": {"type": "uri", "value": "urn:entity:baseline"},
+        "p": {"type": "uri", "value": "urn:prop:name"},
+        "o": {"type": "literal", "value": "Baseline Entity"}
+      }
+    ]
+  }
+}

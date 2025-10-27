@@ -1,0 +1,34 @@
+thresholds:
+  high: 0.82
+  low: 0.50
+
+weights:
+  name_exact: 0.25
+  token_jaccard: 0.2
+  jaro_winkler: 0.2
+  prefix_overlap: 0.05
+  suffix_overlap: 0.05
+  country_match: 0.15
+  id_equal: 0.4
+  url_host: 0.1
+  source_bonus: 0.1
+
+sources:
+  tradegov: 0.5
+  federalregister: 0.5
+
+features:
+  - name_exact
+  - token_jaccard
+  - jaro_winkler
+  - prefix_overlap
+  - suffix_overlap
+  - country_match
+  - id_equal
+  - url_host
+  - source_bonus
+
+notes:
+  description: >
+    Baseline reconciliation rules used for B.24 smoke tests. The values are
+    intentionally stable so regression fixtures can detect drift.
