@@ -12,22 +12,21 @@ from typing import Optional
 
 import requests
 
-from earCrawler.utils.jena_tools import ensure_jena
+from earCrawler.utils.fuseki_tools import ensure_fuseki
 
 
 def fuseki_server_path() -> Path:
     """Return the absolute path to the Fuseki server executable.
 
-    On Windows the batch file is under ``tools/jena/bat`` while on POSIX
-    systems it lives in ``tools/jena/bin``. The path is resolved after
-    ensuring that Jena is installed.
+    On Windows the batch file is at the root of the extracted Fuseki archive,
+    while on POSIX systems it lives alongside the other launch scripts.
     """
 
-    jena_home = ensure_jena(download=True)
+    fuseki_home = ensure_fuseki(download=True)
     if os.name == "nt":
-        exe = jena_home / "bat" / "fuseki-server.bat"
+        exe = fuseki_home / "fuseki-server.bat"
     else:
-        exe = jena_home / "bin" / "fuseki-server"
+        exe = fuseki_home / "fuseki-server"
     return exe.resolve()
 
 
@@ -94,7 +93,8 @@ def start_fuseki(
     if java_opts:
         env["FUSEKI_JAVA_OPTS"] = java_opts
 
-    proc = subprocess.Popen(cmd, env=env, shell=False)
+    server_path = Path(cmd[0])
+    proc = subprocess.Popen(cmd, env=env, shell=False, cwd=server_path.parent)
 
     if not wait:
         return proc
