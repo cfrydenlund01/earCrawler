@@ -2,7 +2,15 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path "$PSScriptRoot/../.."
 Set-Location $repoRoot
 New-Item -ItemType Directory -Force -Path 'kg/reports' | Out-Null
-python -m earCrawler.cli gc --dry-run --target all | Out-Null
+function Resolve-KgPython {
+    if ($env:EARCTL_PYTHON) { return $env:EARCTL_PYTHON }
+    if (Get-Command py -ErrorAction SilentlyContinue) { return 'py' }
+    if (Get-Command python -ErrorAction SilentlyContinue) { return 'python' }
+    throw 'Python interpreter not found. Set EARCTL_PYTHON or ensure py/python is on PATH.'
+}
+$python = Resolve-KgPython
+$args = @('-m','earCrawler.cli','gc','--dry-run','--target','all')
+& $python @args | Out-Null
 if (-not (Test-Path 'kg/reports/gc-report.json')) {
     Write-Error 'gc-report.json missing'
 }

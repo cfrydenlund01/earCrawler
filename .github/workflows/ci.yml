@@ -35,6 +35,13 @@ jobs:
       - name: Tests
         run: pytest -q --disable-warnings --maxfail=1
 
+      - name: Build TTL bundle
+        run: python -m earCrawler.pipelines.build_ttl
+      - name: SHACL gate on bundle
+        run: python -m earCrawler.validation.validate_shapes
+      - name: Conditional Fuseki load (skipped in CI)
+        run: echo "Skipping network load in CI"
+
       - name: Smoke test emit and validate
         shell: pwsh
         run: |

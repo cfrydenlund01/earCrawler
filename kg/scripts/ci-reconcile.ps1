@@ -1,6 +1,13 @@
 $ErrorActionPreference = 'Stop'
 
-python -m earCrawler.cli.reconcile_cmd run
+function Resolve-KgPython {
+    if ($env:EARCTL_PYTHON) { return $env:EARCTL_PYTHON }
+    if (Get-Command py -ErrorAction SilentlyContinue) { return 'py' }
+    if (Get-Command python -ErrorAction SilentlyContinue) { return 'python' }
+    throw 'Python interpreter not found. Set EARCTL_PYTHON or ensure py/python is on PATH.'
+}
+$python = Resolve-KgPython
+& $python -m earCrawler.cli.reconcile_cmd run
 
 $summaryPath = 'kg/reports/reconcile-summary.json'
 if (!(Test-Path $summaryPath)) { throw 'summary missing' }

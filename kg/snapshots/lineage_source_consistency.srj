@@ -1,0 +1,9 @@
+{ "head": {
+    "vars": [ "entity" , "activity" , "agent" , "src" ]
+  } ,
+  "results": {
+    "bindings": [
+      
+    ]
+  }
+}

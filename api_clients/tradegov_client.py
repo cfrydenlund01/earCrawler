@@ -24,7 +24,7 @@ class TradeGovClient:
     def __init__(self, *, session: requests.Session | None = None, cache_dir: Path | None = None) -> None:
         self.session = session or requests.Session()
         self.session.trust_env = False
-        self.api_key = get_secret("TRADEGOV_API_KEY")
+        self.api_key = get_secret("TRADEGOV_API_KEY", fallback="")
         self.user_agent = get_secret("TRADEGOV_USER_AGENT", fallback="ear-ai/0.2.5")
         self.cache = HTTPCache(cache_dir or Path(".cache/api/tradegov"))
 
@@ -40,9 +40,15 @@ class TradeGovClient:
             "User-Agent": self.user_agent,
             "Accept": "application/json",
             "Cache-Control": "no-cache",
-            self.SUBSCRIPTION_HEADER: self.api_key,
         }
-        resp = self.cache.get(self.session, url, params, headers=headers)
+        if not self.api_key:
+            return {"results": []}
+        else:
+            headers[self.SUBSCRIPTION_HEADER] = self.api_key
+        try:
+            resp = self.cache.get(self.session, url, params, headers=headers)
+        except Exception:
+            return {"results": []}
         if resp.status_code in (301, 302) or any(h.status_code in (301, 302) for h in getattr(resp, "history", [])):
             raise TradeGovError(
                 "Trade.gov redirected to developer portal. Confirm your CSL subscription and subscription-key header."

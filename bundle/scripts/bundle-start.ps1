@@ -76,8 +76,8 @@ if ($env:EAR_BUNDLE_FUSEKI_CMD) {
     }
 } else {
     $fusekiCandidates = @(
-        (Join-Path $bundleRoot 'tools/fuseki/fuseki-server.bat'),
-        (Join-Path $bundleRoot 'tools/fuseki/fuseki-server')
+        (Join-Path $bundleRoot 'tools/fuseki/fuseki-server'),
+        (Join-Path $bundleRoot 'tools/fuseki/fuseki-server.bat')
     )
     foreach ($candidate in $fusekiCandidates) {
         if (Test-Path $candidate) {

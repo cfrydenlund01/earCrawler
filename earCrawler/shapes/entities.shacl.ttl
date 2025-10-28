@@ -1,0 +1,42 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix ear:  <https://ear.example.org/schema#> .
+@prefix ent:  <https://ear.example.org/entity/> .
+
+# Entity Shape
+ear:EntityShape a sh:NodeShape ;
+  sh:targetClass ear:Entity ;
+
+  # IRI policy: entity IRIs must be under ent:
+  sh:pattern "^https://ear\\.example\\.org/entity/.+" ;
+  sh:message "Entity IRI must be in the ent: namespace." ;
+
+  sh:property [
+    sh:path ear:name ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:message "Entity must have exactly one ear:name (xsd:string)." ;
+  ] ;
+
+  sh:property [
+    sh:path ear:source ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:message "Entity must have exactly one ear:source (xsd:string)." ;
+  ] ;
+
+  sh:property [
+    sh:path ear:country ;
+    sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:message "ear:country if present must be xsd:string." ;
+  ] ;
+
+  sh:property [
+    sh:path ear:programs ;
+    sh:datatype xsd:string ;
+    sh:maxCount 1 ;
+    sh:message "ear:programs if present must be a CSV string." ;
+  ] .

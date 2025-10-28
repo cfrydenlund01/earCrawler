@@ -1,0 +1,29 @@
+@prefix sh:   <http://www.w3.org/ns/shacl#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix ear:  <https://ear.example.org/schema#> .
+@prefix part: <https://ear.example.org/part/> .
+
+# Part Shape
+ear:PartShape a sh:NodeShape ;
+  sh:targetClass ear:Part ;
+
+  # IRI policy: part IRIs must be under part:
+  sh:pattern "^https://ear\\.example\\.org/part/\\d{3}$" ;
+  sh:message "Part IRI must be part:NNN where NNN is a 3-digit code." ;
+
+  sh:property [
+    sh:path ear:notation ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:pattern "^[0-9]{3}$" ;
+    sh:message "Part must have notation as a 3-digit string." ;
+  ] ;
+
+  sh:property [
+    sh:path ear:title ;
+    sh:datatype xsd:string ;
+    sh:minCount 1 ;
+    sh:maxCount 1 ;
+    sh:message "Part must have exactly one ear:title." ;
+  ] .
