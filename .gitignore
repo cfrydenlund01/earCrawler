@@ -13,3 +13,7 @@ kg/reconcile/decisions.jsonl.gz
 kg/reconcile/idmap.csv
 kg/snapshots/dataset.nq
 kg/snapshots/sample.srj
+db/
+fuseki_db/
+run/
+*.egg-info/
