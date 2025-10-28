@@ -239,3 +239,23 @@ Keep using Trade.gov Data API for entity lookup and Federal Register API for EAR
 Ensure transforms (`csl_to_rdf.py`, `ear_fr_to_rdf.py`) emit IRIs under ent: and part: to satisfy shapes.
 
 Secrets: store in Windows Credential Store or vault. Do not hardcode.
+
+## B.27 — TTL build and gated load
+- Transforms now emit `dist/bundle.ttl`.
+- Validation gate must pass before any load.
+- Local load (Windows PowerShell):
+  ```powershell
+  $env:EAR_FUSEKI_DATASET="http://localhost:3030/ear"
+  $env:EAR_ENABLE_LOAD="1"
+  python -m earCrawler.pipelines.build_ttl
+  python -m earCrawler.pipelines.load_after_validate
+  ```
+
+Data sources remain:
+
+Trade.gov Data API for entity lookup.
+
+Federal Register API for EAR text.
+Embed accesses in client modules only.
+
+Secrets: store in Windows Credential Store or a vault. Do not hardcode.

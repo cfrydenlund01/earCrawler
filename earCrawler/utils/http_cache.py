@@ -8,6 +8,25 @@ from urllib.parse import urlencode
 
 import requests
 
+try:  # pragma: no cover - optional dependency in tests
+    import vcr.stubs
+except Exception:  # pragma: no cover - vcr not installed
+    pass
+else:  # pragma: no cover - executed in test env
+    if not hasattr(vcr.stubs.VCRHTTPResponse, "version_string"):
+        def _version_string(self: object) -> str:
+            version = getattr(self, "version", None)
+            if isinstance(version, bytes):
+                try:
+                    return version.decode("ascii")
+                except Exception:
+                    return "HTTP/1.1"
+            if isinstance(version, str) and version:
+                return version
+            return "HTTP/1.1"
+
+        vcr.stubs.VCRHTTPResponse.version_string = property(_version_string)  # type: ignore[attr-defined]
+
 
 class HTTPCache:
     """Persist GET responses on disk keyed by URL and params."""

@@ -2,6 +2,7 @@
 @prefix prov: <http://www.w3.org/ns/prov#> .
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 @prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix provsh: <https://ear.example.org/prov/shapes#> .
 
 provsh:ApiDerivedEntityShape a sh:NodeShape ;
   sh:targetClass prov:Entity ;
@@ -12,7 +13,7 @@ provsh:ApiDerivedEntityShape a sh:NodeShape ;
 
 provsh:ActivityShape a sh:NodeShape ;
   sh:targetClass prov:Activity ;
-  sh:property [ sh:path prov:used ; sh:minCount 1 ; ] ;
+  sh:property [ sh:path prov:used ; sh:minCount 1 ] ;
   sh:property [ sh:path prov:wasAssociatedWith ; sh:minCount 1 ; sh:class prov:Agent ] .
 
 provsh:AgentShape a sh:NodeShape ;

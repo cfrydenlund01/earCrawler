@@ -12,12 +12,19 @@
 <#owlminiReasoner> a ja:ReasonerFactory ;
     ja:reasonerClass "org.apache.jena.reasoner.rulesys.OWLMiniReasonerFactory" .
 
+<#baseModel> a ja:NamedModel ;
+    ja:content <#dataset> ;
+    ja:NamedModelName 'urn:x-arq:DefaultGraph' .
+
 <#inf> a ja:InfModel ;
-    ja:baseDataset <#dataset> ;
+    ja:baseModel <#baseModel> ;
     ja:reasoner <#owlminiReasoner> .
+
+<#datasetInf> a ja:RDFDataset ;
+    ja:defaultGraph <#inf> .
 
 <#service> a fuseki:Service ;
     fuseki:name "ds-inf" ;
     fuseki:serviceQuery "sparql" ;
-    fuseki:dataset <#inf> ;
+    fuseki:dataset <#datasetInf> ;
     fuseki:allowUpdate false .

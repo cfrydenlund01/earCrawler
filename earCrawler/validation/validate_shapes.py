@@ -3,8 +3,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from pyshacl import validate
 from rdflib import Graph
+
+from earCrawler.utils.io_paths import DIST
+from pyshacl import validate
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = ROOT / "schema" / "ear.ttl"
@@ -35,8 +37,14 @@ def run_validation(data_files: list[Path]) -> int:
 
 
 if __name__ == "__main__":
-    default_files = [
-        ROOT / "samples" / "sample_entities.ttl",
-        ROOT / "samples" / "sample_parts.ttl",
-    ]
-    sys.exit(run_validation(default_files))
+    if len(sys.argv) > 1:
+        targets = [Path(arg) for arg in sys.argv[1:]]
+    else:
+        targets = [
+            ROOT / "samples" / "sample_entities.ttl",
+            ROOT / "samples" / "sample_parts.ttl",
+        ]
+        bundle = DIST / "bundle.ttl"
+        if bundle.exists():
+            targets.append(bundle)
+    sys.exit(run_validation(targets))

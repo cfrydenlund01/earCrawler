@@ -3,7 +3,28 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
  
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-& python -c "import pathlib, importlib.util; repo = pathlib.Path(r'$repoRoot'); spec = importlib.util.spec_from_file_location('jena_tools', repo / 'earCrawler/utils/jena_tools.py'); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); mod.ensure_jena(); mod.ensure_fuseki()" | Out-Null
+function Resolve-KgPython {
+    if ($env:EARCTL_PYTHON) {
+        return $env:EARCTL_PYTHON
+    }
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        return 'py'
+    }
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+        return 'python'
+    }
+    throw 'Python interpreter not found. Set EARCTL_PYTHON or ensure py/python is on PATH.'
+}
+$python = Resolve-KgPython
+$bootstrap = @"
+import pathlib, sys
+repo = pathlib.Path(r'{0}')
+sys.path.insert(0, str(repo))
+from earCrawler.utils import jena_tools, fuseki_tools
+jena_tools.ensure_jena()
+fuseki_tools.ensure_fuseki()
+"@ -f $repoRoot
+& $python -c $bootstrap | Out-Null
 $jena = Join-Path $repoRoot 'tools/jena'
 $fuseki = Join-Path $repoRoot 'tools/fuseki'
 if (-not (Test-Path $jena)) { throw 'Jena not found at tools/jena' }
@@ -27,7 +48,7 @@ if (-not (Test-Path $shapeDest)) {
     $shapesCopied = $true
 }
 if (-not (Test-Path $shapeProvDest)) {
-    $shapeProvSrc = Join-Path $repoRoot 'kg/shapes_prov.ttl'
+    $shapeProvSrc = Join-Path $repoRoot 'earCrawler/kg/shapes_prov.ttl'
     Copy-Item $shapeProvSrc $shapeProvDest
 }
 
@@ -36,14 +57,28 @@ $ttlFiles = Get-ChildItem -Path $kgDir -Filter *.ttl | Where-Object { $_.Name -n
 
 # --- SHACL validation ---
 $shacl = Join-Path $jena 'bat/shacl.bat'
+function Convert-ToFileUri {
+    param([string]$PathValue)
+    $resolved = Resolve-Path $PathValue
+    return (New-Object System.Uri($resolved)).AbsoluteUri
+}
 $dataArgs = @()
-foreach ($ttl in $ttlFiles) { $dataArgs += @('--data', $ttl.FullName) }
+foreach ($ttl in $ttlFiles) {
+    $dataArgs += @('--data', (Convert-ToFileUri $ttl.FullName))
+}
 $shaclTtl = Join-Path $reportsDir 'shacl-report.ttl'
 $shaclJson = Join-Path $reportsDir 'shacl-report.json'
-& $shacl validate --shapes $shapeDest --shapes $shapeProvDest @dataArgs --report $shaclTtl --report-json $shaclJson | Out-Null
+$shapeArgs = @('--shapes', (Convert-ToFileUri $shapeDest), '--shapes', (Convert-ToFileUri $shapeProvDest))
+$shaclOutput = & $shacl validate @shapeArgs @dataArgs
 $shaclExit = $LASTEXITCODE
-$shaclInfo = Get-Content -Raw $shaclJson | ConvertFrom-Json
-$conf = $shaclInfo.conforms
+$joinedOutput = [string]::Join([Environment]::NewLine, $shaclOutput)
+$joinedOutput | Set-Content -Path $shaclTtl -Encoding utf8
+$conf = $false
+$matchSucceeded = $joinedOutput -match 'sh:conforms\s+(true|false)'
+if ($matchSucceeded) {
+    $conf = $matches[1] -eq 'true'
+}
+@{ conforms = $conf } | ConvertTo-Json | Set-Content -Path $shaclJson -Encoding utf8
 Set-Content -Path (Join-Path $reportsDir 'shacl-conforms.txt') -Value ($conf.ToString().ToLowerInvariant())
 if ($shaclExit -ne 0 -or -not $conf) {
     if ($shapesCopied) { Remove-Item $shapeDest -Force }

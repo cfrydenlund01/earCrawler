@@ -1,3 +1,6 @@
+## v0.2.7
+- B.27: Added TTL build pipeline, SHACL-gated load job, and serialization tests.
+
 ## v0.2.6
 - B.26: Added ear.ttl schema, SHACL shapes for Entities and Parts, validator, and CI gate.
 

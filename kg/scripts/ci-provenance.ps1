@@ -2,7 +2,28 @@ param()
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
-& python -c "import pathlib, importlib.util; repo = pathlib.Path(r'$repoRoot'); spec = importlib.util.spec_from_file_location('jena_tools', repo / 'earCrawler/utils/jena_tools.py'); mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod); mod.ensure_jena(); mod.ensure_fuseki()" | Out-Null
+function Resolve-KgPython {
+    if ($env:EARCTL_PYTHON) {
+        return $env:EARCTL_PYTHON
+    }
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        return 'py'
+    }
+    if (Get-Command python -ErrorAction SilentlyContinue) {
+        return 'python'
+    }
+    throw 'Python interpreter not found. Set EARCTL_PYTHON or ensure py/python is on PATH.'
+}
+$python = Resolve-KgPython
+$bootstrap = @"
+import pathlib, sys
+repo = pathlib.Path(r'{0}')
+sys.path.insert(0, str(repo))
+from earCrawler.utils import jena_tools, fuseki_tools
+jena_tools.ensure_jena()
+fuseki_tools.ensure_fuseki()
+"@ -f $repoRoot
+& $python -c $bootstrap | Out-Null
 $jena = Join-Path $repoRoot 'tools/jena'
 $batDir = Join-Path $jena 'bat'
 $env:PATH = "$batDir;$env:PATH"
@@ -29,7 +50,7 @@ $domainTtl = Join-Path $kgDir 'ear_triples.ttl'
 foreach ($ttl in @($domainTtl, $provTtl)) {
     & (Join-Path $batDir 'riot.bat') --validate $ttl
     if ($LASTEXITCODE -ne 0) { throw "RIOT validation failed for $ttl" }
-    & $loader --loc $tdbDir $ttl
+    & $loader "--loc=$tdbDir" $ttl
     if ($LASTEXITCODE -ne 0) { throw "TDB2 load failed for $ttl" }
 }
 
@@ -41,7 +62,7 @@ $queries = @(
 
 foreach ($q in $queries) {
     $out = Join-Path $reportsDir ($q.name + '.srj')
-    & $query --loc $tdbDir --results=JSON $q.file | Out-File -FilePath $out -Encoding utf8
+    & $query "--loc=$tdbDir" "--results=JSON" "--query=$($q.file)" | Out-File -FilePath $out -Encoding utf8
     if ($LASTEXITCODE -ne 0) { throw "Query failed for $($q.name)" }
     if ($q.type -eq 'count') {
         $info = Get-Content $out | ConvertFrom-Json

@@ -13,6 +13,13 @@ from typing import Optional
 import requests
 
 from earCrawler.utils.fuseki_tools import ensure_fuseki
+from earCrawler.utils.jena_tools import ensure_jena as _ensure_jena
+
+
+def ensure_jena(download: bool = True) -> Path:
+    """Backward-compatible shim to ensure Jena is available."""
+
+    return _ensure_jena(download=download)
 
 
 def fuseki_server_path() -> Path:
