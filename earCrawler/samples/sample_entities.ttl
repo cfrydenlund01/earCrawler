@@ -1,0 +1,8 @@
+@prefix ear:  <https://ear.example.org/schema#> .
+@prefix ent:  <https://ear.example.org/entity/> .
+
+ent:sample a ear:Entity ;
+  ear:name "SAMPLE CO" ;
+  ear:source "CSL" ;
+  ear:country "CN" ;
+  ear:programs "Entity List" .

@@ -1,4 +1,8 @@
 param(
+    [Parameter(Position = 0)]
+    [string]$CommitNotation = "",
+    [Parameter(Position = 1)]
+    [string]$TagNotation = "",
     [string]$Remote = "origin",
     [string]$BaseBranch = "main",
     [string]$FeatureBranch = "",
@@ -146,21 +150,66 @@ else {
 Write-Host "Staging all tracked changes..."
 Invoke-Git -Arguments @("add", "--all") | Out-Null
 
+$CommitNotation = $CommitNotation.Trim()
+if (-not [string]::IsNullOrWhiteSpace($CommitNotation)) {
+    $CommitMessage = $CommitNotation
+}
+
 $diffResult = Invoke-Git -Arguments @("diff", "--cached", "--quiet") -IgnoreErrors
 if ($diffResult.ExitCode -eq 0) {
     Write-Host "Nothing staged for commit."
 }
 else {
+    if (-not [string]::IsNullOrWhiteSpace($CommitNotation)) {
+        $CommitMessage = $CommitNotation
+    }
     if ([string]::IsNullOrWhiteSpace($CommitMessage)) {
         $CommitMessage = "Automated sync on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
     }
-
     Write-Host "Committing staged changes..."
     Invoke-Git -Arguments @("commit", "-m", $CommitMessage) | Out-Null
 }
 
+$tagCreated = $false
+$tagName = $null
+$tagMessage = $null
+if (-not [string]::IsNullOrWhiteSpace($TagNotation)) {
+    if ($TagNotation -match "\|") {
+        $parts = $TagNotation.Split("|", 2, [System.StringSplitOptions]::None)
+        $tagName = $parts[0].Trim()
+        $tagMessage = $parts[1].Trim()
+    }
+    elseif ($TagNotation -match "\s") {
+        $parts = $TagNotation.Split(@(" "), 2, [System.StringSplitOptions]::RemoveEmptyEntries)
+        if ($parts.Length -gt 0) {
+            $tagName = $parts[0].Trim()
+        }
+        if ($parts.Length -gt 1) {
+            $tagMessage = $parts[1].Trim()
+        }
+    }
+    else {
+        $tagName = $TagNotation.Trim()
+    }
+
+    if ([string]::IsNullOrWhiteSpace($tagName)) {
+        throw "Unable to derive tag name from notation '$TagNotation'."
+    }
+    if ([string]::IsNullOrWhiteSpace($tagMessage)) {
+        $tagMessage = if ([string]::IsNullOrWhiteSpace($CommitMessage)) { "Tag $tagName created on $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" } else { $CommitMessage }
+    }
+
+    Write-Host "Creating tag '$tagName'..."
+    Invoke-Git -Arguments @("tag", "-a", $tagName, "-m", $tagMessage) | Out-Null
+    $tagCreated = $true
+}
+
 Write-Host "Pushing branch '$currentBranch' to '$Remote'..."
 Invoke-Git -Arguments @("push", "-u", $Remote, $currentBranch) | Out-Null
+if ($tagCreated) {
+    Write-Host "Pushing tags to '$Remote'..."
+    Invoke-Git -Arguments @("push", $Remote, "--follow-tags") | Out-Null
+}
 
 if ($SkipPrCreation) {
     Write-Host "Skipping pull request creation by request."
@@ -169,7 +218,7 @@ if ($SkipPrCreation) {
 
 $ghCommand = Get-Command gh -ErrorAction SilentlyContinue
 if (-not $ghCommand) {
-    Write-Warning "GitHub CLI ('gh') not found. Install it from https://cli.github.com/ to enable automatic PR creation."
+    Write-Host "GitHub CLI ('gh') not found; skipping pull request creation."
     return
 }
 

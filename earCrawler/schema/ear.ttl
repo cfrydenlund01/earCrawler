@@ -1,0 +1,51 @@
+@prefix rdf:  <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix xsd:  <http://www.w3.org/2001/XMLSchema#> .
+@prefix dct:  <http://purl.org/dc/terms/> .
+@prefix skos: <http://www.w3.org/2004/02/skos/core#> .
+@prefix ear:  <https://ear.example.org/schema#> .
+
+### Classes
+ear:Entity a rdfs:Class ;
+  rdfs:label "Entity" ;
+  rdfs:comment "Consolidated Screening List entity normalized for EAR AI." .
+
+ear:Part a rdfs:Class ;
+  rdfs:label "EAR Part" ;
+  rdfs:comment "A Part within 15 CFR referenced by EAR." .
+
+### Properties
+ear:name a rdf:Property ;
+  rdfs:domain ear:Entity ;
+  rdfs:range xsd:string ;
+  rdfs:label "entity name" .
+
+ear:country a rdf:Property ;
+  rdfs:domain ear:Entity ;
+  rdfs:range xsd:string ;
+  rdfs:label "country code or name" .
+
+ear:programs a rdf:Property ;
+  rdfs:domain ear:Entity ;
+  rdfs:range xsd:string ;
+  rdfs:label "source program(s) as CSV" .
+
+ear:source a rdf:Property ;
+  rdfs:domain ear:Entity ;
+  rdfs:range xsd:string ;
+  rdfs:label "data source label" .
+
+ear:mentionedInPart a rdf:Property ;
+  rdfs:domain ear:Entity ;
+  rdfs:range ear:Part ;
+  rdfs:label "mention link to EAR Part" .
+
+ear:notation a rdf:Property ;
+  rdfs:domain ear:Part ;
+  rdfs:range xsd:string ;
+  rdfs:label "part number string" .
+
+ear:title a rdf:Property ;
+  rdfs:domain ear:Part ;
+  rdfs:range xsd:string ;
+  rdfs:label "human title" .

@@ -223,3 +223,19 @@ Run `py -m earCrawler.cli COMMAND --help` for detailed options.
 ## Contributing & License
 
 Pull requests are welcome - open an issue first for substantial changes so we can align on scope. The project is licensed under the MIT License (`LICENSE` in the repository root).
+
+## B.26 — Schema and SHACL
+- Defines `ear:` schema for Entities and Parts.
+- Enforces shapes with `pyshacl` in CI on `windows-latest`.
+- Local run:
+  ```powershell
+  python -m earCrawler.validation.validate_shapes
+  ```
+
+Upstream callers:
+
+Keep using Trade.gov Data API for entity lookup and Federal Register API for EAR text via our clients.
+
+Ensure transforms (`csl_to_rdf.py`, `ear_fr_to_rdf.py`) emit IRIs under ent: and part: to satisfy shapes.
+
+Secrets: store in Windows Credential Store or vault. Do not hardcode.

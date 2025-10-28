@@ -1,3 +1,6 @@
+## v0.2.6
+- B.26: Added ear.ttl schema, SHACL shapes for Entities and Parts, validator, and CI gate.
+
 ## [0.2.5]
 ### Changed
 - Switched the CSL client to the Azure APIM subscription header (`Ocp-Apim-Subscription-Key`) and hardened JSON validation.

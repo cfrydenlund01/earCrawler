@@ -1,0 +1,6 @@
+@prefix ear:  <https://ear.example.org/schema#> .
+@prefix part: <https://ear.example.org/part/> .
+
+part:744 a ear:Part ;
+  ear:notation "744" ;
+  ear:title "15 CFR Part 744" .

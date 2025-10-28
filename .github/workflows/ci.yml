@@ -35,6 +35,10 @@ jobs:
       - name: Tests
         run: pytest -q --disable-warnings --maxfail=1
 
+      - name: Validate SHACL shapes
+        shell: pwsh
+        run: python -m earCrawler.validation.validate_shapes
+
       - name: Smoke test emit and validate
         shell: pwsh
         run: |
