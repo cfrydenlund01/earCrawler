@@ -1,0 +1,17 @@
+PREFIX ear:  <https://ear.example.org/schema#>
+PREFIX part: <https://ear.example.org/part/>
+PREFIX anch: <https://ear.example.org/anchor/>
+PREFIX dct:  <http://purl.org/dc/terms/>
+
+DELETE { part:__PARTNO__ ear:hasAnchor anch:__ANCHOR_ID__ . }
+INSERT {
+  part:__PARTNO__ ear:hasAnchor anch:__ANCHOR_ID__ .
+  anch:__ANCHOR_ID__ a ear:Anchor ;
+                   ear:anchorDocument "__DOC_ID__" ;
+                   dct:title "__TITLE__" ;
+                   dct:source "__SOURCE__" ;
+                   ear:anchorSnippet "__SNIPPET__" .
+}
+WHERE {
+  OPTIONAL { part:__PARTNO__ ear:hasAnchor anch:__ANCHOR_ID__ . }
+}

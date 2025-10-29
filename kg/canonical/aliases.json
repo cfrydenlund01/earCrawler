@@ -1,0 +1,13 @@
+{
+  "names": {
+    "dept. of commerce": "Department of Commerce"
+  },
+  "countries": {
+    "u.s.": "United States",
+    "usa": "United States"
+  },
+  "programs": {
+    "bis": "BIS Entity List"
+  },
+  "deprecated_ids": {}
+}
