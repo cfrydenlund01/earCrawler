@@ -1,6 +1,7 @@
 __pycache__/
 /tools/
 !tools/.gitkeep
+.venv/
 kg/reports/
 kg/shapes.ttl
 perf/synth/out/
@@ -11,9 +12,16 @@ kg/canonical/
 kg/delta/
 kg/reconcile/decisions.jsonl.gz
 kg/reconcile/idmap.csv
+kg/ear.ttl
+kg/ear_triples.ttl
+kg/prov/
+kg/target/
+kg/tradegov.ttl
 kg/snapshots/dataset.nq
 kg/snapshots/sample.srj
 db/
 fuseki_db/
 run/
 *.egg-info/
+dir-tree*.txt
+EAR_AI_Training_Proposal.docx

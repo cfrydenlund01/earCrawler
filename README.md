@@ -14,6 +14,7 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
 - Docker Desktop (needed for optional container packaging)
 - Trade.gov CSL API subscription key (required for live data pulls)
 - Apache Jena Fuseki 4/5 (the CLI can auto-download it on Windows)
+- GitHub CLI (`gh`) 2.x (needed for automated pull-request helpers)
 
 ---
 
@@ -43,6 +44,19 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
    .\.venv\Scripts\Activate.ps1
    py -m pip install --upgrade pip
    py -m pip install -e .
+   ```
+
+4. **Install GitHub CLI (required for PR automation)**
+   ```powershell
+   # winget (Windows 11 default)
+   winget install --id GitHub.cli -e
+
+   # or manually download the MSI/ZIP from https://cli.github.com/manual/installation
+   ```
+   After installation, verify the binary is on `PATH` and sign in once so the `pushCommitsAndLFS.ps1` helper can create pull requests:
+   ```powershell
+   gh --version
+   gh auth login
    ```
 
 ---
