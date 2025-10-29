@@ -4,17 +4,20 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import defaultdict
+from pathlib import Path
 from typing import Callable, Iterable, Mapping, Sequence, Set
 
 from api_clients import search_documents
 from earCrawler.kg.anchors import Anchor, AnchorIndex
 from earCrawler.kg.jena_client import JenaClient
 from earCrawler.kg.provenance_store import ProvenanceRecorder
+from earCrawler.policy import HINTS_FILE, load_hints, hints_manifest
 from earCrawler.transforms import MentionExtractor
 from earCrawler.transforms.ear_fr_to_rdf import extract_parts_from_text, pick_parts
 
 PART_TEMPLATE_PATH = "earCrawler/sparql/upsert_part.sparql"
 PART_ANCHOR_TEMPLATE_PATH = "earCrawler/sparql/upsert_part_anchor.sparql"
+POLICY_HINT_TEMPLATE_PATH = "earCrawler/sparql/upsert_policy_hint.sparql"
 
 
 def upsert_part(jena: JenaClient, part_no: str) -> None:
@@ -112,6 +115,7 @@ def load_parts_from_fr(
     anchor_index: AnchorIndex | None = None,
     search_fn: Callable[..., dict] | None = None,
     entity_names: Mapping[str, str] | None = None,
+    policy_path: Path | None = None,
 ) -> Set[str]:
     """Search the Federal Register for ``term`` and upsert referenced parts."""
 
@@ -201,9 +205,57 @@ def load_parts_from_fr(
             if changed:
                 link_entity_to_part(client, entity_id, part, strength=strength)
 
+    _apply_policy_hints(
+        client,
+        prov,
+        policy_path,
+    )
+
     anchors.flush()
     prov.flush()
     return set(pick_parts(discovered))
+
+
+def _apply_policy_hints(
+    jena: JenaClient,
+    provenance: ProvenanceRecorder,
+    policy_path: Path | None,
+) -> None:
+    hints = load_hints(policy_path or HINTS_FILE)
+    if not hints:
+        return
+    manifest_hash = hashlib.sha256(hints_manifest(hints).encode("utf-8")).hexdigest()
+    hints_file = (policy_path or HINTS_FILE).resolve()
+    source_uri = hints_file.as_uri() if hints_file.exists() else str(hints_file)
+    changed = provenance.record(
+        "urn:policy:hints",
+        source_url=source_uri,
+        provider_domain="ear.ai",
+        content_hash=manifest_hash,
+    )
+    if not changed:
+        return
+    for hint in hints:
+        part_no = hint.part
+        if not part_no:
+            continue
+        upsert_part(jena, part_no)
+        upsert_policy_hint(jena, hint)
+
+
+def upsert_policy_hint(jena: JenaClient, hint) -> None:
+    hint_id = hashlib.sha256(f"{hint.part}:{hint.program}".encode("utf-8")).hexdigest()[:16]
+    with open(POLICY_HINT_TEMPLATE_PATH, "r", encoding="utf-8") as handle:
+        template = handle.read()
+    query = (
+        template
+        .replace("__PARTNO__", hint.part)
+        .replace("__HINT_ID__", hint_id)
+        .replace("__PROGRAM__", _escape(hint.program))
+        .replace("__PRIORITY__", f"{hint.priority:.3f}".rstrip("0").rstrip("."))
+        .replace("__RATIONALE__", _escape(hint.rationale))
+    )
+    jena.update(query)
 
 
 def link_entities_to_parts_by_name_contains(
@@ -243,4 +295,5 @@ __all__ = [
     "load_parts_from_fr",
     "upsert_part",
     "upsert_part_anchor",
+    "upsert_policy_hint",
 ]
