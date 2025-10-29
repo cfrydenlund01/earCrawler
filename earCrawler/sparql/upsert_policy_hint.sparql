@@ -1,0 +1,18 @@
+PREFIX ear:  <https://ear.example.org/schema#>
+PREFIX part: <https://ear.example.org/part/>
+PREFIX hint: <https://ear.example.org/policyHint/>
+PREFIX xsd:  <http://www.w3.org/2001/XMLSchema#>
+
+DELETE {
+  part:__PARTNO__ ear:hasPolicyHint hint:__HINT_ID__ .
+}
+INSERT {
+  part:__PARTNO__ ear:hasPolicyHint hint:__HINT_ID__ .
+  hint:__HINT_ID__ a ear:PolicyHint ;
+                    ear:hintProgram "__PROGRAM__" ;
+                    ear:hintPriority "__PRIORITY__"^^xsd:decimal ;
+                    ear:hintRationale "__RATIONALE__" .
+}
+WHERE {
+  OPTIONAL { part:__PARTNO__ ear:hasPolicyHint hint:__HINT_ID__ . }
+}

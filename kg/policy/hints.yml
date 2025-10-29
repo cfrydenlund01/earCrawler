@@ -1,0 +1,13 @@
+hints:
+  - part: "734"
+    program: "BIS Entity List"
+    priority: 0.9
+    rationale: "Part 734 scope often aligns with Entity List escalations."
+  - part: "736"
+    program: "Denied Persons List"
+    priority: 0.8
+    rationale: "General prohibitions trigger denied-person checks."
+  - part: "744"
+    program: "Military End User"
+    priority: 0.75
+    rationale: "Supplement 4 catches MEU risk for Part 744 entities."
