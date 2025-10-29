@@ -105,6 +105,8 @@ bundle_cli = importlib.import_module("earCrawler.cli.bundle")
 cli.add_command(bundle_cli.bundle, name="bundle")
 jobs_cli = importlib.import_module("earCrawler.cli.jobs")
 cli.add_command(jobs_cli.jobs, name="jobs")
+integrity_cli = importlib.import_module("earCrawler.cli.integrity")
+cli.add_command(integrity_cli.integrity, name="integrity")
 cli.add_command(api_cmd, name="api")
 
 @cli.command(name="crawl")
