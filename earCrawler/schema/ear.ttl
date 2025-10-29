@@ -14,6 +14,10 @@ ear:Part a rdfs:Class ;
   rdfs:label "EAR Part" ;
   rdfs:comment "A Part within 15 CFR referenced by EAR." .
 
+ear:Mention a rdfs:Class ;
+  rdfs:label "Mention" ;
+  rdfs:comment "An extracted mention linking an entity to a part." .
+
 ### Properties
 ear:name a rdf:Property ;
   rdfs:domain ear:Entity ;
@@ -39,6 +43,21 @@ ear:mentionedInPart a rdf:Property ;
   rdfs:domain ear:Entity ;
   rdfs:range ear:Part ;
   rdfs:label "mention link to EAR Part" .
+
+ear:mentionsEntity a rdf:Property ;
+  rdfs:domain ear:Mention ;
+  rdfs:range ear:Entity ;
+  rdfs:label "mention references entity" .
+
+ear:mentionsPart a rdf:Property ;
+  rdfs:domain ear:Mention ;
+  rdfs:range ear:Part ;
+  rdfs:label "mention references part" .
+
+ear:mentionStrength a rdf:Property ;
+  rdfs:domain ear:Mention ;
+  rdfs:range xsd:decimal ;
+  rdfs:label "mention strength score" .
 
 ear:notation a rdf:Property ;
   rdfs:domain ear:Part ;

@@ -99,7 +99,10 @@ class ProvenanceRecorder:
         """
 
         subject_iri = str(subject)
-        timestamp = retrieved_at or _utc_iso()
+        if isinstance(retrieved_at, str) and retrieved_at:
+            timestamp = retrieved_at if "T" in retrieved_at else retrieved_at + "T00:00:00Z"
+        else:
+            timestamp = _utc_iso()
         entry = ProvenanceEntry(
             source_url=source_url,
             provider=provider_domain,

@@ -4,12 +4,13 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import defaultdict
-from typing import Callable, Iterable, Sequence, Set
+from typing import Callable, Iterable, Mapping, Sequence, Set
 
 from api_clients import search_documents
 from earCrawler.kg.anchors import Anchor, AnchorIndex
 from earCrawler.kg.jena_client import JenaClient
 from earCrawler.kg.provenance_store import ProvenanceRecorder
+from earCrawler.transforms import MentionExtractor
 from earCrawler.transforms.ear_fr_to_rdf import extract_parts_from_text, pick_parts
 
 PART_TEMPLATE_PATH = "earCrawler/sparql/upsert_part.sparql"
@@ -52,16 +53,50 @@ def upsert_part_anchor(jena: JenaClient, part_no: str, anchor: Anchor) -> None:
     jena.update(query)
 
 
-def link_entity_to_part(jena: JenaClient, entity_id: str, part_no: str) -> None:
+def link_entity_to_part(
+    jena: JenaClient,
+    entity_id: str,
+    part_no: str,
+    *,
+    strength: float | None = None,
+) -> None:
     """Materialise a relationship between an entity and a part."""
 
     normalized_id = entity_id.replace(" ", "_")
-    update = f"""
+    if strength is None:
+        update = f"""
 PREFIX ear:  <https://ear.example.org/schema#>
 PREFIX ent:  <https://ear.example.org/entity/>
 PREFIX part: <https://ear.example.org/part/>
 INSERT DATA {{
   ent:{normalized_id} ear:mentionedInPart part:{part_no} .
+}}
+"""
+    else:
+        decimal_str = f"{strength:.3f}".rstrip("0").rstrip(".")
+        if not decimal_str:
+            decimal_str = "0"
+        mention_hash = hashlib.sha256(
+            f"{normalized_id}:{part_no}".encode("utf-8")
+        ).hexdigest()[:16]
+        update = f"""
+PREFIX ear:  <https://ear.example.org/schema#>
+PREFIX ent:  <https://ear.example.org/entity/>
+PREFIX part: <https://ear.example.org/part/>
+PREFIX mention: <https://ear.example.org/mention/>
+PREFIX xsd: <http://www.w3.org/2001/XMLSchema#>
+DELETE {{
+  mention:{mention_hash} ear:mentionStrength ?oldStrength .
+}}
+INSERT {{
+  ent:{normalized_id} ear:mentionedInPart part:{part_no} .
+  mention:{mention_hash} a ear:Mention ;
+                         ear:mentionsEntity ent:{normalized_id} ;
+                         ear:mentionsPart part:{part_no} ;
+                         ear:mentionStrength "{decimal_str}"^^xsd:decimal .
+}}
+WHERE {{
+  OPTIONAL {{ mention:{mention_hash} ear:mentionStrength ?oldStrength . }}
 }}
 """
     jena.update(update)
@@ -76,6 +111,7 @@ def load_parts_from_fr(
     provenance: ProvenanceRecorder | None = None,
     anchor_index: AnchorIndex | None = None,
     search_fn: Callable[..., dict] | None = None,
+    entity_names: Mapping[str, str] | None = None,
 ) -> Set[str]:
     """Search the Federal Register for ``term`` and upsert referenced parts."""
 
@@ -83,8 +119,10 @@ def load_parts_from_fr(
     prov = provenance or ProvenanceRecorder()
     anchors = anchor_index or AnchorIndex()
     search_fn = search_fn or search_documents
+    extractor = MentionExtractor()
     discovered: Set[str] = set()
     part_hits: dict[str, list[Anchor]] = defaultdict(list)
+    part_entity_scores: dict[str, dict[str, float]] = defaultdict(dict)
     for page in range(1, pages + 1):
         payload = search_fn(term, per_page=per_page, page=page)
         results: Sequence[dict] = payload.get("results", payload or [])
@@ -113,6 +151,13 @@ def load_parts_from_fr(
             )
             for part in parts:
                 part_hits[part].append(anchor)
+            if entity_names:
+                scores = extractor.extract(text, dict(entity_names))
+                for part in parts:
+                    for entity_id, strength in scores.items():
+                        current = part_entity_scores[part].get(entity_id, 0.0)
+                        if strength > current:
+                            part_entity_scores[part][entity_id] = strength
             discovered.update(parts)
 
     for part, hits in part_hits.items():
@@ -143,6 +188,18 @@ def load_parts_from_fr(
             upsert_part(client, part)
             for anchor in sorted_hits:
                 upsert_part_anchor(client, part, anchor)
+
+    for part, entity_scores in part_entity_scores.items():
+        for entity_id, strength in entity_scores.items():
+            mention_subject = f"https://ear.example.org/mention/{entity_id}_{part}"
+            changed = prov.record(
+                mention_subject,
+                source_url=f"https://ear.example.org/mention/{entity_id}/{part}",
+                provider_domain="ear.ai",
+                content_hash=f"{strength:.3f}",
+            )
+            if changed:
+                link_entity_to_part(client, entity_id, part, strength=strength)
 
     anchors.flush()
     prov.flush()

@@ -22,9 +22,9 @@ def _search_stub(*args, **kwargs):
             {
                 "document_number": "2024-12345",
                 "title": "Export Administration Regulations Update",
-                "abstract": "This rule amends 15 CFR Part 734 with new text.",
+                "abstract": "This rule amends 15 CFR Part 734 with new text impacting ACME Corp.",
                 "excerpts": [
-                    "Changes to 15 CFR Part 734 and 736",
+                    "Changes to 15 CFR Part 734 and 736 affecting ACME Corp",
                 ],
                 "html_url": "https://www.federalregister.gov/doc/2024-12345",
                 "publication_date": "2024-02-01",
@@ -47,14 +47,17 @@ def test_fr_loader_records_anchors_and_delta(tmp_path: Path) -> None:
         provenance=recorder,
         anchor_index=anchors,
         search_fn=_search_stub,
+        entity_names={"acme": "ACME Corp"},
     )
     assert "734" in parts
-    assert len(jena.queries) >= 2
+    assert len(jena.queries) >= 3
     assert anchors_path.exists()
 
     data = json.loads(anchors_path.read_text(encoding="utf-8"))
     assert "734" in data
     assert data["734"][0]["document_id"] == "2024-12345"
+    mention_updates = [q for q in jena.queries if "mentionStrength" in q]
+    assert mention_updates, "mention strength updates expected"
 
     # Second run should detect no deltas, yielding no SPARQL updates
     jena_second = DummyJena()
@@ -66,5 +69,6 @@ def test_fr_loader_records_anchors_and_delta(tmp_path: Path) -> None:
         provenance=recorder_second,
         anchor_index=anchors_second,
         search_fn=_search_stub,
+        entity_names={"acme": "ACME Corp"},
     )
     assert len(jena_second.queries) == 0
