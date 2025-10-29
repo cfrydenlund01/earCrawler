@@ -1,6 +1,7 @@
 """Federal Register API client for EAR text retrieval."""
 from __future__ import annotations
 
+import os
 import re
 from html import unescape
 from pathlib import Path
@@ -11,6 +12,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from earCrawler.utils.secure_store import get_secret
 from earCrawler.utils.http_cache import HTTPCache
+from earCrawler.utils import budget
 
 
 class FederalRegisterError(Exception):
@@ -27,6 +29,8 @@ class FederalRegisterClient:
         self.session.trust_env = False
         self.user_agent = get_secret("FEDERALREGISTER_USER_AGENT", fallback="earCrawler/0.9")
         self.cache = HTTPCache(cache_dir or Path(".cache/api/federalregister"))
+        env_limit = os.getenv("FR_MAX_CALLS")
+        self.request_limit = int(env_limit) if env_limit else None
 
     @retry(
         reraise=True,
@@ -36,7 +40,11 @@ class FederalRegisterClient:
     )
     def _get_json(self, url: str, params: dict[str, str]) -> dict:
         headers = {"User-Agent": self.user_agent, "Accept": "application/json"}
-        resp = self.cache.get(self.session, url, params, headers=headers)
+        try:
+            with budget.consume("federalregister", self.request_limit):
+                resp = self.cache.get(self.session, url, params, headers=headers)
+        except budget.BudgetExceededError:
+            raise
         resp.raise_for_status()
         if "application/json" not in resp.headers.get("Content-Type", ""):
             raise FederalRegisterError(f"Non-JSON response from FR at {resp.url}")

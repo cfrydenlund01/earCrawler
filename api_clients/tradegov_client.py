@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
 from typing import Dict, Iterable, List, Optional
 
 import requests
@@ -9,6 +10,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 
 from earCrawler.utils.secure_store import get_secret
 from earCrawler.utils.http_cache import HTTPCache
+from earCrawler.utils import budget
 
 
 class TradeGovError(Exception):
@@ -27,6 +29,8 @@ class TradeGovClient:
         self.api_key = get_secret("TRADEGOV_API_KEY", fallback="")
         self.user_agent = get_secret("TRADEGOV_USER_AGENT", fallback="ear-ai/0.2.5")
         self.cache = HTTPCache(cache_dir or Path(".cache/api/tradegov"))
+        env_limit = os.getenv("TRADEGOV_MAX_CALLS")
+        self.request_limit = int(env_limit) if env_limit else None
 
     @retry(
         reraise=True,
@@ -46,8 +50,11 @@ class TradeGovClient:
         else:
             headers[self.SUBSCRIPTION_HEADER] = self.api_key
         try:
-            resp = self.cache.get(self.session, url, params, headers=headers)
-        except Exception:
+            with budget.consume("tradegov", self.request_limit):
+                resp = self.cache.get(self.session, url, params, headers=headers)
+        except budget.BudgetExceededError:
+            raise
+        except requests.RequestException:
             return {"results": []}
         if resp.status_code in (301, 302) or any(h.status_code in (301, 302) for h in getattr(resp, "history", [])):
             raise TradeGovError(

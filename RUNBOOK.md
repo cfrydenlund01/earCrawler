@@ -39,6 +39,21 @@
 - Rotate the HTTP auth token stored in the Windows Credential Manager under the name specified by `auth_secret_name` in the config.
 - Force garbage collection of the spool by deleting old `events-*.jsonl.gz` files or running `scripts/telemetry-gc.ps1`.
 
+## Scheduled Jobs & Admin Runs
+- CLI entry point: `py -m earCrawler.cli jobs run {tradegov|federalregister} [--dry-run] [--quiet]`. Pair `--dry-run` with CI or smoke checks; omit it for live ingests.
+- PowerShell wrappers for Task Scheduler live under `scripts/jobs/run_tradegov_ingest.ps1` and `scripts/jobs/run_federalregister_anchor.ps1`. They handle logging folders and status codes for Windows-first deployments.
+- Each invocation emits structured logs plus a JSON run summary (`run_id`, `steps`, `durations`, `status`) under `run/logs/`. Archive these artifacts for operator review and attach them to CI uploads when possible.
+
+## Export Profiles
+- Generate export bundles with `py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem dataset`.
+- Expected outputs: `dist/exports/dataset.ttl`, `dataset.nt`, and gzip variants, alongside `manifest.json` and `checksums.sha256`.
+- Ensure the manifest and checksum files stay in sync with the emitted Turtle/N-Triples. CI should fail fast if hashes drift.
+
+## Integrity Gate
+- Validate graph integrity before export or load via `py -m earCrawler.cli integrity check <ttl>`.
+- Any non-zero violation counters cause the command to exit with a failure code; treat this as a hard stop for downstream export, load, or deployment stages.
+- Typical violations include missing provenance links, namespace drift, or orphaned part nodes—inspect the emitted report to trace the offending triples.
+
 ## Toolchain maintenance
 
 ### Rotating Jena/Fuseki versions

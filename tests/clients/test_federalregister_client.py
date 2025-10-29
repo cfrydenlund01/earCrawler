@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
+
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from api_clients.federalregister_client import FederalRegisterClient
+from earCrawler.utils import budget
 
 
 def test_get_ear_articles(recorder):
@@ -22,3 +26,25 @@ def test_get_article_text(recorder):
     with recorder.use_cassette("federalregister_get_article_text.yaml"):
         text = client.get_article_text("2023-12345")
     assert text == "Hello world."
+
+
+def test_federalregister_budget(monkeypatch):
+    class DummyResponse:
+        status_code = 200
+        headers = {"Content-Type": "application/json"}
+        text = "{}"
+
+        def json(self):
+            return {}
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setenv("FR_MAX_CALLS", "1")
+    budget.reset("federalregister")
+    client = FederalRegisterClient()
+    monkeypatch.setattr(client.cache, "get", lambda *args, **kwargs: DummyResponse())
+    client._get_json("url", {})
+    with pytest.raises(budget.BudgetExceededError):
+        client._get_json("url", {})
+    budget.reset("federalregister")
