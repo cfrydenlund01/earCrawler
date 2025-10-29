@@ -148,3 +148,35 @@ Codebase hygiene (apply once):
 	4) Delete the duplicate `earCrawler/api_clients/` tree.
 	5) Run `pytest -x` and fix any import fallout.
 
+
+Documentation deliverables (additions):
+ D.3 Admin/Jobs Runbooks:
+	- Document CLI jobs: `py -m earCrawler.cli jobs run {tradegov|federalregister} [--dry-run] [--quiet]`.
+	- PowerShell wrappers: `scripts/jobs/run_tradegov_ingest.ps1`, `scripts/jobs/run_federalregister_anchor.ps1`.
+	- Artifacts: logs and JSON run summaries under `run/logs/`.
+	- Status: Documented in `RUNBOOK.md` (see "Scheduled Jobs & Admin Runs").
+ D.4 Export Profiles:
+	- Command: `py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem dataset`.
+	- Outputs: `dataset.ttl`, `dataset.nt`, `dataset.ttl.gz`, `dataset.nt.gz`, `manifest.json`, `checksums.sha256`.
+	- Status: Documented in `RUNBOOK.md` (see "Export Profiles").
+ D.5 Integrity Gate:
+	- Command: `py -m earCrawler.cli integrity check <ttl>`; any non-zero counters fail the gate.
+	- Violations block export/load and CI.
+	- Status: Documented in `RUNBOOK.md` (see "Integrity Gate").
+
+Codebase hygiene (additions):
+ H.2 API budgets & retries:
+	- Enforce `FR_MAX_CALLS` and `TRADEGOV_MAX_CALLS` budgets in clients; bounded retries via tenacity; caching via `HTTPCache`.
+ H.3 Observability:
+	- Jobs and admin commands emit per-run JSON summaries with run_id, steps, durations, and statuses stored under `run/logs/`.
+
+Operator quick reference:
+	- `py -m earCrawler.cli jobs run tradegov --dry-run`
+	- `py -m earCrawler.cli jobs run federalregister --dry-run`
+	- `py -m earCrawler.cli integrity check dist/exports/dataset.ttl`
+	- `py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem dataset`
+	- `py -m earCrawler.cli admin stats --iterations 1`
+
+Errors (tightened acceptance):
+	- `pytest -x` passes with no failures and no unapproved warnings.
+	- Integrity violations and export manifest mismatches are hard errors.
