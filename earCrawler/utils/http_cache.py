@@ -76,3 +76,10 @@ class HTTPCache:
                 encoding="utf-8",
             )
         return resp
+
+    def clear(self) -> None:
+        for path in self.base_dir.glob("*.json"):
+            try:
+                path.unlink()
+            except OSError:
+                continue
