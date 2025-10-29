@@ -9,7 +9,10 @@ BASE = "https://ear.example.org/"
 def _slugify(value: str) -> str:
     """Return a conservative slug made safe for CURIE style identifiers."""
 
-    cleaned = "".join(ch if ch.isalnum() else "_" for ch in value.strip())
+    cleaned = "".join(
+        ch if ch.isalnum() else "_"
+        for ch in value.strip().casefold()
+    )
     while "__" in cleaned:
         cleaned = cleaned.replace("__", "_")
     return cleaned or "entity"

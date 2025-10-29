@@ -8,7 +8,8 @@ perf/synth/out/
 .cache/
 dist/
 kg/.kgstate/
-kg/canonical/
+kg/canonical/*
+!kg/canonical/aliases.json
 kg/delta/
 kg/reconcile/decisions.jsonl.gz
 kg/reconcile/idmap.csv

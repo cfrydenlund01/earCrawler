@@ -6,6 +6,7 @@ from .ear_parts_loader import (  # noqa: F401
     link_entity_to_part,
     load_parts_from_fr,
     upsert_part,
+    upsert_part_anchor,
 )
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "load_parts_from_fr",
     "upsert_entity",
     "upsert_part",
+    "upsert_part_anchor",
 ]
