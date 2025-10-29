@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Iterable
 
-from earCrawler.api_clients import search_entities
+from api_clients import search_entities
 from earCrawler.kg.jena_client import JenaClient
 from earCrawler.transforms.csl_to_rdf import to_bindings
 

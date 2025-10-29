@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Iterable, Sequence, Set
 
-from earCrawler.api_clients import search_documents
+from api_clients import search_documents
 from earCrawler.kg.jena_client import JenaClient
 from earCrawler.transforms.ear_fr_to_rdf import extract_parts_from_text, pick_parts
 

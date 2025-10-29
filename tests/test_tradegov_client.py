@@ -1,7 +1,7 @@
 import keyring
 import pytest
 
-from earCrawler.api_clients.tradegov_client import search_entities
+from api_clients.tradegov_client import search_entities
 
 
 SKIP = keyring.get_password("EAR_AI", "TRADEGOV_API_KEY") is None
