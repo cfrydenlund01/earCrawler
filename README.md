@@ -182,6 +182,8 @@ Environment variables:
 - Health probes live under `scripts/health/` and produce `kg/reports/health-*.txt`.
 - Canary automation uses `canary/config.yml` plus `scripts/canary/run-canaries.ps1`.
 - Telemetry policy and redaction rules are stored in `docs/privacy/`.
+- Scheduler jobs and admin helpers persist structured run logs in `run/logs/`. Each JSON file contains a `run_id`, status, timestamps, and per-step metadata so operators can audit Windows Task Scheduler executions.
+- The Trade.gov and Federal Register clients honour `TRADEGOV_MAX_CALLS` and `FR_MAX_CALLS` environment budgets. Requests use exponential backoff with structured retry logs, and the on-disk cache key now incorporates Accept/User-Agent headers to avoid stale mixes across CLI environments.
 
 ---
 
