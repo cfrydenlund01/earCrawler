@@ -29,29 +29,21 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
    cd earCrawler
    ```
 
-2. **Install Python dependencies**
-   ```powershell
-   py -m pip install --upgrade pip
-   py -m pip install --requirement requirements.txt
-   ```
-   This installs all runtime and developer dependencies defined in `requirements.txt`. To add the `earCrawler` console helpers to your user site-packages, install the project wheel as well:
-   ```powershell
-   py -m pip install --user --upgrade .
-   ```
-   Windows places the console scripts under:
-   ```
-   %LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\Scripts
-   ```
-   Either add that directory to `PATH` or invoke the CLI via the module form shown below.
-
-3. **Optional: create an isolated environment**
+2. **(Recommended) create and activate a virtual environment**
    ```powershell
    py -m venv .venv
    .\.venv\Scripts\Activate.ps1
-   py -m pip install --upgrade pip
-   py -m pip install -r requirements.txt
-   py -m pip install -e .
    ```
+   When the prompt shows `(.venv)` you will be installing into the isolated environment. If you later see `Defaulting to user installation because normal site-packages is not writeable`, the environment is not active—re-run the `Activate.ps1` step.
+
+3. **Install Python dependencies**
+   ```powershell
+   python -m pip install --upgrade pip
+   python -m pip install --requirement requirements.txt
+   python -m pip install -e .
+   ```
+   This path keeps the dependencies and console scripts inside `.venv\Scripts\`. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
+   > Tip: Pip may leave a temporary folder (for example `~aml`) behind or warn that script shims such as `uvicorn.exe` are not on `PATH`. The folder can be deleted safely, and you can either add the scripts directory to `PATH` or continue using `python -m earCrawler.cli ...` to invoke commands.
 
 4. **Install GitHub CLI (required for PR automation)**
    ```powershell
