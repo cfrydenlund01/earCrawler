@@ -104,6 +104,7 @@ def ensure_jena(download: bool = True, version: str | None = None) -> Path:
     jena_home = get_jena_home(root)
 
     if _valid_install(jena_home):
+        os.environ.setdefault("JENA_HOME", str(jena_home))
         return jena_home
     if jena_home.exists():
         shutil.rmtree(jena_home)

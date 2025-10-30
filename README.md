@@ -135,6 +135,11 @@ Environment variables:
    ```powershell
    py -m earCrawler.cli kg-serve --db db --dataset /ear
    ```
+   This command runs until you stop it (CTRL+C). Open a second PowerShell window for follow-on steps, or add `--no-wait` to detach the Fuseki process and regain the prompt:
+   ```powershell
+   py -m earCrawler.cli kg-serve --db db --dataset /ear --no-wait
+   ```
+   (PowerShell does not support the POSIX `&` background operator—either use `--no-wait`, `Start-Job`, or keep Fuseki in its own terminal.)
    Use `Ctrl+C` to stop the server.
 
 3. **Load triples into TDB2**  
