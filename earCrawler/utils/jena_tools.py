@@ -11,6 +11,36 @@ import zipfile
 from urllib.error import HTTPError
 
 
+def _java_executable(home: Path) -> Path:
+    exe = "java.exe" if os.name == "nt" else "java"
+    return home / "bin" / exe
+
+
+def ensure_java_home() -> Path:
+    """Ensure ``JAVA_HOME`` points at a usable Java installation."""
+
+    env_home = os.getenv("JAVA_HOME")
+    if env_home:
+        home = Path(env_home).expanduser()
+        if _java_executable(home).exists():
+            os.environ["JAVA_HOME"] = str(home)
+            return home
+        raise RuntimeError("JAVA_HOME is set but does not look like a valid Java installation")
+
+    java_cmd = shutil.which("java.exe" if os.name == "nt" else "java")
+    if java_cmd:
+        candidate = Path(java_cmd).resolve()
+        home = candidate.parent.parent
+        if _java_executable(home).exists():
+            os.environ["JAVA_HOME"] = str(home)
+            return home
+
+    raise RuntimeError(
+        "JAVA_HOME is not set and no Java runtime was detected on PATH. "
+        "Install a JDK (11 or newer) and set JAVA_HOME."
+    )
+
+
 def get_jena_home(root: Path = Path(".")) -> Path:
     """Return the repository-scoped Jena home directory."""
     return root / "tools" / "jena"
@@ -56,10 +86,12 @@ def ensure_jena(download: bool = True, version: str | None = None) -> Path:
     """Ensure Apache Jena is available, honoring ``JENA_HOME`` overrides."""
 
     root = Path(".").resolve()
+    ensure_java_home()
     env_override = os.getenv("JENA_HOME")
     if env_override:
         env_home = Path(env_override).expanduser()
         if _valid_install(env_home):
+            os.environ["JENA_HOME"] = str(env_home)
             return env_home
         raise RuntimeError(
             "JENA_HOME is set but does not look like a valid Apache Jena installation"
@@ -109,50 +141,34 @@ def ensure_jena(download: bool = True, version: str | None = None) -> Path:
 
     if not _valid_install(jena_home):
         raise RuntimeError("Jena archive missing required Windows scripts")
+    os.environ.setdefault("JENA_HOME", str(jena_home))
     return jena_home
 
 
 # Backwards compatible Fuseki helper
 from . import fuseki_tools as _fuseki_tools  # noqa: E402
 
+
 def ensure_fuseki(*args, **kwargs):  # pragma: no cover - simple delegate
+    ensure_java_home()
     return _fuseki_tools.ensure_fuseki(*args, **kwargs)
 
 
-def _candidate_jena_homes() -> list[Path]:
-    """Return possible Jena installation directories ordered by priority."""
-
-    homes: list[Path] = []
-    env_override = os.getenv("JENA_HOME")
-    if env_override:
-        env_home = Path(env_override).expanduser()
-        if env_home.exists():
-            homes.append(env_home)
-    repo_home = get_jena_home(Path(".").resolve())
-    if repo_home not in homes:
-        homes.append(repo_home)
-    return homes
-
-
 def find_tdbloader() -> Path:
-    homes = _candidate_jena_homes()
-    for home in homes:
-        for names in _expected_scripts(home)[1:2]:
-            for n in names:
-                cand = home / "bat" / n
-                if cand.exists():
-                    return cand.resolve()
-    home = homes[0]
-    return home / "bat" / "tdb2_tdbloader.bat"
+    home = ensure_jena()
+    for names in _expected_scripts(home)[1:2]:
+        for n in names:
+            cand = home / "bat" / n
+            if cand.exists():
+                return cand.resolve()
+    return (home / "bat" / "tdb2_tdbloader.bat").resolve()
 
 
 def find_tdbquery() -> Path:
-    homes = _candidate_jena_homes()
-    for home in homes:
-        for names in _expected_scripts(home)[2:3]:
-            for n in names:
-                cand = home / "bat" / n
-                if cand.exists():
-                    return cand.resolve()
-    home = homes[0]
-    return home / "bat" / "tdb2_tdbquery.bat"
+    home = ensure_jena()
+    for names in _expected_scripts(home)[2:3]:
+        for n in names:
+            cand = home / "bat" / n
+            if cand.exists():
+                return cand.resolve()
+    return (home / "bat" / "tdb2_tdbquery.bat").resolve()

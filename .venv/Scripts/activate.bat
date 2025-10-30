@@ -8,7 +8,7 @@ if defined _OLD_CODEPAGE (
     "%SystemRoot%\System32\chcp.com" 65001 > nul
 )
 
-set "VIRTUAL_ENV=C:\Users\cfrydenlund\AI reporting\AI training docs\EAR AI\earCrawler\.venv"
+set "VIRTUAL_ENV=C:\Users\cfrydenlund\AI reporting\AI apps\EAR AI\earCrawler\earCrawler\.venv"
 
 if not defined PROMPT set PROMPT=$P$G
 
