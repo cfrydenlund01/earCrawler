@@ -7,7 +7,7 @@ commands:
   diagnose: ["reader"]
   gc: ["operator"]
   reconcile: ["maintainer"]
-  policy: ["reader"]
+  policy: ["reader", "operator", "maintainer", "admin"]
   auth: ["admin"]
   audit: ["operator", "admin"]
   crawl: ["operator"]

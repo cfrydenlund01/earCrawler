@@ -167,8 +167,10 @@ Documentation deliverables (additions):
 Codebase hygiene (additions):
  H.2 API budgets & retries:
 	- Enforce `FR_MAX_CALLS` and `TRADEGOV_MAX_CALLS` budgets in clients; bounded retries via tenacity; caching via `HTTPCache`.
+	- Status: Enforced in `api_clients/tradegov_client.py` and `api_clients/federalregister_client.py` with structured logging and enhanced cache keys.
  H.3 Observability:
 	- Jobs and admin commands emit per-run JSON summaries with run_id, steps, durations, and statuses stored under `run/logs/`.
+	- Status: `earCrawler/cli/admin.py` now writes run summaries; coverage asserted in `tests/cli/test_admin_cli.py`.
 
 Operator quick reference:
 	- `py -m earCrawler.cli jobs run tradegov --dry-run`

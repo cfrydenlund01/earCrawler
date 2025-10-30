@@ -10,6 +10,7 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
 
 - Windows 11 with PowerShell 7 (`pwsh`) on `PATH`
 - Python 3.11 or newer (`py --version`)
+- Java 11+ JDK (required for Apache Jena; `ensure_jena` auto-detects and sets `JAVA_HOME`)
 - Git
 - Docker Desktop (needed for optional container packaging)
 - Trade.gov CSL API subscription key (required for live data pulls)
@@ -30,9 +31,14 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
 
 2. **Install Python dependencies**
    ```powershell
+   py -m pip install --upgrade pip
+   py -m pip install --requirement requirements.txt
+   ```
+   This installs all runtime and developer dependencies defined in `requirements.txt`. To add the `earCrawler` console helpers to your user site-packages, install the project wheel as well:
+   ```powershell
    py -m pip install --user --upgrade .
    ```
-   The wheel installs the `earCrawler` package and console helpers into your user site-packages. Windows places the console scripts under:
+   Windows places the console scripts under:
    ```
    %LOCALAPPDATA%\Packages\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\LocalCache\local-packages\Python312\Scripts
    ```
@@ -43,6 +49,7 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
    py -m venv .venv
    .\.venv\Scripts\Activate.ps1
    py -m pip install --upgrade pip
+   py -m pip install -r requirements.txt
    py -m pip install -e .
    ```
 
@@ -78,6 +85,17 @@ py -m earCrawler.cli policy whoami   # shows the identity and roles
 ```
 
 Unset `EARCTL_USER` to fall back to the logged-in Windows account (default role: `reader`).
+
+Built-in identities and their permissions:
+
+| Identity        | Role(s)      | Highlights                                                                          |
+|-----------------|--------------|-------------------------------------------------------------------------------------|
+| `test_reader`   | `reader`     | Read-only commands such as `diagnose`, `report`, and knowledge-graph queries.      |
+| `test_operator` | `operator`   | Data movement commands including `crawl`, `fetch-*`, `bundle`, `jobs`, and `gc`.   |
+| `test_maintainer` | `maintainer` | Release workflows such as `reconcile`, `bundle`, and API management.             |
+| `test_admin`    | `admin`      | Full access across the CLI, including `auth` and audit tooling.                    |
+
+Run `py -m earCrawler.cli policy --help` to see these identities inside the CLI along with tips for setting `EARCTL_USER`.
 
 ---
 
@@ -115,7 +133,7 @@ Environment variables:
 ## Preparing Fuseki & The Knowledge Graph
 
 1. **Ensure Jena is available**  
-   The first CLI call that needs Jena will download it into `tools/jena`. You can pre-flight the download:
+   The first CLI call that needs Jena will download it into `tools/jena` and populate the `JENA_HOME`/`JAVA_HOME` environment variables if they are not already set. If Java cannot be located automatically, install JDK 11+ and set `JAVA_HOME` before retrying. You can pre-flight the download:
    ```powershell
    py -m earCrawler.cli kg-serve --dry-run
    ```
@@ -182,6 +200,8 @@ Environment variables:
 - Health probes live under `scripts/health/` and produce `kg/reports/health-*.txt`.
 - Canary automation uses `canary/config.yml` plus `scripts/canary/run-canaries.ps1`.
 - Telemetry policy and redaction rules are stored in `docs/privacy/`.
+- Scheduler jobs and admin helpers persist structured run logs in `run/logs/`. Each JSON file contains a `run_id`, status, timestamps, and per-step metadata so operators can audit Windows Task Scheduler executions.
+- The Trade.gov and Federal Register clients honour `TRADEGOV_MAX_CALLS` and `FR_MAX_CALLS` environment budgets. Requests use exponential backoff with structured retry logs, and the on-disk cache key now incorporates Accept/User-Agent headers to avoid stale mixes across CLI environments.
 
 ---
 

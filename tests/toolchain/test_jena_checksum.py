@@ -10,6 +10,14 @@ import pytest
 from earCrawler.utils import jena_tools
 
 
+def _seed_java_home(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.delenv("JENA_HOME", raising=False)
+    java_home = tmp_path / "fake-java"
+    (java_home / "bin").mkdir(parents=True)
+    (java_home / "bin" / "java.exe").write_text("")
+    monkeypatch.setenv("JAVA_HOME", str(java_home))
+
+
 def _make_jena_zip(tmp_path: Path, include_riot: bool = True) -> Path:
     root = tmp_path / 'src'
     bat = root / 'apache-jena-5.3.0' / 'bat'
@@ -26,6 +34,7 @@ def _make_jena_zip(tmp_path: Path, include_riot: bool = True) -> Path:
 
 
 def test_jena_checksum_pass(tmp_path, monkeypatch):
+    _seed_java_home(tmp_path, monkeypatch)
     zip_path = _make_jena_zip(tmp_path)
     sha = hashlib.sha512(zip_path.read_bytes()).hexdigest()
     versions = {'jena': {'version': '5.3.0', 'sha512': sha}}
@@ -43,6 +52,7 @@ def test_jena_checksum_pass(tmp_path, monkeypatch):
 
 
 def test_jena_checksum_mismatch(tmp_path, monkeypatch):
+    _seed_java_home(tmp_path, monkeypatch)
     zip_path = _make_jena_zip(tmp_path)
     bad_sha = '0' * 128
     versions = {'jena': {'version': '5.3.0', 'sha512': bad_sha}}
@@ -61,6 +71,7 @@ def test_jena_checksum_mismatch(tmp_path, monkeypatch):
 
 
 def test_jena_missing_script(tmp_path, monkeypatch):
+    _seed_java_home(tmp_path, monkeypatch)
     zip_path = _make_jena_zip(tmp_path, include_riot=False)
     sha = hashlib.sha512(zip_path.read_bytes()).hexdigest()
     versions = {'jena': {'version': '5.3.0', 'sha512': sha}}
