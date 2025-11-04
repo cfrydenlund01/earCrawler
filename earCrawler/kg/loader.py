@@ -50,9 +50,12 @@ def load_tdb(ttl_path: Path, db_dir: Path = Path("db"), auto_install: bool = Tru
                     "Apache Jena TDB2 not found. Rerun without --no-auto-install to fetch a local copy."
                 )
 
-    cmd = [str(loader.resolve()), "--loc", str(db_dir), str(ttl_path)]
+    loader_path = loader.resolve()
+    env = os.environ.copy()
+    env.setdefault("JENA_HOME", str(loader_path.parent.parent))
+    cmd = [str(loader_path), "--loc", str(db_dir), str(ttl_path)]
     try:
-        subprocess.check_call(cmd, shell=False, stderr=subprocess.PIPE)
+        subprocess.check_call(cmd, shell=False, stderr=subprocess.PIPE, env=env)
     except subprocess.CalledProcessError as exc:  # pragma: no cover - error path
         err = exc.stderr.decode() if exc.stderr else ""
         msg = f"TDB2 loader failed: {exc.returncode}"
