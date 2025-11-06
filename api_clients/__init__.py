@@ -33,6 +33,7 @@ except Exception:  # pragma: no cover - optional on non-Windows
     def search_documents(*args, **kwargs):  # type: ignore
         raise RuntimeError("Federal Register client unavailable: install dependencies or configure secrets")
 
+from .ear_api_client import EarCrawlerApiClient, EarApiError
 from .ori_client import ORIClient, ORIClientError
 
 __all__ = [
@@ -45,4 +46,6 @@ __all__ = [
     "search_documents",
     "ORIClient",
     "ORIClientError",
+    "EarCrawlerApiClient",
+    "EarApiError",
 ]

@@ -7,6 +7,7 @@ kg/shapes.ttl
 perf/synth/out/
 .cache/
 dist/
+build/
 kg/.kgstate/
 kg/canonical/*
 !kg/canonical/aliases.json

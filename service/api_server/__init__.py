@@ -12,6 +12,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from earCrawler import __version__ as package_version
 from earCrawler.observability import load_observability_config
 from earCrawler.utils.log_json import JsonLogger
 
@@ -79,10 +80,10 @@ def create_app(
 
     app = FastAPI(
         title="EarCrawler API",
-        version="0.23.0",
+        version=package_version,
         docs_url=None,
         redoc_url=None,
-        openapi_url=None,
+        openapi_url="/openapi.json",
         default_response_class=JSONResponse,
     )
 
