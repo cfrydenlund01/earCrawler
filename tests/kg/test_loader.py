@@ -34,7 +34,7 @@ def test_load_tdb_autoinstall_downloads_once(tmp_path, monkeypatch):
 
     calls: list[list[str]] = []
 
-    def fake_check_call(cmd, shell=False, stderr=None):
+    def fake_check_call(cmd, shell=False, stderr=None, **kwargs):
         calls.append(cmd)
         return 0
 
@@ -49,3 +49,5 @@ def test_load_tdb_autoinstall_downloads_once(tmp_path, monkeypatch):
 
     load_tdb(ttl, Path("mydb2"))
     assert len(downloads) == 1
+    os.environ.pop("JENA_HOME", None)
+    assert "JENA_HOME" not in os.environ
