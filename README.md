@@ -200,6 +200,17 @@ Environment variables:
 - Scheduler jobs and admin helpers persist structured run logs in `run/logs/`. Each JSON file contains a `run_id`, status, timestamps, and per-step metadata so operators can audit Windows Task Scheduler executions.
 - The Trade.gov and Federal Register clients honour `TRADEGOV_MAX_CALLS` and `FR_MAX_CALLS` environment budgets. Requests use exponential backoff with structured retry logs, and the on-disk cache key now incorporates Accept/User-Agent headers to avoid stale mixes across CLI environments.
 
+## Proposal Assets
+- `scripts/demo-end-to-end.ps1` produces a deterministic crawl → KG → bundle
+  run with fixtures and emits a summary artefact.
+- `scripts/build-release.ps1` orchestrates wheel/EXE/installer builds and
+  writes SHA-256 checksums for signing.
+- `docs/proposal/architecture.md`, `docs/proposal/security.md`, and
+  `docs/proposal/observability.md` capture the architecture story, security
+  posture, and SLO model pitched in the proposal.
+- `api_clients.EarCrawlerApiClient` is a typed helper for downstream consumers
+  of the FastAPI facade.
+
 ---
 
 ## Useful CLI Commands

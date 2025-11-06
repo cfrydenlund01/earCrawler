@@ -2,7 +2,7 @@
 name = "earCrawler"
 version = "0.2.5"
 description = "EAR AI ingestion, RAG, and analytics pipeline"
-authors = [{ name = "Your Name", email = "you@example.com" }]
+authors = [{ name = "EAR AI Team", email = "maintainers@ear.ai" }]
 license = { text = "MIT" }
 dependencies = [
   "click>=8.0",
@@ -24,8 +24,8 @@ kg-validate = "cli.kg_validate:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["earCrawler*", "api_clients*", "perf*"]
-namespaces = true
+include = ["earCrawler*", "api_clients*", "perf*", "cli*"]
+namespaces = false
 
 [tool.setuptools.package-data]
 "earCrawler.kg" = ["shapes.ttl"]

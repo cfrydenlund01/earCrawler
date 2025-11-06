@@ -1,0 +1,26 @@
+Guide for installing the EarCrawler API as a Windows service using NSSM.
+
+1. Download NSSM (https://nssm.cc/) and extract to `C:\tools\nssm`.
+2. Install the service as `EarCrawler-API`:
+
+    ```powershell
+    C:\tools\nssm\nssm.exe install EarCrawler-API "C:\Python312\python.exe" `
+      "-m" "uvicorn" "service.api_server.server:app" "--host" "0.0.0.0" "--port" "9001"
+    ```
+
+3. Set the service working directory to the repository root and configure the
+   following environment variables under the NSSM GUI:
+   * `EARCRAWLER_FUSEKI_URL=http://localhost:3030/dataset/query`
+   * `EARCRAWLER_API_HOST=0.0.0.0`
+   * `EARCRAWLER_API_PORT=9001`
+
+4. Configure NSSM I/O redirection to
+   `C:\ProgramData\EarCrawler\logs\api-service.log`.
+
+5. Start the service:
+
+    ```powershell
+    C:\tools\nssm\nssm.exe start EarCrawler-API
+    ```
+
+Use `nssm.exe set EarCrawler-API AppDirectory` to update paths for production.

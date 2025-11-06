@@ -1,4 +1,5 @@
 {
     "chatgpt.openOnStartup": true,
-    "chatgpt.commentCodeLensEnabled": false
+    "chatgpt.commentCodeLensEnabled": false,
+    "editor.fontSize": 18
 }
