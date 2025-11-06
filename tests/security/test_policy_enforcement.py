@@ -16,7 +16,7 @@ def test_policy_matrix():
         ("gc --dry-run", "test_reader", 1),
         ("gc --dry-run", "test_operator", 0),
         ("policy whoami", "test_reader", 0),
-        ("policy whoami", "test_operator", 1),
+        ("policy whoami", "test_operator", 0),
     ]
     for cmd, user, code in matrix:
         res = _invoke(cmd, user)

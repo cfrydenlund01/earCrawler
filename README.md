@@ -255,25 +255,21 @@ Run `py -m earCrawler.cli COMMAND --help` for detailed options.
 
 Pull requests are welcome - open an issue first for substantial changes so we can align on scope. The project is licensed under the MIT License (`LICENSE` in the repository root).
 
-## B.26 — Schema and SHACL
-- Defines `ear:` schema for Entities and Parts.
+## Schema and SHACL
+
+- Defines the `ear:` schema for Entities and Parts.
 - Enforces shapes with `pyshacl` in CI on `windows-latest`.
 - Local run:
   ```powershell
   python -m earCrawler.validation.validate_shapes
   ```
 
-Upstream callers:
+Keep using the Trade.gov Data API for entity lookup and the Federal Register API for EAR text via the packaged clients. Ensure transforms (`csl_to_rdf.py`, `ear_fr_to_rdf.py`) emit IRIs under `ent:` and `part:` to satisfy shapes. Store secrets in the Windows Credential Store or a vault—never hardcode them.
 
-Keep using Trade.gov Data API for entity lookup and Federal Register API for EAR text via our clients.
+## TTL Build and Gated Load
 
-Ensure transforms (`csl_to_rdf.py`, `ear_fr_to_rdf.py`) emit IRIs under ent: and part: to satisfy shapes.
-
-Secrets: store in Windows Credential Store or vault. Do not hardcode.
-
-## B.27 — TTL build and gated load
 - Transforms now emit `dist/bundle.ttl`.
-- Validation gate must pass before any load.
+- A validation gate must pass before any load.
 - Local load (Windows PowerShell):
   ```powershell
   $env:EAR_FUSEKI_DATASET="http://localhost:3030/ear"
@@ -281,12 +277,3 @@ Secrets: store in Windows Credential Store or vault. Do not hardcode.
   python -m earCrawler.pipelines.build_ttl
   python -m earCrawler.pipelines.load_after_validate
   ```
-
-Data sources remain:
-
-Trade.gov Data API for entity lookup.
-
-Federal Register API for EAR text.
-Embed accesses in client modules only.
-
-Secrets: store in Windows Credential Store or a vault. Do not hardcode.

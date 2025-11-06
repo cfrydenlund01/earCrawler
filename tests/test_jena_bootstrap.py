@@ -72,6 +72,7 @@ def test_ensure_jena_bootstrap(tmp_path, monkeypatch):
     monkeypatch.setattr(urllib.request, "urlretrieve", blocker)
     assert jena_tools.ensure_jena() == jena_home
     assert not called
+    os.environ.pop("JENA_HOME", None)
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows-only")
