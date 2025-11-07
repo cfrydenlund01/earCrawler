@@ -1,7 +1,13 @@
 import pytest
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import LoraConfig, get_peft_model
+
+torch = pytest.importorskip("torch")
+transformers = pytest.importorskip("transformers")
+peft = pytest.importorskip("peft")
+
+AutoModelForCausalLM = transformers.AutoModelForCausalLM
+AutoTokenizer = transformers.AutoTokenizer
+LoraConfig = peft.LoraConfig
+get_peft_model = peft.get_peft_model
 
 
 @pytest.mark.gpu

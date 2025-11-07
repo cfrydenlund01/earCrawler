@@ -7,9 +7,9 @@ The workflow defined in `.github/workflows/ci.yml` runs our automated checks.
 - **cpu** – Runs on `windows-latest`, installs `requirements-win.txt`, lints
   with Black and Flake8, executes tests excluding GPU markers, and uploads
   coverage results to Codecov.
-- **gpu** – Runs on `ubuntu-latest` with `continue-on-error: true`, installs
-  `requirements-gpu.txt`, caches the Hugging Face model hub, and runs tests
-  marked with `gpu`.
+- **gpu** - Runs on `ubuntu-latest` with `continue-on-error: true`, installs
+  `requirements-gpu.txt` (the base stack plus the `gpu` extra), caches the
+  Hugging Face model hub, and runs tests marked with `gpu`.
 - **release** – Builds and pushes Docker images when tags are pushed.
 
 ## Secrets

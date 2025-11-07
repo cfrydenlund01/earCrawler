@@ -34,7 +34,9 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
    py -m venv .venv
    .\.venv\Scripts\Activate.ps1
    ```
-   When the prompt shows `(.venv)` you will be installing into the isolated environment. If you later see `Defaulting to user installation because normal site-packages is not writeable`, the environment is not active—re-run the `Activate.ps1` step.
+   When the prompt shows `(.venv)` you will be installing into the isolated environment. If you later see `Defaulting to user installation because normal site-packages is not writeable`, the environment is not active-re-run the `Activate.ps1` step.
+
+   > Tip: Once the virtual environment is active, you can swap `py -m ...` for `python -m ...` to force the venv interpreter. The examples below continue to show the `py` launcher for brevity—use whichever matches your setup.
 
 3. **Install Python dependencies**
    ```powershell
@@ -44,6 +46,12 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
    ```
    This path keeps the dependencies and console scripts inside `.venv\Scripts\`. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
    > Tip: Pip may leave a temporary folder (for example `~aml`) behind or warn that script shims such as `uvicorn.exe` are not on `PATH`. The folder can be deleted safely, and you can either add the scripts directory to `PATH` or continue using `python -m earCrawler.cli ...` to invoke commands.
+
+   > **GPU / inference extras:** The torch/transformers stack lives behind an optional extra so Windows operators can skip it entirely. Install it only when you need the RAG or Mistral agents:
+   > ```powershell
+   > python -m pip install -e .[gpu]
+   > # or use pip install -r requirements-gpu.txt on Linux runners
+   > ```
 
 4. **Install GitHub CLI (required for PR automation)**
    ```powershell
@@ -201,15 +209,10 @@ Environment variables:
 - The Trade.gov and Federal Register clients honour `TRADEGOV_MAX_CALLS` and `FR_MAX_CALLS` environment budgets. Requests use exponential backoff with structured retry logs, and the on-disk cache key now incorporates Accept/User-Agent headers to avoid stale mixes across CLI environments.
 
 ## Proposal Assets
-- `scripts/demo-end-to-end.ps1` produces a deterministic crawl → KG → bundle
-  run with fixtures and emits a summary artefact.
-- `scripts/build-release.ps1` orchestrates wheel/EXE/installer builds and
-  writes SHA-256 checksums for signing.
-- `docs/proposal/architecture.md`, `docs/proposal/security.md`, and
-  `docs/proposal/observability.md` capture the architecture story, security
-  posture, and SLO model pitched in the proposal.
-- `api_clients.EarCrawlerApiClient` is a typed helper for downstream consumers
-  of the FastAPI facade.
+- `scripts/demo-end-to-end.ps1` produces a deterministic crawl -> KG -> bundle run with fixtures and emits a summary artefact. The script uses the active `python` interpreter by default; override with `-Python` to call a specific executable.
+- `scripts/build-release.ps1` orchestrates wheel/EXE/installer builds and writes SHA-256 checksums for signing.
+- `docs/proposal/architecture.md`, `docs/proposal/security.md`, and `docs/proposal/observability.md` capture the architecture story, security posture, and SLO model pitched in the proposal.
+- `api_clients.EarCrawlerApiClient` is a typed helper for downstream consumers of the FastAPI facade.
 
 ---
 

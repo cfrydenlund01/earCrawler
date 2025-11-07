@@ -1,13 +1,15 @@
 import pytest
-import torch
+
+torch = pytest.importorskip("torch")
 from torch.utils.data import Dataset
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    DataCollatorForLanguageModeling,
-    Trainer,
-    TrainingArguments,
-)
+
+transformers = pytest.importorskip("transformers")
+
+AutoModelForCausalLM = transformers.AutoModelForCausalLM
+AutoTokenizer = transformers.AutoTokenizer
+DataCollatorForLanguageModeling = transformers.DataCollatorForLanguageModeling
+Trainer = transformers.Trainer
+TrainingArguments = transformers.TrainingArguments
 
 
 class LineDataset(Dataset):

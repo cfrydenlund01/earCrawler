@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, TYPE_CHECKING
 
-import torch
-from transformers import (
-    AutoModelForCausalLM,
-    AutoModelForSeq2SeqLM,
-    AutoTokenizer,
-)
+from earCrawler.utils.import_guard import import_optional
+
+if TYPE_CHECKING:  # pragma: no cover - hints only
+    import torch
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoModelForSeq2SeqLM,
+        AutoTokenizer,
+    )
 
 LOGGER = logging.getLogger(__name__)
 
@@ -19,9 +22,10 @@ DEFAULT_CONVERSATION_MODEL = "mistralai/Mistral-7B-Instruct-v0.2"
 DEFAULT_LONG_DOCUMENT_MODEL = "allenai/led-large-16384"
 
 
-def _resolve_device(preferred: Optional[str] = None) -> torch.device:
+def _resolve_device(preferred: Optional[str] = None) -> "torch.device":
     """Return a torch device honoring CUDA availability."""
 
+    torch = import_optional("torch", ["torch"])
     if preferred is not None:
         return torch.device(preferred)
     if torch.cuda.is_available():
@@ -56,6 +60,11 @@ class LongContextPipeline:
     def _load_conversation_model(self) -> None:
         """Load the 32k-context conversational model and tokenizer."""
 
+        torch = import_optional("torch", ["torch"])
+        transformers = import_optional("transformers", ["transformers"])
+        AutoTokenizer = transformers.AutoTokenizer
+        AutoModelForCausalLM = transformers.AutoModelForCausalLM
+
         LOGGER.info("Loading conversation model: %%s", self.conversation_model_name)
         torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         self.conversation_tokenizer = AutoTokenizer.from_pretrained(
@@ -76,6 +85,11 @@ class LongContextPipeline:
     def _load_long_document_model(self) -> None:
         """Load the LED model used for long document summarization."""
 
+        torch = import_optional("torch", ["torch"])
+        transformers = import_optional("transformers", ["transformers"])
+        AutoTokenizer = transformers.AutoTokenizer
+        AutoModelForSeq2SeqLM = transformers.AutoModelForSeq2SeqLM
+
         LOGGER.info("Loading long document model: %%s", self.long_document_model_name)
         torch_dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         self.long_document_tokenizer = AutoTokenizer.from_pretrained(
@@ -95,9 +109,10 @@ class LongContextPipeline:
         self.long_document_device = _resolve_device()
         self.long_document_model.to(self.long_document_device)
 
-    def _conversation_device(self) -> torch.device:
+    def _conversation_device(self) -> "torch.device":
         """Return the device used by the conversational model."""
 
+        torch = import_optional("torch", ["torch"])
         if hasattr(self.conversation_model, "hf_device_map"):
             device_map = getattr(self.conversation_model, "hf_device_map")
             if isinstance(device_map, dict):
@@ -170,6 +185,7 @@ class LongContextPipeline:
     def _summarize_chunk(self, chunk_text: str) -> str:
         """Summarize a single chunk with LED."""
 
+        torch = import_optional("torch", ["torch"])
         inputs = self.long_document_tokenizer(
             chunk_text,
             return_tensors="pt",
