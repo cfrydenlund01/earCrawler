@@ -1,0 +1,6 @@
+Demo artefacts generated at C:\Users\cfrydenlund\AI reporting\AI apps\EAR AI\earCrawler\earCrawler\demo.
+  - Crawl output: demo\data
+  - RDF output: demo\kg
+  - TDB2 store: demo\db
+  - Export bundle: demo\bundle
+  - Term frequency report: demo\top_terms.json

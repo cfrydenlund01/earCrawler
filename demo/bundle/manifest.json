@@ -1,0 +1,18 @@
+{
+  "demo.nt": {
+    "sha256": "45c05fcef9c1e97d7e9c978a6da530a76aa635e2d07dfafffbcbf2fbc762b602",
+    "size": 112
+  },
+  "demo.nt.gz": {
+    "sha256": "ae7c14a9017fa24213215587010d62550bcee897e0b6a614ec9702b8417464f6",
+    "size": 109
+  },
+  "demo.ttl": {
+    "sha256": "e8704db112ff2d99a831729b5ca9d0fe5c897547562b99eac49e03f893ced2e5",
+    "size": 64
+  },
+  "demo.ttl.gz": {
+    "sha256": "c2c62129a1ec47ed2c5335c36ca421f9d1ba40ad6dd0553b0996f325e33af701",
+    "size": 84
+  }
+}
