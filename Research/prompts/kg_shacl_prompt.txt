@@ -1,0 +1,36 @@
+
+Base Header
+- You are a senior coding agent working in this repo at the current working directory.
+- Keep changes minimal, deterministic, and Windows-first.
+- Reuse existing CLI/API/file contracts; do not break public interfaces.
+- Validate via tests and local commands; avoid network in tests.
+- Acceptance: all existing tests pass + new tests pass + commands run.
+
+Goal
+- Add SHACL shapes capturing policy-graph constraints and wire to integrity checks.
+
+Scope
+- - SHACL: Every Obligation must have at least one applies_to(Entity)
+- SHACL: Every Exception must point to at least one target rule
+- SHACL: Every ConditionPrerequisite must be boolean-evaluable
+
+Key files
+- earCrawler/kg/ontology.py:1
+- earCrawler/kg/shapes.ttl:1
+- earCrawler/kg/shapes_prov.ttl:1
+- earCrawler/kg/validate.py:1
+- earCrawler/kg/emit_ear.py:1
+
+Deliverables
+- - shapes.ttl updates
+- tests
+
+Acceptance criteria
+- - All shapes conform on positive fixtures
+- Violations reported with clear messages
+
+Validation commands
+- `pytest -q tests/kg/test_shacl_entities.py tests/test_shacl_parts.py`
+
+Non-goals
+- - Temporal logic

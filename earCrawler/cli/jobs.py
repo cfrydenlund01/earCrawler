@@ -56,24 +56,26 @@ def run_job(job: str, dry_run: bool, quiet: bool) -> None:
 
 
 def _execute_tradegov(run, dry_run: bool, quiet: bool) -> None:
-    crawl_args = ["crawl", "-s", "ear", "--out", "data"]
+    corpus_args = ["corpus", "build", "--out", "data", "-s", "ear", "-s", "nsf"]
     if dry_run:
-        crawl_args += ["--fixtures", "tests/fixtures"]
+        corpus_args += ["--fixtures", "tests/fixtures"]
     else:
-        crawl_args.append("--live")
-    _run_step(run, "crawl", crawl_args, quiet=quiet, dry_run=False)
+        corpus_args.append("--live")
+    _run_step(run, "corpus-build", corpus_args, quiet=quiet, dry_run=False)
+    _run_step(run, "corpus-validate", ["corpus", "validate", "--dir", "data"], quiet=quiet, dry_run=False)
 
     bundle_args = ["bundle", "build"]
     _run_step(run, "bundle-build", bundle_args, quiet=quiet, dry_run=dry_run)
 
 
 def _execute_federalregister(run, dry_run: bool, quiet: bool) -> None:
-    crawl_args = ["crawl", "-s", "ear", "--out", "data"]
+    corpus_args = ["corpus", "build", "--out", "data", "-s", "ear"]
     if dry_run:
-        crawl_args += ["--fixtures", "tests/fixtures"]
+        corpus_args += ["--fixtures", "tests/fixtures"]
     else:
-        crawl_args.append("--live")
-    _run_step(run, "crawl", crawl_args, quiet=quiet, dry_run=False)
+        corpus_args.append("--live")
+    _run_step(run, "corpus-build", corpus_args, quiet=quiet, dry_run=False)
+    _run_step(run, "corpus-validate", ["corpus", "validate", "--dir", "data"], quiet=quiet, dry_run=False)
 
     _run_step(run, "bundle-verify", ["bundle", "verify"], quiet=quiet, dry_run=dry_run)
 

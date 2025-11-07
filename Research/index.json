@@ -1,0 +1,135 @@
+{
+  "docs": [
+    {
+      "name": "EAR_AI_Training_Proposal_redlined.docx",
+      "path": "C:\\Users\\cfrydenlund\\AI reporting\\AI apps\\EAR AI\\earCrawler\\earCrawler\\Research\\EAR_AI_Training_Proposal_redlined.docx",
+      "size": 37717,
+      "modified": "2025-11-07T13:04:58.128929",
+      "headings": [
+        "Current Alignment",
+        "Phase-by-Phase Gaps & Next Steps",
+        "Cross-Cutting",
+        "Immediate Next Steps (2\u20133 weeks)",
+        "Milestones"
+      ],
+      "has_sections": {
+        "Current Alignment": true,
+        "Phase-by-Phase Gaps & Next Steps": true,
+        "Cross-Cutting": true,
+        "Immediate Next Steps (2\u20133 weeks)": true,
+        "Milestones": true
+      }
+    },
+    {
+      "name": "Explainable Regulatory LLMs_ Current Landscape and Strategic Roadmap.docx",
+      "path": "C:\\Users\\cfrydenlund\\AI reporting\\AI apps\\EAR AI\\earCrawler\\earCrawler\\Research\\Explainable Regulatory LLMs_ Current Landscape and Strategic Roadmap.docx",
+      "size": 36895,
+      "modified": "2025-11-07T12:46:21.040620",
+      "headings": [
+        "Explainable Regulatory LLMs: Current Landscape and Strategic Roadmap",
+        "Ongoing Relevance of Explainable Regulatory LLMs",
+        "Current Research Trends and Shifts in the Landscape",
+        "Domain-Specific LLMs for Legal/Regulatory QA",
+        "Retrieval-Augmented Generation with Knowledge Graphs",
+        "Explainability Expectations and Trustworthy AI",
+        "Gaps and Challenges (Opportunities & Pitfalls)",
+        "Updated Research Focus and Questions",
+        "Publication Plan: Target Venues and Rationale",
+        "Revised Work Plan Through Q4 2026"
+      ],
+      "has_sections": {
+        "Current Alignment": false,
+        "Phase-by-Phase Gaps & Next Steps": false,
+        "Cross-Cutting": false,
+        "Immediate Next Steps (2\u20133 weeks)": false,
+        "Milestones": false
+      }
+    },
+    {
+      "name": "Outlines_ISWC_SemWebJ.docx",
+      "path": "C:\\Users\\cfrydenlund\\AI reporting\\AI apps\\EAR AI\\earCrawler\\earCrawler\\Research\\Outlines_ISWC_SemWebJ.docx",
+      "size": 37217,
+      "modified": "2025-11-07T13:59:23.127666",
+      "headings": [
+        "ISWC / Semantic Web Journal Outlines"
+      ],
+      "has_sections": {
+        "Current Alignment": false,
+        "Phase-by-Phase Gaps & Next Steps": false,
+        "Cross-Cutting": false,
+        "Immediate Next Steps (2\u20133 weeks)": false,
+        "Milestones": false
+      }
+    },
+    {
+      "name": "Outlines_KDD_WWW_ACL_Industry.docx",
+      "path": "C:\\Users\\cfrydenlund\\AI reporting\\AI apps\\EAR AI\\earCrawler\\earCrawler\\Research\\Outlines_KDD_WWW_ACL_Industry.docx",
+      "size": 37265,
+      "modified": "2025-11-07T13:59:23.157369",
+      "headings": [
+        "KDD / WWW / ACL Industry Outlines"
+      ],
+      "has_sections": {
+        "Current Alignment": false,
+        "Phase-by-Phase Gaps & Next Steps": false,
+        "Cross-Cutting": false,
+        "Immediate Next Steps (2\u20133 weeks)": false,
+        "Milestones": false
+      }
+    },
+    {
+      "name": "Research_Focus_Summary.docx",
+      "path": "C:\\Users\\cfrydenlund\\AI reporting\\AI apps\\EAR AI\\earCrawler\\earCrawler\\Research\\Research_Focus_Summary.docx",
+      "size": 40596,
+      "modified": "2025-11-07T15:21:58.831795",
+      "headings": [
+        "Research Focus Summary",
+        "Working JSON Outline",
+        "Variant Paths (JSON)",
+        "Related Documents"
+      ],
+      "has_sections": {
+        "Current Alignment": false,
+        "Phase-by-Phase Gaps & Next Steps": false,
+        "Cross-Cutting": false,
+        "Immediate Next Steps (2\u20133 weeks)": false,
+        "Milestones": false
+      }
+    },
+    {
+      "name": "Research_Manuscript_Outlines.docx",
+      "path": "C:\\Users\\cfrydenlund\\AI reporting\\AI apps\\EAR AI\\earCrawler\\earCrawler\\Research\\Research_Manuscript_Outlines.docx",
+      "size": 38222,
+      "modified": "2025-11-07T14:05:20.192282",
+      "headings": [
+        "Manuscript-Oriented Research Outlines",
+        "Variant Working Plans (JSON)",
+        "Prompt Scaffold (JSON)",
+        "Related Documents"
+      ],
+      "has_sections": {
+        "Current Alignment": false,
+        "Phase-by-Phase Gaps & Next Steps": false,
+        "Cross-Cutting": false,
+        "Immediate Next Steps (2\u20133 weeks)": false,
+        "Milestones": false
+      }
+    },
+    {
+      "name": "Research_Path_Variants_By_Risk_Resourcing.docx",
+      "path": "C:\\Users\\cfrydenlund\\AI reporting\\AI apps\\EAR AI\\earCrawler\\earCrawler\\Research\\Research_Path_Variants_By_Risk_Resourcing.docx",
+      "size": 38048,
+      "modified": "2025-11-07T13:59:23.099664",
+      "headings": [
+        "Path Variants by Risk/Resourcing"
+      ],
+      "has_sections": {
+        "Current Alignment": false,
+        "Phase-by-Phase Gaps & Next Steps": false,
+        "Cross-Cutting": false,
+        "Immediate Next Steps (2\u20133 weeks)": false,
+        "Milestones": false
+      }
+    }
+  ]
+}
