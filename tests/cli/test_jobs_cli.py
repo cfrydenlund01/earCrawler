@@ -22,10 +22,19 @@ def test_jobs_run_tradegov(monkeypatch, tmp_path: Path):
             self.stdout = ""
             self.stderr = ""
 
-    monkeypatch.setattr("earCrawler.cli.jobs._run_cli", lambda args, quiet: DummyCompleted())
+    commands: list[list[str]] = []
+
+    def _capture(args: list[str], quiet: bool):
+        commands.append(args)
+        return DummyCompleted()
+
+    monkeypatch.setattr("earCrawler.cli.jobs._run_cli", _capture)
 
     runner = CliRunner()
     result = runner.invoke(jobs, ["run", "tradegov", "--dry-run", "--quiet"])
     assert result.exit_code == 0
     summaries = list(run_dir.glob("*.json"))
     assert summaries, "summary file should be created"
+    assert commands, "corpus commands should run even during dry-run"
+    assert commands[0][:2] == ["corpus", "build"]
+    assert commands[1][:2] == ["corpus", "validate"]
