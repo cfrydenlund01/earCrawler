@@ -3,9 +3,7 @@ import json
 import time
 from pathlib import Path
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import PeftModel
+from earCrawler.utils.import_guard import import_optional
 
 
 def parse_args() -> argparse.Namespace:
@@ -31,10 +29,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_model(model_path: str):
-    tokenizer = AutoTokenizer.from_pretrained(model_path)
-    model = AutoModelForCausalLM.from_pretrained(model_path, device_map="auto")
+    transformers = import_optional("transformers", ["transformers"])
+    peft = import_optional("peft", ["peft"])
+
+    tokenizer = transformers.AutoTokenizer.from_pretrained(model_path)
+    model = transformers.AutoModelForCausalLM.from_pretrained(
+        model_path, device_map="auto"
+    )
     try:
-        model = PeftModel.from_pretrained(model, model_path)
+        model = peft.PeftModel.from_pretrained(model, model_path)
     except Exception:
         pass
     model.eval()
@@ -42,6 +45,7 @@ def load_model(model_path: str):
 
 
 def evaluate(model, tokenizer, data):
+    torch = import_optional("torch", ["torch"])
     device = next(model.parameters()).device
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()

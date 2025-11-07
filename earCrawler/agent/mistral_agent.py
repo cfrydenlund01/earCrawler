@@ -6,17 +6,22 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional, TYPE_CHECKING
 
-import bitsandbytes as bnb  # type: ignore
+from earCrawler.utils.import_guard import import_optional
 
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    BitsAndBytesConfig,
-    Trainer,
-    TrainingArguments,
-)
-from datasets import Dataset
-from peft import LoraConfig, get_peft_model
+Dataset = None  # type: ignore[assignment]
+TrainingArguments = None  # type: ignore[assignment]
+Trainer = None  # type: ignore[assignment]
+
+if TYPE_CHECKING:  # pragma: no cover - hints only
+    from datasets import Dataset as HFDataset
+    from transformers import (
+        AutoModelForCausalLM,
+        AutoTokenizer,
+        BitsAndBytesConfig,
+        Trainer,
+        TrainingArguments,
+    )
+    from peft import LoraConfig, get_peft_model
 
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checkers only
@@ -40,22 +45,26 @@ def load_mistral_with_lora(
     use_4bit:
         Whether to enable 4-bit quantization via ``bnb.QuantLinear``.
     """
+    transformers = import_optional("transformers", ["transformers"])
+    peft = import_optional("peft", ["peft"])
+
     quant_config = None
     if use_4bit:
-        quant_config = BitsAndBytesConfig(
+        import_optional("bitsandbytes", ["bitsandbytes"])
+        quant_config = transformers.BitsAndBytesConfig(
             load_in_4bit=True,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
         )
 
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(
+    tokenizer = transformers.AutoTokenizer.from_pretrained(model_name)
+    model = transformers.AutoModelForCausalLM.from_pretrained(
         model_name,
         quantization_config=quant_config,
         device_map="auto" if use_4bit else None,
     )
 
-    lora_config = LoraConfig(
+    lora_config = peft.LoraConfig(
         r=8,
         lora_alpha=16,
         target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
@@ -63,7 +72,7 @@ def load_mistral_with_lora(
         bias="none",
         task_type="CAUSAL_LM",
     )
-    model = get_peft_model(model, lora_config)
+    model = peft.get_peft_model(model, lora_config)
     return tokenizer, model
 
 
@@ -71,12 +80,26 @@ def train_qlora_adapter(
     model_name: str = DEFAULT_MODEL,
     output_dir: Path = ADAPTER_DIR,
     use_4bit: bool = True,
-    trainer_cls=Trainer,
+    trainer_cls=None,
 ) -> None:
     """Fine-tune the adapter weights using a small EAR dataset."""
+    transformers = import_optional("transformers", ["transformers"])
+
+    global Trainer
+    if Trainer is None:
+        Trainer = transformers.Trainer
+    trainer_cls = trainer_cls or Trainer
+
+    global TrainingArguments
+    if TrainingArguments is None:
+        TrainingArguments = transformers.TrainingArguments
     tokenizer, model = load_mistral_with_lora(model_name, use_4bit=use_4bit)
 
-    data = Dataset.from_dict(
+    global Dataset
+    if Dataset is None:
+        datasets = import_optional("datasets", ["datasets"])
+        Dataset = datasets.Dataset
+    data = Dataset.from_dict(  # type: ignore[union-attr]
         {
             "prompt": [
                 "What does EAR regulate?",

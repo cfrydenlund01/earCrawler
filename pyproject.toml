@@ -16,6 +16,18 @@ dependencies = [
   "PyYAML>=6.0",
 ]
 
+[project.optional-dependencies]
+gpu = [
+  "accelerate>=0.32.0",
+  "bitsandbytes==0.43.1; sys_platform != \"win32\"",
+  "datasets==2.20.0",
+  "faiss-cpu==1.8.0; sys_platform != \"win32\"",
+  "peft==0.11.1",
+  "sentence-transformers==2.2.2",
+  "torch==2.3.0",
+  "transformers==4.39.3",
+]
+
 [project.scripts]
 earctl = "earCrawler.cli:main"
 kg-validate = "cli.kg_validate:main"
@@ -25,7 +37,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 include = ["earCrawler*", "api_clients*", "perf*", "cli*"]
-namespaces = false
+namespaces = true
 
 [tool.setuptools.package-data]
 "earCrawler.kg" = ["shapes.ttl"]

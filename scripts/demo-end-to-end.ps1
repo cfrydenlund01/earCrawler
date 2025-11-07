@@ -1,11 +1,19 @@
 param(
-    [string]$Python = "py",
+    [string]$Python = "python",
     [string]$OutRoot = "demo",
     [switch]$Clean
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if (-not (Get-Command $Python -ErrorAction SilentlyContinue)) {
+    if ($Python -eq "python" -and (Get-Command "py" -ErrorAction SilentlyContinue)) {
+        $Python = "py"
+    } else {
+        throw "Python executable '$Python' not found on PATH."
+    }
+}
 
 function Invoke-Step {
     param(

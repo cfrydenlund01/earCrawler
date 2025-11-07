@@ -9,7 +9,9 @@ sys.path.insert(0, str(root))
 import importlib  # noqa: E402
 import pickle  # noqa: E402
 from types import SimpleNamespace  # noqa: E402
-import numpy as np  # noqa: E402
+import pytest  # noqa: E402
+
+np = pytest.importorskip("numpy")  # noqa: E402
 
 
 class DummyModel:

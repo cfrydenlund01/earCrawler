@@ -11,9 +11,10 @@ import time
 from pathlib import Path
 from typing import List
 
-import faiss
-import numpy as np
-from sentence_transformers import SentenceTransformer
+from earCrawler.utils.import_guard import import_optional
+
+SentenceTransformer = None  # type: ignore[assignment]
+faiss = None  # type: ignore[assignment]
 
 from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
@@ -48,10 +49,21 @@ class Retriever:
     ) -> None:
         self.tradegov_client = tradegov_client
         self.fedreg_client = fedreg_client
-        self.model = SentenceTransformer(model_name)
+        global SentenceTransformer
+        if SentenceTransformer is None:
+            sentence_transformers = import_optional(
+                "sentence_transformers", ["sentence-transformers"]
+            )
+            SentenceTransformer = sentence_transformers.SentenceTransformer
+        self.model = SentenceTransformer(model_name)  # type: ignore[misc]
         self.index_path = Path(index_path)
         self.meta_path = self.index_path.with_suffix(".pkl")
         self.logger = logging.getLogger(__name__)
+        global faiss
+        if faiss is None:
+            faiss = import_optional("faiss", ["faiss-cpu"])
+        self._faiss = faiss
+        self._np = import_optional("numpy", ["numpy"])
 
     # ------------------------------------------------------------------
     def _retry(self, func, *args, **kwargs):
@@ -91,7 +103,8 @@ class Retriever:
                 raise
 
     # ------------------------------------------------------------------
-    def _load_index(self, dim: int) -> faiss.IndexIDMap:
+    def _load_index(self, dim: int):
+        faiss = self._faiss
         if self.index_path.exists():
             index = faiss.read_index(str(self.index_path))
             if not isinstance(index, faiss.IndexIDMap):  # pragma: no cover
@@ -110,9 +123,10 @@ class Retriever:
     # ------------------------------------------------------------------
     def _save_index(
         self,
-        index: faiss.IndexIDMap,
+        index,
         metadata: List[dict],
     ) -> None:
+        faiss = self._faiss
         faiss.write_index(index, str(self.index_path))
         with self.meta_path.open("wb") as fh:
             pickle.dump(metadata, fh)
@@ -142,6 +156,7 @@ class Retriever:
             )
             texts.append(str(text))
 
+        np = self._np
         vectors = self._retry(
             self.model.encode,
             texts,
@@ -166,6 +181,7 @@ class Retriever:
         if not self.index_path.exists():
             self.logger.warning("Index file %s not found", self.index_path)
             return []
+        np = self._np
         embedding = self._retry(
             self.model.encode,
             [prompt],

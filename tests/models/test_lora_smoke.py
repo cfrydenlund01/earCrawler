@@ -5,9 +5,17 @@ from pathlib import Path
 import importlib
 import sys
 import types
-import torch
-from transformers import BertConfig, BertForSequenceClassification
-from peft import LoraConfig, PeftModel, get_peft_model
+import pytest
+
+torch = pytest.importorskip("torch")
+transformers = pytest.importorskip("transformers")
+peft = pytest.importorskip("peft")
+
+BertConfig = transformers.BertConfig
+BertForSequenceClassification = transformers.BertForSequenceClassification
+LoraConfig = peft.LoraConfig
+PeftModel = peft.PeftModel
+get_peft_model = peft.get_peft_model
 
 
 def test_classification_adapter_forward(tmp_path, monkeypatch) -> None:
