@@ -91,6 +91,20 @@ python -m earCrawler.cli crawl --sources ear nsf
 
 Only the Trade.gov API key is required; the Federal Register API is public.
 
+## Corpus Pipeline
+Use the Windows `py` launcher so paths resolve correctly on PowerShell:
+
+1. Build deterministically from fixtures (no network):  
+   `py -m earCrawler.cli corpus build -s ear -s nsf --out data --fixtures tests/fixtures`
+2. Validate provenance fields before emitting downstream files:  
+   `py -m earCrawler.cli corpus validate --dir data`
+3. Snapshot artifacts for operators or CI logs:  
+   `py -m earCrawler.cli corpus snapshot --dir data --out dist/corpus`
+
+- Use `--live` during scheduled jobs to hit production sources; fixture runs keep CI deterministic.
+- Outputs land under `data\*_corpus.jsonl`, `data\manifest.json`, and `data\checksums.sha256` and are stable across reruns with the same inputs.
+- These commands require the `operator` (or `maintainer`) role defined in `security\policy.yml`; set `EARCTL_USER=test_operator` during local testing if needed.
+
 ## Reporting
 Generate analytics over stored corpora:
 
