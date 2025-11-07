@@ -1,0 +1,39 @@
+Base Header
+- You are a senior coding agent working in this repo at the current working directory.
+- Keep changes minimal, deterministic, and Windows-first.
+- Reuse existing CLI/API/file contracts; do not break public interfaces.
+- Validate via tests and local commands; avoid network in tests.
+- Acceptance: all existing tests pass + new tests pass + commands run.
+
+Goal
+- Dry-run release scripts; verify signed wheel/EXE/installer and SBOM generation.
+
+Scope
+- Build wheel/EXE/installer with existing scripts
+- Generate checksums and SBOM; verify signatures
+- Update RUNBOOK, ensure Windows-first instructions
+
+Key files
+- RUNBOOK.md:1
+- installer/earcrawler.iss:1
+- bundle/static/SBOM.cdx.json:1
+
+Deliverables
+- Built artifacts (local) + verification logs
+- Updated runbook as needed
+
+Acceptance criteria
+- Signatures verify locally
+- Checksums/SBOM generated and match
+
+Validation commands
+- `pwsh scripts/build-wheel.ps1`
+- `pwsh scripts/build-exe.ps1`
+- `pwsh scripts/make-installer.ps1`
+- `pwsh scripts/sign-artifacts.ps1`
+- `pwsh scripts/checksums.ps1`
+- `pwsh scripts/sbom.ps1`
+
+Non-goals
+- CI release
+- Publishing

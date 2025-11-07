@@ -1,0 +1,205 @@
+{
+  "sections": {
+    "EAR_AI_Training_Proposal_redlined.docx": {
+      "Current Alignment": [
+        "Phase A \u2014 Corpus Curation: loaders, transforms, analytics; deterministic fixtures present.",
+        "Phase B \u2014 Knowledge Graph: ontology, SHACL, emit/load, Fuseki/Jena bootstrap, integrity gates, CI.",
+        "Phase C \u2014 LLM Fine-Tuning: QLoRA scaffolding, sample datasets; config plumbing exists.",
+        "Phase D \u2014 RAG Integration: retriever + agent modules; FastAPI facade + OpenAPI.",
+        "Phase E \u2014 Evaluation: seeded harness and perf tests; needs task/metric expansion.",
+        "Phase F \u2014 Explainability & Release: packaging, installer, SBOM, telemetry, RBAC, audit in place."
+      ],
+      "Phase-by-Phase Gaps & Next Steps": [
+        "Phase A: finalize canonicalization/merge; provenance + redaction enforcement; snapshotting + jobs.",
+        "Phase B: freeze v1 ontology/shapes; export profile verification; SPARQL perf budgets in CI.",
+        "Phase C: dataset builders; experiment tracking/configs; model card + compliance checks; HPC templates.",
+        "Phase D: unified retrieval + ranking; caching + tracing; agent tool-use for SPARQL.",
+        "Phase E: define tasks/metrics and regression gates; dashboards; red-team and compliance tests.",
+        "Phase F: explainability surfaces in API; signed artifacts; SDK + docs; Windows service ops."
+      ],
+      "Cross-Cutting": [
+        "Security/RBAC/Audit: extend to RAG and model endpoints; deny-by-default.",
+        "Observability: canaries + metrics for SPARQL latency, job lag, API availability.",
+        "Privacy: enforce redaction across corpus, logs, telemetry, datasets."
+      ],
+      "Immediate Next Steps (2\u20133 weeks)": [
+        "Lock Phase B baseline: freeze ontology/shapes; export profile hashes; SPARQL perf warmers.",
+        "Phase A hardening: dedupe/merge + snapshots + operator run summaries.",
+        "API + RAG touchpoint: align OpenAPI, add basic RAG endpoint stub with traces.",
+        "Packaging & Ops: dry-run release scripts; signed artifacts + SBOM."
+      ],
+      "Milestones": [
+        "M1: Windows-first end-to-end demo with CI gates.",
+        "M2: Complete Phase B with export verification + API docs/SDK.",
+        "M3: Phase C bootstrap with dataset builders and baselines.",
+        "M4: Phase D/E with unified retrieval and continuous evaluation.",
+        "M5: Phase F release with explainability and signed packages."
+      ]
+    },
+    "Research_Focus_Summary.docx": {
+      "Research Focus Summary": [
+        "Extracted Key Themes from attached document:",
+        "Explainable Regulatory LLMs: Current Landscape and Strategic Roadmap",
+        "Ongoing Relevance of Explainable Regulatory LLMs",
+        "Current Research Trends and Shifts in the Landscape",
+        "Domain-Specific LLMs for Legal/Regulatory QA",
+        "Retrieval-Augmented Generation with Knowledge Graphs",
+        "Explainability Expectations and Trustworthy AI",
+        "Gaps and Challenges (Opportunities & Pitfalls)",
+        "Updated Research Focus and Questions",
+        "Publication Plan: Target Venues and Rationale",
+        "Revised Work Plan Through Q4 2026"
+      ],
+      "Working JSON Outline": [],
+      "Variant Paths (JSON)": [
+        "{\n  \"variants\": [\n    {\n      \"title\": \"Hybrid RAG with KG Grounding\",\n      \"hypotheses\": [\n        \"Hybrid retrieval with entity filters improves precision\",\n        \"Attribution to KG paths reduces hallucination\"\n      ],\n      \"methods\": {\n        \"retrieval\": \"BM25 + dense (E5-legal) with RRF\",\n        \"grounding\": \"SPARQL templates for lineage and citations\",\n        \"generation\": \"Mistral 7B QLoRA with chain-of-thought (regulated)\"\n      },\n      \"datasets\": [\n        \"EAR corpus\",\n        \"NSF cases\",\n        \"synthetic Q/A pairs\"\n      ],\n      \"evaluation\": {\n        \"metrics\": [\n          \"hit@k\",\n          \"nDCG@k\",\n          \"Exact match\",\n          \"BLEU/ROUGE\",\n          \"Attribution score\"\n        ],\n        \"latency\": {\n          \"p95_ms\": 1500\n        }\n      },\n      \"risk_mitigations\": [\n        \"privacy redaction\",\n        \"denylist filters\",\n        \"rate limits\"\n      ],\n      \"gpt5_prompts\": [\n        \"Implement indexer pipeline and hybrid retrieval with deterministic tests.\",\n        \"Add SPARQL grounding step emitting source+path metadata in responses.\"\n      ]\n    },\n    {\n      \"title\": \"Reasoning over KG with Lightweight Generators\",\n      \"hypotheses\": [\n        \"OWL Mini inference enables fewer tokens for QA\"\n      ],\n      \"methods\": {\n        \"reasoning\": \"Fuseki OWL Mini endpoint for ASK/CONSTRUCT\",\n        \"generator\": \"Small T5/LED summarizer for finalization\"\n      },\n      \"evaluation\": {\n        \"metrics\": [\n          \"accuracy\",\n          \"token cost\",\n          \"latency\"\n        ]\n      },\n      \"gpt5_prompts\": [\n        \"Wire inference service and test ASK queries\",\n        \"Compose answers from CONSTRUCT graphs\"\n      ]\n    },\n    {\n      \"title\": \"Instruction-Tuned Legal QA\",\n      \"hypotheses\": [\n        \"Domain instruction data reduces errors\"\n      ],\n      \"methods\": {\n        \"finetune\": \"QLoRA on Mistral/Llama\",\n        \"safety\": \"policy-aware decoding\"\n      },\n      \"datasets\": [\n        \"curated Q/A from EAR/NSF\"\n      ],\n      \"gpt5_prompts\": [\n        \"Dataset builder with redaction/licensing checks\",\n        \"Trainer config + smoke eval\"\n      ]\n    }\n  ]\n}"
+      ],
+      "Related Documents": [
+        "ISWC / Semantic Web Journal Outlines \u2014 Ontology/SHACL, SPARQL lineage, KG quality metrics",
+        "KDD / WWW / ACL Industry Outlines \u2014 Hybrid RAG, SPARQL tool-use, SLOs/latency and ablations",
+        "Path Variants by Risk/Resourcing \u2014 Low/Moderate/High tiers, DAL flag, timelines, prompts",
+        "Research Focus Summary \u2014 Themes + working JSON outline and variant paths",
+        "Proposal (Redlined, Updated) \u2014 Current Alignment, Gaps & Next Steps, Cross-Cutting, Immediate Steps, Milestones",
+        "Strategic Roadmap \u2014 Background landscape and strategy statements",
+        "{\n  \"working_json_outline\": {\n    \"objectives\": [\n      \"KG-anchored, explainable regulatory QA with explicit policy-graph reasoning\",\n      \"Reproducible eval with groundedness-first metrics and evaluator failure-mode checks\"\n    ],\n    \"models\": {\n      \"training_strategy\": {\n        \"instruction_tuning\": \"QLoRA or full-finetune on regulatory corpora with provenance\",\n        \"alignment\": \"DPO/RLAIF with citation-first prompts\",\n        \"long_context\": \"routing to long-context reader for statutes and guidance\"\n      },\n      \"candidates\": {\n        \"general_llm_baselines\": [\n          \"Llama-3.1 Instruct (8B/70B) \\u2014 baseline\",\n          \"Mistral Large class \\u2014 baseline\",\n          \"Claude-class or GPT-class API models \\u2014 yardstick only\"\n        ],\n        \"legal_domain_baselines\": [\n          \"Org-tuned Llama-3.1 legal variant (fine-tuned on legal/regulatory corpora)\",\n          \"Legal-BERT family encoders for retrieval and classification\",\n          \"LED/Longformer-family encoder-decoder for long-document summarization/reranking\"\n        ],\n        \"selection_criteria\": [\n          \"Groundedness under citation constraints\",\n          \"Latency and cost per compliant answer\",\n          \"Explanation fidelity vs KG evidence\"\n        ]\n      }\n    },\n    \"kg_construction\": {\n      \"ontology\": \"EAR ontology with extensions for policy logic\",\n      \"policy_graph\": {\n        \"node_types\": [\n          \"Definition\",\n          \"Entity\",\n          \"Obligation\",\n          \"Prohibition\",\n          \"Permission\",\n          \"Exception\",\n          \"ConditionPrerequisite\",\n          \"ProcedureStep\",\n          \"EffectiveDate\",\n          \"CrossReference\"\n        ],\n        \"edge_types\": [\n          \"applies_to(Entity)\",\n          \"defined_in(Definition \\u2192 Term)\",\n          \"requires(Obligation/ProcedureStep \\u2192 ConditionPrerequisite)\",\n          \"excepts(Obligation/Prohibition \\u2192 Exception)\",\n          \"permits(Permission \\u2192 Action)\",\n          \"supersedes(\\u00a7 \\u2192 \\u00a7)\",\n          \"effective_on(\\u00a7 \\u2192 EffectiveDate)\",\n          \"refers_to(\\u00a7 \\u2192 CrossReference)\"\n        ],\n        \"constraints\": {\n          \"shacl\": [\n            \"Every Obligation must have at least one applies_to(Entity)\",\n            \"Every Exception must point to at least one target rule\",\n            \"Every ConditionPrerequisite must be boolean-evaluable\"\n          ],\n          \"temporal\": \"Queries resolved against applicable EffectiveDate windows\"\n        },\n        \"reasoning_templates\": [\n          \"obligation_check(Entity, Context): walk requires \\u2192 excepts \\u2192 effective_on\",\n          \"permission_with_exception(Entity, Action): permits minus applicable excepts\",\n          \"multi_step_compliance(Entity, Procedure): topological order over ProcedureStep.requires\"\n        ],\n        \"evidence_provenance\": \"Each triple links to regulation span IDs and document hashes\"\n      }\n    },\n    \"retrieval_and_reasoning\": {\n      \"hybrid_retrieval\": [\n        \"BM25 + dense encoders\",\n        \"GraphRAG subgraph expansion from policy_graph\",\n        \"SPARQL templates for obligation/exception chains\"\n      ],\n      \"answering\": {\n        \"constraint_checking\": \"Validate draft answers against KG constraints before emit\",\n        \"explanation_payload\": [\n          \"cited_text_spans\",\n          \"kg_paths_traced\",\n          \"applicability_window\",\n          \"exceptions_considered\"\n        ]\n      }\n    },\n    \"evaluation_and_explainability\": {\n      \"benchmarks\": {\n        \"task_sets\": [\n          \"Obligation/exception resolution\",\n          \"Applicability and effective date checks\",\n          \"Multi-step compliance procedures\",\n          \"Unanswerable/insufficient-evidence detection\"\n        ],\n        \"groundedness_metrics\": [\n          \"Citation Precision/Recall (span-level)\",\n          \"Evidence F1 (document+span)\",\n          \"Attribution Support Score (does evidence entail the claim)\",\n          \"KG-Constraint Consistency Rate\",\n          \"Faithfulness Score (statement-to-evidence)\",\n          \"Answerability Accuracy (reject when evidence absent)\"\n        ],\n        \"quality_metrics\": [\n          \"Exact/Soft match on final decision\",\n          \"Step consistency for multi-step proofs\",\n          \"Latency and cost per answer\"\n        ],\n        \"evaluator_failure_modes\": [\n          \"Ambiguity sensitivity: performance with intentionally ambiguous prompts\",\n          \"Version drift: performance when statutes differ by date\",\n          \"Adversarial citations: model penalized if citing irrelevant spans\",\n          \"Evaluator leakage checks: holdout splits by section/version\",\n          \"Rater variance audits: inter-rater agreement and bias checks\"\n        ]\n      },\n      \"reporting\": {\n        \"per_answer_artifacts\": [\n          \"ranked_evidence_spans\",\n          \"kg_path_visualization_ref\",\n          \"validation_results(shacl, temporal)\",\n          \"decision_trace with step rationales\"\n        ],\n        \"run_artifacts\": [\n          \"model_card with training data provenance\",\n          \"eval_manifest with seeds and corpora hashes\",\n          \"audit_log of prompts, versions, and config\"\n        ]\n      }\n    },\n    \"acceptance_criteria\": [\n      \"Groundedness: Evidence F1 \\u2265 target and KG-Consistency \\u2265 target on holdout\",\n      \"Citation precision \\u2265 target with zero known bad citations on red-team set\",\n      \"Evaluator failure-mode suites pass thresholds\",\n      \"Per-answer artifacts include citations and KG paths\",\n      \"Temporal validity checks enforced for effective dates\"\n    ]\n  }\n}"
+      ]
+    }
+  },
+  "working_json_outline": {
+    "objectives": [
+      "KG-anchored, explainable regulatory QA with explicit policy-graph reasoning",
+      "Reproducible eval with groundedness-first metrics and evaluator failure-mode checks"
+    ],
+    "models": {
+      "training_strategy": {
+        "instruction_tuning": "QLoRA or full-finetune on regulatory corpora with provenance",
+        "alignment": "DPO/RLAIF with citation-first prompts",
+        "long_context": "routing to long-context reader for statutes and guidance"
+      },
+      "candidates": {
+        "general_llm_baselines": [
+          "Llama-3.1 Instruct (8B/70B) \u2014 baseline",
+          "Mistral Large class \u2014 baseline",
+          "Claude-class or GPT-class API models \u2014 yardstick only"
+        ],
+        "legal_domain_baselines": [
+          "Org-tuned Llama-3.1 legal variant (fine-tuned on legal/regulatory corpora)",
+          "Legal-BERT family encoders for retrieval and classification",
+          "LED/Longformer-family encoder-decoder for long-document summarization/reranking"
+        ],
+        "selection_criteria": [
+          "Groundedness under citation constraints",
+          "Latency and cost per compliant answer",
+          "Explanation fidelity vs KG evidence"
+        ]
+      }
+    },
+    "kg_construction": {
+      "ontology": "EAR ontology with extensions for policy logic",
+      "policy_graph": {
+        "node_types": [
+          "Definition",
+          "Entity",
+          "Obligation",
+          "Prohibition",
+          "Permission",
+          "Exception",
+          "ConditionPrerequisite",
+          "ProcedureStep",
+          "EffectiveDate",
+          "CrossReference"
+        ],
+        "edge_types": [
+          "applies_to(Entity)",
+          "defined_in(Definition \u2192 Term)",
+          "requires(Obligation/ProcedureStep \u2192 ConditionPrerequisite)",
+          "excepts(Obligation/Prohibition \u2192 Exception)",
+          "permits(Permission \u2192 Action)",
+          "supersedes(\u00a7 \u2192 \u00a7)",
+          "effective_on(\u00a7 \u2192 EffectiveDate)",
+          "refers_to(\u00a7 \u2192 CrossReference)"
+        ],
+        "constraints": {
+          "shacl": [
+            "Every Obligation must have at least one applies_to(Entity)",
+            "Every Exception must point to at least one target rule",
+            "Every ConditionPrerequisite must be boolean-evaluable"
+          ],
+          "temporal": "Queries resolved against applicable EffectiveDate windows"
+        },
+        "reasoning_templates": [
+          "obligation_check(Entity, Context): walk requires \u2192 excepts \u2192 effective_on",
+          "permission_with_exception(Entity, Action): permits minus applicable excepts",
+          "multi_step_compliance(Entity, Procedure): topological order over ProcedureStep.requires"
+        ],
+        "evidence_provenance": "Each triple links to regulation span IDs and document hashes"
+      }
+    },
+    "retrieval_and_reasoning": {
+      "hybrid_retrieval": [
+        "BM25 + dense encoders",
+        "GraphRAG subgraph expansion from policy_graph",
+        "SPARQL templates for obligation/exception chains"
+      ],
+      "answering": {
+        "constraint_checking": "Validate draft answers against KG constraints before emit",
+        "explanation_payload": [
+          "cited_text_spans",
+          "kg_paths_traced",
+          "applicability_window",
+          "exceptions_considered"
+        ]
+      }
+    },
+    "evaluation_and_explainability": {
+      "benchmarks": {
+        "task_sets": [
+          "Obligation/exception resolution",
+          "Applicability and effective date checks",
+          "Multi-step compliance procedures",
+          "Unanswerable/insufficient-evidence detection"
+        ],
+        "groundedness_metrics": [
+          "Citation Precision/Recall (span-level)",
+          "Evidence F1 (document+span)",
+          "Attribution Support Score (does evidence entail the claim)",
+          "KG-Constraint Consistency Rate",
+          "Faithfulness Score (statement-to-evidence)",
+          "Answerability Accuracy (reject when evidence absent)"
+        ],
+        "quality_metrics": [
+          "Exact/Soft match on final decision",
+          "Step consistency for multi-step proofs",
+          "Latency and cost per answer"
+        ],
+        "evaluator_failure_modes": [
+          "Ambiguity sensitivity: performance with intentionally ambiguous prompts",
+          "Version drift: performance when statutes differ by date",
+          "Adversarial citations: model penalized if citing irrelevant spans",
+          "Evaluator leakage checks: holdout splits by section/version",
+          "Rater variance audits: inter-rater agreement and bias checks"
+        ]
+      },
+      "reporting": {
+        "per_answer_artifacts": [
+          "ranked_evidence_spans",
+          "kg_path_visualization_ref",
+          "validation_results(shacl, temporal)",
+          "decision_trace with step rationales"
+        ],
+        "run_artifacts": [
+          "model_card with training data provenance",
+          "eval_manifest with seeds and corpora hashes",
+          "audit_log of prompts, versions, and config"
+        ]
+      }
+    },
+    "acceptance_criteria": [
+      "Groundedness: Evidence F1 \u2265 target and KG-Consistency \u2265 target on holdout",
+      "Citation precision \u2265 target with zero known bad citations on red-team set",
+      "Evaluator failure-mode suites pass thresholds",
+      "Per-answer artifacts include citations and KG paths",
+      "Temporal validity checks enforced for effective dates"
+    ]
+  }
+}

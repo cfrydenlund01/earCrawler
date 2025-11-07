@@ -1,0 +1,43 @@
+
+Base Header
+- You are a senior coding agent working in this repo at the current working directory.
+- Keep changes minimal, deterministic, and Windows-first.
+- Reuse existing CLI/API/file contracts; do not break public interfaces.
+- Validate via tests and local commands; avoid network in tests.
+- Acceptance: all existing tests pass + new tests pass + commands run.
+
+Goal
+- Build groundedness-first evaluation suite with failure-mode audits.
+
+Scope
+- - Task sets: Obligation/exception resolution, Applicability and effective date checks, Multi-step compliance procedures, Unanswerable/insufficient-evidence detection
+- Metrics: Citation Precision/Recall (span-level), Evidence F1 (document+span), Attribution Support Score (does evidence entail the claim), KG-Constraint Consistency Rate, Faithfulness Score (statement-to-evidence), Answerability Accuracy (reject when evidence absent)
+- Quality metrics: Exact/Soft match on final decision, Step consistency for multi-step proofs, Latency and cost per answer
+- Failure modes: Ambiguity sensitivity: performance with intentionally ambiguous prompts, Version drift: performance when statutes differ by date, Adversarial citations: model penalized if citing irrelevant spans, Evaluator leakage checks: holdout splits by section/version, Rater variance audits: inter-rater agreement and bias checks
+
+Key files
+- earCrawler/rag/retriever.py:1
+- earCrawler/agent/mistral_agent.py:1
+- earCrawler/kg/ontology.py:1
+- earCrawler/kg/shapes.ttl:1
+- earCrawler/kg/shapes_prov.ttl:1
+- earCrawler/kg/validate.py:1
+- earCrawler/kg/emit_ear.py:1
+
+Deliverables
+- - eval harness
+- fixtures
+- reports
+
+Acceptance criteria
+- - Groundedness: Evidence F1 ≥ target and KG-Consistency ≥ target on holdout
+- Citation precision ≥ target with zero known bad citations on red-team set
+- Evaluator failure-mode suites pass thresholds
+- Per-answer artifacts include citations and KG paths
+- Temporal validity checks enforced for effective dates
+
+Validation commands
+- `pytest -q tests/perf tests/eval -q`
+
+Non-goals
+- - Live API eval
