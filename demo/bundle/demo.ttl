@@ -1,0 +1,4 @@
+@prefix ear: <https://example.org/ear#> .
+
+ear:reg a ear:Reg .
+
