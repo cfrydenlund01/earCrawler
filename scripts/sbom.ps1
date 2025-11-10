@@ -1,3 +1,4 @@
 param()
 if (!(Test-Path dist)) { New-Item -ItemType Directory -Path dist | Out-Null }
-pip-licenses --format=json --output-file dist/sbom.spdx.json
+& py -m pip install --quiet pip-licenses | Out-Null
+& py -m piplicenses --format json --output-file dist/sbom.spdx.json

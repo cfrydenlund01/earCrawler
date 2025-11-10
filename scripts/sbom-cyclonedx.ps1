@@ -1,8 +1,6 @@
 $repoRoot = Resolve-Path "$PSScriptRoot/.."
 $dist = Join-Path $repoRoot 'dist'
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
-if (-not (Get-Command cyclonedx-py -ErrorAction SilentlyContinue)) {
-    pip install cyclonedx-bom | Out-Null
-}
+& py -m pip install --quiet cyclonedx-bom | Out-Null
 $dest = Join-Path $dist 'sbom.cdx.json'
-cyclonedx-py -o $dest | Out-Null
+& py -m cyclonedx_py environment -o $dest | Out-Null

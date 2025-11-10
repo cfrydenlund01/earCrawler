@@ -4,8 +4,8 @@ block_cipher = None
 
 
 a = Analysis(
-    ['earCrawler/cli/__main__.py'],
-    pathex=[],
+    ['../earCrawler/cli/__main__.py'],
+    pathex=['..'],
     binaries=[],
     datas=[],
     hiddenimports=[],
@@ -32,5 +32,5 @@ exe = EXE(
     strip=False,
     upx=True,
     console=True,
-    icon='packaging/assets/app.ico',
+    icon=None,
 )
