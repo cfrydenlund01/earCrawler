@@ -25,7 +25,8 @@ class HTTPSink:
         data = "\n".join(json.dumps(e) for e in events)
         for _ in range(5):
             try:
-                requests.post(self.cfg.endpoint, data=data, timeout=5)
+                resp = requests.post(self.cfg.endpoint, data=data, timeout=5)
+                resp.raise_for_status()
                 self.backoff = 1
                 return
             except Exception:

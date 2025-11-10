@@ -25,8 +25,15 @@ def install() -> None:
     old_exit = sys.exit
     old_hook = sys.excepthook
 
-    def _exit(code: int | None = 0) -> None:
-        sys._exit_code = int(code or 0)
+    def _coerce_exit_code(value: object) -> int:
+        if isinstance(value, int):
+            return value
+        if value is None:
+            return 0
+        return 1
+
+    def _exit(code: object = 0) -> None:
+        sys._exit_code = _coerce_exit_code(code)
         old_exit(code)
 
     def _handle(exc_type, exc, tb):

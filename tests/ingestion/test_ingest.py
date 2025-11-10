@@ -39,6 +39,7 @@ def setup_ingestor(monkeypatch, tmp_path, validate_return=(True, None, ""), load
     fr.search_documents = lambda eid: [{"id": "d1"}]
 
     ing = Ingestor(tg, fr, Path(tmp_path / "tdb"))
+    monkeypatch.setenv("EAR_DISABLE_JENA_BOOTSTRAP", "1")
 
     monkeypatch.setattr(ing, "map_entity_to_triples", lambda e: Graph())
     monkeypatch.setattr(ing, "map_document_to_triples", lambda d: Graph())
