@@ -3,6 +3,14 @@ from .search import SearchResponse, SearchHit
 from .lineage import LineageResponse, LineageEdge
 from .errors import ProblemDetails
 from .sparql import SparqlProxyRequest, SparqlProxyResponse
+from .rag import (
+    RagQueryRequest,
+    RagResponse,
+    RagAnswer,
+    RagSource,
+    RagLineageReference,
+    CacheState,
+)
 
 __all__ = [
     "EntityView",
@@ -14,4 +22,10 @@ __all__ = [
     "ProblemDetails",
     "SparqlProxyRequest",
     "SparqlProxyResponse",
+    "RagQueryRequest",
+    "RagResponse",
+    "RagAnswer",
+    "RagSource",
+    "RagLineageReference",
+    "CacheState",
 ]

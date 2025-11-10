@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from . import entities, health, lineage, search, sparql
+from . import entities, health, lineage, rag, search, sparql
 
 
 def build_router() -> APIRouter:
@@ -12,4 +12,5 @@ def build_router() -> APIRouter:
     router.include_router(search.router)
     router.include_router(sparql.router)
     router.include_router(lineage.router)
+    router.include_router(rag.router)
     return router

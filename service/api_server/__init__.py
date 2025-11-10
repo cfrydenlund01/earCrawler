@@ -25,6 +25,7 @@ from .middleware import BodyLimitMiddleware, ConcurrencyLimitMiddleware, Request
 from .schemas import ProblemDetails
 from .templates import TemplateRegistry
 from .routers import build_router
+from .rag_support import RagQueryCache, load_retriever, RetrieverProtocol
 
 _DOCS_PATH = Path(__file__).resolve().parent.parent / "docs" / "index.md"
 _OPENAPI_PATH = Path(__file__).resolve().parent.parent / "openapi" / "openapi.yaml"
@@ -64,6 +65,8 @@ def create_app(
     *,
     registry: Optional[TemplateRegistry] = None,
     fuseki_client: Optional[FusekiClient] = None,
+    retriever: Optional[RetrieverProtocol] = None,
+    rag_cache: Optional[RagQueryCache] = None,
 ) -> FastAPI:
     settings = settings or ApiSettings.from_env()
     registry = registry or TemplateRegistry.load_default()
@@ -105,6 +108,8 @@ def create_app(
     app.state.rate_limiter = rate_limiter
     app.state.observability = observability
     app.state.request_logger = json_logger
+    app.state.rag_cache = rag_cache or RagQueryCache()
+    app.state.rag_retriever = retriever or load_retriever()
 
     router = build_router()
     app.include_router(router)
