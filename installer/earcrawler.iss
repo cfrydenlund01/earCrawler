@@ -9,9 +9,11 @@ AppName=EarCrawler
 AppVersion={#MyAppVersion}
 DefaultDirName={pf}\EarCrawler
 DefaultGroupName=EarCrawler
-OutputDir=dist
+OutputDir=..\dist
 OutputBaseFilename=earcrawler-setup-{#MyAppVersion}
+#ifexist "packaging\\assets\\app.ico"
 SetupIconFile=packaging\assets\app.ico
+#endif
 DisableProgramGroupPage=yes
 
 [Languages]
@@ -21,8 +23,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "addpath"; Description: "Add EarCrawler to PATH"; GroupDescription: "Additional tasks"; Flags: unchecked
 
 [Files]
-Source: "dist\earctl-{#MyAppVersion}-win64.exe"; DestDir: "{app}"; DestName: "earctl.exe"; Flags: ignoreversion
-Source: "README.md"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\dist\earctl-{#MyAppVersion}-win64.exe"; DestDir: "{app}"; DestName: "earctl.exe"; Flags: ignoreversion
+Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\EarCrawler CLI"; Filename: "{app}\earctl.exe"
