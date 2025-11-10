@@ -4,6 +4,7 @@ from fastapi import Depends, Request
 
 from ..fuseki import FusekiGateway
 from ..limits import RateLimiter, enforce_rate_limits
+from ..rag_support import RagQueryCache, RetrieverProtocol
 
 
 def get_gateway(request: Request) -> FusekiGateway:
@@ -24,3 +25,11 @@ def rate_limit(scope: str):
 
 def get_limiter(request: Request) -> RateLimiter:
     return request.app.state.rate_limiter
+
+
+def get_rag_cache(request: Request) -> RagQueryCache:
+    return request.app.state.rag_cache
+
+
+def get_retriever(request: Request) -> RetrieverProtocol:
+    return request.app.state.rag_retriever

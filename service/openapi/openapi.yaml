@@ -120,6 +120,85 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/LineageEdge'
+    RagSource:
+      type: object
+      properties:
+        id:
+          type: string
+          description: KG entity or citation identifier
+        url:
+          type: string
+          format: uri
+        label:
+          type: string
+        section:
+          type: string
+        provider:
+          type: string
+    RagLineageReference:
+      type: object
+      required: [entity_id, edges]
+      properties:
+        entity_id:
+          type: string
+          format: uri
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineageEdge'
+    RagAnswer:
+      type: object
+      required: [content, score, source]
+      properties:
+        content:
+          type: string
+        score:
+          type: number
+        source:
+          $ref: '#/components/schemas/RagSource'
+        lineage:
+          $ref: '#/components/schemas/RagLineageReference'
+    CacheState:
+      type: object
+      required: [hit]
+      properties:
+        hit:
+          type: boolean
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+    RagResponse:
+      type: object
+      required: [trace_id, latency_ms, query, cache, results]
+      properties:
+        trace_id:
+          type: string
+        latency_ms:
+          type: number
+        query:
+          type: string
+        cache:
+          $ref: '#/components/schemas/CacheState'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RagAnswer'
+    RagQueryRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          maxLength: 512
+        top_k:
+          type: integer
+          minimum: 1
+          maximum: 10
+          default: 3
+        include_lineage:
+          type: boolean
+          default: false
     SparqlProxyRequest:
       type: object
       required: [template]
@@ -270,6 +349,31 @@ paths:
                 $ref: '#/components/schemas/LineageResponse'
         '404':
           description: Lineage missing
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /v1/rag/query:
+    post:
+      summary: Retrieve cached RAG passages with lineage metadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RagQueryRequest'
+      security:
+        - ApiKey: []
+        - {}
+      responses:
+        '200':
+          description: Retrieved passages
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RagResponse'
+        '429':
+          description: Rate limit exceeded
           content:
             application/problem+json:
               schema:
