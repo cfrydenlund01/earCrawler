@@ -4,6 +4,7 @@ import os
 import yaml
 from dataclasses import dataclass, field
 from functools import wraps
+from pathlib import Path
 from typing import Callable, Iterable, List, Dict, Set, Tuple
 
 import click
@@ -13,7 +14,8 @@ import time
 from earCrawler.audit import ledger
 from earCrawler.telemetry import redaction
 
-POLICY_PATH = os.path.join("security", "policy.yml")
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+POLICY_PATH = _REPO_ROOT / "security" / "policy.yml"
 
 
 class PolicyError(Exception):
@@ -53,9 +55,14 @@ class Policy:
         return False, f"command '{command}' requires role(s): {', '.join(needed)}"
 
 
-def load_policy(path: str | None = None) -> Policy:
-    pol_path = path or os.environ.get("EARCTL_POLICY_PATH") or POLICY_PATH
-    with open(pol_path, "r", encoding="utf-8") as fh:
+def load_policy(path: str | os.PathLike | None = None) -> Policy:
+    pol_setting = path or os.environ.get("EARCTL_POLICY_PATH") or POLICY_PATH
+    pol_path = Path(pol_setting)
+    if not pol_path.is_absolute():
+        pol_path = _REPO_ROOT / pol_path
+    if not pol_path.exists():
+        raise PolicyError(f"policy file not found at {pol_path}")
+    with pol_path.open("r", encoding="utf-8") as fh:
         data = yaml.safe_load(fh) or {}
     return Policy(
         roles=data.get("roles", {}),

@@ -12,6 +12,7 @@ def test_corpus_cli_build_validate_and_snapshot(tmp_path: Path, monkeypatch) -> 
     repo_root = Path(__file__).resolve().parents[2]
     fixtures = repo_root / "tests" / "fixtures"
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARCTL_USER", "test_operator")
 
     build_result = runner.invoke(
         corpus,
@@ -36,6 +37,7 @@ def test_corpus_cli_build_validate_and_snapshot(tmp_path: Path, monkeypatch) -> 
 def test_corpus_validate_cli_fails_on_bad_data(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("EARCTL_USER", "test_operator")
     data_dir = tmp_path / "data"
     data_dir.mkdir()
     (data_dir / "ear_corpus.jsonl").write_text("{}", encoding="utf-8")

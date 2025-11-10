@@ -7,9 +7,12 @@ from pathlib import Path
 import click
 
 from earCrawler.corpus import build_corpus, validate_corpus, snapshot_corpus
+from earCrawler.security import policy
 
 
 @click.group()
+@policy.require_role("operator", "maintainer")
+@policy.enforce
 def corpus() -> None:
     """Build, validate, and snapshot curated corpora."""
 

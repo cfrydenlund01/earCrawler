@@ -91,6 +91,20 @@ python -m earCrawler.cli crawl --sources ear nsf
 
 Only the Trade.gov API key is required; the Federal Register API is public.
 
+## Corpus Pipeline
+Use the Windows `py` launcher so paths resolve correctly on PowerShell:
+
+1. Build deterministically from fixtures (no network):  
+   `py -m earCrawler.cli corpus build -s ear -s nsf --out data --fixtures tests/fixtures`
+2. Validate provenance fields before emitting downstream files:  
+   `py -m earCrawler.cli corpus validate --dir data`
+3. Snapshot artifacts for operators or CI logs:  
+   `py -m earCrawler.cli corpus snapshot --dir data --out dist/corpus`
+
+- Use `--live` during scheduled jobs to hit production sources; fixture runs keep CI deterministic.
+- Outputs land under `data\*_corpus.jsonl`, `data\manifest.json`, and `data\checksums.sha256` and are stable across reruns with the same inputs.
+- These commands require the `operator` (or `maintainer`) role defined in `security\policy.yml`; set `EARCTL_USER=test_operator` during local testing if needed.
+
 ## Reporting
 Generate analytics over stored corpora:
 
@@ -106,6 +120,14 @@ Use `--out report.json` to save the results to a file.
 Classes: `ear:Reg`, `ear:Section`, `ear:Paragraph`, `ear:Citation`, `ent:Entity`
 
 Properties: `ear:hasSection`, `ear:hasParagraph`, `ear:cites`, `dct:source`, `dct:issued`, `prov:wasDerivedFrom`
+
+### Versioning & exports
+- Schema and SHACL shapes are frozen at **v1.0.0** (`earCrawler.kg.ontology.KG_SCHEMA_VERSION`) with matching metadata embedded at the head of `earCrawler/kg/shapes.ttl` and `earCrawler/kg/shapes_prov.ttl`.
+- Deterministic export hashes for `kg/ear.ttl` live in `kg/ear_export_manifest.json`. Regenerate with `py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem ear` and update the manifest intentionally when the ontology changes.
+
+### Warmers & budgets
+- `perf/warmers/warm_queries.json` primes lookup, aggregation, and join query groups (each query carries a `# @group` comment).
+- Run `pwsh kg/scripts/cache-warm.ps1` against a Fuseki endpoint before collecting performance reports so that the budgets in `perf/config/perf_budgets.yml` see warm caches.
 
 ```
 Reg --hasSection--> Section --hasParagraph--> Paragraph

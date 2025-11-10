@@ -24,6 +24,7 @@ kg/snapshots/sample.srj
 db/
 fuseki_db/
 run/
+Research/
 *.egg-info/
 dir-tree*.txt
 EAR_AI_Training_Proposal.docx

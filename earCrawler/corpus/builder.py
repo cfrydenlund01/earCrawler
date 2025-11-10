@@ -20,11 +20,13 @@ from earCrawler.policy import load_hints
 from earCrawler.privacy import scrub_text
 from earCrawler.transforms.canonical import CanonicalRegistry
 from earCrawler.transforms.mentions import MentionExtractor
+from earCrawler.utils.log_json import JsonLogger
 
 SUPPORTED_SOURCES = ("ear", "nsf")
 DEFAULT_FIXTURES = Path("tests/fixtures")
 DEFAULT_DATE = "1970-01-01"
 EAR_QUERY = "export administration regulations"
+_logger = JsonLogger("corpus")
 
 
 @dataclass
@@ -480,13 +482,31 @@ def build_corpus(
     live: bool,
     fixtures: Path | None,
 ) -> dict:
-    builder = CorpusBuilder(Path(out_dir), live, Path(fixtures) if fixtures else None)
-    return builder.build(sources)
+    out_path = Path(out_dir)
+    fixtures_path = Path(fixtures) if fixtures else None
+    _logger.info(
+        "corpus.build.start",
+        sources=list(sources) or list(SUPPORTED_SOURCES),
+        out_dir=str(out_path),
+        live=live,
+        fixtures=str(fixtures_path) if fixtures_path else None,
+    )
+    builder = CorpusBuilder(out_path, live, fixtures_path)
+    manifest = builder.build(sources)
+    _logger.info(
+        "corpus.build.complete",
+        out_dir=str(out_path),
+        files=len(manifest.get("files", [])),
+        summary=manifest.get("summary"),
+        live=live,
+    )
+    return manifest
 
 
 def validate_corpus(data_dir: Path) -> list[str]:
     problems: list[str] = []
     data_dir = Path(data_dir)
+    _logger.info("corpus.validate.start", data_dir=str(data_dir))
     for path in sorted(data_dir.glob("*_corpus.jsonl")):
         records = _read_records(path)
         for idx, record in enumerate(records, start=1):
@@ -513,12 +533,17 @@ def validate_corpus(data_dir: Path) -> list[str]:
             identifiers = record.get("identifiers")
             if not isinstance(identifiers, list) or not identifiers:
                 problems.append(f"{path.name}:{idx} missing identifiers")
+    if problems:
+        _logger.warning("corpus.validate.failed", data_dir=str(data_dir), issues=len(problems))
+    else:
+        _logger.info("corpus.validate.ok", data_dir=str(data_dir))
     return problems
 
 
 def snapshot_corpus(data_dir: Path, out_dir: Path) -> Path:
     data_dir = Path(data_dir)
     out_dir = Path(out_dir)
+    _logger.info("corpus.snapshot.start", data_dir=str(data_dir), out_dir=str(out_dir))
     timestamp = _now().strftime("%Y%m%dT%H%M%SZ")
     target = out_dir / timestamp
     counter = 1
@@ -535,6 +560,7 @@ def snapshot_corpus(data_dir: Path, out_dir: Path) -> Path:
     for path in files:
         if path.exists():
             shutil.copy2(path, target / path.name)
+    _logger.info("corpus.snapshot.complete", target=str(target))
     return target
 
 

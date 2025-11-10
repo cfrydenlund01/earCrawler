@@ -1,5 +1,6 @@
 import argparse
 import subprocess
+import sys
 from pathlib import Path
 
 research = Path.cwd() / 'Research'
@@ -7,7 +8,7 @@ research.mkdir(exist_ok=True)
 
 def run_pytest(pytest_args: list[str]) -> int:
     try:
-        result = subprocess.run(['pytest', '-q', *pytest_args], check=False)
+        result = subprocess.run([sys.executable, '-m', 'pytest', '-q', *pytest_args], check=False)
         return result.returncode
     except FileNotFoundError:
         return 127

@@ -1,0 +1,10 @@
+PREFIX ear: <https://example.org/ear#>
+# @group: aggregation
+SELECT ?section (COUNT(?paragraph) AS ?paragraph_count)
+WHERE {
+  ?section a ear:Section ;
+           ear:hasParagraph ?paragraph .
+}
+GROUP BY ?section
+ORDER BY DESC(?paragraph_count)
+LIMIT 5
