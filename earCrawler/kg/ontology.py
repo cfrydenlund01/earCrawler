@@ -14,6 +14,9 @@ DCT = Namespace("http://purl.org/dc/terms/")
 PROV = Namespace("http://www.w3.org/ns/prov#")
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
 
+# Frozen v1 schema identifier referenced by CI manifests/tests.
+KG_SCHEMA_VERSION = "1.0.0"
+
 
 def graph_with_prefixes(*, identifier: rdflib.term.Identifier | None = None) -> Graph:
     """Return a graph pre-bound with common prefixes.
@@ -76,5 +79,6 @@ __all__ = [
     "DCT",
     "PROV",
     "XSD",
+    "KG_SCHEMA_VERSION",
 ]
 

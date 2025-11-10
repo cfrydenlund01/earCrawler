@@ -121,6 +121,14 @@ Classes: `ear:Reg`, `ear:Section`, `ear:Paragraph`, `ear:Citation`, `ent:Entity`
 
 Properties: `ear:hasSection`, `ear:hasParagraph`, `ear:cites`, `dct:source`, `dct:issued`, `prov:wasDerivedFrom`
 
+### Versioning & exports
+- Schema and SHACL shapes are frozen at **v1.0.0** (`earCrawler.kg.ontology.KG_SCHEMA_VERSION`) with matching metadata embedded at the head of `earCrawler/kg/shapes.ttl` and `earCrawler/kg/shapes_prov.ttl`.
+- Deterministic export hashes for `kg/ear.ttl` live in `kg/ear_export_manifest.json`. Regenerate with `py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem ear` and update the manifest intentionally when the ontology changes.
+
+### Warmers & budgets
+- `perf/warmers/warm_queries.json` primes lookup, aggregation, and join query groups (each query carries a `# @group` comment).
+- Run `pwsh kg/scripts/cache-warm.ps1` against a Fuseki endpoint before collecting performance reports so that the budgets in `perf/config/perf_budgets.yml` see warm caches.
+
 ```
 Reg --hasSection--> Section --hasParagraph--> Paragraph
 Paragraph --cites--> Citation

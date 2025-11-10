@@ -1,0 +1,23 @@
+{
+  "version": "1.0.0",
+  "source": "kg/ear.ttl",
+  "stem": "ear",
+  "files": {
+    "ear.nt": {
+      "sha256": "b8630f19e7de19e4324e33c3aec0ffe90ed99e6367d975f7be0b639f35fb7ec9",
+      "size": 932
+    },
+    "ear.nt.gz": {
+      "sha256": "70fa1adbc5cda8bfb508f633ab5f4d89a5fa3931563bcee201d54e3d997286d7",
+      "size": 264
+    },
+    "ear.ttl": {
+      "sha256": "2a9d12668948cb6c4ccfbbdb6645830b690c271af7728365aa3b06d4e72679a7",
+      "size": 466
+    },
+    "ear.ttl.gz": {
+      "sha256": "59f91fa5774420e46404f9753020943f42251a12e932c30eb77f72629b44481f",
+      "size": 260
+    }
+  }
+}

@@ -1,3 +1,17 @@
 [
-  {"file": "perf/queries/warm/lookup.rq", "repeat": 3}
+  {
+    "file": "perf/queries/warm/lookup.rq",
+    "group": "lookup",
+    "repeat": 3
+  },
+  {
+    "file": "perf/queries/warm/aggregation.rq",
+    "group": "aggregation",
+    "repeat": 2
+  },
+  {
+    "file": "perf/queries/warm/join.rq",
+    "group": "join",
+    "repeat": 2
+  }
 ]

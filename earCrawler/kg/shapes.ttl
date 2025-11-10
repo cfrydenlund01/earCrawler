@@ -6,8 +6,14 @@
 @prefix ent: <https://example.org/entity#> .
 @prefix dct: <http://purl.org/dc/terms/> .
 @prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
 
 # Shapes for core EAR ontology classes.
+
+ear:Schema a owl:Ontology ;
+    dct:identifier "EAR KG Schema" ;
+    owl:versionInfo "1.0.0" ;
+    dct:issued "2025-11-07"^^xsd:date .
 
 ear:RegShape a sh:NodeShape ;
     sh:targetClass ear:Reg ;
