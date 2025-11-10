@@ -10,6 +10,15 @@
 7. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
 8. Create a GitHub release and upload the wheel, EXE, installer, checksum, and SBOM files.
 
+Windows notes
+- Inno Setup (iscc.exe): install via winget if not present.
+  - `set PATH=%LOCALAPPDATA%\\Microsoft\\WindowsApps;%PATH%`
+  - `winget install --id JRSoftware.InnoSetup -e --accept-package-agreements --accept-source-agreements`
+  - If `iscc.exe` is not on PATH after install, invoke directly:
+    - `%LOCALAPPDATA%\\Programs\\Inno Setup 6\\ISCC.exe installer\\earcrawler.iss`
+- The installer script writes output to `dist\\` (configured in `installer/earcrawler.iss`).
+- `scripts/make-installer.ps1` exports `EARCRAWLER_VERSION` automatically; no manual env prep needed.
+
 ## Deploying LoRA/QLoRA Models
 1. Tag a release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
 2. GitHub Actions builds and pushes `api`, `rag`, and `agent` images to GHCR.
