@@ -75,6 +75,12 @@ class SPARQLClient:
         if resp.status_code not in (200, 204):
             raise RuntimeError(f"SPARQL UPDATE failed: {resp.status_code}")
 
+    def close(self) -> None:
+        try:
+            self.session.close()
+        except Exception:
+            pass
+
     @staticmethod
     def _derive_update_endpoint(endpoint: str) -> str:
         if endpoint.endswith("/sparql"):

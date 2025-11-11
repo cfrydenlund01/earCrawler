@@ -114,6 +114,11 @@ def create_app(
     router = build_router()
     app.include_router(router)
 
+    # Ensure any pooled async HTTP clients are closed on shutdown.
+    close_hook = getattr(fuseki_client, "aclose", None)
+    if callable(close_hook):
+        app.add_event_handler("shutdown", close_hook)
+
     @app.get("/docs", include_in_schema=False)
     async def docs() -> Response:
         body = _DOCS_PATH.read_text(encoding="utf-8")

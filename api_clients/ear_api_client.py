@@ -1,7 +1,7 @@
 """Typed client for the EarCrawler public API facade."""
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
 
 import requests
@@ -33,6 +33,7 @@ class EarCrawlerApiClient:
     timeout: float = 10.0
 
     def __post_init__(self) -> None:
+        self._owns_session: bool = self.session is None
         self._session = self.session or requests.Session()
 
     # ------------------------------------------------------------------#
@@ -61,6 +62,21 @@ class EarCrawlerApiClient:
     def get_entity(self, urn: str) -> Dict[str, Any]:
         """Fetch a single entity via ``/v1/entities/{urn}``."""
         return self._request("GET", f"/v1/entities/{urn}")
+
+    # --------------------------------------------------------------
+    # Resource lifecycle
+    def close(self) -> None:
+        try:
+            if self._owns_session:
+                self._session.close()
+        except Exception:
+            pass
+
+    def __enter__(self) -> "EarCrawlerApiClient":  # pragma: no cover - convenience
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - convenience
+        self.close()
 
 
 __all__ = ["EarCrawlerApiClient", "EarApiError"]

@@ -81,6 +81,11 @@ class LongContextPipeline:
             getattr(self.conversation_model.config, "max_position_embeddings", 0),
             32_768,
         )
+        # Ensure inference-only mode for performance and memory
+        try:
+            self.conversation_model.eval()
+        except Exception:
+            pass
 
     def _load_long_document_model(self) -> None:
         """Load the LED model used for long document summarization."""
@@ -108,6 +113,10 @@ class LongContextPipeline:
         )
         self.long_document_device = _resolve_device()
         self.long_document_model.to(self.long_document_device)
+        try:
+            self.long_document_model.eval()
+        except Exception:
+            pass
 
     def _conversation_device(self) -> "torch.device":
         """Return the device used by the conversational model."""
@@ -135,13 +144,16 @@ class LongContextPipeline:
         )
         device = self._conversation_device()
         inputs = {key: value.to(device) for key, value in inputs.items()}
-        output_ids = self.conversation_model.generate(
-            **inputs,
-            max_new_tokens=max_new_tokens,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.9,
-        )
+        torch = import_optional("torch", ["torch"])
+        ctx = getattr(torch, "inference_mode", None) or torch.no_grad
+        with ctx():
+            output_ids = self.conversation_model.generate(
+                **inputs,
+                max_new_tokens=max_new_tokens,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.9,
+            )
         return self.conversation_tokenizer.decode(output_ids[0], skip_special_tokens=True)
 
     def summarize_long_document(self, document: str) -> str:
@@ -158,19 +170,27 @@ class LongContextPipeline:
         return self._reduce_summaries(initial_summaries)
 
     def _reduce_summaries(self, summaries: List[str]) -> str:
-        """Collapse intermediate summaries into a single final summary."""
+        """Collapse intermediate summaries into a single final summary (iterative)."""
 
-        merged_text = "\n\n".join(summary.strip() for summary in summaries if summary.strip())
-        if not merged_text:
+        current = [s for s in (x.strip() for x in summaries) if s]
+        if not current:
             return ""
-        if self._count_tokens(merged_text) <= self.chunk_token_length:
-            return self._summarize_chunk(merged_text)
-        condensed = self._summarize_in_chunks(merged_text, chunk_tokens=self.chunk_token_length)
-        if not condensed:
-            return merged_text
-        if len(condensed) == 1:
-            return condensed[0]
-        return self._reduce_summaries(condensed)
+        # Avoid deep recursion by iteratively condensing until it fits.
+        # Add a conservative iteration cap to prevent degenerate loops.
+        for _ in range(32):
+            merged_text = "\n\n".join(current)
+            if not merged_text:
+                return ""
+            if self._count_tokens(merged_text) <= self.chunk_token_length:
+                return self._summarize_chunk(merged_text)
+            next_level = self._summarize_in_chunks(merged_text, chunk_tokens=self.chunk_token_length)
+            if not next_level:
+                return merged_text
+            if len(next_level) == 1:
+                return next_level[0]
+            current = [s for s in (x.strip() for x in next_level) if s]
+        # Fallback if iteration cap reached; return best-effort merge
+        return self._summarize_chunk("\n\n".join(current))
 
     def _summarize_in_chunks(
         self, text: str, *, chunk_tokens: Optional[int] = None
@@ -195,13 +215,15 @@ class LongContextPipeline:
         inputs = {key: value.to(self.long_document_device) for key, value in inputs.items()}
         global_attention_mask = torch.zeros_like(inputs["input_ids"])
         global_attention_mask[:, 0] = 1
-        summary_ids = self.long_document_model.generate(
-            **inputs,
-            global_attention_mask=global_attention_mask,
-            max_length=self.summary_max_length,
-            num_beams=self.summary_num_beams,
-            early_stopping=True,
-        )
+        ctx = getattr(torch, "inference_mode", None) or torch.no_grad
+        with ctx():
+            summary_ids = self.long_document_model.generate(
+                **inputs,
+                global_attention_mask=global_attention_mask,
+                max_length=self.summary_max_length,
+                num_beams=self.summary_num_beams,
+                early_stopping=True,
+            )
         return self.long_document_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
 
     def _chunk_text(

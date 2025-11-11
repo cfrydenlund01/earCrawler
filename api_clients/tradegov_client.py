@@ -46,10 +46,15 @@ class TradeGovClient:
 
     def __init__(self, *, session: requests.Session | None = None, cache_dir: Path | None = None) -> None:
         self.session = session or requests.Session()
+        self._owns_session = session is None
         self.session.trust_env = False
         self.api_key = get_secret("TRADEGOV_API_KEY", fallback="")
         self.user_agent = get_secret("TRADEGOV_USER_AGENT", fallback="ear-ai/0.2.5")
-        self.cache = HTTPCache(cache_dir or Path(".cache/api/tradegov"))
+        ttl_env = os.getenv("TRADEGOV_CACHE_TTL_SECONDS")
+        ttl_seconds = int(ttl_env) if ttl_env else None
+        max_env = os.getenv("TRADEGOV_CACHE_MAX_ENTRIES")
+        max_entries = int(max_env) if max_env else 4096
+        self.cache = HTTPCache(cache_dir or Path(".cache/api/tradegov"), max_entries=max_entries, ttl_seconds=ttl_seconds)
         env_limit = os.getenv("TRADEGOV_MAX_CALLS")
         self.request_limit = int(env_limit) if env_limit else None
         _logger.info(
@@ -164,6 +169,14 @@ class TradeGovClient:
     # Backwards compatibility aliases
     def search_entities(self, query: str, page_size: int = 100):
         return iter(self.search(query, limit=page_size))
+
+    # Resource lifecycle -------------------------------------------------
+    def close(self) -> None:
+        try:
+            if self._owns_session:
+                self.session.close()
+        except Exception:
+            pass
 
 
 # Alias for legacy imports
