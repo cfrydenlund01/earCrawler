@@ -22,6 +22,7 @@ class ORIClient:
 
     def __init__(self) -> None:
         self.session = requests.Session()
+        self._owns_session = True
 
     def _get(self, url: str) -> str:
         attempts = 3
@@ -51,3 +52,10 @@ class ORIClient:
     def get_case_html(self, url: str) -> str:
         """Return HTML for a specific case detail page ``url``."""
         return self._get(url)
+
+    def close(self) -> None:
+        try:
+            if self._owns_session:
+                self.session.close()
+        except Exception:
+            pass

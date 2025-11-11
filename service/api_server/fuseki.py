@@ -3,7 +3,7 @@ from __future__ import annotations
 """Fuseki integration helpers."""
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import json
 from typing import Any, Dict, Iterable, List, Mapping, Protocol
 
@@ -24,16 +24,31 @@ class FusekiClient(Protocol):
 class HttpFusekiClient:
     endpoint: str
     timeout: float
+    _client: httpx.AsyncClient | None = field(default=None, init=False, repr=False)
+
+    async def _ensure_client(self) -> httpx.AsyncClient:
+        # Lazily create a pooled AsyncClient and reuse it for all queries.
+        if self._client is None:
+            self._client = httpx.AsyncClient(timeout=self.timeout)
+        return self._client
+
+    async def aclose(self) -> None:
+        # Allow FastAPI to cleanly close the connection pool on shutdown.
+        if self._client is not None:
+            try:
+                await self._client.aclose()
+            finally:
+                self._client = None
 
     async def query(self, template: Template, query: str) -> Mapping[str, Any]:
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            response = await client.post(
-                self.endpoint,
-                content=query.encode("utf-8"),
-                headers={"Content-Type": "application/sparql-query"},
-            )
-            response.raise_for_status()
-            return response.json()
+        client = await self._ensure_client()
+        response = await client.post(
+            self.endpoint,
+            content=query.encode("utf-8"),
+            headers={"Content-Type": "application/sparql-query"},
+        )
+        response.raise_for_status()
+        return response.json()
 
 
 class FusekiGateway:
