@@ -82,25 +82,25 @@ class JsonLogger:
         self._sample_rate = max(0.0, min(1.0, float(sample_rate)))
 
     def info(self, event: str, **fields: Any) -> None:
-        self._emit("INFO", event, fields)
+        return self._emit("INFO", event, fields)
 
     def warning(self, event: str, **fields: Any) -> None:
-        self._emit("WARNING", event, fields)
+        return self._emit("WARNING", event, fields)
 
     def error(self, event: str, **fields: Any) -> None:
-        self._emit("ERROR", event, fields)
+        return self._emit("ERROR", event, fields)
 
     def emit(self, level: str, event: str, **fields: Any) -> None:
-        self._emit(level.upper(), event, dict(fields))
+        return self._emit(level.upper(), event, dict(fields))
 
     def should_sample(self) -> bool:
         if self._sample_rate >= 1.0:
             return True
         return random.random() <= self._sample_rate
 
-    def _emit(self, level: str, event: str, fields: MutableMapping[str, Any]) -> None:
+    def _emit(self, level: str, event: str, fields: MutableMapping[str, Any]) -> dict[str, Any] | None:
         if not self.should_sample():
-            return
+            return None
         entry: dict[str, Any] = {
             "ts": datetime.now(timezone.utc).isoformat(),
             "level": level.upper(),
@@ -131,6 +131,7 @@ class JsonLogger:
                 if reason:
                     summary = f"{event}: {reason}"
             write_event_log(summary[:300], level=entry["level"])
+        return entry
 
 
 __all__ = ["JsonLogger"]

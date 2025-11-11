@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """ASGI middleware hooking structured logging and security headers."""
 
+import asyncio
 import time
 from typing import Any, Callable, Awaitable
 
@@ -31,6 +32,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         error: Exception | None = None
         status_code: int | None = None
         continue_log = True
+        entry: dict[str, Any] | None = None
         try:
             response = await call_next(request)
             status_code = response.status_code
@@ -67,7 +69,7 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
             trace_id = getattr(request.state, "trace_id", "")
             route = request.url.path
             if continue_log:
-                self._logger.emit(
+                entry = self._logger.emit(
                     level,
                     event,
                     trace_id=trace_id,
@@ -76,7 +78,24 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                     status=status_code,
                     details=details,
                 )
+            if entry:
+                await self._forward_log(request, entry, level)
         return response
+
+    async def _forward_log(self, request: Request, entry: dict[str, Any], level: str) -> None:
+        queue = getattr(request.app.state, "request_log_queue", None)
+        if queue is None:
+            return
+        try:
+            queue.put_nowait(entry)
+            return
+        except asyncio.QueueFull:
+            if level.upper() not in {"ERROR", "WARNING", "CRITICAL"}:
+                return
+        try:
+            await asyncio.wait_for(queue.put(entry), timeout=0.02)
+        except (asyncio.TimeoutError, asyncio.QueueFull):
+            return
 
 
 def _apply_security_headers(request: Request, response: Response) -> None:

@@ -50,6 +50,8 @@ class AsyncHTTPSink:
     """Async telemetry sender with connection pooling and async backoff."""
 
     def __init__(self, cfg: TelemetryConfig):
+        if httpx is None:  # type: ignore[name-defined]
+            raise RuntimeError("AsyncHTTPSink requires httpx; install optional dependency to enable HTTP sink")
         self.cfg = cfg
         self.backoff = 1.0
         self._client: httpx.AsyncClient | None = None  # type: ignore[name-defined]
