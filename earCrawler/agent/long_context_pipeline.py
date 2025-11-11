@@ -170,19 +170,27 @@ class LongContextPipeline:
         return self._reduce_summaries(initial_summaries)
 
     def _reduce_summaries(self, summaries: List[str]) -> str:
-        """Collapse intermediate summaries into a single final summary."""
+        """Collapse intermediate summaries into a single final summary (iterative)."""
 
-        merged_text = "\n\n".join(summary.strip() for summary in summaries if summary.strip())
-        if not merged_text:
+        current = [s for s in (x.strip() for x in summaries) if s]
+        if not current:
             return ""
-        if self._count_tokens(merged_text) <= self.chunk_token_length:
-            return self._summarize_chunk(merged_text)
-        condensed = self._summarize_in_chunks(merged_text, chunk_tokens=self.chunk_token_length)
-        if not condensed:
-            return merged_text
-        if len(condensed) == 1:
-            return condensed[0]
-        return self._reduce_summaries(condensed)
+        # Avoid deep recursion by iteratively condensing until it fits.
+        # Add a conservative iteration cap to prevent degenerate loops.
+        for _ in range(32):
+            merged_text = "\n\n".join(current)
+            if not merged_text:
+                return ""
+            if self._count_tokens(merged_text) <= self.chunk_token_length:
+                return self._summarize_chunk(merged_text)
+            next_level = self._summarize_in_chunks(merged_text, chunk_tokens=self.chunk_token_length)
+            if not next_level:
+                return merged_text
+            if len(next_level) == 1:
+                return next_level[0]
+            current = [s for s in (x.strip() for x in next_level) if s]
+        # Fallback if iteration cap reached; return best-effort merge
+        return self._summarize_chunk("\n\n".join(current))
 
     def _summarize_in_chunks(
         self, text: str, *, chunk_tokens: Optional[int] = None
