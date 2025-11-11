@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """ETL ingestion module for loading Trade.gov and Federal Register data."""
 
+import os
 from pathlib import WindowsPath, Path
 import logging
 import subprocess
@@ -17,6 +18,7 @@ except Exception:  # pragma: no cover - fallback for pyshacl versions
 
 from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
+from earCrawler.utils.jena_tools import find_tdbloader
 
 
 class Ingestor:
@@ -114,12 +116,22 @@ class Ingestor:
             return
 
         try:
-            subprocess.run([
-                "tdb2.tdbloader",
-                "--loc",
-                str(self.tdb_location),
-                str(ttl_path),
-            ], check=True)
+            env_loader = os.getenv("EAR_TDBLOADER_PATH")
+            if env_loader:
+                loader = Path(env_loader)
+            elif os.getenv("EAR_DISABLE_JENA_BOOTSTRAP") == "1":
+                loader = Path("tdb2.tdbloader")
+            else:
+                loader = find_tdbloader()
+            subprocess.run(
+                [
+                    str(loader),
+                    "--loc",
+                    str(self.tdb_location),
+                    str(ttl_path),
+                ],
+                check=True,
+            )
         except subprocess.CalledProcessError as exc:
             self.logger.warning("Jena load failed: %s", exc)
             return

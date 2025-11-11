@@ -40,7 +40,7 @@ include = ["earCrawler*", "api_clients*", "perf*", "cli*"]
 namespaces = true
 
 [tool.setuptools.package-data]
-"earCrawler.kg" = ["shapes.ttl"]
+"earCrawler.kg" = ["shapes.ttl", "data/*.json"]
 "earCrawler.sparql" = ["*.sparql"]
 
 [tool.setuptools.data-files]

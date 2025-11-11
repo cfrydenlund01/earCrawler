@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import hashlib
 import json
 from pathlib import Path
@@ -40,9 +41,10 @@ def _iter_files(root: Path) -> Iterable[Path]:
     for pattern in INCLUDE_GLOBS:
         for p in root.glob(pattern):
             if p.is_file():
-                if any(p.match(ex) for ex in EXCLUDE_GLOBS):
-                    continue
                 rp = p.relative_to(root)
+                rel_posix = rp.as_posix()
+                if any(fnmatch.fnmatch(rel_posix, ex) for ex in EXCLUDE_GLOBS):
+                    continue
                 if rp not in seen:
                     seen.add(rp)
                     yield rp

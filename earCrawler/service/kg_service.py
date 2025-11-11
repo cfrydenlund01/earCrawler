@@ -14,6 +14,7 @@ from typing import Any, List
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from rdflib import Graph
 from pydantic import BaseModel
 from SPARQLWrapper import JSON, SPARQLWrapper
 from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
@@ -153,13 +154,16 @@ def kg_insert(body: InsertRequest) -> InsertResponse:
     ttl = body.ttl
     logger.info("Received KG insert request")
 
+    parsed_graph: Graph | None = None
     try:
-        valid, _graph, text = validate(
+        valid, data_graph, text = validate(
             data_graph=ttl,
             shacl_graph=SHAPES_TTL,
             data_graph_format="turtle",
             shacl_graph_format="turtle",
         )
+        if isinstance(data_graph, Graph):
+            parsed_graph = data_graph
     except Exception as exc:  # pragma: no cover - pyshacl internal error
         logger.error("SHACL validation error: %s", exc)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -168,9 +172,23 @@ def kg_insert(body: InsertRequest) -> InsertResponse:
         logger.error("SHACL validation failed: %s", text)
         raise HTTPException(status_code=400, detail=text)
 
+    if parsed_graph is None:
+        try:
+            parsed_graph = Graph().parse(data=ttl, format="turtle")
+        except Exception as exc:
+            logger.error("Invalid Turtle payload: %s", exc)
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid Turtle payload",
+            ) from exc
+
+    serialized = parsed_graph.serialize(format="nt")
+    if isinstance(serialized, bytes):
+        serialized = serialized.decode("utf-8")
+
     wrapper = SPARQLWrapper(ENDPOINT_URL)
     wrapper.setMethod("POST")
-    wrapper.setQuery(f"INSERT DATA {{ {ttl} }}")
+    wrapper.setQuery(f"INSERT DATA {{\n{serialized}\n}}")
 
     try:
         wrapper.query()

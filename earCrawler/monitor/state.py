@@ -51,7 +51,15 @@ def update_state_and_write_delta(items: Dict[str, Any], state_path: Path, monito
     if not changed:
         return {}
     ts = timestamp or datetime.utcnow()
-    delta_path = monitor_dir / f"delta-{ts.strftime('%Y%m%d')}.json"
+    base_day = ts.strftime("%Y%m%d")
+    delta_path = monitor_dir / f"delta-{base_day}.json"
+    if delta_path.exists():
+        base_name = ts.strftime("%Y%m%dT%H%M%S")
+        delta_path = monitor_dir / f"delta-{base_name}.json"
+        counter = 1
+        while delta_path.exists():
+            counter += 1
+            delta_path = monitor_dir / f"delta-{base_name}-{counter:02d}.json"
     with delta_path.open("w", encoding="utf-8") as fh:
         json.dump(changed, fh, indent=2, sort_keys=True)
     return changed

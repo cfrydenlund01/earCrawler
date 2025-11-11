@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
-from rdflib import RDF, Graph, URIRef
+from urllib.parse import quote
+from rdflib import RDF, Graph, URIRef, Namespace
 from rdflib.namespace import RDFS
 from .ontology import EAR_NS, DCT, graph_with_prefixes, safe_literal
 from .prov import add_provenance
@@ -11,28 +12,42 @@ def export_triples(
     out_ttl: Path = Path("kg/ear_triples.ttl"),
 ) -> None:
     out_ttl.parent.mkdir(parents=True, exist_ok=True)
-    with out_ttl.open("w", encoding="utf-8") as f:
-        f.write(Path("kg/ear_ontology.ttl").read_text())
-        for source in ("ear", "nsf"):
-            fn = data_dir / f"{source}_corpus.jsonl"
-            if not fn.exists():
+    g = graph_with_prefixes()
+    ex_ns = Namespace("http://example.org/ear/")
+    g.namespace_manager.bind("ex", ex_ns, replace=True)
+    for source in ("ear", "nsf"):
+        fn = data_dir / f"{source}_corpus.jsonl"
+        if not fn.exists():
+            continue
+        for line in fn.read_text(encoding="utf-8").splitlines():
+            if not line:
                 continue
-            for line in fn.read_text(encoding="utf-8").splitlines():
-                if not line:
-                    continue
-                rec = json.loads(line)
-                pid = rec["identifier"].replace(":", "_")
-                f.write(f"\nex:paragraph_{pid} a ex:Paragraph ;\n")
-                escaped_text = rec["text"].replace('"', '\\"')
-                f.write(f'    ex:hasText """{escaped_text}""" ;\n')
-                if source == "ear":
-                    part = rec["identifier"].split(":")[0]
-                    f.write(f'    ex:part "{part}" ;\n')
-                f.write("\n")
-                for ent in rec.get("entities", {}).get("orgs", []):
-                    eid = ent.replace(" ", "_")
-                    f.write(f"ex:paragraph_{pid} ex:mentions ex:entity_{eid} .\n")
-                    f.write(f"ex:entity_{eid} a ex:Entity ; rdfs:label \"{ent}\" .\n")
+            rec = json.loads(line)
+            identifier = str(rec.get("identifier", "")).strip()
+            if not identifier:
+                continue
+            pid = identifier.replace(":", "_")
+            paragraph_iri = ex_ns[f"paragraph_{pid}"]
+            g.add((paragraph_iri, RDF.type, ex_ns.Paragraph))
+            text_value = rec.get("text", "")
+            if text_value:
+                g.add((paragraph_iri, ex_ns.hasText, safe_literal(text_value)))
+            if source == "ear":
+                part = identifier.split(":", 1)[0]
+                if part:
+                    g.add((paragraph_iri, ex_ns.part, safe_literal(part)))
+            entities = rec.get("entities", {}).get("orgs", []) or []
+            for entity_name in entities:
+                slug = quote(entity_name.strip() or "entity", safe="").lower()
+                ent_iri = ex_ns[f"entity_{slug}"]
+                g.add((paragraph_iri, ex_ns.mentions, ent_iri))
+                g.add((ent_iri, RDF.type, ex_ns.Entity))
+                g.add((ent_iri, RDFS.label, safe_literal(entity_name)))
+    prefix_text = ""
+    schema = Path("kg/ear_ontology.ttl")
+    if schema.exists():
+        prefix_text = schema.read_text(encoding="utf-8")
+    _write_sorted_ttl(g, out_ttl, prefix_text=prefix_text)
 
 
 
@@ -67,7 +82,7 @@ def emit_tradegov_entities(
     return out_path, len(g)
 
 
-def _write_sorted_ttl(graph: Graph, out_path: Path) -> None:
+def _write_sorted_ttl(graph: Graph, out_path: Path, *, prefix_text: str = "") -> None:
     prefixes = sorted(graph.namespace_manager.namespaces(), key=lambda x: x[0])
     lines: list[str] = []
     nm = graph.namespace_manager
@@ -75,6 +90,10 @@ def _write_sorted_ttl(graph: Graph, out_path: Path) -> None:
         lines.append(f"{s.n3(nm)} {p.n3(nm)} {o.n3(nm)} .")
     lines.sort()
     with out_path.open("w", encoding="utf-8") as f:
+        if prefix_text:
+            f.write(prefix_text)
+            if not prefix_text.endswith("\n"):
+                f.write("\n")
         for prefix, ns in prefixes:
             f.write(f"@prefix {prefix}: <{ns}> .\n")
         f.write("\n")

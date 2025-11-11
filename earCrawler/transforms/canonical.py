@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import json
 import re
+from importlib import resources
 from pathlib import Path
 from typing import Dict, Iterable, List
 
 
 DEFAULT_ALIAS_PATH = Path("kg/canonical/aliases.json")
+_EMBEDDED_ALIAS_RESOURCE = "kg/data/default_aliases.json"
 
 
 def _load_alias_file(path: Path) -> dict:
@@ -19,6 +21,18 @@ def _load_alias_file(path: Path) -> dict:
         raise ValueError(f"Invalid JSON in alias registry: {path}") from None
 
 
+def _load_embedded_aliases() -> dict:
+    try:
+        data = resources.files("earCrawler").joinpath(_EMBEDDED_ALIAS_RESOURCE)
+    except (AttributeError, ModuleNotFoundError):
+        return {}
+    try:
+        with data.open("r", encoding="utf-8") as fh:
+            return json.load(fh)
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        return {}
+
+
 def _normalise_key(text: str) -> str:
     return text.casefold().strip()
 
@@ -27,7 +41,12 @@ class CanonicalRegistry:
     """Registry containing alias mappings for names, countries and programs."""
 
     def __init__(self, *, alias_path: Path | None = None) -> None:
-        data = _load_alias_file(alias_path or DEFAULT_ALIAS_PATH)
+        if alias_path:
+            data = _load_alias_file(Path(alias_path))
+        elif DEFAULT_ALIAS_PATH.exists():
+            data = _load_alias_file(DEFAULT_ALIAS_PATH)
+        else:
+            data = _load_embedded_aliases()
         self._name_aliases = {
             _normalise_key(k): v.strip()
             for k, v in data.get("names", {}).items()
@@ -95,4 +114,3 @@ def _title_case(value: str) -> str:
 
 
 __all__ = ["CanonicalRegistry"]
-
