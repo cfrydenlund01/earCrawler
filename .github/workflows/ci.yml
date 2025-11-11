@@ -10,9 +10,13 @@ env:
   HF_HUB_DISABLE_PROGRESS_BARS: "1"
   PYTHONUTF8: "1"
 
+permissions:
+  contents: read
+
 jobs:
   cpu:
     runs-on: windows-latest
+    timeout-minutes: 45
     env:
       TRADEGOV_API_KEY: ${{ secrets.TRADEGOV_API_KEY }}
       FEDREG_API_KEY: ${{ secrets.FEDREG_API_KEY }}
@@ -22,14 +26,19 @@ jobs:
         shell: pwsh
         run: python scripts/check_versions.py
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-3.11-${{ hashFiles('**/requirements*.txt') }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements-win.txt
-          pip install black flake8 "coverage[toml]"
+          pip install --upgrade --retries 5 -r requirements.txt -r requirements-win.txt
+          pip install --upgrade black flake8 "coverage[toml]"
       - name: Lint
         run: black --check . && flake8 .
       - name: Tests
@@ -55,7 +64,9 @@ jobs:
           PY
 
   gpu:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     continue-on-error: true
     env:
       TRADEGOV_API_KEY: ${{ secrets.TRADEGOV_API_KEY }}
@@ -63,9 +74,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-3.11-${{ hashFiles('**/requirements*.txt') }}
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
@@ -79,15 +95,18 @@ jobs:
         run: pytest -m gpu
 
   benchmark:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: windows-gpu-t4
-    needs: gpu
+    needs: cpu
+    continue-on-error: true
+    timeout-minutes: 60
     env:
       TRADEGOV_API_KEY: ${{ secrets.TRADEGOV_API_KEY }}
       FEDREG_API_KEY: ${{ secrets.FEDREG_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
       - name: Install dependencies
@@ -103,9 +122,20 @@ jobs:
           path: benchmark.md
 
   validate-container:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build API image
+        run: docker build --pull --progress plain -f docker/api.Dockerfile -t ghcr.io/${{ github.repository }}/api:ci .
       - name: Install Apptainer
         run: |
           sudo apt-get update
@@ -120,6 +150,11 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     needs: cpu
     runs-on: windows-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
     env:
       TRADEGOV_API_KEY: ${{ secrets.TRADEGOV_API_KEY }}
       FEDREG_API_KEY: ${{ secrets.FEDREG_API_KEY }}

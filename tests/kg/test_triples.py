@@ -14,5 +14,5 @@ def test_export_triples_creates_file(tmp_path, monkeypatch):
     out_ttl = tmp_path / "kg.ttl"
     export_triples(data_dir, out_ttl)
     content = out_ttl.read_text()
-    assert "ex:paragraph_123_0 a ex:Paragraph" in content
-    assert "ex:entity_OrgX a ex:Entity" in content
+    assert "ex:paragraph_123_0 rdf:type ex:Paragraph" in content
+    assert "ex:entity_orgx rdf:type ex:Entity" in content
