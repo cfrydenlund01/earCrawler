@@ -49,7 +49,11 @@ class FederalRegisterClient:
         self._owns_session = session is None
         self.session.trust_env = False
         self.user_agent = get_secret("FEDERALREGISTER_USER_AGENT", fallback="earCrawler/0.9")
-        self.cache = HTTPCache(cache_dir or Path(".cache/api/federalregister"))
+        ttl_env = os.getenv("FR_CACHE_TTL_SECONDS")
+        ttl_seconds = int(ttl_env) if ttl_env else None
+        max_env = os.getenv("FR_CACHE_MAX_ENTRIES")
+        max_entries = int(max_env) if max_env else 4096
+        self.cache = HTTPCache(cache_dir or Path(".cache/api/federalregister"), max_entries=max_entries, ttl_seconds=ttl_seconds)
         env_limit = os.getenv("FR_MAX_CALLS")
         self.request_limit = int(env_limit) if env_limit else None
         _logger.info(
