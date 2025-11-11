@@ -76,3 +76,21 @@ Artifacts:
 Notes:
 - Added winget fallback flow (session PATH injection) and adjusted `installer/earcrawler.iss` paths (`OutputDir`, file sources) and optional icon.
 
+## 2025-11-11T19:31:00Z - Packaging refresh - pass
+Rebuilt CLI wheel, PyInstaller EXE, and Inno Setup installer after latest code changes. Re-generated checksums and SBOM artifacts with updated script to skip self-hashing.
+Artifacts:
+- dist/earcrawler-0.2.5-py3-none-any.whl (exists)
+- dist/earctl-0.2.5-win64.exe (exists)
+- dist/earcrawler-setup-0.2.5.exe (exists)
+- dist/checksums.sha256 (exists)
+- dist/sbom.spdx.json (exists)
+- dist/sbom.cdx.json (exists)
+
+## 2025-11-11T19:44:00Z - API SDK alignment - pass
+EarCrawlerApiClient now mirrors the facade contract: X-Api-Key auth, lineage and SPARQL helpers, and the RAG endpoint. Added regression tests and docs snippet for downstream integrators.
+Artifacts:
+- api_clients/ear_api_client.py (updated)
+- tests/clients/test_ear_api_client.py (new)
+- docs/api/readme.md (updated)
+- scripts/checksums.ps1 (updated)
+

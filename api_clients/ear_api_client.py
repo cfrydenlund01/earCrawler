@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Mapping, Optional
 
 import requests
 
@@ -20,7 +20,7 @@ class EarCrawlerApiClient:
     base_url:
         Root URL for the API facade (e.g. ``http://localhost:9001``).
     api_key:
-        Optional API key value for authenticated requests.
+        Optional API key value for authenticated requests (``X-Api-Key`` header).
     session:
         Optional :class:`requests.Session` for connection pooling.
     timeout:
@@ -31,18 +31,27 @@ class EarCrawlerApiClient:
     api_key: Optional[str] = None
     session: Optional[requests.Session] = None
     timeout: float = 10.0
+    _owns_session: bool = field(init=False, repr=False, default=False)
+    _session: requests.Session = field(init=False, repr=False)
 
     def __post_init__(self) -> None:
-        self._owns_session: bool = self.session is None
+        self._owns_session = self.session is None
         self._session = self.session or requests.Session()
 
     # ------------------------------------------------------------------#
-    def _request(self, method: str, path: str, *, params: Optional[Dict[str, Any]] = None) -> Any:
+    def _request(
+        self,
+        method: str,
+        path: str,
+        *,
+        params: Optional[Mapping[str, Any]] = None,
+        json: Optional[Mapping[str, Any]] = None,
+    ) -> Any:
         url = f"{self.base_url.rstrip('/')}{path}"
         headers = {"Accept": "application/json"}
         if self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-        resp = self._session.request(method, url, params=params, headers=headers, timeout=self.timeout)
+            headers["X-Api-Key"] = self.api_key
+        resp = self._session.request(method, url, params=params, json=json, headers=headers, timeout=self.timeout)
         if resp.status_code >= 400:
             raise EarApiError(f"{resp.status_code}: {resp.text}")
         if resp.headers.get("Content-Type", "").startswith("application/json"):
@@ -50,20 +59,38 @@ class EarCrawlerApiClient:
         return resp.text
 
     # ------------------------------------------------------------------#
-    def health(self) -> Dict[str, Any]:
+    def health(self) -> dict[str, Any]:
         """Return ``/health`` response."""
         return self._request("GET", "/health")
 
-    def search_entities(self, query: str, *, limit: int = 10) -> Dict[str, Any]:
+    def search_entities(self, query: str, *, limit: int = 10, offset: int = 0) -> dict[str, Any]:
         """Call ``/v1/search`` with query parameters."""
-        params = {"q": query, "limit": str(limit)}
+        params = {"q": query, "limit": str(limit), "offset": str(offset)}
         return self._request("GET", "/v1/search", params=params)
 
-    def get_entity(self, urn: str) -> Dict[str, Any]:
+    def get_entity(self, urn: str) -> dict[str, Any]:
         """Fetch a single entity via ``/v1/entities/{urn}``."""
         return self._request("GET", f"/v1/entities/{urn}")
 
-    # --------------------------------------------------------------
+    def get_lineage(self, urn: str) -> dict[str, Any]:
+        """Fetch lineage edges via ``/v1/lineage/{urn}``."""
+        return self._request("GET", f"/v1/lineage/{urn}")
+
+    def run_template(self, template: str, *, parameters: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
+        """Execute an allow-listed SPARQL template via ``/v1/sparql``."""
+        payload = {"template": template, "parameters": dict(parameters or {})}
+        return self._request("POST", "/v1/sparql", json=payload)
+
+    def rag_query(self, query: str, *, top_k: int = 3, include_lineage: bool = False) -> dict[str, Any]:
+        """Call the ``/v1/rag/query`` endpoint."""
+        payload = {
+            "query": query,
+            "top_k": top_k,
+            "include_lineage": include_lineage,
+        }
+        return self._request("POST", "/v1/rag/query", json=payload)
+
+    # --------------------------------------------------------------#
     # Resource lifecycle
     def close(self) -> None:
         try:

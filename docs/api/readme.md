@@ -17,6 +17,23 @@ configured latency budget.
 
 Refer to `service/openapi/openapi.yaml` for exhaustive schemas and examples.
 
+## SDK usage
+
+```python
+from api_clients.ear_api_client import EarCrawlerApiClient
+
+with EarCrawlerApiClient("http://localhost:9001", api_key="dev-token") as client:
+    print(client.health())
+    search = client.search_entities("export controls", limit=5)
+    entity = client.get_entity(search["results"][0]["id"])
+    lineage = client.get_lineage(entity["id"])
+    sparql = client.run_template("search_entities", parameters={"q": "example"})
+    rag = client.rag_query("What changed in part 734?", include_lineage=True)
+```
+
+`EarCrawlerApiClient` automatically sets the `X-Api-Key` header when a token is
+provided and returns parsed JSON dictionaries for each call.
+
 ## Budgets and Limits
 
 * Request body limit: **32 KB**
