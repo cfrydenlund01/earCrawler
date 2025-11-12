@@ -1,0 +1,196 @@
+{
+  "info": {
+    "name": "EarCrawler API",
+    "_postman_id": "earcrawler-api-contract",
+    "description": "Collection derived from service/openapi/openapi.yaml",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        },
+        "description": "Liveness/readiness probe"
+      }
+    },
+    {
+      "name": "Search",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/search",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "search"
+          ],
+          "query": [
+            {
+              "key": "q",
+              "value": "{{search_query}}",
+              "description": "Search term"
+            },
+            {
+              "key": "limit",
+              "value": "5",
+              "description": "Result cap"
+            }
+          ]
+        },
+        "description": "Label search against curated indexes"
+      }
+    },
+    {
+      "name": "Get Entity",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/entities/{{entity_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "entities",
+            "{{entity_id}}"
+          ]
+        },
+        "description": "Fetch curated entity projection"
+      }
+    },
+    {
+      "name": "Lineage",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/lineage/{{entity_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "lineage",
+            "{{entity_id}}"
+          ]
+        },
+        "description": "Retrieve provenance edges for an entity"
+      }
+    },
+    {
+      "name": "SPARQL Template",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/sparql",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "sparql"
+          ]
+        },
+        "description": "Execute allowlisted SPARQL template by name",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"template\": \"search_entities\",\n  \"parameters\": {\n    \"q\": \"{{search_query}}\",\n    \"limit\": 5\n  }\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "RAG Query",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/v1/rag/query",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "v1",
+            "rag",
+            "query"
+          ]
+        },
+        "description": "Retrieve cached RAG answers with lineage metadata",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"What changed in Part 734?\",\n  \"top_k\": 3,\n  \"include_lineage\": true\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      {
+        "key": "value",
+        "value": "{{api_key}}",
+        "type": "string"
+      },
+      {
+        "key": "key",
+        "value": "X-Api-Key",
+        "type": "string"
+      },
+      {
+        "key": "in",
+        "value": "header",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:9001",
+      "type": "string",
+      "description": "FastAPI facade base URL"
+    },
+    {
+      "key": "api_key",
+      "value": "",
+      "type": "string",
+      "description": "Optional X-Api-Key for elevated quotas"
+    },
+    {
+      "key": "entity_id",
+      "value": "urn:ear:entity:demo",
+      "type": "string",
+      "description": "Sample KG entity identifier"
+    },
+    {
+      "key": "search_query",
+      "value": "export controls",
+      "type": "string",
+      "description": "Default /v1/search query string"
+    }
+  ]
+}

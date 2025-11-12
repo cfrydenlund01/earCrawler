@@ -7,6 +7,8 @@ on:
       - 'packaging/**'
       - 'installer/**'
       - 'scripts/**'
+      - 'service/openapi/**'
+      - 'docs/api/**'
       - '.github/workflows/kg-ci.yml'
   pull_request:
     paths:
@@ -14,21 +16,45 @@ on:
       - 'packaging/**'
       - 'installer/**'
       - 'scripts/**'
+      - 'service/openapi/**'
+      - 'docs/api/**'
       - '.github/workflows/kg-ci.yml'
 
 jobs:
   hermetic-setup:
     runs-on: windows-latest
+    env:
+      MITIGATION_LOG: kg/reports/ci-mitigations-${{ github.job }}.log
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Prepare mitigation log
+        shell: pwsh
+        run: |
+          $logDir = Split-Path -Parent $env:MITIGATION_LOG
+          if ($logDir) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
+          '' | Out-File -FilePath $env:MITIGATION_LOG -Encoding utf8
       - name: Install pip-tools
         run: pip install pip-tools
-      - name: Verify Java tools
+      - name: Verify Java tools (retry)
         shell: pwsh
-        run: scripts/verify-java-tools.ps1
+        run: |
+          $attempts = 3
+          for ($i = 1; $i -le $attempts; $i++) {
+            try {
+              ./scripts/verify-java-tools.ps1
+              $msg = "$(Get-Date -Format o) [verify-java-tools] success on attempt $i"
+              Add-Content -Path $env:MITIGATION_LOG -Value $msg
+              break
+            } catch {
+              $err = "$(Get-Date -Format o) [verify-java-tools] attempt $i failed: $($_.Exception.Message)"
+              Add-Content -Path $env:MITIGATION_LOG -Value $err
+              if ($i -eq $attempts) { throw }
+              Start-Sleep -Seconds (5 * $i)
+            }
+          }
       - name: Build wheelhouse
         shell: pwsh
         run: |
@@ -38,6 +64,13 @@ jobs:
       - name: Generate SBOM
         shell: pwsh
         run: scripts/sbom-cyclonedx.ps1
+      - name: Upload mitigation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitigations-${{ github.job }}
+          path: ${{ env.MITIGATION_LOG }}
+          if-no-files-found: ignore
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -50,11 +83,19 @@ jobs:
   api-surface:
     needs: hermetic-setup
     runs-on: windows-latest
+    env:
+      MITIGATION_LOG: kg/reports/ci-mitigations-${{ github.job }}.log
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Prepare mitigation log
+        shell: pwsh
+        run: |
+          $logDir = Split-Path -Parent $env:MITIGATION_LOG
+          if ($logDir) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
+          '' | Out-File -FilePath $env:MITIGATION_LOG -Encoding utf8
       - name: Install dependencies
         run: |
           python -m pip install -r requirements-win.txt
@@ -67,6 +108,21 @@ jobs:
         env:
           EARCRAWLER_API_EMBEDDED_FIXTURE: '1'
         run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
+      - name: Wait for API health
+        shell: pwsh
+        run: |
+          $attempts = 6
+          for ($i = 1; $i -le $attempts; $i++) {
+            try {
+              Invoke-RestMethod -Uri 'http://127.0.0.1:9001/health' -TimeoutSec 5 | Out-Null
+              Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [api-wait] health probe passed on attempt $i"
+              break
+            } catch {
+              Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [api-wait] attempt $i failed: $($_.Exception.Message)"
+              if ($i -eq $attempts) { throw }
+              Start-Sleep -Seconds (5 * $i)
+            }
+          }
       - name: Smoke test
         shell: pwsh
         run: scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001
@@ -80,15 +136,30 @@ jobs:
         with:
           name: api-smoke
           path: kg/reports/api-smoke.txt
+      - name: Upload mitigation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitigations-${{ github.job }}
+          path: ${{ env.MITIGATION_LOG }}
+          if-no-files-found: ignore
 
   observability-health:
     needs: api-surface
     runs-on: windows-latest
+    env:
+      MITIGATION_LOG: kg/reports/ci-mitigations-${{ github.job }}.log
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Prepare mitigation log
+        shell: pwsh
+        run: |
+          $logDir = Split-Path -Parent $env:MITIGATION_LOG
+          if ($logDir) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
+          '' | Out-File -FilePath $env:MITIGATION_LOG -Encoding utf8
       - name: Install dependencies
         run: |
           python -m pip install -r requirements-win.txt
@@ -98,7 +169,14 @@ jobs:
         run: New-Item -ItemType Directory -Force -Path 'kg/reports' | Out-Null
       - name: Register Event Log source
         shell: pwsh
-        run: scripts/eventlog/register-source.ps1 -Source EarCrawler
+        run: |
+          try {
+            scripts/eventlog/register-source.ps1 -Source EarCrawler
+            Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [eventlog] registration succeeded"
+          } catch {
+            Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [eventlog] registration failed: $($_.Exception.Message)"
+            Write-Warning "Continuing despite Event Log registration failure"
+          }
       - name: Start Fuseki stub
         shell: pwsh
         run: |
@@ -106,12 +184,28 @@ jobs:
           $proc = Start-Process -FilePath $python -ArgumentList '-m','earCrawler.tests.obs.stub_fuseki_server' -PassThru -WindowStyle Hidden
           $proc.Id | Out-File -FilePath 'kg/reports/fuseki.pid' -Encoding ascii
           Start-Sleep -Seconds 2
+          Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [fuseki-stub] started pid $($proc.Id)"
       - name: Start API facade
         shell: pwsh
         env:
           EARCRAWLER_FUSEKI_URL: http://127.0.0.1:3030/ds/query
           EARCRAWLER_API_EMBEDDED_FIXTURE: '1'
         run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
+      - name: Wait for API facade health
+        shell: pwsh
+        run: |
+          $attempts = 6
+          for ($i = 1; $i -le $attempts; $i++) {
+            try {
+              Invoke-RestMethod -Uri 'http://127.0.0.1:9001/health' -TimeoutSec 5 | Out-Null
+              Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [api-wait] health probe passed on attempt $i"
+              break
+            } catch {
+              Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [api-wait] attempt $i failed: $($_.Exception.Message)"
+              if ($i -eq $attempts) { throw }
+              Start-Sleep -Seconds (5 * $i)
+            }
+          }
       - name: Fuseki health probe
         shell: pwsh
         run: scripts/health/fuseki-probe.ps1 -FusekiUrl http://127.0.0.1:3030/ds/query
@@ -132,7 +226,15 @@ jobs:
           if (Test-Path 'kg/reports/fuseki.pid') {
             $pid = Get-Content 'kg/reports/fuseki.pid'
             Stop-Process -Id ([int]$pid) -ErrorAction SilentlyContinue
+            Remove-Item 'kg/reports/fuseki.pid' -ErrorAction SilentlyContinue
           }
+      - name: Upload mitigation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitigations-${{ github.job }}
+          path: ${{ env.MITIGATION_LOG }}
+          if-no-files-found: ignore
       - name: Upload observability reports
         if: always()
         uses: actions/upload-artifact@v4
@@ -142,6 +244,58 @@ jobs:
             kg/reports/health-*.txt
             kg/reports/canary-summary.*
             kg/reports/watchdog-*.txt
+
+  contract-artifacts:
+    needs: observability-health
+    runs-on: windows-latest
+    env:
+      MITIGATION_LOG: kg/reports/ci-mitigations-${{ github.job }}.log
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare mitigation log
+        shell: pwsh
+        run: |
+          $logDir = Split-Path -Parent $env:MITIGATION_LOG
+          if ($logDir) { New-Item -ItemType Directory -Force -Path $logDir | Out-Null }
+          '' | Out-File -FilePath $env:MITIGATION_LOG -Encoding utf8
+      - name: Install API contract dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyyaml
+      - name: Export OpenAPI + Postman artifacts
+        shell: pwsh
+        run: python scripts/api/export_contract.py
+      - name: Package API contract bundle
+        shell: pwsh
+        run: pwsh scripts/api/package_contract.ps1
+      - name: Hash contract bundle
+        shell: pwsh
+        run: |
+          $zip = Get-ChildItem dist -Filter 'api-contract-*.zip' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          if (-not $zip) { throw "api-contract zip not found" }
+          $hash = Get-FileHash $zip.FullName -Algorithm SHA256
+          $msg = "$(Get-Date -Format o) [contract-bundle] $($zip.Name) SHA256=$($hash.Hash)"
+          Add-Content -Path $env:MITIGATION_LOG -Value $msg
+          Write-Host $msg
+      - name: Upload API contract artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-contract
+          path: |
+            dist/api-contract-*.zip
+            dist/api-contract-*/openapi.json
+            dist/api-contract-*/postman_collection.json
+            dist/api-contract-*/release-notes.md
+      - name: Upload mitigation log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mitigations-${{ github.job }}
+          path: ${{ env.MITIGATION_LOG }}
+          if-no-files-found: ignore
 
   incremental-scan:
     runs-on: windows-latest
