@@ -1,6 +1,7 @@
 name: kg-ci
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'kg/**'
