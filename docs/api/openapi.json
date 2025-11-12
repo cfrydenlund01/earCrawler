@@ -1,0 +1,635 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "EarCrawler Read-only API",
+    "version": "0.2.5",
+    "description": "Read-only HTTP facade exposing curated SPARQL resources with rate limiting and immutable query templates."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:9001",
+      "description": "Local development"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "ApiKey": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "X-Api-Key"
+      }
+    },
+    "schemas": {
+      "ProblemDetails": {
+        "type": "object",
+        "required": [
+          "type",
+          "title",
+          "status"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "instance": {
+            "type": "string"
+          },
+          "trace_id": {
+            "type": "string"
+          }
+        }
+      },
+      "EntityAttribute": {
+        "type": "object",
+        "required": [
+          "predicate",
+          "value"
+        ],
+        "properties": {
+          "predicate": {
+            "type": "string",
+            "format": "uri"
+          },
+          "value": {
+            "type": "string"
+          }
+        }
+      },
+      "EntityView": {
+        "type": "object",
+        "required": [
+          "id",
+          "labels",
+          "types",
+          "same_as",
+          "attributes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uri"
+          },
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "description": {
+            "type": "string",
+            "nullable": true
+          },
+          "types": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "same_as": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uri"
+            }
+          },
+          "attributes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/EntityAttribute"
+            }
+          }
+        }
+      },
+      "SearchHit": {
+        "type": "object",
+        "required": [
+          "id",
+          "score"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uri"
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "score": {
+            "type": "number"
+          },
+          "snippet": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SearchResponse": {
+        "type": "object",
+        "required": [
+          "total",
+          "results"
+        ],
+        "properties": {
+          "total": {
+            "type": "integer"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SearchHit"
+            }
+          }
+        }
+      },
+      "LineageEdge": {
+        "type": "object",
+        "required": [
+          "source",
+          "relation",
+          "target"
+        ],
+        "properties": {
+          "source": {
+            "type": "string",
+            "format": "uri"
+          },
+          "relation": {
+            "type": "string",
+            "format": "uri"
+          },
+          "target": {
+            "type": "string",
+            "format": "uri"
+          },
+          "timestamp": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "LineageResponse": {
+        "type": "object",
+        "required": [
+          "id",
+          "edges"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uri"
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            }
+          }
+        }
+      },
+      "RagSource": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "KG entity or citation identifier"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "label": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          }
+        }
+      },
+      "RagLineageReference": {
+        "type": "object",
+        "required": [
+          "entity_id",
+          "edges"
+        ],
+        "properties": {
+          "entity_id": {
+            "type": "string",
+            "format": "uri"
+          },
+          "edges": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LineageEdge"
+            }
+          }
+        }
+      },
+      "RagAnswer": {
+        "type": "object",
+        "required": [
+          "content",
+          "score",
+          "source"
+        ],
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "score": {
+            "type": "number"
+          },
+          "source": {
+            "$ref": "#/components/schemas/RagSource"
+          },
+          "lineage": {
+            "$ref": "#/components/schemas/RagLineageReference"
+          }
+        }
+      },
+      "CacheState": {
+        "type": "object",
+        "required": [
+          "hit"
+        ],
+        "properties": {
+          "hit": {
+            "type": "boolean"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "RagResponse": {
+        "type": "object",
+        "required": [
+          "trace_id",
+          "latency_ms",
+          "query",
+          "cache",
+          "results"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "latency_ms": {
+            "type": "number"
+          },
+          "query": {
+            "type": "string"
+          },
+          "cache": {
+            "$ref": "#/components/schemas/CacheState"
+          },
+          "results": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RagAnswer"
+            }
+          }
+        }
+      },
+      "RagQueryRequest": {
+        "type": "object",
+        "required": [
+          "query"
+        ],
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 512
+          },
+          "top_k": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10,
+            "default": 3
+          },
+          "include_lineage": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "SparqlProxyRequest": {
+        "type": "object",
+        "required": [
+          "template"
+        ],
+        "properties": {
+          "template": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "SparqlProxyResponse": {
+        "type": "object",
+        "required": [
+          "head",
+          "results"
+        ],
+        "properties": {
+          "head": {
+            "type": "object"
+          },
+          "results": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Service health check",
+        "responses": {
+          "200": {
+            "description": "Liveness and readiness indicator",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/entities/{entity_id}": {
+      "get": {
+        "summary": "Retrieve curated entity view",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Entity view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntityView"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Entity not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/search": {
+      "get": {
+        "summary": "Search entity labels",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50,
+              "default": 10
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Search results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sparql": {
+      "post": {
+        "summary": "Execute allowlisted SPARQL template",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparqlProxyRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "SPARQL results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparqlProxyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Template validation failed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/lineage/{entity_id}": {
+      "get": {
+        "summary": "Retrieve PROV-O lineage",
+        "parameters": [
+          {
+            "name": "entity_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        ],
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Lineage edges",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LineageResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Lineage missing",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/rag/query": {
+      "post": {
+        "summary": "Retrieve cached RAG passages with lineage metadata",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RagQueryRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Retrieved passages",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RagResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

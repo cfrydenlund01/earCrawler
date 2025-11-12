@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: EarCrawler Read-only API
-  version: 0.22.0
+  version: 0.2.5
   description: >-
     Read-only HTTP facade exposing curated SPARQL resources with rate limiting
     and immutable query templates.
