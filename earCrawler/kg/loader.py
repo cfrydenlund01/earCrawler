@@ -10,7 +10,9 @@ import subprocess
 from earCrawler.utils.jena_tools import ensure_jena, find_tdbloader
 
 
-def load_tdb(ttl_path: Path, db_dir: Path = Path("db"), auto_install: bool = True) -> None:
+def load_tdb(
+    ttl_path: Path, db_dir: Path = Path("db"), auto_install: bool = True
+) -> None:
     """Load TTL triples into a Jena TDB2 database at ``db_dir``.
 
     Parameters
@@ -62,7 +64,6 @@ def load_tdb(ttl_path: Path, db_dir: Path = Path("db"), auto_install: bool = Tru
         if err:
             msg += f": {err}"
         raise RuntimeError(msg) from exc
-
 
 
 def enrich_entities_with_tradegov(records, client=None):

@@ -30,7 +30,7 @@ def test_canonical_sorting(tmp_path):
     assert lines == sorted(lines)
     # JSON keys sorted
     srj_text = (ROOT / "kg" / "canonical" / "snapshots" / "sample.srj").read_text()
-    assert srj_text.index("\"a\"") < srj_text.index("\"b\"")
+    assert srj_text.index('"a"') < srj_text.index('"b"')
     # ZIP timestamps
     run_ps("scripts/make-canonical-zip.ps1", "-Version", "test", env=env)
     zip_path = next((ROOT / "dist").glob("*.zip"))

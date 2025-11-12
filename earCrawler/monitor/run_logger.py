@@ -1,4 +1,5 @@
 """Run logger capturing structured step telemetry for observability (B.36)."""
+
 from __future__ import annotations
 
 import json
@@ -31,7 +32,11 @@ class RunRecord:
         return {
             "run_id": self.run_id,
             "started": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.started)),
-            "finished": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.finished)) if self.finished else None,
+            "finished": (
+                time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(self.finished))
+                if self.finished
+                else None
+            ),
             "status": self.status,
             "input_hash": self.input_hash,
             "steps": [
@@ -47,8 +52,12 @@ class RunRecord:
 
 
 @contextmanager
-def run_logger(path: Path, *, run_id: str | None = None, input_hash: str | None = None) -> RunRecord:
-    record = RunRecord(run_id=run_id or uuid.uuid4().hex, started=time.time(), input_hash=input_hash)
+def run_logger(
+    path: Path, *, run_id: str | None = None, input_hash: str | None = None
+) -> RunRecord:
+    record = RunRecord(
+        run_id=run_id or uuid.uuid4().hex, started=time.time(), input_hash=input_hash
+    )
     try:
         yield record
         record.status = "ok"

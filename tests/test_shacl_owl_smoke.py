@@ -17,8 +17,8 @@ import pytest
 from .java_utils import JAVA_VERSION_OK
 from .tooling import require_jena_and_fuseki
 
-SCRIPT = pathlib.Path('kg/scripts/ci-shacl-owl.ps1')
-REPORTS_DIR = pathlib.Path('kg') / 'reports'
+SCRIPT = pathlib.Path("kg/scripts/ci-shacl-owl.ps1")
+REPORTS_DIR = pathlib.Path("kg") / "reports"
 MISSING_TOOLS_MSG = (
     "The Apache Jena and Fuseki tools must be downloaded before running "
     "the SHACL/OWL smoke tests."

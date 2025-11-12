@@ -16,7 +16,8 @@ from .ontology import (
     DCT,
     PROV,
     graph_with_prefixes,
-    iri_for_paragraph, iri_for_section,
+    iri_for_paragraph,
+    iri_for_section,
     safe_literal,
 )
 
@@ -104,4 +105,3 @@ def emit_nsf(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
 
 
 __all__ = ["emit_nsf"]
-

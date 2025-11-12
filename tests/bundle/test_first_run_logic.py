@@ -100,12 +100,19 @@ if __name__ == '__main__':
     fake_java_dir = tmp_path / "bin"
     fake_java_dir.mkdir()
     fake_java = fake_java_dir / "java"
-    _write_executable(fake_java, "#!/usr/bin/env python3\nprint('java version ""0""')\n")
+    _write_executable(
+        fake_java, "#!/usr/bin/env python3\nprint('java version " "0" "')\n"
+    )
 
     env = os.environ.copy()
     env["PATH"] = str(fake_java_dir) + os.pathsep + env.get("PATH", "")
 
-    subprocess.run(["pwsh", "-File", str(FIRST_RUN_SCRIPT), "-Path", str(bundle)], check=True, env=env, cwd=ROOT)
+    subprocess.run(
+        ["pwsh", "-File", str(FIRST_RUN_SCRIPT), "-Path", str(bundle)],
+        check=True,
+        env=env,
+        cwd=ROOT,
+    )
     marker = bundle / "fuseki" / "databases" / "first_run.ok"
     assert marker.exists()
     report = bundle / "kg" / "reports" / "bundle-smoke.txt"
@@ -113,6 +120,11 @@ if __name__ == '__main__':
     assert any(line.startswith("timestamp=") for line in contents)
 
     # Idempotent second run
-    subprocess.run(["pwsh", "-File", str(FIRST_RUN_SCRIPT), "-Path", str(bundle)], check=True, env=env, cwd=ROOT)
+    subprocess.run(
+        ["pwsh", "-File", str(FIRST_RUN_SCRIPT), "-Path", str(bundle)],
+        check=True,
+        env=env,
+        cwd=ROOT,
+    )
     assert marker.read_text().strip()
     assert (bundle / "fuseki" / "databases" / "tdb2" / "loader.ok").exists()

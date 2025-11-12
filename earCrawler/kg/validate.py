@@ -30,9 +30,7 @@ def run_sparql_checks(graph: Graph) -> list[tuple[str, int]]:
     return results
 
 
-def run_shacl(
-    graph: Graph, shapes_path: str | Path
-) -> tuple[bool, Graph, str]:
+def run_shacl(graph: Graph, shapes_path: str | Path) -> tuple[bool, Graph, str]:
     """Validate ``graph`` against ``shapes_path`` using ``pyshacl``."""
 
     conforms, results_graph, results_text = shacl_validate(
@@ -111,12 +109,9 @@ def validate_files(
 
     # Deterministic table output
     col_widths = [
-        max(len(h), *(len(r[i]) for r in rows))
-        for i, h in enumerate(headers)
+        max(len(h), *(len(r[i]) for r in rows)) for i, h in enumerate(headers)
     ]
-    header_line = " ".join(
-        h.ljust(col_widths[i]) for i, h in enumerate(headers)
-    )
+    header_line = " ".join(h.ljust(col_widths[i]) for i, h in enumerate(headers))
     print(header_line)
     for r in rows:
         print(" ".join(r[i].ljust(col_widths[i]) for i in range(len(headers))))

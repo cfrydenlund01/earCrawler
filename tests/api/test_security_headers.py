@@ -6,7 +6,9 @@ import pytest
 pytestmark = pytest.mark.enable_socket
 
 
-@pytest.mark.parametrize("path", ["/health", "/v1/search?q=x", "/v1/entities/urn:example:entity:1"])
+@pytest.mark.parametrize(
+    "path", ["/health", "/v1/search?q=x", "/v1/entities/urn:example:entity:1"]
+)
 def test_security_headers_present(app, path: str) -> None:
     res = app.get(path)
     assert res.headers["Cache-Control"] == "no-store"

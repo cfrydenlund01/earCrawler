@@ -5,9 +5,24 @@ from earCrawler.utils import perf_report
 
 
 def test_timeout_causes_failure(tmp_path):
-    report = {"runs": [{"results": [{"group": "lookup", "latencies_ms": [10], "errors": 0, "timeouts": 1}]}]}
+    report = {
+        "runs": [
+            {
+                "results": [
+                    {
+                        "group": "lookup",
+                        "latencies_ms": [10],
+                        "errors": 0,
+                        "timeouts": 1,
+                    }
+                ]
+            }
+        ]
+    }
     baseline = {"groups": {"lookup": {"p95_ms": 15, "p99_ms": 20}}}
-    budgets = {"scales": {"S": {"query_groups": {"lookup": {"p95_ms": 100, "p99_ms": 120}}}}}
+    budgets = {
+        "scales": {"S": {"query_groups": {"lookup": {"p95_ms": 100, "p99_ms": 120}}}}
+    }
     rp = tmp_path / "r.json"
     bp = tmp_path / "b.json"
     bud = tmp_path / "bud.yml"

@@ -9,7 +9,11 @@ from .dependencies import get_gateway, rate_limit
 router = APIRouter(prefix="/v1", tags=["lineage"])
 
 
-@router.get("/lineage/{entity_id}", response_model=LineageResponse, responses={404: {"model": ProblemDetails}})
+@router.get(
+    "/lineage/{entity_id}",
+    response_model=LineageResponse,
+    responses={404: {"model": ProblemDetails}},
+)
 async def lineage(
     entity_id: str,
     gateway: FusekiGateway = Depends(get_gateway),
@@ -31,5 +35,9 @@ async def lineage(
             timestamp = ts_value["value"]
         elif isinstance(ts_value, str):
             timestamp = ts_value
-        edges.append(LineageEdge(source=str(src), target=tgt, relation=relation, timestamp=timestamp))
+        edges.append(
+            LineageEdge(
+                source=str(src), target=tgt, relation=relation, timestamp=timestamp
+            )
+        )
     return LineageResponse(id=entity_id, edges=edges)

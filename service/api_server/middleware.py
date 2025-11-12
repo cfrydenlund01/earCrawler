@@ -19,12 +19,16 @@ from .schemas.errors import ProblemDetails
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, resolver: ApiKeyResolver, timeout_seconds: float) -> None:
+    def __init__(
+        self, app: ASGIApp, resolver: ApiKeyResolver, timeout_seconds: float
+    ) -> None:
         super().__init__(app)
         self._resolver = resolver
         self._timeout = timeout_seconds
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         trace_id = uuid.uuid4().hex
         start = time.perf_counter()
         identity = resolve_identity(request, self._resolver)
@@ -47,7 +51,8 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 status=429,
                 problem=problem,
                 retry_after=exc.retry_after,
-                rate_limit=request.state.rate_limit or {
+                rate_limit=request.state.rate_limit
+                or {
                     "limit": exc.limit,
                     "remaining": max(0, exc.remaining),
                     "retry_after": exc.retry_after,
@@ -86,7 +91,9 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 trace_id=trace_id,
             )
         duration = time.perf_counter() - start
-        _inject_headers(response.headers, trace_id, identity, duration, request.state.rate_limit)
+        _inject_headers(
+            response.headers, trace_id, identity, duration, request.state.rate_limit
+        )
         return response
 
 
@@ -95,7 +102,9 @@ class ConcurrencyLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._sem = asyncio.Semaphore(limit)
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         async with self._sem:
             return await call_next(request)
 
@@ -105,7 +114,9 @@ class BodyLimitMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self._limit = limit_bytes
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         length = request.headers.get("content-length")
         if length and int(length) > self._limit:
             return _problem_response(
@@ -140,7 +151,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     def __init__(self, app: ASGIApp) -> None:
         super().__init__(app)
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         response = await call_next(request)
         response.headers.setdefault("Cache-Control", "no-store")
         response.headers.setdefault("X-Content-Type-Options", "nosniff")

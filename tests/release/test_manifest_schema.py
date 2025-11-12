@@ -9,12 +9,14 @@ pytestmark = pytest.mark.usefixtures("require_pwsh")
 
 ROOT = Path(__file__).resolve().parents[2]
 
+
 def run_ps(script, *args, env=None):
     cmd = ["pwsh", "-File", str(ROOT / script)] + list(args)
     env_vars = dict(os.environ)
     if env:
         env_vars.update(env)
     subprocess.run(cmd, check=True, cwd=ROOT, env=env_vars)
+
 
 def test_manifest_schema(tmp_path):
     env = dict(SOURCE_DATE_EPOCH="946684800")

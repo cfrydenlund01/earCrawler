@@ -1,4 +1,5 @@
 """Helpers for retrieving secrets from env vars or Windows Credential Manager."""
+
 from __future__ import annotations
 
 import os

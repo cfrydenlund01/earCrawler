@@ -1,4 +1,5 @@
 """Helpers for recording provenance metadata with delta awareness."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -70,8 +71,7 @@ class ProvenanceRecorder:
 
     def _write_manifest(self) -> None:
         serialised = {
-            subject: entry.__dict__
-            for subject, entry in sorted(self._current.items())
+            subject: entry.__dict__ for subject, entry in sorted(self._current.items())
         }
         self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
         self.manifest_path.write_text(
@@ -100,7 +100,9 @@ class ProvenanceRecorder:
 
         subject_iri = str(subject)
         if isinstance(retrieved_at, str) and retrieved_at:
-            timestamp = retrieved_at if "T" in retrieved_at else retrieved_at + "T00:00:00Z"
+            timestamp = (
+                retrieved_at if "T" in retrieved_at else retrieved_at + "T00:00:00Z"
+            )
         else:
             timestamp = _utc_iso()
         entry = ProvenanceEntry(

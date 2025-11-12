@@ -40,12 +40,24 @@ class ApiKeyResolver:
     def resolve(self, candidate: str) -> Optional[Identity]:
         for label, value in self._env_keys.items():
             if value and value == candidate:
-                return Identity(key=f"api:{label}", display_name=label, authenticated=True, api_key_label=label)
+                return Identity(
+                    key=f"api:{label}",
+                    display_name=label,
+                    authenticated=True,
+                    api_key_label=label,
+                )
         try:
             stored = keyring.get_password(self._service_name, candidate)
             if stored:
-                return Identity(key=f"api:{candidate}", display_name=candidate, authenticated=True, api_key_label=candidate)
-        except Exception:  # pragma: no cover - defensive for environments without keyring backend
+                return Identity(
+                    key=f"api:{candidate}",
+                    display_name=candidate,
+                    authenticated=True,
+                    api_key_label=candidate,
+                )
+        except (
+            Exception
+        ):  # pragma: no cover - defensive for environments without keyring backend
             pass
         return None
 

@@ -31,7 +31,9 @@ class StubClient(SimpleNamespace):
     pass
 
 
-def setup_ingestor(monkeypatch, tmp_path, validate_return=(True, None, ""), loader_exc=None):
+def setup_ingestor(
+    monkeypatch, tmp_path, validate_return=(True, None, ""), loader_exc=None
+):
     Ingestor = _import_ingestor()
     tg = StubClient()
     fr = StubClient()
@@ -43,7 +45,9 @@ def setup_ingestor(monkeypatch, tmp_path, validate_return=(True, None, ""), load
 
     monkeypatch.setattr(ing, "map_entity_to_triples", lambda e: Graph())
     monkeypatch.setattr(ing, "map_document_to_triples", lambda d: Graph())
-    monkeypatch.setattr("earCrawler.ingestion.ingest.validate", lambda **kw: validate_return)
+    monkeypatch.setattr(
+        "earCrawler.ingestion.ingest.validate", lambda **kw: validate_return
+    )
 
     calls = []
 
@@ -66,7 +70,9 @@ def test_ingest_success(monkeypatch, tmp_path):
 
 def test_shacl_failure(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
-    ing, calls = setup_ingestor(monkeypatch, tmp_path, validate_return=(False, None, "bad"))
+    ing, calls = setup_ingestor(
+        monkeypatch, tmp_path, validate_return=(False, None, "bad")
+    )
     ing.run("foo")
     assert (tmp_path / "generated-triples.ttl").exists()
     assert calls == []

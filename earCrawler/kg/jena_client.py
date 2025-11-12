@@ -1,4 +1,5 @@
 """Thin convenience wrapper around :class:`earCrawler.kg.sparql.SPARQLClient`."""
+
 from __future__ import annotations
 
 import os
@@ -13,9 +14,7 @@ def _resolve_dataset_url(dataset_url: str | None) -> str:
     """Return the dataset URL taking environment overrides into account."""
 
     return (
-        dataset_url
-        or os.getenv("FUSEKI_DATASET_URL")
-        or DEFAULT_DATASET_URL
+        dataset_url or os.getenv("FUSEKI_DATASET_URL") or DEFAULT_DATASET_URL
     ).rstrip("/")
 
 
@@ -24,8 +23,16 @@ class JenaClient:
 
     def __init__(self, dataset_url: str | None = None, *, timeout: int = 15) -> None:
         self.dataset_url = _resolve_dataset_url(dataset_url)
-        query_endpoint = f"{self.dataset_url}/sparql" if not self.dataset_url.endswith("/sparql") else self.dataset_url
-        update_endpoint = f"{self.dataset_url}/update" if not self.dataset_url.endswith("/update") else self.dataset_url
+        query_endpoint = (
+            f"{self.dataset_url}/sparql"
+            if not self.dataset_url.endswith("/sparql")
+            else self.dataset_url
+        )
+        update_endpoint = (
+            f"{self.dataset_url}/update"
+            if not self.dataset_url.endswith("/update")
+            else self.dataset_url
+        )
         if query_endpoint.endswith("/update"):
             query_endpoint = query_endpoint[:-7] + "sparql"
         self._client = SPARQLClient(

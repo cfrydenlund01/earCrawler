@@ -49,10 +49,14 @@ def app() -> TestClient:
                 "source": "urn:example:entity:1",
                 "relation": "http://www.w3.org/ns/prov#used",
                 "target": "urn:example:artifact:2",
-                "timestamp": {"value": "2023-01-02T00:00:00Z", "datatype": "http://www.w3.org/2001/XMLSchema#dateTime"},
+                "timestamp": {
+                    "value": "2023-01-02T00:00:00Z",
+                    "datatype": "http://www.w3.org/2001/XMLSchema#dateTime",
+                },
             }
         ],
     }
+
     class FixtureFusekiClient(StubFusekiClient):
         async def query(self, template, query):  # type: ignore[override]
             if template.name == "entity_by_id" and "urn:example:entity:1" not in query:

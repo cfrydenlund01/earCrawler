@@ -10,11 +10,14 @@ from typing import Any
 
 from rdflib import Graph, URIRef, Literal
 from pyshacl import validate
+
 try:
     from pyshacl.errors import SHACLValidationError
 except Exception:  # pragma: no cover - fallback for pyshacl versions
+
     class SHACLValidationError(Exception):
         """Fallback SHACL validation error."""
+
 
 from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
@@ -39,13 +42,20 @@ class Ingestor:
     paths in source.
     """
 
-    def __init__(self, tradegov_client: TradeGovClient, fedreg_client: FederalRegisterClient, tdb_location: WindowsPath) -> None:
+    def __init__(
+        self,
+        tradegov_client: TradeGovClient,
+        fedreg_client: FederalRegisterClient,
+        tdb_location: WindowsPath,
+    ) -> None:
         self.tradegov_client = tradegov_client
         self.fedreg_client = fedreg_client
         self.tdb_location = tdb_location
         self.logger = logging.getLogger(__name__)
         # Load SHACL shapes path from secure config; do not hard-code in source.
-        self.shapes_path = Path(__file__).resolve().parents[1] / "ontology" / "shapes.ttl"
+        self.shapes_path = (
+            Path(__file__).resolve().parents[1] / "ontology" / "shapes.ttl"
+        )
 
     def map_entity_to_triples(self, entity: dict[str, Any]) -> Graph:
         """Map an entity JSON dictionary to RDF triples.

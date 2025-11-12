@@ -201,7 +201,9 @@ def score_pair(a: Entity, b: Entity, rules: dict) -> Tuple[float, dict]:
 # Reconciliation
 
 
-def _apply_overrides(left: str, right: str, rules: dict) -> Tuple[str | None, str | None]:
+def _apply_overrides(
+    left: str, right: str, rules: dict
+) -> Tuple[str | None, str | None]:
     pair = (left, right)
     if pair in rules.get("whitelist", {}):
         return "auto_merge", rules["whitelist"][pair]
@@ -272,14 +274,14 @@ def reconcile(entities: List[Entity], rules: dict, out_dir: Path) -> dict:
     # TTL merges
     ttl_path = Path("kg/delta/reconcile-merged.ttl")
     with ttl_path.open("w", encoding="utf-8") as fh:
-        fh.write("""
+        fh.write(
+            """
 @prefix owl: <http://www.w3.org/2002/07/owl#> .
-""")
+"""
+        )
         for sid, cid in canonical.items():
             if sid != cid:
-                fh.write(
-                    f"<urn:entity:{cid}> owl:sameAs <urn:entity:{sid}> .\n"
-                )
+                fh.write(f"<urn:entity:{cid}> owl:sameAs <urn:entity:{sid}> .\n")
 
     feature_avgs = {
         k: (feature_totals[k] / len(decisions) if decisions else 0.0)
@@ -305,4 +307,3 @@ def reconcile(entities: List[Entity], rules: dict, out_dir: Path) -> dict:
 
 # The module exposes functions used by the CLI and tests: normalize,
 # blocking_keys, load_rules, load_corpus, score_pair and reconcile.
-

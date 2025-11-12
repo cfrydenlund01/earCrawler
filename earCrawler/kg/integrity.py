@@ -8,6 +8,7 @@ import rdflib
 
 EAR_NS = rdflib.Namespace("https://ear.example.org/schema#")
 
+
 @dataclass
 class IntegrityIssue:
     name: str
@@ -43,7 +44,9 @@ WHERE {
 }
 
 
-def run_checks(graph: rdflib.Graph, queries: Dict[str, str] | None = None) -> List[IntegrityIssue]:
+def run_checks(
+    graph: rdflib.Graph, queries: Dict[str, str] | None = None
+) -> List[IntegrityIssue]:
     checks = []
     for name, query in (queries or QUERIES).items():
         result = graph.query(query)

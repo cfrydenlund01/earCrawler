@@ -34,12 +34,12 @@ class ORIClient:
             except requests.HTTPError as exc:
                 status = getattr(exc.response, "status_code", 0)
                 if 500 <= status < 600 and attempt < attempts - 1:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
                 raise ORIClientError(f"ORI request failed: {status}") from exc
             except requests.RequestException as exc:
                 if attempt < attempts - 1:
-                    time.sleep(2 ** attempt)
+                    time.sleep(2**attempt)
                     continue
                 raise ORIClientError(f"ORI request error: {exc}") from exc
         raise ORIClientError("ORI request failed after retries")

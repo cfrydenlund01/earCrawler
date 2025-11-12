@@ -23,7 +23,9 @@ def _logs_dir() -> Path:
 
 
 def _run_cli(args: list[str], *, quiet: bool) -> subprocess.CompletedProcess[str]:
-    return subprocess.run([_python_exe(), "-m", "earCrawler.cli", *args], capture_output=quiet, text=True)
+    return subprocess.run(
+        [_python_exe(), "-m", "earCrawler.cli", *args], capture_output=quiet, text=True
+    )
 
 
 @click.group()
@@ -49,7 +51,9 @@ def run_job_internal(job: str, dry_run: bool, quiet: bool) -> Path:
 
 @jobs.command("run")
 @click.argument("job", type=click.Choice(["tradegov", "federalregister"]))
-@click.option("--dry-run", is_flag=True, help="Skip network calls and run validations only")
+@click.option(
+    "--dry-run", is_flag=True, help="Skip network calls and run validations only"
+)
 @click.option("--quiet", is_flag=True, help="Suppress stdout from child commands")
 def run_job(job: str, dry_run: bool, quiet: bool) -> None:
     run_job_internal(job, dry_run, quiet)
@@ -62,7 +66,13 @@ def _execute_tradegov(run, dry_run: bool, quiet: bool) -> None:
     else:
         corpus_args.append("--live")
     _run_step(run, "corpus-build", corpus_args, quiet=quiet, dry_run=False)
-    _run_step(run, "corpus-validate", ["corpus", "validate", "--dir", "data"], quiet=quiet, dry_run=False)
+    _run_step(
+        run,
+        "corpus-validate",
+        ["corpus", "validate", "--dir", "data"],
+        quiet=quiet,
+        dry_run=False,
+    )
 
     bundle_args = ["bundle", "build"]
     _run_step(run, "bundle-build", bundle_args, quiet=quiet, dry_run=dry_run)
@@ -75,7 +85,13 @@ def _execute_federalregister(run, dry_run: bool, quiet: bool) -> None:
     else:
         corpus_args.append("--live")
     _run_step(run, "corpus-build", corpus_args, quiet=quiet, dry_run=False)
-    _run_step(run, "corpus-validate", ["corpus", "validate", "--dir", "data"], quiet=quiet, dry_run=False)
+    _run_step(
+        run,
+        "corpus-validate",
+        ["corpus", "validate", "--dir", "data"],
+        quiet=quiet,
+        dry_run=False,
+    )
 
     _run_step(run, "bundle-verify", ["bundle", "verify"], quiet=quiet, dry_run=dry_run)
 

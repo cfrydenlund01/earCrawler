@@ -11,10 +11,14 @@ from typing import Any, Iterable, Mapping, MutableMapping
 from earCrawler.utils.eventlog import write_event_log
 
 EMAIL_RE = __import__("re").compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
-TOKEN_RE = __import__("re").compile(r"(?:bearer\s+)?[A-Za-z0-9\-_=]{20,}", __import__("re").IGNORECASE)
+TOKEN_RE = __import__("re").compile(
+    r"(?:bearer\s+)?[A-Za-z0-9\-_=]{20,}", __import__("re").IGNORECASE
+)
 PATH_RE = __import__("re").compile(r"(?:[A-Za-z]:\\\\[^\s]+|/[^\s]+)")
 URL_QUERY_RE = __import__("re").compile(r"https?://[^\s?]+\?[^\s]+")
-GUID_RE = __import__("re").compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+GUID_RE = __import__("re").compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+)
 
 _LEVEL_MAP = {
     "DEBUG": logging.DEBUG,
@@ -49,7 +53,9 @@ def _sanitize(obj: Any) -> Any:
 def _truncate(details: Mapping[str, Any] | Iterable[Any], max_bytes: int) -> Any:
     if max_bytes <= 0:
         return details
-    serialized = json.dumps(details, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    serialized = json.dumps(
+        details, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    )
     blob = serialized.encode("utf-8")
     if len(blob) <= max_bytes:
         return details
@@ -98,7 +104,9 @@ class JsonLogger:
             return True
         return random.random() <= self._sample_rate
 
-    def _emit(self, level: str, event: str, fields: MutableMapping[str, Any]) -> dict[str, Any] | None:
+    def _emit(
+        self, level: str, event: str, fields: MutableMapping[str, Any]
+    ) -> dict[str, Any] | None:
         if not self.should_sample():
             return None
         entry: dict[str, Any] = {
@@ -117,17 +125,25 @@ class JsonLogger:
             entry["details"] = _truncate(sanitized, self._max_details_bytes)
         if fields:
             residual = _truncate(_sanitize(fields), self._max_details_bytes)
-            if "details" in entry and isinstance(entry["details"], dict) and isinstance(residual, dict):
+            if (
+                "details" in entry
+                and isinstance(entry["details"], dict)
+                and isinstance(residual, dict)
+            ):
                 entry["details"].update(residual)
             else:
                 entry["details"] = residual
-        payload = json.dumps(entry, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        payload = json.dumps(
+            entry, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        )
         self._logger.log(_LEVEL_MAP.get(level.upper(), logging.INFO), payload)
         if self._eventlog_enabled and entry.get("level") in {"ERROR", "WARNING"}:
             summary = event
             detail = entry.get("details")
             if isinstance(detail, dict):
-                reason = detail.get("reason") or detail.get("message") or detail.get("error")
+                reason = (
+                    detail.get("reason") or detail.get("message") or detail.get("error")
+                )
                 if reason:
                     summary = f"{event}: {reason}"
             write_event_log(summary[:300], level=entry["level"])

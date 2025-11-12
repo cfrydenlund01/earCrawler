@@ -20,6 +20,7 @@ def _allow_socket():
 def _load_app(monkeypatch, wrapper_cls):
     monkeypatch.setenv("SPARQL_ENDPOINT_URL", "http://example.com")
     import earCrawler.service.sparql_service as svc
+
     importlib.reload(svc)
     monkeypatch.setattr(svc, "SPARQLWrapper", wrapper_cls)
     return TestClient(svc.app)

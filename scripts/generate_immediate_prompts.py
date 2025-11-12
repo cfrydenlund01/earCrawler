@@ -152,20 +152,20 @@ PROMPT_FMT = (
     "Non-goals\n{non_goals}\n"
 )
 
-outdir = Path('Research/prompts')
+outdir = Path("Research/prompts")
 outdir.mkdir(parents=True, exist_ok=True)
 
 for item in IMMEDIATE:
     content = PROMPT_FMT.format(
-        base=BASE_HEADER.replace('\n', '\n- '),
-        goal=item['goal'],
-        scope='\n'.join(f'- {s}' for s in item['scope']),
-        key_files='\n'.join(f'- {p}' for p in item['key_files']),
-        deliverables='\n'.join(f'- {d}' for d in item['deliverables']),
-        acceptance='\n'.join(f'- {a}' for a in item['acceptance']),
-        validation='\n'.join(f'- `{c}`' for c in item['validation']),
-        non_goals='\n'.join(f'- {n}' for n in item['non_goals']),
+        base=BASE_HEADER.replace("\n", "\n- "),
+        goal=item["goal"],
+        scope="\n".join(f"- {s}" for s in item["scope"]),
+        key_files="\n".join(f"- {p}" for p in item["key_files"]),
+        deliverables="\n".join(f"- {d}" for d in item["deliverables"]),
+        acceptance="\n".join(f"- {a}" for a in item["acceptance"]),
+        validation="\n".join(f"- `{c}`" for c in item["validation"]),
+        non_goals="\n".join(f"- {n}" for n in item["non_goals"]),
     )
-    (outdir / f"{item['name']}_prompt.txt").write_text(content, encoding='utf-8')
+    (outdir / f"{item['name']}_prompt.txt").write_text(content, encoding="utf-8")
 
-print('Generated immediate prompts in', outdir)
+print("Generated immediate prompts in", outdir)

@@ -24,7 +24,11 @@ from .config import ApiSettings
 from .fuseki import FusekiClient, FusekiGateway, HttpFusekiClient, StubFusekiClient
 from .limits import RateLimiter
 from .logging_integration import ObservabilityMiddleware
-from .middleware import BodyLimitMiddleware, ConcurrencyLimitMiddleware, RequestContextMiddleware
+from .middleware import (
+    BodyLimitMiddleware,
+    ConcurrencyLimitMiddleware,
+    RequestContextMiddleware,
+)
 from .schemas import ProblemDetails
 from .templates import TemplateRegistry
 from .routers import build_router
@@ -77,7 +81,9 @@ def create_app(
     if fuseki_client is None:
         embedded = os.getenv("EARCRAWLER_API_EMBEDDED_FIXTURE") == "1"
         if settings.fuseki_url:
-            fuseki_client = HttpFusekiClient(endpoint=settings.fuseki_url, timeout=settings.request_timeout_seconds)
+            fuseki_client = HttpFusekiClient(
+                endpoint=settings.fuseki_url, timeout=settings.request_timeout_seconds
+            )
         else:
             responses = _EMBEDDED_FIXTURE if embedded else {}
             fuseki_client = StubFusekiClient(responses=responses)
@@ -107,11 +113,15 @@ def create_app(
     http_sink_cfg = observability.request_http_sink
     if http_sink_cfg.enabled and http_sink_cfg.endpoint:
         try:
-            sink = AsyncHTTPSink(TelemetryConfig(enabled=True, endpoint=http_sink_cfg.endpoint))
+            sink = AsyncHTTPSink(
+                TelemetryConfig(enabled=True, endpoint=http_sink_cfg.endpoint)
+            )
         except RuntimeError as exc:
             json_logger.warning("telemetry.http_sink.disabled", reason=str(exc))
         else:
-            queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(maxsize=http_sink_cfg.queue_max)
+            queue: asyncio.Queue[dict[str, object]] = asyncio.Queue(
+                maxsize=http_sink_cfg.queue_max
+            )
             flush_interval = max(0.1, http_sink_cfg.flush_ms / 1000.0)
             batch_size = max(1, http_sink_cfg.batch_size)
 
@@ -120,7 +130,9 @@ def create_app(
                 try:
                     while True:
                         try:
-                            item = await asyncio.wait_for(queue.get(), timeout=flush_interval)
+                            item = await asyncio.wait_for(
+                                queue.get(), timeout=flush_interval
+                            )
                             batch.append(item)
                             if len(batch) >= batch_size:
                                 await sink.send(list(batch))
@@ -163,10 +175,16 @@ def create_app(
             app.add_event_handler("startup", _start_request_logs)
             app.add_event_handler("shutdown", _stop_request_logs)
 
-    app.add_middleware(ObservabilityMiddleware, logger=json_logger, config=observability)
+    app.add_middleware(
+        ObservabilityMiddleware, logger=json_logger, config=observability
+    )
     app.add_middleware(BodyLimitMiddleware, limit_bytes=settings.request_body_limit)
     app.add_middleware(ConcurrencyLimitMiddleware, limit=settings.concurrency_limit)
-    app.add_middleware(RequestContextMiddleware, resolver=resolver, timeout_seconds=settings.request_timeout_seconds)
+    app.add_middleware(
+        RequestContextMiddleware,
+        resolver=resolver,
+        timeout_seconds=settings.request_timeout_seconds,
+    )
 
     app.state.registry = registry
     app.state.gateway = gateway
@@ -194,10 +212,15 @@ def create_app(
 
     @app.get("/openapi.yaml", include_in_schema=False)
     async def openapi_spec() -> Response:
-        return Response(content=_OPENAPI_PATH.read_text(encoding="utf-8"), media_type="application/yaml")
+        return Response(
+            content=_OPENAPI_PATH.read_text(encoding="utf-8"),
+            media_type="application/yaml",
+        )
 
     @app.exception_handler(RequestValidationError)
-    async def validation_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    async def validation_handler(
+        request: Request, exc: RequestValidationError
+    ) -> JSONResponse:
         trace_id = getattr(request.state, "trace_id", "")
         detail = exc.errors()
         problem = ProblemDetails(
@@ -208,7 +231,9 @@ def create_app(
             instance=str(request.url),
             trace_id=trace_id,
         )
-        return JSONResponse(status_code=422, content=problem.model_dump(exclude_none=True))
+        return JSONResponse(
+            status_code=422, content=problem.model_dump(exclude_none=True)
+        )
 
     @app.exception_handler(HTTPException)
     @app.exception_handler(StarletteHTTPException)
@@ -225,7 +250,11 @@ def create_app(
         headers = {}
         if exc.headers:
             headers.update(exc.headers)
-        return JSONResponse(status_code=exc.status_code, content=problem.model_dump(exclude_none=True), headers=headers)
+        return JSONResponse(
+            status_code=exc.status_code,
+            content=problem.model_dump(exclude_none=True),
+            headers=headers,
+        )
 
     return app
 

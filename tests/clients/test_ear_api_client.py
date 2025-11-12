@@ -8,7 +8,13 @@ from api_clients.ear_api_client import EarCrawlerApiClient, EarApiError
 
 
 class _StubResponse:
-    def __init__(self, *, payload: dict[str, Any], status_code: int = 200, content_type: str = "application/json") -> None:
+    def __init__(
+        self,
+        *,
+        payload: dict[str, Any],
+        status_code: int = 200,
+        content_type: str = "application/json",
+    ) -> None:
         self._payload = payload
         self.status_code = status_code
         self.headers = {"Content-Type": content_type}
@@ -23,7 +29,9 @@ class _StubSession:
         self.responses = responses
         self.calls: list[dict[str, Any]] = []
 
-    def request(self, method, url, params=None, json=None, headers=None, timeout=None):  # noqa: D401 - requests compat
+    def request(
+        self, method, url, params=None, json=None, headers=None, timeout=None
+    ):  # noqa: D401 - requests compat
         self.calls.append(
             {
                 "method": method,
@@ -45,7 +53,9 @@ def test_client_sets_x_api_key_and_query_params():
             _StubResponse(payload={"id": "urn:example:entity:1", "edges": []}),
         ]
     )
-    client = EarCrawlerApiClient("http://localhost:9001", api_key="dev-token", session=session)
+    client = EarCrawlerApiClient(
+        "http://localhost:9001", api_key="dev-token", session=session
+    )
 
     client.health()
     client.search_entities("export controls", limit=5, offset=2)
@@ -53,7 +63,11 @@ def test_client_sets_x_api_key_and_query_params():
 
     assert len(session.calls) == 3
     assert session.calls[0]["headers"]["X-Api-Key"] == "dev-token"
-    assert session.calls[1]["params"] == {"q": "export controls", "limit": "5", "offset": "2"}
+    assert session.calls[1]["params"] == {
+        "q": "export controls",
+        "limit": "5",
+        "offset": "2",
+    }
     assert session.calls[2]["url"].endswith("/v1/lineage/urn:example:entity:1")
 
 
@@ -68,8 +82,15 @@ def test_sparql_and_rag_payloads():
     client.run_template("search_entities", parameters={"q": "foo", "limit": 1})
     client.rag_query("export controls", top_k=2, include_lineage=True)
 
-    assert session.calls[0]["json"] == {"template": "search_entities", "parameters": {"q": "foo", "limit": 1}}
-    assert session.calls[1]["json"] == {"query": "export controls", "top_k": 2, "include_lineage": True}
+    assert session.calls[0]["json"] == {
+        "template": "search_entities",
+        "parameters": {"q": "foo", "limit": 1},
+    }
+    assert session.calls[1]["json"] == {
+        "query": "export controls",
+        "top_k": 2,
+        "include_lineage": True,
+    }
 
 
 def test_error_response_raises():

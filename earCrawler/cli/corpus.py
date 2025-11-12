@@ -47,11 +47,15 @@ def corpus() -> None:
     default=False,
     help="Fetch data from live sources instead of fixtures.",
 )
-def build_cmd(sources: tuple[str, ...], out_dir: Path, fixtures: Path, live: bool) -> None:
+def build_cmd(
+    sources: tuple[str, ...], out_dir: Path, fixtures: Path, live: bool
+) -> None:
     """Materialize curated JSONL corpora."""
 
     try:
-        manifest = build_corpus(list(sources), out_dir, live, fixtures if not live else None)
+        manifest = build_corpus(
+            list(sources), out_dir, live, fixtures if not live else None
+        )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
     summary = manifest.get("summary", {})

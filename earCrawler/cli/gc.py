@@ -12,7 +12,13 @@ from earCrawler.security import policy
 @click.command()
 @policy.require_role("operator")
 @policy.enforce
-@click.option("--dry-run", "dry_run", is_flag=True, default=False, help="Preview without deleting.")
+@click.option(
+    "--dry-run",
+    "dry_run",
+    is_flag=True,
+    default=False,
+    help="Preview without deleting.",
+)
 @click.option("--apply", "apply", is_flag=True, default=False, help="Delete files.")
 @click.option("--yes", is_flag=True, help="Confirm deletions without prompt.")
 @click.option(
@@ -21,8 +27,12 @@ from earCrawler.security import policy
     default="all",
 )
 @click.option("--max-age", type=int, default=None, help="Override max age in days.")
-@click.option("--max-mb", type=int, default=None, help="Override total size limit in MB.")
-@click.option("--keep-last", type=int, default=None, help="Override keep_last_n policy.")
+@click.option(
+    "--max-mb", type=int, default=None, help="Override total size limit in MB."
+)
+@click.option(
+    "--keep-last", type=int, default=None, help="Override keep_last_n policy."
+)
 def gc(
     dry_run: bool,
     apply: bool,

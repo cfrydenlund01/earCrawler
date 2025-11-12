@@ -41,7 +41,9 @@ def test_dry_run_and_whitelist(tmp_path, monkeypatch):
 
     outside = tmp_path / "other" / "bad.txt"
     _touch(outside, 10, 40)
-    res = retention.gc_paths([outside], retention.RetentionPolicy(max_days=1), dry_run=True)
+    res = retention.gc_paths(
+        [outside], retention.RetentionPolicy(max_days=1), dry_run=True
+    )
     assert res["errors"]
 
 

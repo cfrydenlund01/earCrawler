@@ -136,7 +136,12 @@ def main() -> None:
 
     retriever = DummyRetriever()
     legalbert = DummyLegalBERT()
-    agent = Agent(retriever=retriever, legalbert=legalbert, model=DummyModel(), tokenizer=DummyTokenizer())
+    agent = Agent(
+        retriever=retriever,
+        legalbert=legalbert,
+        model=DummyModel(),
+        tokenizer=DummyTokenizer(),
+    )
 
     process = psutil.Process() if psutil else None
 
@@ -158,9 +163,7 @@ def main() -> None:
         generation_latency = time.perf_counter() - start
 
         hit = expected.lower() in answer.lower() if expected else False
-        memory = (
-            process.memory_info().rss / (1024 ** 2) if process else 0.0
-        )
+        memory = process.memory_info().rss / (1024**2) if process else 0.0
 
         records.append(
             {
@@ -178,9 +181,7 @@ def main() -> None:
         )
 
     avg_retrieval = statistics.mean(r["retrieval_latency"] for r in records)
-    avg_classification = statistics.mean(
-        r["classification_latency"] for r in records
-    )
+    avg_classification = statistics.mean(r["classification_latency"] for r in records)
     avg_generation = statistics.mean(r["generation_latency"] for r in records)
     accuracy = statistics.mean(r["hit"] for r in records)
 

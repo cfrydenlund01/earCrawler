@@ -731,10 +731,9 @@ PY
       - name: Upload GC reports
         if: always()
         uses: actions/upload-artifact@v4
-
-     with:
-        name: gc-reports
-        path: kg/reports/*
+        with:
+          name: gc-reports
+          path: kg/reports/*
 
   reconcile-checks:
     needs: [provenance-checks, telemetry-tests]

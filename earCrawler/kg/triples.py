@@ -50,7 +50,6 @@ def export_triples(
     _write_sorted_ttl(g, out_ttl, prefix_text=prefix_text)
 
 
-
 def emit_tradegov_entities(
     records: list[dict[str, str]], out_dir: Path, prov_graph: Graph | None = None
 ) -> tuple[Path, int]:

@@ -1,6 +1,7 @@
 from perf.synth import generator
 from pathlib import Path
 
+
 def test_synth_determinism(tmp_path):
     out1 = tmp_path / "out1"
     m1 = generator.generate("S", out1)

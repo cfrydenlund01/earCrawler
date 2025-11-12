@@ -24,7 +24,13 @@ def _base(event: str) -> Dict[str, Any]:
 
 def cli_run(command: str, duration_ms: int, exit_code: int) -> Dict[str, Any]:
     ev = _base("cli_run")
-    ev.update({"command": command, "duration_ms": int(duration_ms), "exit_code": int(exit_code)})
+    ev.update(
+        {
+            "command": command,
+            "duration_ms": int(duration_ms),
+            "exit_code": int(exit_code),
+        }
+    )
     return ev
 
 
@@ -36,5 +42,7 @@ def crash_report(command: str, error: str) -> Dict[str, Any]:
 
 def http_error_summary(command: str, count: int) -> Dict[str, Any]:
     ev = _base("http_error_summary")
-    ev.update({"command": command, "duration_ms": 0, "exit_code": 0, "error": str(count)})
+    ev.update(
+        {"command": command, "duration_ms": 0, "exit_code": 0, "error": str(count)}
+    )
     return ev

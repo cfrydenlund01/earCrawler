@@ -107,7 +107,9 @@ def test_health_success(tmp_path):
     server = _start_server(port, ok=True)
     try:
         _write_config(tmp_path, port)
-        subprocess.run(["pwsh", "-File", str(HEALTH_SCRIPT), "-Path", str(tmp_path)], check=True)
+        subprocess.run(
+            ["pwsh", "-File", str(HEALTH_SCRIPT), "-Path", str(tmp_path)], check=True
+        )
     finally:
         server.shutdown()
 
@@ -116,4 +118,15 @@ def test_health_failure(tmp_path):
     port = _free_port()
     _write_config(tmp_path, port)
     with pytest.raises(subprocess.CalledProcessError):
-        subprocess.run(["pwsh", "-File", str(HEALTH_SCRIPT), "-Path", str(tmp_path), "-TimeoutSeconds", "2"], check=True)
+        subprocess.run(
+            [
+                "pwsh",
+                "-File",
+                str(HEALTH_SCRIPT),
+                "-Path",
+                str(tmp_path),
+                "-TimeoutSeconds",
+                "2",
+            ],
+            check=True,
+        )

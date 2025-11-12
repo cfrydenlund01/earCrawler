@@ -11,7 +11,11 @@ from .dependencies import get_gateway, rate_limit
 router = APIRouter(prefix="/v1", tags=["entities"])
 
 
-@router.get("/entities/{entity_id}", response_model=EntityView, responses={404: {"model": ProblemDetails}})
+@router.get(
+    "/entities/{entity_id}",
+    response_model=EntityView,
+    responses={404: {"model": ProblemDetails}},
+)
 async def get_entity(
     entity_id: str,
     request: Request,
@@ -41,7 +45,11 @@ async def get_entity(
         obj = row.get("value")
         if isinstance(predicate, str) and isinstance(obj, str):
             attributes_map[predicate].add(obj)
-    attributes = [EntityAttribute(predicate=pred, value=val) for pred, values in attributes_map.items() for val in sorted(values)]
+    attributes = [
+        EntityAttribute(predicate=pred, value=val)
+        for pred, values in attributes_map.items()
+        for val in sorted(values)
+    ]
     return EntityView(
         id=entity_id,
         labels=labels,

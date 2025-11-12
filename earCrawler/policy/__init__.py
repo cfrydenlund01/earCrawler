@@ -1,4 +1,5 @@
 """Policy hint loader for advisory linking rules."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -38,9 +39,10 @@ def load_hints(path: Path | None = None) -> List[PolicyHint]:
 
 
 def hints_manifest(hints: Iterable[PolicyHint]) -> str:
-    serialisable = [hint.__dict__ for hint in sorted(hints, key=lambda h: (h.part, h.program))]
+    serialisable = [
+        hint.__dict__ for hint in sorted(hints, key=lambda h: (h.part, h.program))
+    ]
     return json.dumps(serialisable, sort_keys=True)
 
 
 __all__ = ["PolicyHint", "load_hints", "hints_manifest", "HINTS_FILE"]
-

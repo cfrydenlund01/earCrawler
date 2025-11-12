@@ -6,7 +6,9 @@ from typing import Tuple
 
 
 class FusekiStubHandler(BaseHTTPRequestHandler):
-    def log_message(self, format: str, *args: object) -> None:  # pragma: no cover - suppress stderr
+    def log_message(
+        self, format: str, *args: object
+    ) -> None:  # pragma: no cover - suppress stderr
         return
 
     def do_GET(self) -> None:  # pragma: no cover - only used in CI
@@ -38,7 +40,9 @@ class FusekiStubHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
 
-def run(host: str = "127.0.0.1", port: int = 3030) -> Tuple[str, int]:  # pragma: no cover - utility
+def run(
+    host: str = "127.0.0.1", port: int = 3030
+) -> Tuple[str, int]:  # pragma: no cover - utility
     server = HTTPServer((host, port), FusekiStubHandler)
     try:
         server.serve_forever()

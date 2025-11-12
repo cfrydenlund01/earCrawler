@@ -16,7 +16,17 @@ def test_corpus_cli_build_validate_and_snapshot(tmp_path: Path, monkeypatch) -> 
 
     build_result = runner.invoke(
         corpus,
-        ["build", "-s", "ear", "-s", "nsf", "--out", "data", "--fixtures", str(fixtures)],
+        [
+            "build",
+            "-s",
+            "ear",
+            "-s",
+            "nsf",
+            "--out",
+            "data",
+            "--fixtures",
+            str(fixtures),
+        ],
     )
     assert build_result.exit_code == 0, build_result.output
     data_dir = tmp_path / "data"

@@ -40,7 +40,9 @@ class ObservabilityConfig:
     request_logging_max_details_bytes: int = 4096
     eventlog_enabled: bool = True
     health: HealthBudgets = field(default_factory=HealthBudgets)
-    request_http_sink: RequestHttpSinkConfig = field(default_factory=RequestHttpSinkConfig)
+    request_http_sink: RequestHttpSinkConfig = field(
+        default_factory=RequestHttpSinkConfig
+    )
 
 
 def _coerce_float(value: Any, default: float) -> float:
@@ -85,13 +87,23 @@ def load_observability_config(path: Path | None = None) -> ObservabilityConfig:
     """Load observability settings from YAML with safe defaults."""
 
     if path is None:
-        path = Path(__file__).resolve().parents[1] / "service" / "config" / "observability.yml"
+        path = (
+            Path(__file__).resolve().parents[1]
+            / "service"
+            / "config"
+            / "observability.yml"
+        )
     if not path.exists():
         return ObservabilityConfig()
     raw = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     health = _load_health(raw.get("health"))
-    sample_rate = max(0.0, min(1.0, _coerce_float(raw.get("request_logging", {}).get("sample_rate"), 1.0)))
-    max_details = _coerce_int(raw.get("request_logging", {}).get("max_details_bytes"), 4096)
+    sample_rate = max(
+        0.0,
+        min(1.0, _coerce_float(raw.get("request_logging", {}).get("sample_rate"), 1.0)),
+    )
+    max_details = _coerce_int(
+        raw.get("request_logging", {}).get("max_details_bytes"), 4096
+    )
     enabled = bool(raw.get("request_logging", {}).get("enabled", True))
     eventlog_enabled = bool(raw.get("eventlog", {}).get("enabled", True))
     http_sink = _load_http_sink(raw.get("request_http_sink"))

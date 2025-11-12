@@ -7,8 +7,12 @@ import yaml
 
 
 def test_warm_queries_align_with_budgets() -> None:
-    warmers = json.loads(Path("perf/warmers/warm_queries.json").read_text(encoding="utf-8"))
-    budgets = yaml.safe_load(Path("perf/config/perf_budgets.yml").read_text(encoding="utf-8"))["scales"]["S"]["query_groups"]
+    warmers = json.loads(
+        Path("perf/warmers/warm_queries.json").read_text(encoding="utf-8")
+    )
+    budgets = yaml.safe_load(
+        Path("perf/config/perf_budgets.yml").read_text(encoding="utf-8")
+    )["scales"]["S"]["query_groups"]
     warmer_groups = {entry["group"] for entry in warmers}
 
     # Every budgeted group must have a warmer and the underlying query file must be annotated.

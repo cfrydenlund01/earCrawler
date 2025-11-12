@@ -1,4 +1,5 @@
 """Simple in-memory call budget tracker for API usage limits."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -47,4 +48,3 @@ def consume(name: str, limit: int | None = None):
         yield
     finally:
         pass
-

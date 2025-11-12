@@ -16,8 +16,8 @@ import pytest
 from .java_utils import JAVA_VERSION_OK
 from .tooling import require_jena_and_fuseki
 
-SCRIPT = pathlib.Path('kg/scripts/ci-inference-smoke.ps1')
-REPORTS_DIR = pathlib.Path('kg') / 'reports'
+SCRIPT = pathlib.Path("kg/scripts/ci-inference-smoke.ps1")
+REPORTS_DIR = pathlib.Path("kg") / "reports"
 MISSING_TOOLS_MSG = (
     "The Apache Jena and Fuseki tools must be downloaded before running "
     "the inference smoke tests."
@@ -54,12 +54,17 @@ def test_inference_rdfs_smoke_when_tools_present():
         "JENA_HOME": str(jena_dir),
         "FUSEKI_HOME": str(fuseki_dir),
     }
-    result = subprocess.run([
-        "pwsh",
-        str(SCRIPT),
-        "-Mode",
-        "rdfs",
-    ], capture_output=True, text=True, env=env)
+    result = subprocess.run(
+        [
+            "pwsh",
+            str(SCRIPT),
+            "-Mode",
+            "rdfs",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     json_path = REPORTS_DIR / "inference-rdfs.json"
     select_path = REPORTS_DIR / "inference-rdfs-select.srj"
@@ -77,12 +82,17 @@ def test_inference_owlmini_smoke_when_tools_present():
         "JENA_HOME": str(jena_dir),
         "FUSEKI_HOME": str(fuseki_dir),
     }
-    result = subprocess.run([
-        "pwsh",
-        str(SCRIPT),
-        "-Mode",
-        "owlmini",
-    ], capture_output=True, text=True, env=env)
+    result = subprocess.run(
+        [
+            "pwsh",
+            str(SCRIPT),
+            "-Mode",
+            "owlmini",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+    )
     assert result.returncode == 0, result.stdout + result.stderr
     json_path = REPORTS_DIR / "inference-owlmini.json"
     select_path = REPORTS_DIR / "inference-owlmini-select.srj"

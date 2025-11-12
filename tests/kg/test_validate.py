@@ -15,7 +15,9 @@ def _copy(src: str, dst: Path) -> None:
 
 
 def _run(args: list[str]):
-    return run([sys.executable, "-m", "cli.kg_validate", *args], capture_output=True, text=True)
+    return run(
+        [sys.executable, "-m", "cli.kg_validate", *args], capture_output=True, text=True
+    )
 
 
 def test_validate_happy(tmp_path: Path) -> None:

@@ -7,14 +7,14 @@ from pathlib import Path
 
 import pytest
 
-SCRIPT = Path('kg/scripts/ci-incremental.ps1')
-MANIFEST = Path('kg/.kgstate/manifest.json')
-STATUS = Path('kg/reports/incremental-status.json')
-NOOP = Path('kg/reports/incremental-noop.txt')
-SNAPSHOT = Path('kg/snapshots/smoke.srj')
-INC_TOUCH = Path('kg/testdata/inc_touch.ttl')
+SCRIPT = Path("kg/scripts/ci-incremental.ps1")
+MANIFEST = Path("kg/.kgstate/manifest.json")
+STATUS = Path("kg/reports/incremental-status.json")
+NOOP = Path("kg/reports/incremental-noop.txt")
+SNAPSHOT = Path("kg/snapshots/smoke.srj")
+INC_TOUCH = Path("kg/testdata/inc_touch.ttl")
 
-run = pytest.mark.skipif(sys.platform != 'win32', reason='Windows-only')
+run = pytest.mark.skipif(sys.platform != "win32", reason="Windows-only")
 
 
 @pytest.fixture(autouse=True)
@@ -28,14 +28,14 @@ def cleanup_inc_touch():
 
 def _run_script():
     env = os.environ.copy()
-    env['INCREMENTAL_SCAN_ONLY'] = '1'
+    env["INCREMENTAL_SCAN_ONLY"] = "1"
     exe = _powershell_executable()
-    subprocess.run([exe, '-File', str(SCRIPT)], check=True, env=env)
+    subprocess.run([exe, "-File", str(SCRIPT)], check=True, env=env)
     return json.loads(STATUS.read_text())
 
 
 def _powershell_executable():
-    for candidate in ('pwsh', 'pwsh.exe', 'powershell', 'powershell.exe'):
+    for candidate in ("pwsh", "pwsh.exe", "powershell", "powershell.exe"):
         path = shutil.which(candidate)
         if path:
             return path
@@ -51,7 +51,7 @@ def test_incremental_first_run_marks_changed():
     if MANIFEST.exists():
         MANIFEST.unlink()
     status = _run_script()
-    assert status['changed'] is True
+    assert status["changed"] is True
     assert STATUS.exists()
 
 
@@ -59,7 +59,7 @@ def test_incremental_first_run_marks_changed():
 def test_incremental_second_run_noop():
     before = SNAPSHOT.stat().st_mtime
     status = _run_script()
-    assert status['changed'] is False
+    assert status["changed"] is False
     assert NOOP.exists()
     after = SNAPSHOT.stat().st_mtime
     assert before == after
@@ -67,7 +67,7 @@ def test_incremental_second_run_noop():
 
 @run
 def test_incremental_detects_touch(tmp_path):
-    INC_TOUCH.write_text('test')
+    INC_TOUCH.write_text("test")
     status = _run_script()
-    assert status['changed'] is True
-    assert 'kg/testdata/inc_touch.ttl' in status['paths']
+    assert status["changed"] is True
+    assert "kg/testdata/inc_touch.ttl" in status["paths"]

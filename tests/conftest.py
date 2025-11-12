@@ -18,11 +18,15 @@ except Exception:  # pragma: no cover - pytest_socket optional in some environme
 def _disable_network(request: pytest.FixtureRequest):
     """Restrict network access while allowing opt-in socket usage."""
 
-    if os.getenv("PYTEST_ALLOW_NETWORK", "0") == "1" or not (disable_socket and enable_socket):
+    if os.getenv("PYTEST_ALLOW_NETWORK", "0") == "1" or not (
+        disable_socket and enable_socket
+    ):
         yield
         return
 
-    allow_marker = request.node.get_closest_marker("enable_socket") or request.node.get_closest_marker("network")
+    allow_marker = request.node.get_closest_marker(
+        "enable_socket"
+    ) or request.node.get_closest_marker("network")
     hosts = ["127.0.0.1", "::1"] if socket_allow_hosts else None
 
     if allow_marker:

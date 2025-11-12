@@ -39,7 +39,9 @@ class Policy:
     def required_roles_for(self, command: str) -> List[str]:
         return self.commands.get(command, [])
 
-    def check_access(self, user: str, command: str, required: Iterable[str] | None = None) -> Tuple[bool, str]:
+    def check_access(
+        self, user: str, command: str, required: Iterable[str] | None = None
+    ) -> Tuple[bool, str]:
         roles = self.roles_for_user(user)
         needed = list(required) if required else self.required_roles_for(command)
         if not needed:
@@ -120,6 +122,7 @@ def enforce(fn: Callable) -> Callable:
                     break
                 parent_ctx = parent_ctx.parent
         from . import identity
+
         ident = identity.whoami()
         required = getattr(fn, "required_roles", None)
         if required is None and ctx.command is not None:
@@ -127,15 +130,33 @@ def enforce(fn: Callable) -> Callable:
         allowed, msg = pol.check_access(ident["user"], cmd, required)
         args_sanitized = str(redaction.redact(" ".join(sys.argv[1:])))
         if not allowed:
-            ledger.append_event("denied", ident["user"], ident["roles"], cmd, args_sanitized, 1, 0)
+            ledger.append_event(
+                "denied", ident["user"], ident["roles"], cmd, args_sanitized, 1, 0
+            )
             raise click.ClickException(msg)
         start = time.time()
         try:
             rv = fn(*args, **kwargs)
-            ledger.append_event("command", ident["user"], ident["roles"], cmd, args_sanitized, 0, int((time.time()-start)*1000))
+            ledger.append_event(
+                "command",
+                ident["user"],
+                ident["roles"],
+                cmd,
+                args_sanitized,
+                0,
+                int((time.time() - start) * 1000),
+            )
             return rv
         except Exception:
-            ledger.append_event("command", ident["user"], ident["roles"], cmd, args_sanitized, 1, int((time.time()-start)*1000))
+            ledger.append_event(
+                "command",
+                ident["user"],
+                ident["roles"],
+                cmd,
+                args_sanitized,
+                1,
+                int((time.time() - start) * 1000),
+            )
             raise
 
     return wrapper

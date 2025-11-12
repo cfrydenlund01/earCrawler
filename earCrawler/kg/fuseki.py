@@ -115,7 +115,9 @@ def start_fuseki(
     return proc
 
 
-def wait_until_ready(port: int, timeout_s: int = 30, proc: subprocess.Popen | None = None) -> None:
+def wait_until_ready(
+    port: int, timeout_s: int = 30, proc: subprocess.Popen | None = None
+) -> None:
     """Poll ``/$/ping`` until Fuseki responds or timeout elapses."""
 
     deadline = time.time() + timeout_s
@@ -144,7 +146,9 @@ def running_fuseki(
 ):
     """Context manager to start and terminate Fuseki."""
 
-    proc = start_fuseki(db_dir, dataset=dataset, port=port, wait=True, java_opts=java_opts)
+    proc = start_fuseki(
+        db_dir, dataset=dataset, port=port, wait=True, java_opts=java_opts
+    )
     try:
         yield proc
     finally:  # pragma: no branch - cleanup

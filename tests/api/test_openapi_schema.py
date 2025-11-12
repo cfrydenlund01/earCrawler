@@ -14,7 +14,9 @@ def test_openapi_schema_matches_routes(app) -> None:
     data = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
     assert data["openapi"].startswith("3.1")
     spec_paths = set(data["paths"].keys())
-    app_paths = {route.path for route in app.app.routes if getattr(route, "methods", None)}
+    app_paths = {
+        route.path for route in app.app.routes if getattr(route, "methods", None)
+    }
     for path in spec_paths:
         assert path in app_paths, f"Path {path} missing from application routes"
     assert "/health" in spec_paths

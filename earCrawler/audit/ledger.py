@@ -58,8 +58,15 @@ def _commit_hash() -> str:
         return "unknown"
 
 
-def append_event(event: str, user: str, roles: Iterable[str], command: str, args_sanitized: str,
-                 exit_code: int, duration_ms: int) -> None:
+def append_event(
+    event: str,
+    user: str,
+    roles: Iterable[str],
+    command: str,
+    args_sanitized: str,
+    exit_code: int,
+    duration_ms: int,
+) -> None:
     path = current_log_path()
     path.parent.mkdir(parents=True, exist_ok=True)
     entry: Dict[str, Any] = {
@@ -78,12 +85,20 @@ def append_event(event: str, user: str, roles: Iterable[str], command: str, args
     entry["chain_prev"] = prev
     sanitized = dict(entry)
     sanitized["args_sanitized"] = redaction.redact(entry.get("args_sanitized", ""))
-    base = {k: sanitized[k] for k in sanitized if k not in {"chain_prev", "chain_hash", "hmac"}}
+    base = {
+        k: sanitized[k]
+        for k in sanitized
+        if k not in {"chain_prev", "chain_hash", "hmac"}
+    }
     canonical = json.dumps(base, sort_keys=True, separators=(",", ":"))
-    sanitized["chain_hash"] = hashlib.sha256((prev + canonical).encode("utf-8")).hexdigest()
+    sanitized["chain_hash"] = hashlib.sha256(
+        (prev + canonical).encode("utf-8")
+    ).hexdigest()
     hmac_key = cred_store.get_secret("EARCTL_AUDIT_HMAC_KEY")
     if hmac_key:
-        sanitized["hmac"] = hmaclib.new(hmac_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest()
+        sanitized["hmac"] = hmaclib.new(
+            hmac_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
     try:
         with path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(sanitized, ensure_ascii=False) + "\n")
@@ -115,13 +130,26 @@ def verify_chain(path: Path) -> bool:
     with path.open("r", encoding="utf-8") as fh:
         for line in fh:
             entry = json.loads(line)
-            canonical = json.dumps({k: entry[k] for k in entry if k not in {"chain_prev", "chain_hash", "hmac"}},
-                                   sort_keys=True, separators=(",", ":"))
+            canonical = json.dumps(
+                {
+                    k: entry[k]
+                    for k in entry
+                    if k not in {"chain_prev", "chain_hash", "hmac"}
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            )
             expected = hashlib.sha256((prev + canonical).encode("utf-8")).hexdigest()
             if entry.get("chain_prev") != prev or entry.get("chain_hash") != expected:
                 return False
             hmac_key = cred_store.get_secret("EARCTL_AUDIT_HMAC_KEY")
-            if hmac_key and entry.get("hmac") != hmaclib.new(hmac_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256).hexdigest():
+            if (
+                hmac_key
+                and entry.get("hmac")
+                != hmaclib.new(
+                    hmac_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256
+                ).hexdigest()
+            ):
                 return False
             prev = entry["chain_hash"]
     return True

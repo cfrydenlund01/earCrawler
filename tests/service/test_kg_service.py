@@ -52,6 +52,7 @@ def _load_app(monkeypatch, wrapper_cls, validate_func, tmp_path) -> TestClient:
     monkeypatch.setenv("SHAPES_FILE_PATH", str(shapes_file))
 
     import earCrawler.service.kg_service as svc
+
     importlib.reload(svc)
     monkeypatch.setattr(svc, "SPARQLWrapper", wrapper_cls)
     monkeypatch.setattr(svc, "validate", validate_func)
@@ -59,20 +60,26 @@ def _load_app(monkeypatch, wrapper_cls, validate_func, tmp_path) -> TestClient:
 
 
 def test_query_success(monkeypatch, tmp_path):
-    client = _load_app(monkeypatch, _GoodWrapper, lambda **_: (True, None, ""), tmp_path)
+    client = _load_app(
+        monkeypatch, _GoodWrapper, lambda **_: (True, None, ""), tmp_path
+    )
     resp = client.post("/kg/query", json={"sparql": "SELECT * WHERE {}"})
     assert resp.status_code == 200
     assert resp.json() == {"results": [{"x": {"value": "1"}}]}
 
 
 def test_query_invalid(monkeypatch, tmp_path):
-    client = _load_app(monkeypatch, _GoodWrapper, lambda **_: (True, None, ""), tmp_path)
+    client = _load_app(
+        monkeypatch, _GoodWrapper, lambda **_: (True, None, ""), tmp_path
+    )
     resp = client.post("/kg/query", json={"sparql": "CONSTRUCT {}"})
     assert resp.status_code == 400
 
 
 def test_query_http_error(monkeypatch, tmp_path):
-    client = _load_app(monkeypatch, _HttpErrorWrapper, lambda **_: (True, None, ""), tmp_path)
+    client = _load_app(
+        monkeypatch, _HttpErrorWrapper, lambda **_: (True, None, ""), tmp_path
+    )
     resp = client.post("/kg/query", json={"sparql": "SELECT * WHERE {}"})
     assert resp.status_code == 502
 
@@ -101,7 +108,9 @@ def test_insert_http_error(monkeypatch, tmp_path):
 
 
 def test_health(monkeypatch, tmp_path):
-    client = _load_app(monkeypatch, _GoodWrapper, lambda **_: (True, None, ""), tmp_path)
+    client = _load_app(
+        monkeypatch, _GoodWrapper, lambda **_: (True, None, ""), tmp_path
+    )
     resp = client.get("/health")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}

@@ -17,7 +17,7 @@ def diff_text(left: Path, right: Path) -> Dict[str, Any]:
     diff = list(
         difflib.unified_diff(a, b, fromfile=str(left), tofile=str(right), lineterm="")
     )
-    changed = any(line.startswith(('+', '-')) for line in diff[2:])
+    changed = any(line.startswith(("+", "-")) for line in diff[2:])
     return {"changed": changed, "diff": "\n".join(diff)}
 
 
@@ -25,7 +25,10 @@ def _normalize_json(obj: Any) -> Any:
     if isinstance(obj, dict):
         return {k: _normalize_json(obj[k]) for k in sorted(obj)}
     if isinstance(obj, list):
-        return sorted((_normalize_json(x) for x in obj), key=lambda x: json.dumps(x, sort_keys=True))
+        return sorted(
+            (_normalize_json(x) for x in obj),
+            key=lambda x: json.dumps(x, sort_keys=True),
+        )
     return obj
 
 
@@ -36,14 +39,20 @@ def diff_srj(left: Path, right: Path) -> Dict[str, Any]:
     b_str = json.dumps(b, sort_keys=True, indent=2)
     diff = list(
         difflib.unified_diff(
-            a_str.splitlines(), b_str.splitlines(), fromfile=str(left), tofile=str(right), lineterm=""
+            a_str.splitlines(),
+            b_str.splitlines(),
+            fromfile=str(left),
+            tofile=str(right),
+            lineterm="",
         )
     )
-    changed = any(line.startswith(('+', '-')) for line in diff[2:])
+    changed = any(line.startswith(("+", "-")) for line in diff[2:])
     return {"changed": changed, "diff": "\n".join(diff)}
 
 
-def write_report(result: Dict[str, Any], txt_path: Path | None, json_path: Path | None) -> None:
+def write_report(
+    result: Dict[str, Any], txt_path: Path | None, json_path: Path | None
+) -> None:
     if txt_path:
         txt_path.write_text(result.get("diff", ""), encoding="utf-8")
     if json_path:

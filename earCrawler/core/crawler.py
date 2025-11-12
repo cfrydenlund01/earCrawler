@@ -8,15 +8,19 @@ from typing import Dict, List, Tuple, TYPE_CHECKING
 try:
     from api_clients.tradegov_client import TradeGovError
 except Exception:  # pragma: no cover - fallback for non-Windows env
+
     class TradeGovError(Exception):
         """Fallback TradeGov error when client module is unavailable."""
+
 
 try:
     from api_clients.federalregister_client import FederalRegisterError
 except Exception:  # pragma: no cover - fallback for non-Windows env
+
     class FederalRegisterError(Exception):
         """Fallback Federal Register error when client module is
         unavailable."""
+
 
 if TYPE_CHECKING:  # pragma: no cover - type hints only
     from api_clients.tradegov_client import TradeGovClient

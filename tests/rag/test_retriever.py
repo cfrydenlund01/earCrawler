@@ -80,9 +80,9 @@ class StubFaiss(SimpleNamespace):
 def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
     index = StubIndex()
     faiss_mod = StubFaiss(index)
-    monkeypatch.setitem(sys.modules, 'faiss', faiss_mod)
+    monkeypatch.setitem(sys.modules, "faiss", faiss_mod)
     st_mod = SimpleNamespace(SentenceTransformer=lambda name: DummyModel(name))
-    monkeypatch.setitem(sys.modules, 'sentence_transformers', st_mod)
+    monkeypatch.setitem(sys.modules, "sentence_transformers", st_mod)
     tg_mod = SimpleNamespace(TradeGovClient=object)
     fr_mod = SimpleNamespace(FederalRegisterClient=object)
     pkg_mod = SimpleNamespace(
@@ -91,39 +91,40 @@ def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
         FederalRegisterClient=object,
         FederalRegisterError=Exception,
     )
-    monkeypatch.setitem(sys.modules, 'api_clients.tradegov_client', tg_mod)
+    monkeypatch.setitem(sys.modules, "api_clients.tradegov_client", tg_mod)
     monkeypatch.setitem(
         sys.modules,
-        'api_clients.federalregister_client',
+        "api_clients.federalregister_client",
         fr_mod,
     )
-    monkeypatch.setitem(sys.modules, 'api_clients', pkg_mod)
+    monkeypatch.setitem(sys.modules, "api_clients", pkg_mod)
     import earCrawler.rag.retriever as retriever
+
     importlib.reload(retriever)
     monkeypatch.setattr(
         retriever.Retriever,
-        '_load_index',
+        "_load_index",
         lambda self, dim: index,
     )
-    model = DummyModel('x')
+    model = DummyModel("x")
     model.fail_once = fail_encode
-    monkeypatch.setattr(retriever, 'SentenceTransformer', lambda name: model)
-    monkeypatch.setattr(retriever, 'faiss', faiss_mod)
+    monkeypatch.setattr(retriever, "SentenceTransformer", lambda name: model)
+    monkeypatch.setattr(retriever, "faiss", faiss_mod)
     r = retriever.Retriever(
         SimpleNamespace(),
         SimpleNamespace(),
-        index_path=Path(tmp_path / 'idx.faiss'),
+        index_path=Path(tmp_path / "idx.faiss"),
     )
     return r, model, index, faiss_mod
 
 
 def test_add_documents_creates_index(monkeypatch, tmp_path):
     r, model, index, faiss_mod = _load_retriever(monkeypatch, tmp_path)
-    docs = [{'text': 'a'}, {'text': 'b'}]
+    docs = [{"text": "a"}, {"text": "b"}]
     r.add_documents(docs)
     assert len(index.added[0]) == 2
     assert faiss_mod.write_args[1] == str(r.index_path)
-    meta = pickle.load(open(r.meta_path, 'rb'))
+    meta = pickle.load(open(r.meta_path, "rb"))
     assert meta == docs
 
 
@@ -136,15 +137,15 @@ def test_add_documents_empty(monkeypatch, tmp_path):
 
 def test_query_returns_docs(monkeypatch, tmp_path):
     r, model, index, faiss_mod = _load_retriever(monkeypatch, tmp_path)
-    docs = [{'text': 'a'}, {'text': 'b'}]
+    docs = [{"text": "a"}, {"text": "b"}]
     r.add_documents(docs)
-    result = r.query('hi', k=2)
+    result = r.query("hi", k=2)
     assert result == docs[:2]
 
 
 def test_query_no_index(monkeypatch, tmp_path):
     r, _m, index, _f = _load_retriever(monkeypatch, tmp_path)
-    result = r.query('hi')
+    result = r.query("hi")
     assert result == []
 
 
@@ -154,7 +155,7 @@ def test_retry_on_encode_failure(monkeypatch, tmp_path):
         tmp_path,
         fail_encode=True,
     )
-    docs = [{'text': 'a'}]
+    docs = [{"text": "a"}]
     r.add_documents(docs)
     # encode should be called twice due to retry
     assert len(model.calls) == 2

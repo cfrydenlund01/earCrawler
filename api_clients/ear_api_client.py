@@ -1,4 +1,5 @@
 """Typed client for the EarCrawler public API facade."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -51,7 +52,9 @@ class EarCrawlerApiClient:
         headers = {"Accept": "application/json"}
         if self.api_key:
             headers["X-Api-Key"] = self.api_key
-        resp = self._session.request(method, url, params=params, json=json, headers=headers, timeout=self.timeout)
+        resp = self._session.request(
+            method, url, params=params, json=json, headers=headers, timeout=self.timeout
+        )
         if resp.status_code >= 400:
             raise EarApiError(f"{resp.status_code}: {resp.text}")
         if resp.headers.get("Content-Type", "").startswith("application/json"):
@@ -63,7 +66,9 @@ class EarCrawlerApiClient:
         """Return ``/health`` response."""
         return self._request("GET", "/health")
 
-    def search_entities(self, query: str, *, limit: int = 10, offset: int = 0) -> dict[str, Any]:
+    def search_entities(
+        self, query: str, *, limit: int = 10, offset: int = 0
+    ) -> dict[str, Any]:
         """Call ``/v1/search`` with query parameters."""
         params = {"q": query, "limit": str(limit), "offset": str(offset)}
         return self._request("GET", "/v1/search", params=params)
@@ -76,12 +81,16 @@ class EarCrawlerApiClient:
         """Fetch lineage edges via ``/v1/lineage/{urn}``."""
         return self._request("GET", f"/v1/lineage/{urn}")
 
-    def run_template(self, template: str, *, parameters: Optional[Mapping[str, Any]] = None) -> dict[str, Any]:
+    def run_template(
+        self, template: str, *, parameters: Optional[Mapping[str, Any]] = None
+    ) -> dict[str, Any]:
         """Execute an allow-listed SPARQL template via ``/v1/sparql``."""
         payload = {"template": template, "parameters": dict(parameters or {})}
         return self._request("POST", "/v1/sparql", json=payload)
 
-    def rag_query(self, query: str, *, top_k: int = 3, include_lineage: bool = False) -> dict[str, Any]:
+    def rag_query(
+        self, query: str, *, top_k: int = 3, include_lineage: bool = False
+    ) -> dict[str, Any]:
         """Call the ``/v1/rag/query`` endpoint."""
         payload = {
             "query": query,

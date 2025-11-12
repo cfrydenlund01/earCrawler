@@ -63,9 +63,7 @@ def main(
             paths.extend([glob_pattern, *ctx.args])
         else:
             pattern_path = Path(glob_pattern)
-            paths.extend(
-                str(p) for p in pattern_path.parent.glob(pattern_path.name)
-            )
+            paths.extend(str(p) for p in pattern_path.parent.glob(pattern_path.name))
     paths.extend(str(p) for p in ttls)
 
     if shapes is None:

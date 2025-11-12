@@ -9,7 +9,9 @@ from .dependencies import get_gateway, rate_limit
 router = APIRouter(prefix="/v1", tags=["search"])
 
 
-@router.get("/search", response_model=SearchResponse, responses={429: {"model": ProblemDetails}})
+@router.get(
+    "/search", response_model=SearchResponse, responses={429: {"model": ProblemDetails}}
+)
 async def search(
     q: str = Query(..., min_length=1, max_length=128, description="Search query"),
     limit: int = Query(10, ge=1, le=50),
@@ -17,7 +19,9 @@ async def search(
     gateway: FusekiGateway = Depends(get_gateway),
     _: None = Depends(rate_limit("search")),
 ) -> SearchResponse:
-    rows = await gateway.select("search_entities", {"q": q, "limit": limit, "offset": offset})
+    rows = await gateway.select(
+        "search_entities", {"q": q, "limit": limit, "offset": offset}
+    )
     hits: list[SearchHit] = []
     for row in rows:
         score_raw = row.get("score")
@@ -27,7 +31,9 @@ async def search(
                 id=str(row.get("entity")),
                 label=row.get("label") if isinstance(row.get("label"), str) else None,
                 score=round(score, 4),
-                snippet=row.get("snippet") if isinstance(row.get("snippet"), str) else None,
+                snippet=(
+                    row.get("snippet") if isinstance(row.get("snippet"), str) else None
+                ),
             )
         )
     return SearchResponse(total=len(hits), results=hits)

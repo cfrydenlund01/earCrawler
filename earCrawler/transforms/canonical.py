@@ -1,4 +1,5 @@
 """Canonicalization helpers for deterministic IRIs and literals."""
+
 from __future__ import annotations
 
 import json
@@ -48,20 +49,16 @@ class CanonicalRegistry:
         else:
             data = _load_embedded_aliases()
         self._name_aliases = {
-            _normalise_key(k): v.strip()
-            for k, v in data.get("names", {}).items()
+            _normalise_key(k): v.strip() for k, v in data.get("names", {}).items()
         }
         self._country_aliases = {
-            _normalise_key(k): v.strip()
-            for k, v in data.get("countries", {}).items()
+            _normalise_key(k): v.strip() for k, v in data.get("countries", {}).items()
         }
         self._program_aliases = {
-            _normalise_key(k): v.strip()
-            for k, v in data.get("programs", {}).items()
+            _normalise_key(k): v.strip() for k, v in data.get("programs", {}).items()
         }
         self._deprecated_ids = {
-            k.strip(): v.strip()
-            for k, v in data.get("deprecated_ids", {}).items()
+            k.strip(): v.strip() for k, v in data.get("deprecated_ids", {}).items()
         }
 
     # ------------------------------------------------------------------

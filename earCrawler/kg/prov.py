@@ -124,6 +124,7 @@ def write_prov_files(graph: Graph, out_dir) -> None:
         for line in nq_lines:
             f.write(line + "\n")
 
+
 __all__ = [
     "new_prov_graph",
     "add_provenance",

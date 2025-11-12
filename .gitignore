@@ -2,6 +2,7 @@ __pycache__/
 /tools/
 !tools/.gitkeep
 .venv/
+.env
 kg/reports/
 kg/shapes.ttl
 perf/synth/out/

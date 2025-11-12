@@ -30,7 +30,9 @@ def test_kg_query_select(tmp_path, monkeypatch):
     monkeypatch.setattr(sparql.requests.Session, "get", fake_get)
     runner = CliRunner()
     out = tmp_path / "rows.json"
-    result = runner.invoke(cli.kg_query, ["--sparql", "SELECT * WHERE { ?s ?p ?o }", "-o", str(out)])
+    result = runner.invoke(
+        cli.kg_query, ["--sparql", "SELECT * WHERE { ?s ?p ?o }", "-o", str(out)]
+    )
     assert result.exit_code == 0
     content = json.loads(out.read_text())
     assert len(content["results"]["bindings"]) == 2
@@ -49,7 +51,9 @@ def test_kg_query_ask(tmp_path, monkeypatch):
     monkeypatch.setattr(sparql.requests.Session, "get", fake_get)
     runner = CliRunner()
     out = tmp_path / "ask.json"
-    result = runner.invoke(cli.kg_query, ["--form", "ask", "--sparql", "ASK { }", "-o", str(out)])
+    result = runner.invoke(
+        cli.kg_query, ["--form", "ask", "--sparql", "ASK { }", "-o", str(out)]
+    )
     assert result.exit_code == 0
     content = json.loads(out.read_text())
     assert content["boolean"] is True
@@ -68,7 +72,14 @@ def test_kg_query_construct(tmp_path, monkeypatch):
     out = tmp_path / "graph.nt"
     result = runner.invoke(
         cli.kg_query,
-        ["--form", "construct", "--sparql", "CONSTRUCT WHERE { ?s ?p ?o }", "-o", str(out)],
+        [
+            "--form",
+            "construct",
+            "--sparql",
+            "CONSTRUCT WHERE { ?s ?p ?o }",
+            "-o",
+            str(out),
+        ],
     )
     assert result.exit_code == 0
     text = out.read_text()

@@ -8,7 +8,11 @@ from earCrawler.corpus import build_corpus, validate_corpus, snapshot_corpus
 
 
 def _read_jsonl(path: Path) -> list[dict]:
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    return [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
 
 
 def test_build_corpus_with_fixtures(tmp_path: Path) -> None:
@@ -25,12 +29,18 @@ def test_build_corpus_with_fixtures(tmp_path: Path) -> None:
 
     ear_records = _read_jsonl(data_dir / "ear_corpus.jsonl")
     nsf_records = _read_jsonl(data_dir / "nsf_corpus.jsonl")
-    assert any("[redacted]" in rec["paragraph"] for rec in ear_records), "PII should be redacted"
+    assert any(
+        "[redacted]" in rec["paragraph"] for rec in ear_records
+    ), "PII should be redacted"
     assert all("example.com?q" not in rec["paragraph"] for rec in ear_records)
-    assert len(nsf_records) == 1, "duplicate NSF paragraph should be removed after dedupe"
+    assert (
+        len(nsf_records) == 1
+    ), "duplicate NSF paragraph should be removed after dedupe"
 
     first_run = (data_dir / "ear_corpus.jsonl").read_text(encoding="utf-8")
-    second_manifest = build_corpus(["ear", "nsf"], data_dir, live=False, fixtures=fixtures)
+    second_manifest = build_corpus(
+        ["ear", "nsf"], data_dir, live=False, fixtures=fixtures
+    )
     assert second_manifest["summary"] == manifest["summary"]
     assert first_run == (data_dir / "ear_corpus.jsonl").read_text(encoding="utf-8")
     assert validate_corpus(data_dir) == []

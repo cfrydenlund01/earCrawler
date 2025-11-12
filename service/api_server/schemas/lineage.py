@@ -8,7 +8,9 @@ class LineageEdge(BaseModel):
     source: str = Field(..., description="Subject entity IRI")
     target: str = Field(..., description="Object entity IRI")
     relation: str = Field(..., description="Predicate IRI")
-    timestamp: Optional[str] = Field(default=None, description="prov:atTime literal if present")
+    timestamp: Optional[str] = Field(
+        default=None, description="prov:atTime literal if present"
+    )
 
 
 class LineageResponse(BaseModel):

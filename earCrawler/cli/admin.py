@@ -34,12 +34,18 @@ def _start_run(prefix: str) -> tuple[Path, str]:
 
 
 @admin.command()
-@click.option("--canonical", type=click.Path(path_type=Path), default=Path("kg/canonical"))
-@click.option("--out", type=click.Path(path_type=Path), default=Path("dist/offline_bundle"))
+@click.option(
+    "--canonical", type=click.Path(path_type=Path), default=Path("kg/canonical")
+)
+@click.option(
+    "--out", type=click.Path(path_type=Path), default=Path("dist/offline_bundle")
+)
 def build(canonical: Path, out: Path) -> None:
     summary_path, run_id = _start_run("admin-build")
     with run_logger(summary_path, run_id=run_id, input_hash=str(canonical)) as run:
-        with log_step(run, "bundle-build", metadata={"canonical": str(canonical)}) as meta:
+        with log_step(
+            run, "bundle-build", metadata={"canonical": str(canonical)}
+        ) as meta:
             bundle_build.callback(canonical=canonical)  # type: ignore[attr-defined]
             meta["bundle_path"] = str(out)
     click.echo(f"Bundle staged under {out}")
@@ -93,7 +99,11 @@ def load(job: str, dry_run: bool, quiet: bool) -> None:
         with log_step(
             run,
             "jobs-run",
-            metadata={"job": job, "dry_run": str(dry_run).lower(), "quiet": str(quiet).lower()},
+            metadata={
+                "job": job,
+                "dry_run": str(dry_run).lower(),
+                "quiet": str(quiet).lower(),
+            },
         ) as meta:
             job_summary = run_job_internal(job, dry_run, quiet)
             meta["job_summary"] = str(job_summary)
@@ -102,9 +112,13 @@ def load(job: str, dry_run: bool, quiet: bool) -> None:
 
 
 @admin.command()
-@click.option("--out", type=click.Path(path_type=Path), default=Path("run/logs/bench.json"))
+@click.option(
+    "--out", type=click.Path(path_type=Path), default=Path("run/logs/bench.json")
+)
 @click.option("--iterations", default=1, show_default=True)
-@click.option("--fixtures", type=click.Path(path_type=Path), default=Path("tests/fixtures"))
+@click.option(
+    "--fixtures", type=click.Path(path_type=Path), default=Path("tests/fixtures")
+)
 def stats(out: Path, iterations: int, fixtures: Path) -> None:
     summary_path, run_id = _start_run("admin-stats")
     with run_logger(summary_path, run_id=run_id, input_hash=str(fixtures)) as run:
@@ -116,7 +130,9 @@ def stats(out: Path, iterations: int, fixtures: Path) -> None:
             stats = run_benchmarks(fixtures, iterations=iterations)
             timings = getattr(stats, "timings", {})
             if timings:
-                meta["timings"] = ";".join(f"{k}={round(v, 4)}" for k, v in timings.items())
+                meta["timings"] = ";".join(
+                    f"{k}={round(v, 4)}" for k, v in timings.items()
+                )
         with log_step(run, "write-output", metadata={"out": str(out)}) as meta:
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_text(stats.to_json(), encoding="utf-8")

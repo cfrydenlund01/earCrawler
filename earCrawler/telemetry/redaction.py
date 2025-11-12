@@ -8,7 +8,9 @@ EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}")
 TOKEN_RE = re.compile(r"(?:bearer\s+)?[A-Za-z0-9\-_=]{20,}", re.IGNORECASE)
 PATH_RE = re.compile(r"(?:[A-Za-z]:\\\\[^\s]+|/[^\s]+)")
 URL_QUERY_RE = re.compile(r"https?://[^\s?]+\?[^\s]+")
-GUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}")
+GUID_RE = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"
+)
 
 ALLOWED_KEYS = {
     "command",
@@ -39,7 +41,11 @@ def redact(obj: Any) -> Any:
     if isinstance(obj, list):
         return [redact(v) for v in obj]
     if isinstance(obj, str):
-        env_keys = [k for k in os.environ if k.endswith("_KEY") or k.endswith("_TOKEN") or k.endswith("_SECRET")]
+        env_keys = [
+            k
+            for k in os.environ
+            if k.endswith("_KEY") or k.endswith("_TOKEN") or k.endswith("_SECRET")
+        ]
         for k in env_keys:
             if os.getenv(k) and os.getenv(k) in obj:
                 obj = obj.replace(os.getenv(k), "[redacted]")

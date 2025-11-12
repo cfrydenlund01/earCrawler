@@ -17,14 +17,38 @@ KG_DIR = ROOT / "kg"
 REPORTS_DIR = KG_DIR / "reports"
 QUERIES = {
     "rdfs": [
-        ("subclass", KG_DIR / "queries" / "infer_subclass_ask.rq", "Subclass inference via rdfs:subClassOf"),
-        ("domain-range", KG_DIR / "queries" / "infer_domain_range_ask.rq", "Domain and range infer types"),
-        ("equivalence", KG_DIR / "queries" / "infer_equivalence_ask.rq", "Equivalent classes propagate type"),
+        (
+            "subclass",
+            KG_DIR / "queries" / "infer_subclass_ask.rq",
+            "Subclass inference via rdfs:subClassOf",
+        ),
+        (
+            "domain-range",
+            KG_DIR / "queries" / "infer_domain_range_ask.rq",
+            "Domain and range infer types",
+        ),
+        (
+            "equivalence",
+            KG_DIR / "queries" / "infer_equivalence_ask.rq",
+            "Equivalent classes propagate type",
+        ),
     ],
     "owlmini": [
-        ("subclass", KG_DIR / "queries" / "infer_subclass_ask.rq", "Subclass inference via rdfs:subClassOf"),
-        ("domain-range", KG_DIR / "queries" / "infer_domain_range_ask.rq", "Domain and range infer types"),
-        ("equivalence", KG_DIR / "queries" / "infer_equivalence_ask.rq", "Equivalent classes propagate type"),
+        (
+            "subclass",
+            KG_DIR / "queries" / "infer_subclass_ask.rq",
+            "Subclass inference via rdfs:subClassOf",
+        ),
+        (
+            "domain-range",
+            KG_DIR / "queries" / "infer_domain_range_ask.rq",
+            "Domain and range infer types",
+        ),
+        (
+            "equivalence",
+            KG_DIR / "queries" / "infer_equivalence_ask.rq",
+            "Equivalent classes propagate type",
+        ),
     ],
 }
 SELECT_QUERY = KG_DIR / "queries" / "infer_report_select.rq"
@@ -151,7 +175,9 @@ def execute(mode: str) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Offline inference smoke checks without Fuseki.")
+    parser = argparse.ArgumentParser(
+        description="Offline inference smoke checks without Fuseki."
+    )
     parser.add_argument("--mode", choices=("rdfs", "owlmini"), default="rdfs")
     args = parser.parse_args()
     execute(args.mode)

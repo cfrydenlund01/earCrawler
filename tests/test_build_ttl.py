@@ -10,7 +10,10 @@ def test_build_ttl_serializes(tmp_path, monkeypatch):
     # isolate dist path during test
     monkeypatch.setattr("earCrawler.utils.io_paths.DIST", tmp_path)
     monkeypatch.setattr("earCrawler.pipelines.build_ttl.DIST", tmp_path, raising=False)
-    monkeypatch.setattr("earCrawler.pipelines.build_ttl.ensure_dirs", lambda: tmp_path.mkdir(exist_ok=True))
+    monkeypatch.setattr(
+        "earCrawler.pipelines.build_ttl.ensure_dirs",
+        lambda: tmp_path.mkdir(exist_ok=True),
+    )
 
     output = build_samples()
     assert output.exists()

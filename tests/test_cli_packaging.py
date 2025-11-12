@@ -11,12 +11,16 @@ from earCrawler import __version__
 
 
 def test_python_module_version():
-    out = subprocess.check_output([sys.executable, "-m", "earCrawler.cli", "--version"], text=True)
+    out = subprocess.check_output(
+        [sys.executable, "-m", "earCrawler.cli", "--version"], text=True
+    )
     assert __version__ in out.strip()
 
 
 def test_python_module_diagnose():
-    out = subprocess.check_output([sys.executable, "-m", "earCrawler.cli", "diagnose"], text=True)
+    out = subprocess.check_output(
+        [sys.executable, "-m", "earCrawler.cli", "diagnose"], text=True
+    )
     data = json.loads(out)
     assert data["earCrawler"] == __version__
 

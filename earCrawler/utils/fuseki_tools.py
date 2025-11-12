@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """Checksum-verified helper for Apache Jena Fuseki."""
 
 from pathlib import Path
@@ -67,7 +68,9 @@ def ensure_fuseki(download: bool = True, version: str | None = None) -> Path:
     download_dir.mkdir(parents=True, exist_ok=True)
     zip_path = download_dir / f"apache-jena-fuseki-{version}.zip"
     archive_url = f"https://archive.apache.org/dist/jena/binaries/apache-jena-fuseki-{version}.zip"
-    mirror_url = f"https://downloads.apache.org/jena/binaries/apache-jena-fuseki-{version}.zip"
+    mirror_url = (
+        f"https://downloads.apache.org/jena/binaries/apache-jena-fuseki-{version}.zip"
+    )
     for url in [archive_url, mirror_url]:
         try:
             urllib.request.urlretrieve(url, zip_path)

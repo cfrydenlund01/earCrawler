@@ -45,7 +45,10 @@ def test_ensure_jena_bootstrap(tmp_path, monkeypatch):
     (java_home / "bin" / "java.exe").write_text("")
     monkeypatch.setenv("JAVA_HOME", str(java_home))
 
-    versions = json.loads((Path(__file__).resolve().parents[1] / "tools/versions.json").read_text())
+    versions = json.loads(
+        (Path(__file__).resolve().parents[1] / "tools/versions.json").read_text()
+    )
+
     def fake_urlretrieve(url, filename):
         with zipfile.ZipFile(filename, "w") as zf:
             base = f"apache-jena-{versions['jena']['version']}/bat"
@@ -85,7 +88,10 @@ def test_ensure_jena_missing_scripts(tmp_path, monkeypatch):
     (java_home / "bin" / "java.exe").write_text("")
     monkeypatch.setenv("JAVA_HOME", str(java_home))
 
-    versions = json.loads((Path(__file__).resolve().parents[1] / "tools/versions.json").read_text())
+    versions = json.loads(
+        (Path(__file__).resolve().parents[1] / "tools/versions.json").read_text()
+    )
+
     def fake_urlretrieve(url, filename):
         with zipfile.ZipFile(filename, "w") as zf:
             zf.writestr(f"apache-jena-{versions['jena']['version']}/README.txt", "")
@@ -113,5 +119,7 @@ def test_ensure_jena_honors_env_override(tmp_path, monkeypatch):
     monkeypatch.setenv("JAVA_HOME", str(java_home))
     monkeypatch.setenv("JENA_HOME", str(home))
     assert jena_tools.ensure_jena(download=False) == home
-    assert jena_tools.find_tdbloader().resolve() == (bat / "tdb2_tdbloader.bat").resolve()
+    assert (
+        jena_tools.find_tdbloader().resolve() == (bat / "tdb2_tdbloader.bat").resolve()
+    )
     assert jena_tools.find_tdbquery().resolve() == (bat / "tdb2_tdbquery.bat").resolve()

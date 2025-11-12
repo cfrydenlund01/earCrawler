@@ -1,4 +1,5 @@
 """Load Consolidated Screening List entities into Fuseki."""
+
 from __future__ import annotations
 
 import hashlib
@@ -22,8 +23,7 @@ def upsert_entity(jena: JenaClient, bindings: dict) -> None:
     # id placeholder is reused for CURIE and literal; keep literal replacements afterwards
     query = template.replace("__ID__", bindings["id"].replace(" ", "_"))
     query = (
-        query
-        .replace("__NAME__", bindings["name"])
+        query.replace("__NAME__", bindings["name"])
         .replace("__SOURCE__", bindings["source"])
         .replace("__PROGRAMS__", bindings["programs"])
         .replace("__COUNTRY__", bindings["country"])
@@ -64,7 +64,9 @@ def load_csl_by_query(
             or record.get("updated_at")
             or record.get("date_updated")
         )
-        request_url = canonical.get("request_url") or record.get("request_url") or source_url
+        request_url = (
+            canonical.get("request_url") or record.get("request_url") or source_url
+        )
         bindings = to_bindings(canonical)
         payload = {
             "id": bindings["id"],
