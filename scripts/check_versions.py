@@ -10,6 +10,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 VERSIONS_FILE = ROOT / "tools" / "versions.json"
 
+
 def load_versions() -> dict[str, Any]:
     try:
         return json.loads(VERSIONS_FILE.read_text())

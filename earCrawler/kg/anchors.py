@@ -1,4 +1,5 @@
 """Utilities for tracking part/document anchors."""
+
 from __future__ import annotations
 
 import json
@@ -46,7 +47,9 @@ class AnchorIndex:
                 title=a.title.strip(),
                 source_url=a.source_url.strip(),
                 snippet=_normalise_snippet(a.snippet),
-                publication_date=(a.publication_date.strip() if a.publication_date else None),
+                publication_date=(
+                    a.publication_date.strip() if a.publication_date else None
+                ),
             )
             for a in anchors
         ]

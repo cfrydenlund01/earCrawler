@@ -39,8 +39,8 @@ def generate(scale: str, out_dir: Path | None = None, seed: int = 12345) -> dict
     for i in range(n):
         iri = f"<{BASE}{i}>"
         val = rng.randint(0, 9999)
-        ttl_lines.append(f"{iri} <{PRED}> \"{val}\" .")
-        ttl_lines.append(f"{iri} <{TEXT}> \"EAR node {i}\" .")
+        ttl_lines.append(f'{iri} <{PRED}> "{val}" .')
+        ttl_lines.append(f'{iri} <{TEXT}> "EAR node {i}" .')
         ttl_lines.append(f"{iri} <{PROV}> <{PROC}> .")
 
     ttl_lines.sort()

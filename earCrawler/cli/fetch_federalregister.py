@@ -1,4 +1,5 @@
 """Fetch Federal Register EAR articles for monitoring."""
+
 from __future__ import annotations
 
 import argparse

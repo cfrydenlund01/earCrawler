@@ -1,4 +1,5 @@
 """Federal Register API client for EAR text retrieval."""
+
 from __future__ import annotations
 
 import os
@@ -8,7 +9,13 @@ from pathlib import Path
 from typing import Dict, List
 
 import requests
-from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    RetryCallState,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from earCrawler.utils.secure_store import get_secret
 from earCrawler.utils.http_cache import HTTPCache
@@ -22,7 +29,11 @@ _logger = JsonLogger("federalregister-client")
 
 def _log_retry(retry_state: RetryCallState) -> None:
     exc = retry_state.outcome.exception() if retry_state.outcome else None
-    wait_time = getattr(retry_state.next_action, "sleep", None) if retry_state.next_action else None
+    wait_time = (
+        getattr(retry_state.next_action, "sleep", None)
+        if retry_state.next_action
+        else None
+    )
     url = ""
     if len(retry_state.args) >= 2:
         url = str(retry_state.args[1])
@@ -44,16 +55,24 @@ class FederalRegisterClient:
 
     BASE_URL = "https://api.federalregister.gov/v1"
 
-    def __init__(self, *, session: requests.Session | None = None, cache_dir: Path | None = None) -> None:
+    def __init__(
+        self, *, session: requests.Session | None = None, cache_dir: Path | None = None
+    ) -> None:
         self.session = session or requests.Session()
         self._owns_session = session is None
         self.session.trust_env = False
-        self.user_agent = get_secret("FEDERALREGISTER_USER_AGENT", fallback="earCrawler/0.9")
+        self.user_agent = get_secret(
+            "FEDERALREGISTER_USER_AGENT", fallback="earCrawler/0.9"
+        )
         ttl_env = os.getenv("FR_CACHE_TTL_SECONDS")
         ttl_seconds = int(ttl_env) if ttl_env else None
         max_env = os.getenv("FR_CACHE_MAX_ENTRIES")
         max_entries = int(max_env) if max_env else 4096
-        self.cache = HTTPCache(cache_dir or Path(".cache/api/federalregister"), max_entries=max_entries, ttl_seconds=ttl_seconds)
+        self.cache = HTTPCache(
+            cache_dir or Path(".cache/api/federalregister"),
+            max_entries=max_entries,
+            ttl_seconds=ttl_seconds,
+        )
         env_limit = os.getenv("FR_MAX_CALLS")
         self.request_limit = int(env_limit) if env_limit else None
         _logger.info(
@@ -102,7 +121,9 @@ class FederalRegisterClient:
             url=url,
             status=resp.status_code,
             cache="hit" if getattr(resp, "from_cache", False) else "miss",
-            result_count=len(payload.get("results", [])) if isinstance(payload, dict) else None,
+            result_count=(
+                len(payload.get("results", [])) if isinstance(payload, dict) else None
+            ),
         )
         return payload
 
@@ -135,7 +156,9 @@ class FederalRegisterClient:
         try:
             data = self._get_json(url, params={})
         except requests.RequestException as exc:
-            _logger.error("api.request_failed", url=url, document=doc_id, error=str(exc))
+            _logger.error(
+                "api.request_failed", url=url, document=doc_id, error=str(exc)
+            )
             return ""
         return self._clean_text(data.get("body_html") or data.get("body_text") or "")
 
@@ -153,7 +176,9 @@ class FederalRegisterClient:
         try:
             data = self._get_json(url, params)
         except requests.RequestException as exc:
-            _logger.error("api.request_failed", url=url, query=query, page=page, error=str(exc))
+            _logger.error(
+                "api.request_failed", url=url, query=query, page=page, error=str(exc)
+            )
             return []
         return data.get("results", [])
 
@@ -162,7 +187,9 @@ class FederalRegisterClient:
         try:
             return self._get_json(url, params={})
         except requests.RequestException as exc:
-            _logger.error("api.request_failed", url=url, document=doc_number, error=str(exc))
+            _logger.error(
+                "api.request_failed", url=url, document=doc_number, error=str(exc)
+            )
             return {}
 
     def get_ear_text(self, citation: str) -> str:

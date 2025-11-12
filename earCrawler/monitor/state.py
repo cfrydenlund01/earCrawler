@@ -1,4 +1,5 @@
 """State tracking and delta file generation for upstream monitoring."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -13,6 +14,7 @@ from .utils import stable_hash, normalize_json
 @dataclass
 class WatchItem:
     """Simple representation of a watchlist item."""
+
     id: str
     payload: Any
 
@@ -30,7 +32,13 @@ def write_state(path: Path, state: Dict[str, str]) -> None:
         json.dump(state, fh, indent=2, sort_keys=True)
 
 
-def update_state_and_write_delta(items: Dict[str, Any], state_path: Path, monitor_dir: Path, *, timestamp: datetime | None = None) -> Dict[str, Any]:
+def update_state_and_write_delta(
+    items: Dict[str, Any],
+    state_path: Path,
+    monitor_dir: Path,
+    *,
+    timestamp: datetime | None = None,
+) -> Dict[str, Any]:
     """Update ``state`` with ``items`` and emit delta file for changes.
 
     Returns a mapping of changed item ids to their payloads.

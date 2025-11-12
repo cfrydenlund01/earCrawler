@@ -96,7 +96,9 @@ class NSFCaseParser:
                 cases.append(self.parse_from_html(case_html, url))
         else:
             fixtures_dir = Path(fixtures_dir)
-            listing_html = (fixtures_dir / "ori_case_listing.html").read_text(encoding="utf-8")
+            listing_html = (fixtures_dir / "ori_case_listing.html").read_text(
+                encoding="utf-8"
+            )
             listing = BeautifulSoup(listing_html, "html.parser")
             links = [a["href"] for a in listing.select("a[href]")]
             for link in links:

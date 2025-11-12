@@ -1,4 +1,5 @@
 """Normalization and hashing helpers for upstream monitoring."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -26,7 +27,9 @@ def _normalize(value: Any) -> Any:
 def normalize_json(data: Any) -> str:
     """Return a deterministic JSON string with keys sorted."""
     normalized = _normalize(data)
-    return json.dumps(normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return json.dumps(
+        normalized, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
 
 
 def stable_hash(data: Any) -> str:

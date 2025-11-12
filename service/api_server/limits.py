@@ -19,7 +19,9 @@ class BucketState:
 
 
 class RateLimitExceeded(Exception):
-    def __init__(self, retry_after: float, scope: str, limit: int, remaining: int) -> None:
+    def __init__(
+        self, retry_after: float, scope: str, limit: int, remaining: int
+    ) -> None:
         super().__init__("rate limit exceeded")
         self.retry_after = retry_after
         self.scope = scope
@@ -33,7 +35,9 @@ class RateLimiter:
         self._lock = threading.Lock()
         self._buckets: Dict[Tuple[str, str], BucketState] = {}
 
-    def _get_bucket(self, key: Tuple[str, str], refill_rate: float, capacity: int) -> BucketState:
+    def _get_bucket(
+        self, key: Tuple[str, str], refill_rate: float, capacity: int
+    ) -> BucketState:
         now = time.monotonic()
         with self._lock:
             state = self._buckets.get(key)
@@ -46,7 +50,9 @@ class RateLimiter:
                 state.last_refill = now
             return state
 
-    def _consume(self, key: Tuple[str, str], refill_rate: float, capacity: int) -> Tuple[int, float]:
+    def _consume(
+        self, key: Tuple[str, str], refill_rate: float, capacity: int
+    ) -> Tuple[int, float]:
         state = self._get_bucket(key, refill_rate, capacity)
         if state.tokens >= 1:
             state.tokens -= 1
@@ -56,7 +62,9 @@ class RateLimiter:
         remaining = int(state.tokens)
         return remaining, retry
 
-    def check(self, identity: str, scope: str, authenticated: bool) -> Tuple[int, float, int]:
+    def check(
+        self, identity: str, scope: str, authenticated: bool
+    ) -> Tuple[int, float, int]:
         if authenticated:
             limit_per_minute = self._config.authenticated_per_minute
             burst = self._config.authenticated_burst
@@ -74,11 +82,15 @@ async def enforce_rate_limits(request: Request, limiter: RateLimiter) -> None:
     identity = request.state.identity
     scope = request.state.rate_scope
     authenticated = getattr(identity, "authenticated", False)
-    capacity, retry_after, remaining = limiter.check(identity.key, scope=scope, authenticated=authenticated)
+    capacity, retry_after, remaining = limiter.check(
+        identity.key, scope=scope, authenticated=authenticated
+    )
     request.state.rate_limit = {
         "limit": capacity,
         "remaining": max(0, remaining),
         "retry_after": retry_after,
     }
     if retry_after > 0:
-        raise RateLimitExceeded(retry_after=retry_after, scope=scope, limit=capacity, remaining=remaining)
+        raise RateLimitExceeded(
+            retry_after=retry_after, scope=scope, limit=capacity, remaining=remaining
+        )

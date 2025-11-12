@@ -71,7 +71,9 @@ class LongContextPipeline:
             self.conversation_model_name
         )
         if self.conversation_tokenizer.pad_token is None:
-            self.conversation_tokenizer.pad_token = self.conversation_tokenizer.eos_token
+            self.conversation_tokenizer.pad_token = (
+                self.conversation_tokenizer.eos_token
+            )
         self.conversation_model = AutoModelForCausalLM.from_pretrained(
             self.conversation_model_name,
             device_map="auto",
@@ -101,7 +103,9 @@ class LongContextPipeline:
             self.long_document_model_name
         )
         if self.long_document_tokenizer.pad_token is None:
-            self.long_document_tokenizer.pad_token = self.long_document_tokenizer.eos_token
+            self.long_document_tokenizer.pad_token = (
+                self.long_document_tokenizer.eos_token
+            )
         self.long_document_tokenizer.model_max_length = self.max_long_document_tokens
         self.long_document_model = AutoModelForSeq2SeqLM.from_pretrained(
             self.long_document_model_name,
@@ -133,7 +137,9 @@ class LongContextPipeline:
         except StopIteration:  # pragma: no cover
             return torch.device("cpu")
 
-    def generate_conversation_reply(self, prompt: str, max_new_tokens: int = 512) -> str:
+    def generate_conversation_reply(
+        self, prompt: str, max_new_tokens: int = 512
+    ) -> str:
         """Generate a reply with the primary 32k-context LLM."""
 
         inputs = self.conversation_tokenizer(
@@ -154,7 +160,9 @@ class LongContextPipeline:
                 temperature=0.7,
                 top_p=0.9,
             )
-        return self.conversation_tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        return self.conversation_tokenizer.decode(
+            output_ids[0], skip_special_tokens=True
+        )
 
     def summarize_long_document(self, document: str) -> str:
         """Summarize arbitrarily long documents using hierarchical LED passes."""
@@ -183,7 +191,9 @@ class LongContextPipeline:
                 return ""
             if self._count_tokens(merged_text) <= self.chunk_token_length:
                 return self._summarize_chunk(merged_text)
-            next_level = self._summarize_in_chunks(merged_text, chunk_tokens=self.chunk_token_length)
+            next_level = self._summarize_in_chunks(
+                merged_text, chunk_tokens=self.chunk_token_length
+            )
             if not next_level:
                 return merged_text
             if len(next_level) == 1:
@@ -212,7 +222,9 @@ class LongContextPipeline:
             truncation=True,
             max_length=self.max_long_document_tokens,
         )
-        inputs = {key: value.to(self.long_document_device) for key, value in inputs.items()}
+        inputs = {
+            key: value.to(self.long_document_device) for key, value in inputs.items()
+        }
         global_attention_mask = torch.zeros_like(inputs["input_ids"])
         global_attention_mask[:, 0] = 1
         ctx = getattr(torch, "inference_mode", None) or torch.no_grad
@@ -224,14 +236,18 @@ class LongContextPipeline:
                 num_beams=self.summary_num_beams,
                 early_stopping=True,
             )
-        return self.long_document_tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+        return self.long_document_tokenizer.decode(
+            summary_ids[0], skip_special_tokens=True
+        )
 
     def _chunk_text(
         self, text: str, *, chunk_tokens: Optional[int] = None
     ) -> Iterable[str]:
         """Yield overlapping text chunks within the LED context window."""
 
-        chunk_size = min(chunk_tokens or self.chunk_token_length, self.max_long_document_tokens)
+        chunk_size = min(
+            chunk_tokens or self.chunk_token_length, self.max_long_document_tokens
+        )
         chunk_size = max(chunk_size, 128)
         overlap = min(self.chunk_overlap, chunk_size // 2)
         encoding = self.long_document_tokenizer(

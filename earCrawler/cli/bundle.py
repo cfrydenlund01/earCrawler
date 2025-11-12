@@ -25,7 +25,9 @@ def _run_ps(script: Path, *args: str) -> None:
     cmd = [_pwsh(), "-File", str(script)] + list(args)
     completed = subprocess.run(cmd, check=False)
     if completed.returncode != 0:
-        raise click.ClickException(f"Command failed with exit code {completed.returncode}: {' '.join(cmd)}")
+        raise click.ClickException(
+            f"Command failed with exit code {completed.returncode}: {' '.join(cmd)}"
+        )
 
 
 @click.group()
@@ -36,27 +38,37 @@ def bundle() -> None:
 
 
 @bundle.command()
-@click.option("--canonical", type=click.Path(path_type=Path), default=Path("kg/canonical"))
+@click.option(
+    "--canonical", type=click.Path(path_type=Path), default=Path("kg/canonical")
+)
 def build(canonical: Path) -> None:
     """Build the offline bundle under dist/offline_bundle."""
     repo = _repo_root()
     script = repo / "scripts" / "build-offline-bundle.ps1"
-    args = ["-CanonicalDir", str(canonical)] if canonical != Path("kg/canonical") else []
+    args = (
+        ["-CanonicalDir", str(canonical)] if canonical != Path("kg/canonical") else []
+    )
     _run_ps(script, *args)
 
 
 @bundle.command()
-@click.option("--path", type=click.Path(path_type=Path), default=Path("dist/offline_bundle"))
+@click.option(
+    "--path", type=click.Path(path_type=Path), default=Path("dist/offline_bundle")
+)
 def verify(path: Path) -> None:
     """Verify bundle checksums."""
     script = path / "scripts" / "bundle-verify.ps1"
     if not script.exists():
-        raise click.ClickException(f"Verification script not found under {script.parent}")
+        raise click.ClickException(
+            f"Verification script not found under {script.parent}"
+        )
     _run_ps(script, "-Path", str(path))
 
 
 @bundle.command()
-@click.option("--path", type=click.Path(path_type=Path), default=Path("dist/offline_bundle"))
+@click.option(
+    "--path", type=click.Path(path_type=Path), default=Path("dist/offline_bundle")
+)
 def smoke(path: Path) -> None:
     """Run first-run bootstrap smoke test."""
     script = path / "scripts" / "bundle-first-run.ps1"
@@ -66,7 +78,9 @@ def smoke(path: Path) -> None:
 
 
 @bundle.command("export-profiles")
-@click.option("--ttl", type=click.Path(path_type=Path), required=True, help="Source Turtle file")
+@click.option(
+    "--ttl", type=click.Path(path_type=Path), required=True, help="Source Turtle file"
+)
 @click.option("--out", type=click.Path(path_type=Path), default=Path("dist/exports"))
 @click.option("--stem", type=str, default="dataset")
 def export_profiles_cmd(ttl: Path, out: Path, stem: str) -> None:

@@ -10,7 +10,9 @@ from earCrawler.cli.admin import admin
 
 def _allow_operator(monkeypatch) -> None:
     monkeypatch.setenv("EARCTL_USER", "test_operator")
-    policy_path = Path(__file__).resolve().parents[3] / "earCrawler" / "security" / "policy.yml"
+    policy_path = (
+        Path(__file__).resolve().parents[3] / "earCrawler" / "security" / "policy.yml"
+    )
     monkeypatch.setenv("EARCTL_POLICY_PATH", str(policy_path))
 
 
@@ -26,7 +28,9 @@ def test_admin_stats_writes_run_summary(monkeypatch, tmp_path: Path) -> None:
         def to_json(self) -> str:
             return '{"timings":{"load_ttl":0.1}}'
 
-    monkeypatch.setattr("earCrawler.cli.admin.run_benchmarks", lambda fixtures, iterations: DummyBench())
+    monkeypatch.setattr(
+        "earCrawler.cli.admin.run_benchmarks", lambda fixtures, iterations: DummyBench()
+    )
 
     runner = CliRunner()
     result = runner.invoke(admin, ["stats", "--iterations", "1"])

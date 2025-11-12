@@ -5,7 +5,9 @@ from earCrawler.transforms.mentions import MentionExtractor
 
 def test_exact_match_scores_max():
     extractor = MentionExtractor()
-    strength = extractor.score("Huawei Technologies Co., Ltd. released a notice.", "Huawei Technologies Co Ltd")
+    strength = extractor.score(
+        "Huawei Technologies Co., Ltd. released a notice.", "Huawei Technologies Co Ltd"
+    )
     assert strength == 1.0
 
 
@@ -18,5 +20,7 @@ def test_core_tokens_window_score():
 
 def test_stopwords_restrict_false_positive():
     extractor = MentionExtractor()
-    strength = extractor.score("The international community met to discuss policy.", "International Holdings")
+    strength = extractor.score(
+        "The international community met to discuss policy.", "International Holdings"
+    )
     assert strength == 0.0

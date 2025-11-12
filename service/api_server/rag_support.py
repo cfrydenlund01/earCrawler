@@ -14,14 +14,15 @@ logger = logging.getLogger(__name__)
 class RetrieverProtocol(Protocol):
     """Minimal protocol implemented by the vector retriever."""
 
-    def query(self, prompt: str, k: int = 5) -> list[dict]:
-        ...
+    def query(self, prompt: str, k: int = 5) -> list[dict]: ...
 
 
 class NullRetriever:
     """Fallback retriever returning no results when FAISS/model deps are unavailable."""
 
-    def query(self, prompt: str, k: int = 5) -> list[dict]:  # pragma: no cover - trivial
+    def query(
+        self, prompt: str, k: int = 5
+    ) -> list[dict]:  # pragma: no cover - trivial
         logger.debug("NullRetriever returning empty set for query=%s", prompt)
         return []
 

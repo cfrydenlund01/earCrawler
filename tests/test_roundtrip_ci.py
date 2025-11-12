@@ -16,10 +16,7 @@ from .java_utils import JAVA_VERSION_OK
 from .tooling import require_jena_and_fuseki
 
 SCRIPT = (
-    pathlib.Path(__file__).resolve().parents[1]
-    / 'kg'
-    / 'scripts'
-    / 'ci-roundtrip.ps1'
+    pathlib.Path(__file__).resolve().parents[1] / "kg" / "scripts" / "ci-roundtrip.ps1"
 )
 MISSING_TOOLS_MSG = (
     "The Apache Jena and Fuseki tools must be downloaded before running "
@@ -69,6 +66,6 @@ def test_ci_roundtrip_runs_if_tools_present():
 
 
 def test_snapshot_files_exist_after_ci():
-    snap_dir = pathlib.Path('kg') / 'snapshots'
+    snap_dir = pathlib.Path("kg") / "snapshots"
     assert snap_dir.exists()
-    list(snap_dir.glob('*.srj'))  # should not raise
+    list(snap_dir.glob("*.srj"))  # should not raise

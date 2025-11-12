@@ -10,9 +10,11 @@ PATH_RE = re.compile(
     r"(?:[A-Za-z]:\\[^\s]+|\\\\[^\s]+|~/[^\s]+|(?<![A-Za-z0-9:/])/(?!/)[^\s]+)"
 )
 URL_QUERY_RE = re.compile(r"https?://[^\s?]+(?:\?[^\s#]+)")
-GUID_RE = re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
-                     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
-                     r"[0-9a-fA-F]{12}")
+GUID_RE = re.compile(
+    r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
+    r"[0-9a-fA-F]{12}"
+)
 PHONE_RE = re.compile(
     r"\b(?:\+?1[-.\s]?)?(?:\(\d{3}\)|\d{3})[-.\s]?\d{3}[-.\s]?\d{4}\b"
 )

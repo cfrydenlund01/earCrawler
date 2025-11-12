@@ -36,7 +36,9 @@ class Template:
             elif spec.default is not None:
                 merged[key] = _sanitize(spec.default, spec.type)
             else:
-                raise KeyError(f"Missing required template parameter '{key}' for {self.name}")
+                raise KeyError(
+                    f"Missing required template parameter '{key}' for {self.name}"
+                )
         # Ensure no unexpected params sneak in
         for unexpected in set(values) - set(self.params):
             raise KeyError(f"Unknown template parameter '{unexpected}' for {self.name}")
@@ -82,7 +84,11 @@ class TemplateRegistry:
             raise KeyError(f"Unknown template '{name}'") from exc
 
     def filter_by_allow_in(self, scope: str) -> Dict[str, Template]:
-        return {name: template for name, template in self._templates.items() if scope in template.allow_in}
+        return {
+            name: template
+            for name, template in self._templates.items()
+            if scope in template.allow_in
+        }
 
     @property
     def names(self) -> Iterable[str]:
@@ -99,7 +105,7 @@ def _sanitize(value: Any, kind: str) -> str:
     if kind == "string":
         if not isinstance(value, str):
             raise TypeError("String parameters must be str")
-        escaped = value.replace("\\", "\\\\").replace("\"", "\\\"")
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
         return f'"{escaped}"'
     if kind == "int":
         if isinstance(value, str) and value.isdigit():

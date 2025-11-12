@@ -2,7 +2,10 @@ from unittest.mock import Mock
 
 import pytest
 
-from api_clients.federalregister_client import FederalRegisterClient, FederalRegisterError
+from api_clients.federalregister_client import (
+    FederalRegisterClient,
+    FederalRegisterError,
+)
 
 
 def test_html_guard(monkeypatch) -> None:

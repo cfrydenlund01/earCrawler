@@ -22,7 +22,9 @@ from .dependencies import get_gateway, get_rag_cache, get_retriever, rate_limit
 router = APIRouter(prefix="/v1", tags=["rag"])
 
 
-@router.post("/rag/query", response_model=RagResponse, responses={429: {"model": ProblemDetails}})
+@router.post(
+    "/rag/query", response_model=RagResponse, responses={429: {"model": ProblemDetails}}
+)
 async def rag_query(
     payload: RagQueryRequest,
     request: Request,
@@ -58,7 +60,9 @@ async def rag_query(
     )
 
 
-async def _build_answer(doc: dict, gateway: FusekiGateway, include_lineage: bool) -> RagAnswer:
+async def _build_answer(
+    doc: dict, gateway: FusekiGateway, include_lineage: bool
+) -> RagAnswer:
     content = str(
         doc.get("text")
         or doc.get("content")
@@ -97,7 +101,14 @@ async def _lineage_edges(gateway: FusekiGateway, entity_id: str) -> list[Lineage
             timestamp = timestamp["value"]
         if not (target and relation):
             continue
-        edges.append(LineageEdge(source=source, relation=relation, target=target, timestamp=_maybe_str(timestamp)))
+        edges.append(
+            LineageEdge(
+                source=source,
+                relation=relation,
+                target=target,
+                timestamp=_maybe_str(timestamp),
+            )
+        )
     return edges
 
 

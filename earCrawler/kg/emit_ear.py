@@ -23,9 +23,11 @@ from .ontology import (
 from .prov import add_provenance
 
 
-
-
-def fetch_ear_corpus(term_or_citation: str, client: FederalRegisterClient | None = None, out_dir: Path = Path("kg/source/ear")) -> Path:
+def fetch_ear_corpus(
+    term_or_citation: str,
+    client: FederalRegisterClient | None = None,
+    out_dir: Path = Path("kg/source/ear"),
+) -> Path:
     """Fetch EAR articles and write normalized JSONL."""
     client = client or FederalRegisterClient()
     articles = client.get_ear_articles(term_or_citation, per_page=1)
@@ -43,6 +45,7 @@ def fetch_ear_corpus(term_or_citation: str, client: FederalRegisterClient | None
             }
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
     return out_path
+
 
 def _is_url(value: str) -> bool:
     try:
@@ -67,7 +70,9 @@ def _write_sorted_ttl(graph: Graph, out_path: Path) -> None:
             f.write(line + "\n")
 
 
-def emit_ear(in_dir: Path, out_dir: Path, prov_graph: Graph | None = None) -> tuple[Path, int]:
+def emit_ear(
+    in_dir: Path, out_dir: Path, prov_graph: Graph | None = None
+) -> tuple[Path, int]:
     """Emit EAR JSONL from ``in_dir`` to Turtle in ``out_dir``.
 
     Returns a tuple of output path and triple count.
@@ -131,4 +136,3 @@ def emit_ear(in_dir: Path, out_dir: Path, prov_graph: Graph | None = None) -> tu
 
 
 __all__ = ["emit_ear"]
-

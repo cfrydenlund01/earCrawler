@@ -63,7 +63,9 @@ def _normalise_url(value: str | None, fallback: str) -> str:
     return fallback
 
 
-def _load_fixture_metadata(fixtures_dir: Path | None, stem: str) -> dict[str, dict[str, str]]:
+def _load_fixture_metadata(
+    fixtures_dir: Path | None, stem: str
+) -> dict[str, dict[str, str]]:
     if not fixtures_dir:
         return {}
     path = fixtures_dir / f"{stem}_metadata.json"
@@ -89,12 +91,17 @@ class EarMetadataResolver:
             return self._cache[key]
         if key in self._metadata:
             raw = self._metadata[key]
-            source_url = raw.get("source_url") or f"https://www.federalregister.gov/documents/{key}"
+            source_url = (
+                raw.get("source_url")
+                or f"https://www.federalregister.gov/documents/{key}"
+            )
             provider = raw.get("provider") or "federalregister.gov"
             date = _normalise_date(raw.get("date"))
             section = raw.get("section")
             meta = DocMeta(
-                source_url=_normalise_url(source_url, f"https://www.federalregister.gov/documents/{key}"),
+                source_url=_normalise_url(
+                    source_url, f"https://www.federalregister.gov/documents/{key}"
+                ),
                 date=date,
                 provider=provider,
                 section=str(section) if section else None,
@@ -112,12 +119,20 @@ class EarMetadataResolver:
         if self._client is None:
             self._client = FederalRegisterClient()
         detail = self._client.get_document(key)
-        source_url = detail.get("html_url") or detail.get("url") or f"https://www.federalregister.gov/documents/{key}"
+        source_url = (
+            detail.get("html_url")
+            or detail.get("url")
+            or f"https://www.federalregister.gov/documents/{key}"
+        )
         provider = urlparse(source_url).netloc or "federalregister.gov"
-        date = _normalise_date(detail.get("publication_date") or detail.get("effective_on"))
+        date = _normalise_date(
+            detail.get("publication_date") or detail.get("effective_on")
+        )
         section = _extract_section(detail)
         meta = DocMeta(
-            source_url=_normalise_url(source_url, f"https://www.federalregister.gov/documents/{key}"),
+            source_url=_normalise_url(
+                source_url, f"https://www.federalregister.gov/documents/{key}"
+            ),
             date=date,
             provider=provider or "federalregister.gov",
             section=section,
@@ -133,12 +148,20 @@ class NSFMetadataResolver:
         for case in cases:
             case_no = str(case.get("case_number") or "")
             raw = overrides.get(case_no, {})
-            base_url = raw.get("source_url") or case.get("url") or f"https://ori.hhs.gov/case/{case_no}"
-            provider = raw.get("provider") or urlparse(str(base_url)).netloc or "ori.hhs.gov"
+            base_url = (
+                raw.get("source_url")
+                or case.get("url")
+                or f"https://ori.hhs.gov/case/{case_no}"
+            )
+            provider = (
+                raw.get("provider") or urlparse(str(base_url)).netloc or "ori.hhs.gov"
+            )
             date = raw.get("date") or case.get("decision_date")
             section = raw.get("section")
             self._metadata[case_no] = DocMeta(
-                source_url=_normalise_url(str(base_url), f"https://ori.hhs.gov/case/{case_no}"),
+                source_url=_normalise_url(
+                    str(base_url), f"https://ori.hhs.gov/case/{case_no}"
+                ),
                 date=_normalise_date(date),
                 provider=provider,
                 section=str(section) if section else None,
@@ -192,12 +215,16 @@ class CorpusBuilder:
                 if sha in global_records:
                     current_owner = owners[sha]
                     if current_owner == source:
-                        global_records[sha] = _merge_records(global_records[sha], record)
+                        global_records[sha] = _merge_records(
+                            global_records[sha], record
+                        )
                     else:
                         prev_rank = source_priority.get(current_owner, 999)
                         new_rank = source_priority.get(source, 999)
                         if new_rank < prev_rank:
-                            global_records[sha] = _merge_records(record, global_records[sha])
+                            global_records[sha] = _merge_records(
+                                record, global_records[sha]
+                            )
                             owners[sha] = source
                     continue
                 global_records[sha] = record
@@ -223,7 +250,9 @@ class CorpusBuilder:
             identifier = str(row["identifier"])
             doc_number = identifier.split(":", 1)[0]
             meta = self.ear_meta.resolve(doc_number)
-            record = self._make_record("ear", identifier, row["text"], meta, extra_entities=None)
+            record = self._make_record(
+                "ear", identifier, row["text"], meta, extra_entities=None
+            )
             if record:
                 records.append(record)
         return records
@@ -237,13 +266,19 @@ class CorpusBuilder:
                 return []
             rows: list[dict[str, str]] = []
             for payload in _read_records(path):
-                identifier = f"{payload.get('document_number')}:{payload.get('paragraph_index')}"
+                identifier = (
+                    f"{payload.get('document_number')}:{payload.get('paragraph_index')}"
+                )
                 rows.append({"identifier": identifier, "text": payload.get("text", "")})
             return rows
         fixtures = self.fixtures or DEFAULT_FIXTURES
         loader = EARLoader(FederalRegisterClient(), query=EAR_QUERY)
-        paragraphs = loader.run(fixtures_dir=fixtures, live=False, output_dir=str(self.out_dir))
-        return [{"identifier": rec["identifier"], "text": rec["text"]} for rec in paragraphs]
+        paragraphs = loader.run(
+            fixtures_dir=fixtures, live=False, output_dir=str(self.out_dir)
+        )
+        return [
+            {"identifier": rec["identifier"], "text": rec["text"]} for rec in paragraphs
+        ]
 
     def _build_nsf_records(self) -> list[dict]:
         parser = NSFCaseParser()
@@ -254,7 +289,9 @@ class CorpusBuilder:
             fixtures = self.fixtures or DEFAULT_FIXTURES
             cases = parser.run(fixtures, live=False)
             loader = NSFLoader(parser, fixtures)
-            paragraphs = loader.run(fixtures_dir=fixtures, live=False, output_dir=str(self.out_dir))
+            paragraphs = loader.run(
+                fixtures_dir=fixtures, live=False, output_dir=str(self.out_dir)
+            )
         resolver = NSFMetadataResolver(self.fixtures, cases)
         case_entities = _case_entities_map(cases, self.canonical)
         records: list[dict] = []
@@ -267,7 +304,9 @@ class CorpusBuilder:
                 case_entities.get(case_number, []),
                 self.extractor,
             )
-            record = self._make_record("nsf", identifier, row["text"], meta, extra_entities=extra_entities)
+            record = self._make_record(
+                "nsf", identifier, row["text"], meta, extra_entities=extra_entities
+            )
             if record:
                 records.append(record)
         return records
@@ -351,20 +390,51 @@ def _paragraphs_from_cases(cases: Sequence[dict]) -> list[dict[str, str]]:
     return rows
 
 
-def _case_entities_map(cases: Sequence[dict], canonical: CanonicalRegistry) -> dict[str, list[str]]:
+def _case_entities_map(
+    cases: Sequence[dict], canonical: CanonicalRegistry
+) -> dict[str, list[str]]:
     mapping: dict[str, list[str]] = {}
     for case in cases:
         case_number = str(case.get("case_number") or "")
-        entities = [canonical.canonical_name(str(val)) for val in case.get("entities", [])]
+        entities = [
+            canonical.canonical_name(str(val)) for val in case.get("entities", [])
+        ]
         mapping[case_number] = [val for val in entities if val]
     return mapping
 
 
 def _classify_entity(name: str) -> str:
     normalized = name.lower()
-    if any(prefix in name for prefix in ("R01-", "R21-", "R03-", "U01-", "P30-", "K99-", "F31-", "DOD", "NSF", "DOE")):
+    if any(
+        prefix in name
+        for prefix in (
+            "R01-",
+            "R21-",
+            "R03-",
+            "U01-",
+            "P30-",
+            "K99-",
+            "F31-",
+            "DOD",
+            "NSF",
+            "DOE",
+        )
+    ):
         return "GRANT"
-    if any(token in normalized for token in ("university", "college", "institute", "laboratory", "inc", "llc", "gmbh", "corp", "company")):
+    if any(
+        token in normalized
+        for token in (
+            "university",
+            "college",
+            "institute",
+            "laboratory",
+            "inc",
+            "llc",
+            "gmbh",
+            "corp",
+            "company",
+        )
+    ):
         return "ORG"
     if len(name.split()) >= 2:
         return "PERSON"
@@ -421,7 +491,11 @@ def _read_records(path: Path) -> list[dict]:
 def _write_records(path: Path, records: Sequence[dict]) -> None:
     ordered = sorted(
         records,
-        key=lambda rec: (rec.get("source") or "", rec.get("sha256") or "", rec.get("id") or ""),
+        key=lambda rec: (
+            rec.get("source") or "",
+            rec.get("sha256") or "",
+            rec.get("id") or "",
+        ),
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
@@ -431,7 +505,9 @@ def _write_records(path: Path, records: Sequence[dict]) -> None:
 
 def _merge_records(primary: dict, secondary: dict) -> dict:
     merged = dict(primary)
-    merged_ids = list({*(primary.get("identifiers") or []), *(secondary.get("identifiers") or [])})
+    merged_ids = list(
+        {*(primary.get("identifiers") or []), *(secondary.get("identifiers") or [])}
+    )
     merged["identifiers"] = sorted(merged_ids)
     for field in ("source_url", "date", "provider", "section", "paragraph", "text"):
         if not merged.get(field) and secondary.get(field):
@@ -471,7 +547,9 @@ def _write_manifest(out_dir: Path) -> dict:
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     checksum_items = [(fp.name, _file_sha256(fp)) for fp in corpus_files]
     checksum_items.append(("manifest.json", _file_sha256(manifest_path)))
-    checksum_lines = "\n".join(f"{sha}  {name}" for name, sha in sorted(checksum_items)) + "\n"
+    checksum_lines = (
+        "\n".join(f"{sha}  {name}" for name, sha in sorted(checksum_items)) + "\n"
+    )
     (out_dir / "checksums.sha256").write_text(checksum_lines, encoding="utf-8")
     return manifest
 
@@ -534,7 +612,9 @@ def validate_corpus(data_dir: Path) -> list[str]:
             if not isinstance(identifiers, list) or not identifiers:
                 problems.append(f"{path.name}:{idx} missing identifiers")
     if problems:
-        _logger.warning("corpus.validate.failed", data_dir=str(data_dir), issues=len(problems))
+        _logger.warning(
+            "corpus.validate.failed", data_dir=str(data_dir), issues=len(problems)
+        )
     else:
         _logger.info("corpus.validate.ok", data_dir=str(data_dir))
     return problems

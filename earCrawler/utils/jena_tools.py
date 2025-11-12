@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 """Helpers for managing a local Apache Jena installation with checksum verification."""
 
 from pathlib import Path
@@ -25,7 +26,9 @@ def ensure_java_home() -> Path:
         if _java_executable(home).exists():
             os.environ["JAVA_HOME"] = str(home)
             return home
-        raise RuntimeError("JAVA_HOME is set but does not look like a valid Java installation")
+        raise RuntimeError(
+            "JAVA_HOME is set but does not look like a valid Java installation"
+        )
 
     java_cmd = shutil.which("java.exe" if os.name == "nt" else "java")
     if java_cmd:
@@ -114,7 +117,9 @@ def ensure_jena(download: bool = True, version: str | None = None) -> Path:
     download_dir = root / "tools" / "jena-download"
     download_dir.mkdir(parents=True, exist_ok=True)
     zip_path = download_dir / f"apache-jena-{version}.zip"
-    archive_url = f"https://archive.apache.org/dist/jena/binaries/apache-jena-{version}.zip"
+    archive_url = (
+        f"https://archive.apache.org/dist/jena/binaries/apache-jena-{version}.zip"
+    )
     mirror_url = f"https://downloads.apache.org/jena/binaries/apache-jena-{version}.zip"
     attempts = [archive_url, mirror_url]
     for url in attempts:

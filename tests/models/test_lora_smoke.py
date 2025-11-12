@@ -25,7 +25,9 @@ def test_classification_adapter_forward(tmp_path, monkeypatch) -> None:
     monkeypatch.setattr(
         importlib.util,
         "find_spec",
-        lambda name, *a, **k: None if name == "bitsandbytes" else orig_find_spec(name, *a, **k),
+        lambda name, *a, **k: (
+            None if name == "bitsandbytes" else orig_find_spec(name, *a, **k)
+        ),
     )
 
     config = BertConfig(num_labels=2)

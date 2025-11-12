@@ -9,9 +9,13 @@ from .lineage import LineageEdge
 
 
 class RagQueryRequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=512, description="Natural language question")
+    query: str = Field(
+        ..., min_length=1, max_length=512, description="Natural language question"
+    )
     top_k: int = Field(3, ge=1, le=10, description="Maximum candidate passages")
-    include_lineage: bool = Field(False, description="Return KG lineage data when available")
+    include_lineage: bool = Field(
+        False, description="Return KG lineage data when available"
+    )
 
     def cache_key(self) -> str:
         lineage_flag = "1" if self.include_lineage else "0"
@@ -19,11 +23,17 @@ class RagQueryRequest(BaseModel):
 
 
 class RagSource(BaseModel):
-    id: Optional[str] = Field(default=None, description="Source identifier (section/entity)")
+    id: Optional[str] = Field(
+        default=None, description="Source identifier (section/entity)"
+    )
     url: Optional[str] = Field(default=None, description="Canonical URL")
     label: Optional[str] = Field(default=None, description="Display title or citation")
-    section: Optional[str] = Field(default=None, description="Regulatory section or part")
-    provider: Optional[str] = Field(default=None, description="Upstream provider (e.g., federalregister.gov)")
+    section: Optional[str] = Field(
+        default=None, description="Regulatory section or part"
+    )
+    provider: Optional[str] = Field(
+        default=None, description="Upstream provider (e.g., federalregister.gov)"
+    )
 
 
 class RagLineageReference(BaseModel):

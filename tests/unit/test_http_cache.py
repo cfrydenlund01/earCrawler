@@ -13,7 +13,9 @@ class DummySession:
     def __init__(self, response: requests.Response):
         self._response = response
 
-    def get(self, url, params, headers, timeout):  # pragma: no cover - simple pass-through
+    def get(
+        self, url, params, headers, timeout
+    ):  # pragma: no cover - simple pass-through
         return self._response
 
 
@@ -35,7 +37,7 @@ def test_skip_cache_for_non_json(tmp_path: Path) -> None:
 
 def test_cache_written_for_json(tmp_path: Path) -> None:
     cache = HTTPCache(tmp_path)
-    resp = make_response("{\"a\":1}", "application/json; charset=utf-8")
+    resp = make_response('{"a":1}', "application/json; charset=utf-8")
     session = DummySession(resp)
     cache.get(session, "https://example.com", {})
     assert any(tmp_path.iterdir())

@@ -14,7 +14,9 @@ pytestmark = pytest.mark.usefixtures("require_pwsh")
 
 
 def run_build(tmp_env: dict[str, str] | None = None) -> Path:
-    subprocess.run(["pwsh", "-File", str(BUILD_SCRIPT)], check=True, cwd=ROOT, env=tmp_env)
+    subprocess.run(
+        ["pwsh", "-File", str(BUILD_SCRIPT)], check=True, cwd=ROOT, env=tmp_env
+    )
     return ROOT / "dist" / "offline_bundle"
 
 
@@ -30,11 +32,19 @@ def test_manifest_sorted_and_verify(tmp_path):
     sorted_lines = sorted(line for line in checksums if line.strip())
     assert checksums == sorted_lines
 
-    subprocess.run(["pwsh", "-File", str(bundle / "scripts" / "bundle-verify.ps1"), "-Path", str(bundle)], check=True, cwd=ROOT)
+    subprocess.run(
+        [
+            "pwsh",
+            "-File",
+            str(bundle / "scripts" / "bundle-verify.ps1"),
+            "-Path",
+            str(bundle),
+        ],
+        check=True,
+        cwd=ROOT,
+    )
 
     # determinism: rebuild and ensure manifest unchanged
     manifest_copy = manifest_path.read_text()
     bundle = run_build(None)
     assert manifest_path.read_text() == manifest_copy
-
-

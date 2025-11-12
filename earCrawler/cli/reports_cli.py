@@ -15,9 +15,7 @@ def _get_service_url() -> str:
     """Return the analytics service base URL from ``ANALYTICS_SERVICE_URL``."""
     url = os.getenv("ANALYTICS_SERVICE_URL")
     if not url:
-        raise click.ClickException(
-            "ANALYTICS_SERVICE_URL environment variable not set"
-        )
+        raise click.ClickException("ANALYTICS_SERVICE_URL environment variable not set")
     return url.rstrip("/")
 
 

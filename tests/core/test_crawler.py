@@ -29,7 +29,9 @@ class StubTradeGovClient:
 
 
 class StubFederalRegisterClient:
-    def __init__(self, docs: dict[str, list[Dict]], fail_ids: Iterable[str] | None = None) -> None:
+    def __init__(
+        self, docs: dict[str, list[Dict]], fail_ids: Iterable[str] | None = None
+    ) -> None:
         self.docs = docs
         self.fail_ids = set(fail_ids or [])
         self.queries: list[str] = []
@@ -75,7 +77,9 @@ def test_tradegov_error_logged(caplog: pytest.LogCaptureFixture):
 
 def test_federalregister_error_logged(caplog: pytest.LogCaptureFixture):
     tg = StubTradeGovClient([{"id": "good"}, {"id": "bad"}, {"id": "ok"}])
-    fr = StubFederalRegisterClient({"good": [{"d": 1}], "ok": [{"d": 2}]}, fail_ids=["bad"])
+    fr = StubFederalRegisterClient(
+        {"good": [{"d": 1}], "ok": [{"d": 2}]}, fail_ids=["bad"]
+    )
     crawler = Crawler(tg, fr)
     with caplog.at_level(logging.WARNING):
         entities, documents = crawler.run("foo")

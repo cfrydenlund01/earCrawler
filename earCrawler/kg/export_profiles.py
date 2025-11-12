@@ -1,4 +1,5 @@
 """Export graphs into multiple profiles (TTL, NT, gz, manifest)."""
+
 from __future__ import annotations
 
 import gzip
@@ -34,8 +35,12 @@ def export_profiles(ttl_source: Path, out_dir: Path, *, stem: str = "dataset") -
 
     manifest_path = out_dir / "manifest.json"
     checksum_path = out_dir / "checksums.sha256"
-    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8")
-    checksum_lines = [f"{entry['sha256']}  {name}" for name, entry in sorted(manifest.items())]
+    manifest_path.write_text(
+        json.dumps(manifest, indent=2, sort_keys=True), encoding="utf-8"
+    )
+    checksum_lines = [
+        f"{entry['sha256']}  {name}" for name, entry in sorted(manifest.items())
+    ]
     checksum_path.write_text("\n".join(checksum_lines) + "\n", encoding="utf-8")
     return manifest
 
@@ -43,7 +48,9 @@ def export_profiles(ttl_source: Path, out_dir: Path, *, stem: str = "dataset") -
 def _gzip_file(path: Path) -> Path:
     gz_path = path.with_suffix(path.suffix + ".gz")
     with path.open("rb") as src, gz_path.open("wb") as raw:
-        with gzip.GzipFile(filename=gz_path.name, mode="wb", fileobj=raw, mtime=0) as dst:
+        with gzip.GzipFile(
+            filename=gz_path.name, mode="wb", fileobj=raw, mtime=0
+        ) as dst:
             copyfileobj(src, dst)
     return gz_path
 

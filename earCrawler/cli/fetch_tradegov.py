@@ -1,4 +1,5 @@
 """Fetch Trade.gov entities for monitoring."""
+
 from __future__ import annotations
 
 import argparse

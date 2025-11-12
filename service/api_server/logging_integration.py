@@ -26,7 +26,9 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
         self._logger = logger
         self._config = config
 
-    async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    async def dispatch(
+        self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
         start = time.perf_counter()
         response: Response | None = None
         error: Exception | None = None
@@ -82,7 +84,9 @@ class ObservabilityMiddleware(BaseHTTPMiddleware):
                 await self._forward_log(request, entry, level)
         return response
 
-    async def _forward_log(self, request: Request, entry: dict[str, Any], level: str) -> None:
+    async def _forward_log(
+        self, request: Request, entry: dict[str, Any], level: str
+    ) -> None:
         queue = getattr(request.app.state, "request_log_queue", None)
         if queue is None:
             return

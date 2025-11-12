@@ -1,4 +1,5 @@
 """Mention extraction with token-aware scoring and guardrails."""
+
 from __future__ import annotations
 
 import re
@@ -36,7 +37,9 @@ class MentionScore:
 class MentionExtractor:
     """Score entity mentions in text using token and pattern heuristics."""
 
-    def __init__(self, *, stopwords: Iterable[str] | None = None, window: int = 8) -> None:
+    def __init__(
+        self, *, stopwords: Iterable[str] | None = None, window: int = 8
+    ) -> None:
         self.stopwords = {s.lower() for s in (stopwords or STOPWORDS)}
         self.window = max(2, window)
 
@@ -105,11 +108,13 @@ class MentionExtractor:
         if len(pattern) == 0 or len(tokens) < len(pattern):
             return False
         for idx in range(len(tokens) - len(pattern) + 1):
-            if tokens[idx: idx + len(pattern)] == list(pattern):
+            if tokens[idx : idx + len(pattern)] == list(pattern):
                 return True
         return False
 
-    def _core_in_window(self, tokens: Sequence[str], core_tokens: Sequence[str]) -> bool:
+    def _core_in_window(
+        self, tokens: Sequence[str], core_tokens: Sequence[str]
+    ) -> bool:
         target = set(core_tokens)
         if not target:
             return False
@@ -130,4 +135,3 @@ class MentionExtractor:
 
 
 __all__ = ["MentionExtractor", "MentionScore"]
-

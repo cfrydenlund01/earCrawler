@@ -8,10 +8,10 @@ key = os.getenv("TRADEGOV_API_KEY")
 if not key:
     try:
         import keyring
-        key = (
-            keyring.get_password("EAR_AI", "TRADEGOV_API_KEY")
-            or keyring.get_password("earCrawler", "TRADEGOV_API_KEY")
-        )
+
+        key = keyring.get_password(
+            "EAR_AI", "TRADEGOV_API_KEY"
+        ) or keyring.get_password("earCrawler", "TRADEGOV_API_KEY")
     except Exception:
         key = None
 

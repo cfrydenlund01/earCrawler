@@ -1,4 +1,5 @@
 """Trade.gov Data API client with caching and keyring integration."""
+
 from __future__ import annotations
 
 import os
@@ -6,7 +7,13 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
 import requests
-from tenacity import RetryCallState, retry, retry_if_exception_type, stop_after_attempt, wait_exponential
+from tenacity import (
+    RetryCallState,
+    retry,
+    retry_if_exception_type,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from earCrawler.utils.secure_store import get_secret
 from earCrawler.utils.http_cache import HTTPCache
@@ -21,7 +28,11 @@ _logger = JsonLogger("tradegov-client")
 def _log_retry(retry_state: RetryCallState) -> None:
     """Emit structured telemetry for retry attempts."""
     exc = retry_state.outcome.exception() if retry_state.outcome else None
-    wait_time = getattr(retry_state.next_action, "sleep", None) if retry_state.next_action else None
+    wait_time = (
+        getattr(retry_state.next_action, "sleep", None)
+        if retry_state.next_action
+        else None
+    )
     endpoint = ""
     if len(retry_state.args) >= 2:
         endpoint = str(retry_state.args[1])
@@ -44,7 +55,9 @@ class TradeGovClient:
     BASE_URL = "https://data.trade.gov/consolidated_screening_list/v1"
     SUBSCRIPTION_HEADER = "subscription-key"
 
-    def __init__(self, *, session: requests.Session | None = None, cache_dir: Path | None = None) -> None:
+    def __init__(
+        self, *, session: requests.Session | None = None, cache_dir: Path | None = None
+    ) -> None:
         self.session = session or requests.Session()
         self._owns_session = session is None
         self.session.trust_env = False
@@ -54,7 +67,11 @@ class TradeGovClient:
         ttl_seconds = int(ttl_env) if ttl_env else None
         max_env = os.getenv("TRADEGOV_CACHE_MAX_ENTRIES")
         max_entries = int(max_env) if max_env else 4096
-        self.cache = HTTPCache(cache_dir or Path(".cache/api/tradegov"), max_entries=max_entries, ttl_seconds=ttl_seconds)
+        self.cache = HTTPCache(
+            cache_dir or Path(".cache/api/tradegov"),
+            max_entries=max_entries,
+            ttl_seconds=ttl_seconds,
+        )
         env_limit = os.getenv("TRADEGOV_MAX_CALLS")
         self.request_limit = int(env_limit) if env_limit else None
         _logger.info(
@@ -79,11 +96,15 @@ class TradeGovClient:
             "Cache-Control": "no-cache",
         }
         if not self.api_key:
-            _logger.warning("api.request.skipped", reason="missing_api_key", endpoint=endpoint)
+            _logger.warning(
+                "api.request.skipped", reason="missing_api_key", endpoint=endpoint
+            )
             return {"results": []}
         else:
             headers[self.SUBSCRIPTION_HEADER] = self.api_key
-        _logger.info("api.request", endpoint=endpoint, params=params, limit=self.request_limit)
+        _logger.info(
+            "api.request", endpoint=endpoint, params=params, limit=self.request_limit
+        )
         try:
             with budget.consume("tradegov", self.request_limit):
                 resp = self.cache.get(
@@ -94,10 +115,16 @@ class TradeGovClient:
                     vary_headers=_VARY_HEADERS,
                 )
         except budget.BudgetExceededError:
-            _logger.error("api.budget_exceeded", endpoint=endpoint, limit=self.request_limit)
+            _logger.error(
+                "api.budget_exceeded", endpoint=endpoint, limit=self.request_limit
+            )
             raise
-        if resp.status_code in (301, 302) or any(h.status_code in (301, 302) for h in getattr(resp, "history", [])):
-            _logger.error("api.redirect", endpoint=endpoint, status=resp.status_code, url=resp.url)
+        if resp.status_code in (301, 302) or any(
+            h.status_code in (301, 302) for h in getattr(resp, "history", [])
+        ):
+            _logger.error(
+                "api.redirect", endpoint=endpoint, status=resp.status_code, url=resp.url
+            )
             raise TradeGovError(
                 "Trade.gov redirected to developer portal. Confirm your CSL subscription and subscription-key header."
             )
@@ -124,7 +151,9 @@ class TradeGovClient:
             endpoint=endpoint,
             status=resp.status_code,
             cache="hit" if getattr(resp, "from_cache", False) else "miss",
-            result_count=len(payload.get("results", [])) if isinstance(payload, dict) else None,
+            result_count=(
+                len(payload.get("results", [])) if isinstance(payload, dict) else None
+            ),
         )
         return payload
 

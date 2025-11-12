@@ -1,4 +1,5 @@
 """Loader utilities for EAR parts derived from Federal Register content."""
+
 from __future__ import annotations
 
 import hashlib
@@ -30,7 +31,7 @@ def upsert_part(jena: JenaClient, part_no: str) -> None:
 
 
 def _escape(value: str) -> str:
-    return value.replace("\\", "\\\\").replace("\"", "\\\"")
+    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _anchor_identifier(part_no: str, anchor: Anchor) -> str:
@@ -45,8 +46,7 @@ def upsert_part_anchor(jena: JenaClient, part_no: str, anchor: Anchor) -> None:
     with open(PART_ANCHOR_TEMPLATE_PATH, "r", encoding="utf-8") as handle:
         template = handle.read()
     query = (
-        template
-        .replace("__PARTNO__", part_no)
+        template.replace("__PARTNO__", part_no)
         .replace("__ANCHOR_ID__", anchor_id)
         .replace("__DOC_ID__", _escape(anchor.document_id))
         .replace("__TITLE__", _escape(anchor.title))
@@ -244,12 +244,13 @@ def _apply_policy_hints(
 
 
 def upsert_policy_hint(jena: JenaClient, hint) -> None:
-    hint_id = hashlib.sha256(f"{hint.part}:{hint.program}".encode("utf-8")).hexdigest()[:16]
+    hint_id = hashlib.sha256(f"{hint.part}:{hint.program}".encode("utf-8")).hexdigest()[
+        :16
+    ]
     with open(POLICY_HINT_TEMPLATE_PATH, "r", encoding="utf-8") as handle:
         template = handle.read()
     query = (
-        template
-        .replace("__PARTNO__", hint.part)
+        template.replace("__PARTNO__", hint.part)
         .replace("__HINT_ID__", hint_id)
         .replace("__PROGRAM__", _escape(hint.program))
         .replace("__PRIORITY__", f"{hint.priority:.3f}".rstrip("0").rstrip("."))

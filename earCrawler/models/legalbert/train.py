@@ -28,6 +28,7 @@ if TYPE_CHECKING:  # pragma: no cover - hints only
 try:
     from torch.utils.data import Dataset
 except ImportError:  # pragma: no cover - optional dependency
+
     class Dataset:  # type: ignore
         """Fallback Dataset base class used when torch is unavailable."""
 
@@ -48,7 +49,10 @@ class TextDataset(Dataset):
     """
 
     def __init__(
-        self, texts: List[str], tokenizer: AutoTokenizer, labels: List[int] | None = None
+        self,
+        texts: List[str],
+        tokenizer: AutoTokenizer,
+        labels: List[int] | None = None,
     ) -> None:
         torch_mod = import_optional("torch", ["torch"])
         encodings = tokenizer(
@@ -171,7 +175,9 @@ def run_classification(tokenizer: AutoTokenizer, do_train: bool, do_eval: bool) 
 
     adapter_path = Path("models") / "legalbert" / "lora_pretrained"
     if adapter_path.exists():
-        model.load_adapter(str(adapter_path), adapter_name="pretrained", is_trainable=True)
+        model.load_adapter(
+            str(adapter_path), adapter_name="pretrained", is_trainable=True
+        )
         # ``set_active_adapters`` was removed in favour of ``set_adapter`` in
         # recent versions of ``peft``. Using the newer API avoids an
         # AttributeError during fine-tuning.

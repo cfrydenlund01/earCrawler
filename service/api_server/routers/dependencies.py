@@ -16,7 +16,9 @@ def get_registry(request: Request):  # pragma: no cover - convenience
 
 
 def rate_limit(scope: str):
-    async def dependency(request: Request, limiter: RateLimiter = Depends(get_limiter)) -> None:
+    async def dependency(
+        request: Request, limiter: RateLimiter = Depends(get_limiter)
+    ) -> None:
         request.state.rate_scope = scope
         await enforce_rate_limits(request, limiter)
 

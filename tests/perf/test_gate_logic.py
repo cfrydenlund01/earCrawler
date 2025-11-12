@@ -5,10 +5,38 @@ from earCrawler.utils import perf_report
 
 
 def test_gate_pass_fail(tmp_path):
-    report_good = {"runs": [{"results": [{"group": "lookup", "latencies_ms": [10, 20, 30], "errors": 0, "timeouts": 0}]}]}
-    report_bad = {"runs": [{"results": [{"group": "lookup", "latencies_ms": [2000, 3000], "errors": 0, "timeouts": 0}]}]}
+    report_good = {
+        "runs": [
+            {
+                "results": [
+                    {
+                        "group": "lookup",
+                        "latencies_ms": [10, 20, 30],
+                        "errors": 0,
+                        "timeouts": 0,
+                    }
+                ]
+            }
+        ]
+    }
+    report_bad = {
+        "runs": [
+            {
+                "results": [
+                    {
+                        "group": "lookup",
+                        "latencies_ms": [2000, 3000],
+                        "errors": 0,
+                        "timeouts": 0,
+                    }
+                ]
+            }
+        ]
+    }
     baseline = {"groups": {"lookup": {"p95_ms": 15, "p99_ms": 20}}}
-    budgets = {"scales": {"S": {"query_groups": {"lookup": {"p95_ms": 100, "p99_ms": 120}}}}}
+    budgets = {
+        "scales": {"S": {"query_groups": {"lookup": {"p95_ms": 100, "p99_ms": 120}}}}
+    }
     rp = tmp_path / "r.json"
     bp = tmp_path / "b.json"
     bud = tmp_path / "bud.yml"

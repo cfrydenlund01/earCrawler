@@ -10,7 +10,9 @@ def test_jobs_run_tradegov(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("TRADEGOV_MAX_CALLS", "10")
     monkeypatch.setenv("FR_MAX_CALLS", "10")
     monkeypatch.setenv("EARCTL_USER", "test_operator")
-    policy_path = Path(__file__).resolve().parents[3] / "earCrawler" / "security" / "policy.yml"
+    policy_path = (
+        Path(__file__).resolve().parents[3] / "earCrawler" / "security" / "policy.yml"
+    )
     monkeypatch.setenv("EARCTL_POLICY_PATH", str(policy_path))
 
     run_dir = tmp_path / "run/logs"

@@ -32,16 +32,22 @@ from bs4 import BeautifulSoup
 try:
     from api_clients.federalregister_client import FederalRegisterClient, FederalRegisterError  # type: ignore
 except Exception:
+
     class FederalRegisterError(Exception):
         """Fallback error used when FederalRegisterClient cannot be imported."""
+
     class FederalRegisterClient:
         """Fallback dummy Federal Register client used during docs/tests."""
+
         def search_documents(self, query: str, per_page: int = 100) -> Iterable[Dict]:
             return []
+
         def get_document(self, doc_number: str) -> Dict:
             return {}
 
+
 ParagraphCitation = str
+
 
 @dataclass
 class ParagraphRecord:
@@ -53,8 +59,10 @@ class ParagraphRecord:
     scraped_at: str
     version: int = 1
 
+
 class EARCrawler:
     """Incrementally crawl EAR paragraphs from the Federal Register."""
+
     def __init__(
         self,
         federal_client: FederalRegisterClient,
@@ -65,7 +73,9 @@ class EARCrawler:
         self.client = federal_client
         self.storage_dir = storage_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
-        self.citation_regex = citation_regex or re.compile(r"\b\d{1,3}\s+FR\s+\d{1,6}\b", re.IGNORECASE)
+        self.citation_regex = citation_regex or re.compile(
+            r"\b\d{1,3}\s+FR\s+\d{1,6}\b", re.IGNORECASE
+        )
         self.session = session or requests.Session()
         self.logger = logging.getLogger(self.__class__.__name__)
         self.paragraphs_path = self.storage_dir / "ear_paragraphs.jsonl"
@@ -84,7 +94,9 @@ class EARCrawler:
 
     def _save_index(self) -> None:
         serialisable = {sha: asdict(rec) for sha, rec in self.hash_index.items()}
-        self.index_path.write_text(json.dumps(serialisable, ensure_ascii=False, indent=2), encoding="utf-8")
+        self.index_path.write_text(
+            json.dumps(serialisable, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
 
     def _normalise_text(self, text: str) -> str:
         return " ".join(text.strip().split())
@@ -108,7 +120,9 @@ class EARCrawler:
             if text:
                 yield self._normalise_text(text)
 
-    def run(self, query: str, per_page: int = 100, delay: float = 1.0) -> List[ParagraphRecord]:
+    def run(
+        self, query: str, per_page: int = 100, delay: float = 1.0
+    ) -> List[ParagraphRecord]:
         new_records: List[ParagraphRecord] = []
         try:
             documents_iter = self.client.search_documents(query, per_page=per_page)
@@ -119,7 +133,9 @@ class EARCrawler:
         for doc in documents_iter:
             doc_number = str(doc.get("document_number") or doc.get("document_number"))
             if not doc_number:
-                self.logger.warning("Skipping document missing 'document_number': %s", doc)
+                self.logger.warning(
+                    "Skipping document missing 'document_number': %s", doc
+                )
                 continue
             try:
                 detail = self.client.get_document(doc_number)
@@ -127,7 +143,12 @@ class EARCrawler:
                 self.logger.warning("Failed to fetch document %s: %s", doc_number, exc)
                 continue
             html_url: Optional[str] = None
-            for key in ("body_html_url", "html_url", "html_url_publication", "html_url_download"):
+            for key in (
+                "body_html_url",
+                "html_url",
+                "html_url_publication",
+                "html_url_download",
+            ):
                 val = detail.get(key)
                 if isinstance(val, str) and val:
                     html_url = val
@@ -146,7 +167,10 @@ class EARCrawler:
                     continue
                 version = 1
                 for existing in self.hash_index.values():
-                    if existing.document_number == doc_number and existing.paragraph_index == idx:
+                    if (
+                        existing.document_number == doc_number
+                        and existing.paragraph_index == idx
+                    ):
                         version = existing.version + 1
                         break
                 record = ParagraphRecord(

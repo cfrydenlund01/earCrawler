@@ -75,5 +75,6 @@ def crash_test() -> None:
     cfg = tconfig.load_config()
     sink = FileSink(cfg)
     from earCrawler.telemetry.events import crash_report
+
     sink.write(crash_report("crash-test", "RuntimeError"))
     raise RuntimeError("crash test")

@@ -16,8 +16,7 @@ from .templates import Template, TemplateRegistry
 
 
 class FusekiClient(Protocol):
-    async def query(self, template: Template, query: str) -> Mapping[str, Any]:
-        ...
+    async def query(self, template: Template, query: str) -> Mapping[str, Any]: ...
 
 
 @dataclass(slots=True)
@@ -56,13 +55,17 @@ class FusekiGateway:
         self._registry = registry
         self._client = client
 
-    async def select(self, template_name: str, params: Mapping[str, Any]) -> List[Dict[str, Any]]:
+    async def select(
+        self, template_name: str, params: Mapping[str, Any]
+    ) -> List[Dict[str, Any]]:
         template = self._registry.get(template_name)
         query = template.render(params)
         payload = await self._client.query(template, query)
         return _coerce_bindings(payload)
 
-    async def select_as_raw(self, template_name: str, params: Mapping[str, Any]) -> Mapping[str, Any]:
+    async def select_as_raw(
+        self, template_name: str, params: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
         template = self._registry.get(template_name)
         query = template.render(params)
         return await self._client.query(template, query)
@@ -103,18 +106,21 @@ class StubFusekiClient:
         if payload is None:
             return {"head": {"vars": []}, "results": {"bindings": []}}
         bindings = [
-            {
-                key: _to_binding(value)
-                for key, value in row.items()
-            }
-            for row in payload
+            {key: _to_binding(value) for key, value in row.items()} for row in payload
         ]
-        return {"head": {"vars": list(bindings[0].keys()) if bindings else []}, "results": {"bindings": bindings}}
+        return {
+            "head": {"vars": list(bindings[0].keys()) if bindings else []},
+            "results": {"bindings": bindings},
+        }
 
 
 def _to_binding(value: Any) -> Dict[str, Any]:
     if isinstance(value, dict) and {"value", "datatype"} <= set(value):
-        return {"type": "literal", "value": value["value"], "datatype": value["datatype"]}
+        return {
+            "type": "literal",
+            "value": value["value"],
+            "datatype": value["datatype"],
+        }
     if isinstance(value, dict) and {"value", "lang"} <= set(value):
         return {"type": "literal", "value": value["value"], "xml:lang": value["lang"]}
     if isinstance(value, str) and value.startswith("http"):

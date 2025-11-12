@@ -80,7 +80,7 @@ def _evaluate(base: Path, policy: RetentionPolicy) -> Tuple[List[dict], int]:
         key=lambda p: (p.stat().st_mtime, p.as_posix()),
         reverse=True,
     )
-  
+
     protected = set(files[: policy.keep_last_n]) if policy.keep_last_n > 0 else set()
     now = _now().timestamp()
     candidates: List[dict] = []
@@ -158,11 +158,21 @@ def gc_paths(
 
 
 DEFAULT_POLICIES = {
-    "telemetry": RetentionPolicy(max_days=30, max_total_mb=256, max_file_mb=8, keep_last_n=10),
-    "cache": RetentionPolicy(max_days=30, max_total_mb=512, max_file_mb=64, keep_last_n=10),
-    "kg": RetentionPolicy(max_days=30, max_total_mb=1024, max_file_mb=256, keep_last_n=10),
-    "audit": RetentionPolicy(max_days=30, max_total_mb=256, max_file_mb=8, keep_last_n=10),
-    "bundle": RetentionPolicy(max_days=90, max_total_mb=4096, max_file_mb=512, keep_last_n=3),
+    "telemetry": RetentionPolicy(
+        max_days=30, max_total_mb=256, max_file_mb=8, keep_last_n=10
+    ),
+    "cache": RetentionPolicy(
+        max_days=30, max_total_mb=512, max_file_mb=64, keep_last_n=10
+    ),
+    "kg": RetentionPolicy(
+        max_days=30, max_total_mb=1024, max_file_mb=256, keep_last_n=10
+    ),
+    "audit": RetentionPolicy(
+        max_days=30, max_total_mb=256, max_file_mb=8, keep_last_n=10
+    ),
+    "bundle": RetentionPolicy(
+        max_days=90, max_total_mb=4096, max_file_mb=512, keep_last_n=3
+    ),
 }
 
 
@@ -174,7 +184,9 @@ def run_gc(
     max_file_mb: int | None = None,
     keep_last_n: int | None = None,
 ) -> dict:
-    targets = ["telemetry", "cache", "kg", "audit", "bundle"] if target == "all" else [target]
+    targets = (
+        ["telemetry", "cache", "kg", "audit", "bundle"] if target == "all" else [target]
+    )
     all_candidates: List[dict] = []
     errors: List[str] = []
     policies: dict[str, dict] = {}
@@ -200,7 +212,9 @@ def run_gc(
         ],
         "audit": [
             Path(os.getenv("APPDATA") or str(Path.home())) / "EarCrawler" / "audit",
-            Path(os.getenv("PROGRAMDATA") or (os.getenv("APPDATA") or str(Path.home()))) / "EarCrawler" / "audit",
+            Path(os.getenv("PROGRAMDATA") or (os.getenv("APPDATA") or str(Path.home())))
+            / "EarCrawler"
+            / "audit",
         ],
         "bundle": [
             Path("dist/offline_bundle"),
@@ -208,7 +222,9 @@ def run_gc(
     }
 
     for tgt in targets:
-        policy = DEFAULT_POLICIES[tgt].override(max_days, max_total_mb, max_file_mb, keep_last_n)
+        policy = DEFAULT_POLICIES[tgt].override(
+            max_days, max_total_mb, max_file_mb, keep_last_n
+        )
         policies[tgt] = asdict(policy)
         report = gc_paths(paths_map[tgt], policy, dry_run=dry_run, audit=not dry_run)
         for c in report["candidates"]:

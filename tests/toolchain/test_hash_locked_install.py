@@ -33,6 +33,8 @@ def test_hash_locked_install(tmp_path):
     with pytest.raises(subprocess.CalledProcessError):
         subprocess.check_call([str(pip), "install", "--require-hashes", "-r", str(bad)])
     with pytest.raises(subprocess.CalledProcessError):
-        subprocess.check_call([str(pip), "install", "--require-hashes", "-r", str(wrong)])
+        subprocess.check_call(
+            [str(pip), "install", "--require-hashes", "-r", str(wrong)]
+        )
 
     subprocess.check_call([str(pip), "install", "--require-hashes", "-r", str(good)])

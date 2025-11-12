@@ -8,6 +8,7 @@ from click.testing import CliRunner
 
 root = Path(__file__).resolve().parents[2]  # noqa: E402
 import sys  # noqa: E402
+
 sys.path.insert(0, str(root))  # noqa: E402
 
 import earCrawler.cli.reports_cli as reports_cli  # noqa: E402

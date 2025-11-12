@@ -22,7 +22,9 @@ _EVENT_TYPES = {
 _LOGGER = logging.getLogger("earcrawler.eventlog")
 
 
-def write_event_log(message: str, *, level: str = "INFO", source: str = "EarCrawler") -> None:
+def write_event_log(
+    message: str, *, level: str = "INFO", source: str = "EarCrawler"
+) -> None:
     """Write an event to the Windows Event Log if supported."""
 
     if platform.system() != "Windows" or ctypes is None:

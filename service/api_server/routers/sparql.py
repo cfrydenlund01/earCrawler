@@ -10,7 +10,11 @@ from .dependencies import get_gateway, rate_limit
 router = APIRouter(prefix="/v1", tags=["sparql"])
 
 
-@router.post("/sparql", response_model=SparqlProxyResponse, responses={400: {"model": ProblemDetails}})
+@router.post(
+    "/sparql",
+    response_model=SparqlProxyResponse,
+    responses={400: {"model": ProblemDetails}},
+)
 async def sparql_proxy(
     payload: SparqlProxyRequest,
     request: Request,
@@ -26,5 +30,7 @@ async def sparql_proxy(
     except KeyError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if "head" not in raw or "results" not in raw:
-        raise HTTPException(status_code=502, detail="Unexpected response from SPARQL endpoint")
+        raise HTTPException(
+            status_code=502, detail="Unexpected response from SPARQL endpoint"
+        )
     return SparqlProxyResponse(head=raw.get("head", {}), results=raw.get("results", {}))

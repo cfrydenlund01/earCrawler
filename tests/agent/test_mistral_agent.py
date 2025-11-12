@@ -60,7 +60,6 @@ class DummyLongContextPipeline:
         return f"summary:{text}"
 
 
-
 class DummyDataset:
     def __init__(self, data):
         self.data = data
@@ -71,6 +70,7 @@ class DummyDataset:
 
     def map(self, func):
         return self
+
 
 class DummyTrainer:
     def __init__(self, model, train_dataset, args):  # noqa: D401
@@ -158,6 +158,7 @@ def test_train_qlora_adapter_runs(tmp_path, monkeypatch) -> None:
         return DummyTokenizer(), DummyModel()
 
     monkeypatch.setattr(mistral_agent, "Dataset", DummyDataset)
+
     class DummyTrainingArgs:
         def __init__(self, **kwargs):
             self.kwargs = kwargs

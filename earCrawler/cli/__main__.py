@@ -21,6 +21,7 @@ from earCrawler.kg import emit_ear, emit_nsf
 from earCrawler.telemetry.hooks import install as install_telem
 from .telemetry import telemetry, crash_test
 from .gc import gc
+
 try:  # optional
     from . import reconcile_cmd
 except Exception:  # pragma: no cover
@@ -47,6 +48,7 @@ def cli() -> None:  # pragma: no cover - simple wrapper
 def diagnose() -> None:
     """Print deterministic diagnostic information."""
     from earCrawler.telemetry import config as tconfig
+
     cfg = tconfig.load_config()
     info = {
         "python": sys.version.split()[0],
@@ -55,7 +57,7 @@ def diagnose() -> None:
         "telemetry": {
             "enabled": cfg.enabled,
             "spool_dir": cfg.spool_dir,
-            "files": len(list(Path(cfg.spool_dir).glob('*'))) if cfg.enabled else 0,
+            "files": len(list(Path(cfg.spool_dir).glob("*"))) if cfg.enabled else 0,
         },
     }
     click.echo(json.dumps(info, sort_keys=True, indent=2))
@@ -111,6 +113,7 @@ corpus_cli = importlib.import_module("earCrawler.cli.corpus")
 cli.add_command(corpus_cli.corpus, name="corpus")
 cli.add_command(api_cmd, name="api")
 
+
 @cli.command(name="crawl")
 @click.option(
     "--sources",
@@ -135,7 +138,12 @@ cli.add_command(api_cmd, name="api")
     show_default=True,
     help="Fixture directory for NSF loader.",
 )
-@click.option("--live", is_flag=True, default=False, help="Enable live HTTP fetching (disabled by default).")
+@click.option(
+    "--live",
+    is_flag=True,
+    default=False,
+    help="Enable live HTTP fetching (disabled by default).",
+)
 def crawl(sources: tuple[str, ...], out: str, fixtures: Path, live: bool) -> None:
     """Load paragraphs from selected sources and print counts."""
     from api_clients.federalregister_client import FederalRegisterClient
@@ -210,7 +218,9 @@ def report(
             results[src] = {k: sorted(v) for k, v in mapping.items()}
 
     if out:
-        out.write_text(json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8")
+        out.write_text(
+            json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         return
 
     for src, data in results.items():
@@ -245,12 +255,12 @@ def kg_export(data_dir: str, out_ttl: str) -> None:
     help="Disable auto-download of Apache Jena; fail if not present.",
 )
 def kg_load(ttl: str, db: str, no_auto_install: bool) -> None:
-#    """Load Turtle into a local TDB2 store.
-#
-#    Example (PowerShell)::
-#
-#        python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
-#    """
+    #    """Load Turtle into a local TDB2 store.
+    #
+    #    Example (PowerShell)::
+    #
+    #        python -m earCrawler.cli kg-load --ttl kg\ear_triples.ttl --db db
+    #    """
     from pathlib import Path
     from earCrawler.kg.loader import load_tdb
 
@@ -269,10 +279,20 @@ cli.add_command(kg_load, name="kg-load")
     show_default=True,
     help="Dataset name (must start with '/').",
 )
-@click.option("--port", "-p", default=3030, show_default=True, type=int, help="Fuseki port.")
-@click.option("--java-opts", default=None, help="Extra JVM opts (e.g., '-Xms1g -Xmx2g').")
-@click.option("--no-wait", is_flag=True, help="Do not wait for server health check; start and return immediately.")
-@click.option("--dry-run", is_flag=True, help="Print the command and exit without launching.")
+@click.option(
+    "--port", "-p", default=3030, show_default=True, type=int, help="Fuseki port."
+)
+@click.option(
+    "--java-opts", default=None, help="Extra JVM opts (e.g., '-Xms1g -Xmx2g')."
+)
+@click.option(
+    "--no-wait",
+    is_flag=True,
+    help="Do not wait for server health check; start and return immediately.",
+)
+@click.option(
+    "--dry-run", is_flag=True, help="Print the command and exit without launching."
+)
 def kg_serve(db, dataset, port, java_opts, no_wait, dry_run):
     """
     Serve the local TDB2 store with Fuseki.
@@ -305,8 +325,12 @@ cli.add_command(kg_serve, name="kg-serve")
 
 
 @click.command()
-@click.option("--endpoint", default="http://localhost:3030/ear/sparql", show_default=True)
-@click.option("--file", "-f", type=click.Path(exists=True), help="SPARQL query file (.rq)")
+@click.option(
+    "--endpoint", default="http://localhost:3030/ear/sparql", show_default=True
+)
+@click.option(
+    "--file", "-f", type=click.Path(exists=True), help="SPARQL query file (.rq)"
+)
 @click.option("--sparql", "-q", help="Inline SPARQL query string")
 @click.option(
     "--form",
@@ -338,7 +362,9 @@ def kg_query(endpoint, file, sparql, form, out):
     try:
         if form == "select":
             data = client.select(query)
-            out_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            out_path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
+            )
             click.echo(f"{len(data.get('results', {}).get('bindings', []))} rows")
         elif form == "ask":
             boolean = client.ask(query)

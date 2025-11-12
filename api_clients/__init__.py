@@ -18,7 +18,10 @@ except Exception:  # pragma: no cover - optional on non-Windows
     TradeGovError = Exception  # type: ignore
 
     def search_entities(*args, **kwargs):  # type: ignore
-        raise RuntimeError("Trade.gov client unavailable: install dependencies or configure secrets")
+        raise RuntimeError(
+            "Trade.gov client unavailable: install dependencies or configure secrets"
+        )
+
 
 try:  # pragma: no cover - platform specific
     from .federalregister_client import (
@@ -31,7 +34,10 @@ except Exception:  # pragma: no cover - optional on non-Windows
     FederalRegisterError = Exception  # type: ignore
 
     def search_documents(*args, **kwargs):  # type: ignore
-        raise RuntimeError("Federal Register client unavailable: install dependencies or configure secrets")
+        raise RuntimeError(
+            "Federal Register client unavailable: install dependencies or configure secrets"
+        )
+
 
 from .ear_api_client import EarCrawlerApiClient, EarApiError
 from .ori_client import ORIClient, ORIClientError

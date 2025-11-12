@@ -1,4 +1,5 @@
 """Utilities for extracting EAR part references from Federal Register content."""
+
 from __future__ import annotations
 
 import re

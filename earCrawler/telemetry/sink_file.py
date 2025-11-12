@@ -41,7 +41,9 @@ class FileSink:
         self.current = self.dir / "current.jsonl"
 
     def _gc(self) -> None:
-        files = sorted(self.dir.glob("events-*.jsonl.gz"), key=lambda p: p.stat().st_mtime)
+        files = sorted(
+            self.dir.glob("events-*.jsonl.gz"), key=lambda p: p.stat().st_mtime
+        )
         max_total = self.cfg.max_spool_mb * 1024 * 1024
         total = sum(p.stat().st_size for p in files)
         now = time.time()

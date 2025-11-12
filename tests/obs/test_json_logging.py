@@ -16,7 +16,13 @@ def _make_logger(*, max_details: int = 256) -> tuple[JsonLogger, io.StringIO]:
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
     logger.propagate = False
-    json_logger = JsonLogger("api", logger=logger, eventlog_enabled=False, max_details_bytes=max_details, sample_rate=1.0)
+    json_logger = JsonLogger(
+        "api",
+        logger=logger,
+        eventlog_enabled=False,
+        max_details_bytes=max_details,
+        sample_rate=1.0,
+    )
     return json_logger, stream
 
 
@@ -29,7 +35,10 @@ def test_json_logger_emits_required_fields():
         route="/v1/test",
         latency_ms=12.5,
         status=200,
-        details={"token": "tokensecretABCDEFGHIJKLMNOPQRST", "email": "user@example.com"},
+        details={
+            "token": "tokensecretABCDEFGHIJKLMNOPQRST",
+            "email": "user@example.com",
+        },
     )
     payload = json.loads(stream.getvalue())
     assert payload["event"] == "request"

@@ -1,4 +1,5 @@
 """CLI commands for interacting with Trade.gov and Federal Register APIs."""
+
 from __future__ import annotations
 
 import json

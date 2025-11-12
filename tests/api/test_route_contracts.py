@@ -37,7 +37,10 @@ def test_search_contract(app) -> None:
 def test_sparql_proxy_contract(app) -> None:
     res = app.post(
         "/v1/sparql",
-        json={"template": "search_entities", "parameters": {"q": "example", "limit": 1, "offset": 0}},
+        json={
+            "template": "search_entities",
+            "parameters": {"q": "example", "limit": 1, "offset": 0},
+        },
     )
     assert res.status_code == 200
     payload = res.json()
@@ -50,4 +53,6 @@ def test_lineage_contract(app) -> None:
     payload = res.json()
     assert payload["id"] == "urn:example:entity:1"
     assert payload["edges"]
-    assert payload["edges"][0]["relation"].endswith("prov#used") or payload["edges"][0]["relation"].endswith("prov#wasDerivedFrom")
+    assert payload["edges"][0]["relation"].endswith("prov#used") or payload["edges"][0][
+        "relation"
+    ].endswith("prov#wasDerivedFrom")

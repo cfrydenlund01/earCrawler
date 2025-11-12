@@ -60,11 +60,17 @@ def load_json(path: Path) -> Dict:
 
 
 def load_budgets(path: Path, scale: str) -> Dict:
-    data = yaml.safe_load(Path(path).read_text()) if path.suffix in {".yml", ".yaml"} else json.loads(Path(path).read_text())
+    data = (
+        yaml.safe_load(Path(path).read_text())
+        if path.suffix in {".yml", ".yaml"}
+        else json.loads(Path(path).read_text())
+    )
     return data["scales"][scale]
 
 
-def compare(summary: Dict[str, Dict[str, float]], baseline: Dict, budgets: Dict) -> Tuple[bool, Dict]:
+def compare(
+    summary: Dict[str, Dict[str, float]], baseline: Dict, budgets: Dict
+) -> Tuple[bool, Dict]:
     passed = True
     diff: Dict[str, Dict[str, float]] = {}
     for group, stats in summary.items():
@@ -82,7 +88,9 @@ def compare(summary: Dict[str, Dict[str, float]], baseline: Dict, budgets: Dict)
     return passed, diff
 
 
-def gate(report_path: Path, baseline_path: Path, budgets_path: Path, scale: str) -> Tuple[bool, Dict]:
+def gate(
+    report_path: Path, baseline_path: Path, budgets_path: Path, scale: str
+) -> Tuple[bool, Dict]:
     report = load_json(report_path)
     baseline = load_json(baseline_path)
     budgets = load_budgets(budgets_path, scale)
@@ -95,6 +103,7 @@ def gate(report_path: Path, baseline_path: Path, budgets_path: Path, scale: str)
 
 def main() -> None:  # pragma: no cover - CLI wrapper
     import argparse
+
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd")
     g = sub.add_parser("gate")
@@ -104,7 +113,9 @@ def main() -> None:  # pragma: no cover - CLI wrapper
     g.add_argument("--scale", default="S")
     g.add_argument("--out", default="kg/reports/perf-gate.txt")
     args = parser.parse_args()
-    passed, result = gate(Path(args.report), Path(args.baseline), Path(args.budgets), args.scale)
+    passed, result = gate(
+        Path(args.report), Path(args.baseline), Path(args.budgets), args.scale
+    )
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     Path(args.out).write_text(json.dumps(result, indent=2), encoding="utf-8")
     if not passed:

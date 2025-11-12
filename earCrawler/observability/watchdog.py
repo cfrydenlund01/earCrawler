@@ -46,7 +46,9 @@ def create_watchdog_plan(
     suffix = ts.strftime("%Y%m%dT%H%M%SZ")
     report_path = report_dir / f"watchdog-{suffix}.txt"
     report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    return WatchdogPlan(missing=missing, restart_commands=restart_commands, report_path=report_path)
+    return WatchdogPlan(
+        missing=missing, restart_commands=restart_commands, report_path=report_path
+    )
 
 
 __all__ = ["WatchdogPlan", "create_watchdog_plan"]

@@ -2,6 +2,7 @@
 
 Adds basic TTL and LRU-style eviction using filesystem mtimes. By default,
 eviction is disabled (no TTL; high max entries)."""
+
 from __future__ import annotations
 
 import hashlib
@@ -19,6 +20,7 @@ except Exception:  # pragma: no cover - vcr not installed
     pass
 else:  # pragma: no cover - executed in test env
     if not hasattr(vcr.stubs.VCRHTTPResponse, "version_string"):
+
         def _version_string(self: object) -> str:
             version = getattr(self, "version", None)
             if isinstance(version, bytes):
@@ -48,7 +50,13 @@ class HTTPCache:
         TTL are treated as expired and are removed during maintenance.
     """
 
-    def __init__(self, base_dir: Path, *, max_entries: int = 4096, ttl_seconds: float | None = None) -> None:
+    def __init__(
+        self,
+        base_dir: Path,
+        *,
+        max_entries: int = 4096,
+        ttl_seconds: float | None = None,
+    ) -> None:
         self.base_dir = Path(base_dir)
         self.base_dir.mkdir(parents=True, exist_ok=True)
         self.max_entries = int(max_entries)
@@ -61,13 +69,17 @@ class HTTPCache:
         headers: Mapping[str, str],
         vary_headers: Iterable[str],
     ) -> Path:
-        normalized_params = urlencode(sorted((str(k), str(v)) for k, v in params.items()))
+        normalized_params = urlencode(
+            sorted((str(k), str(v)) for k, v in params.items())
+        )
         header_map = {str(k).lower(): str(v) for k, v in headers.items()}
         header_components = []
         for name in vary_headers:
             key = str(name).lower()
             header_components.append(f"{key}={header_map.get(key, '')}")
-        key_source = "||".join(filter(None, [url, normalized_params, "|".join(header_components)]))
+        key_source = "||".join(
+            filter(None, [url, normalized_params, "|".join(header_components)])
+        )
         digest = hashlib.sha256(key_source.encode("utf-8")).hexdigest()
         return self.base_dir / f"{digest}.json"
 

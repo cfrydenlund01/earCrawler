@@ -41,12 +41,18 @@ def evaluate_canary_response(
 
     message_parts: list[str] = []
     ok = True
-    if status_code is not None and budget.expect_status and status_code != budget.expect_status:
+    if (
+        status_code is not None
+        and budget.expect_status
+        and status_code != budget.expect_status
+    ):
         ok = False
         message_parts.append(f"status {status_code} != expected {budget.expect_status}")
     if latency_ms > budget.max_latency_ms:
         ok = False
-        message_parts.append(f"latency {latency_ms:.2f}ms > {budget.max_latency_ms}ms budget")
+        message_parts.append(
+            f"latency {latency_ms:.2f}ms > {budget.max_latency_ms}ms budget"
+        )
     if observed_rows < budget.min_rows:
         ok = False
         message_parts.append(f"rows {observed_rows} < min {budget.min_rows}")

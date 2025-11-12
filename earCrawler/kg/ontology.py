@@ -81,4 +81,3 @@ __all__ = [
     "XSD",
     "KG_SCHEMA_VERSION",
 ]
-

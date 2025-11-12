@@ -42,9 +42,21 @@ def run(scale: str, cold: bool, warm: bool) -> None:
 
 
 @perf.command()
-@click.option("--baseline", type=click.Path(path_type=Path), default=Path("perf/baselines/baseline_S.json"))
-@click.option("--budgets", type=click.Path(path_type=Path), default=Path("perf/config/perf_budgets.yml"))
-@click.option("--report", type=click.Path(path_type=Path), default=Path("kg/reports/perf-report.json"))
+@click.option(
+    "--baseline",
+    type=click.Path(path_type=Path),
+    default=Path("perf/baselines/baseline_S.json"),
+)
+@click.option(
+    "--budgets",
+    type=click.Path(path_type=Path),
+    default=Path("perf/config/perf_budgets.yml"),
+)
+@click.option(
+    "--report",
+    type=click.Path(path_type=Path),
+    default=Path("kg/reports/perf-report.json"),
+)
 @click.option("--scale", type=click.Choice(["S", "M"]), default="S")
 @policy.require_role("maintainer")
 @policy.enforce

@@ -30,7 +30,11 @@ async def health(request: Request) -> Dict[str, Any]:
     readiness_checks["rate_limiter"] = _check_rate_limiter(request, budgets)
     readiness_checks["disk"] = _check_disk(budgets)
 
-    readiness_status = "pass" if all(check["status"] == "pass" for check in readiness_checks.values()) else "fail"
+    readiness_status = (
+        "pass"
+        if all(check["status"] == "pass" for check in readiness_checks.values())
+        else "fail"
+    )
     overall_status = "pass" if readiness_status == "pass" else "fail"
 
     return {
@@ -58,7 +62,9 @@ async def _check_fuseki(request: Request, budgets: HealthBudgets) -> Dict[str, A
         latency_ms = round((time.perf_counter() - start) * 1000, 3)
         if latency_ms > budgets.fuseki_select_ms:
             status = "fail"
-            detail["reason"] = f"latency {latency_ms}ms > {budgets.fuseki_select_ms}ms budget"
+            detail["reason"] = (
+                f"latency {latency_ms}ms > {budgets.fuseki_select_ms}ms budget"
+            )
     except Exception as exc:  # pragma: no cover - defensive
         latency_ms = round((time.perf_counter() - start) * 1000, 3)
         status = "fail"
@@ -82,12 +88,22 @@ def _check_templates(request: Request) -> Dict[str, Any]:
 def _check_rate_limiter(request: Request, budgets: HealthBudgets) -> Dict[str, Any]:
     limiter: RateLimiter = request.app.state.rate_limiter
     try:
-        capacity, retry_after, remaining = limiter.check("health-probe", scope="health", authenticated=True)
+        capacity, retry_after, remaining = limiter.check(
+            "health-probe", scope="health", authenticated=True
+        )
         status = "pass" if capacity >= budgets.rate_limit_min_capacity else "fail"
-        detail = {"limit": capacity, "remaining": remaining, "retry_after": round(retry_after, 3)}
+        detail = {
+            "limit": capacity,
+            "remaining": remaining,
+            "retry_after": round(retry_after, 3),
+        }
     except RateLimitExceeded as exc:  # pragma: no cover - defensive
         status = "fail"
-        detail = {"limit": exc.limit, "remaining": exc.remaining, "retry_after": exc.retry_after}
+        detail = {
+            "limit": exc.limit,
+            "remaining": exc.remaining,
+            "retry_after": exc.retry_after,
+        }
     return {"status": status, "details": detail}
 
 

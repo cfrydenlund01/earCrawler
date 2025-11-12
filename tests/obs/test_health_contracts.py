@@ -13,7 +13,9 @@ pytestmark = pytest.mark.enable_socket
 
 
 class FailingFuseki:
-    async def query(self, template: Template, query: str):  # pragma: no cover - simple stub
+    async def query(
+        self, template: Template, query: str
+    ):  # pragma: no cover - simple stub
         raise RuntimeError("fuseki offline")
 
 
@@ -42,7 +44,9 @@ def test_health_endpoint_reports_checks():
 def test_health_endpoint_degraded_on_fuseki_failure():
     settings = ApiSettings(fuseki_url=None)
     registry = TemplateRegistry.load_default()
-    app = create_app(settings=settings, registry=registry, fuseki_client=FailingFuseki())
+    app = create_app(
+        settings=settings, registry=registry, fuseki_client=FailingFuseki()
+    )
     client = TestClient(app)
     resp = client.get("/health")
     assert resp.status_code == 200

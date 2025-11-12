@@ -26,7 +26,9 @@ class EARLoader(CorpusLoader):
             html = detail.get("html", "")
             yield from self._parse_document(doc_number, html)
 
-    def _parse_document(self, doc_number: str, html: str) -> Iterable[Dict[str, object]]:
+    def _parse_document(
+        self, doc_number: str, html: str
+    ) -> Iterable[Dict[str, object]]:
         """Yield paragraph dictionaries from a document's HTML."""
         soup = BeautifulSoup(html, "html.parser")
         for idx, p in enumerate(soup.find_all("p")):
