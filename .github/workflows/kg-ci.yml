@@ -25,7 +25,7 @@ jobs:
   hermetic-setup:
     runs-on: windows-latest
     env:
-      MITIGATION_LOG: kg/reports/ci-mitigations-${{ github.job }}.log
+      MITIGATION_LOG: kg/reports/ci-mitigations-hermetic-setup.log
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -69,7 +69,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mitigations-${{ github.job }}
+          name: mitigations-hermetic-setup
           path: ${{ env.MITIGATION_LOG }}
           if-no-files-found: ignore
       - name: Upload artifacts
@@ -85,7 +85,7 @@ jobs:
     needs: hermetic-setup
     runs-on: windows-latest
     env:
-      MITIGATION_LOG: kg/reports/ci-mitigations-${{ github.job }}.log
+      MITIGATION_LOG: kg/reports/ci-mitigations-api-surface.log
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -141,7 +141,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mitigations-${{ github.job }}
+          name: mitigations-api-surface
           path: ${{ env.MITIGATION_LOG }}
           if-no-files-found: ignore
 
@@ -149,7 +149,7 @@ jobs:
     needs: api-surface
     runs-on: windows-latest
     env:
-      MITIGATION_LOG: kg/reports/ci-mitigations-${{ github.job }}.log
+      MITIGATION_LOG: kg/reports/ci-mitigations-observability-health.log
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -233,7 +233,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mitigations-${{ github.job }}
+          name: mitigations-observability-health
           path: ${{ env.MITIGATION_LOG }}
           if-no-files-found: ignore
       - name: Upload observability reports
@@ -250,7 +250,7 @@ jobs:
     needs: observability-health
     runs-on: windows-latest
     env:
-      MITIGATION_LOG: kg/reports/ci-mitigations-${{ github.job }}.log
+      MITIGATION_LOG: kg/reports/ci-mitigations-contract-artifacts.log
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -294,7 +294,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mitigations-${{ github.job }}
+          name: mitigations-contract-artifacts
           path: ${{ env.MITIGATION_LOG }}
           if-no-files-found: ignore
 
