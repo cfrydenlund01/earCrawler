@@ -71,8 +71,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mitigations-${{ github.job }}
-          path: kg/reports/ci-mitigations-${{ github.job }}.log
+          name: mitigations-hermetic-setup
+          path: kg/reports/ci-mitigations-hermetic-setup.log
           if-no-files-found: ignore
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -146,8 +146,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mitigations-${{ github.job }}
-          path: kg/reports/ci-mitigations-${{ github.job }}.log
+          name: mitigations-api-surface
+          path: kg/reports/ci-mitigations-api-surface.log
           if-no-files-found: ignore
 
   observability-health:
@@ -241,8 +241,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mitigations-${{ github.job }}
-          path: kg/reports/ci-mitigations-${{ github.job }}.log
+          name: mitigations-observability
+          path: kg/reports/ci-mitigations-observability-health.log
           if-no-files-found: ignore
       - name: Upload observability reports
         if: always()
@@ -305,8 +305,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: mitigations-${{ github.job }}
-          path: kg/reports/ci-mitigations-${{ github.job }}.log
+          name: mitigations-contract-artifacts
+          path: kg/reports/ci-mitigations-contract-artifacts.log
           if-no-files-found: ignore
 
   incremental-scan:
