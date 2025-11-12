@@ -72,7 +72,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mitigations-${{ github.job }}
-          path: ${{ env.MITIGATION_LOG }}
+          path: kg/reports/ci-mitigations-${{ github.job }}.log
           if-no-files-found: ignore
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -147,7 +147,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mitigations-${{ github.job }}
-          path: ${{ env.MITIGATION_LOG }}
+          path: kg/reports/ci-mitigations-${{ github.job }}.log
           if-no-files-found: ignore
 
   observability-health:
@@ -242,7 +242,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mitigations-${{ github.job }}
-          path: ${{ env.MITIGATION_LOG }}
+          path: kg/reports/ci-mitigations-${{ github.job }}.log
           if-no-files-found: ignore
       - name: Upload observability reports
         if: always()
@@ -306,7 +306,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: mitigations-${{ github.job }}
-          path: ${{ env.MITIGATION_LOG }}
+          path: kg/reports/ci-mitigations-${{ github.job }}.log
           if-no-files-found: ignore
 
   incremental-scan:
