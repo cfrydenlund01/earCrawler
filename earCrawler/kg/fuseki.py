@@ -22,12 +22,37 @@ def ensure_jena(download: bool = True) -> Path:
     return _ensure_jena(download=download)
 
 
-def fuseki_server_path() -> Path:
-    """Return the absolute path to the Fuseki server executable.
+def _jena_fuseki_candidate() -> Path | None:
+    """Return the Fuseki script bundled with Jena, if it exists."""
 
-    On Windows the batch file is at the root of the extracted Fuseki archive,
-    while on POSIX systems it lives alongside the other launch scripts.
-    """
+    try:
+        jena_home = ensure_jena(download=True)
+    except Exception:  # pragma: no cover - fallback handled by caller
+        return None
+
+    if os.name == "nt":
+        names = ("fuseki-server.bat", "fuseki-server.cmd", "fuseki-server")
+        subdirs = ("bin", "bat", "")
+    else:
+        names = ("fuseki-server",)
+        subdirs = ("bin", "")
+
+    for subdir in subdirs:
+        base = jena_home / subdir if subdir else jena_home
+        for name in names:
+            candidate = base / name
+            if candidate.is_file():
+                return candidate.resolve()
+    return None
+
+
+def fuseki_server_path() -> Path:
+    """Return the absolute path to the Fuseki server executable."""
+
+    # Prefer the Fuseki script supplied with Jena to avoid redundant downloads.
+    jena_candidate = _jena_fuseki_candidate()
+    if jena_candidate:
+        return jena_candidate
 
     fuseki_home = ensure_fuseki(download=True)
     if os.name == "nt":
