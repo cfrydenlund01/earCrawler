@@ -16,6 +16,7 @@ kg/delta/
 kg/reconcile/decisions.jsonl.gz
 kg/reconcile/idmap.csv
 kg/ear.ttl
+!kg/ear.ttl
 kg/ear_triples.ttl
 kg/prov/
 kg/target/
@@ -29,3 +30,10 @@ Research/
 *.egg-info/
 dir-tree*.txt
 EAR_AI_Training_Proposal.docx
+
+# CI watcher script and output
+ci_watch.ps1
+ci_watch_output.txt
+# Agent guidance file
+AGENTS.md
+

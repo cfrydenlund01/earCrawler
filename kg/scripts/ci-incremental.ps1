@@ -31,6 +31,12 @@ function Resolve-KgPython {
 
 $python = Resolve-KgPython
 
+$requirements = Join-Path $repoRoot 'requirements-win.txt'
+if (($env:KG_CI_SKIP_PIP -ne '1') -and (Test-Path $requirements)) {
+    Write-Host "Installing incremental dependencies from $requirements"
+    & $python -m pip install --disable-pip-version-check -r $requirements
+}
+
 $manifestPath = Join-Path $manifestDir 'manifest.json'
 $statusPath = Join-Path $reportDir 'incremental-status.json'
 

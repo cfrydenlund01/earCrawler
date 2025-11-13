@@ -7,11 +7,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$yamlLib = Join-Path $PSScriptRoot '../lib/import_yaml.ps1' | Resolve-Path
+. $yamlLib
+
 if (-not (Test-Path $ConfigPath)) {
     throw "Canary config not found at $ConfigPath"
 }
 
-$cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Yaml
+$cfg = Import-YamlDocument -Path $ConfigPath
 $results = New-Object System.Collections.Generic.List[object]
 
 function Add-CanaryResult([string]$Name, [string]$Kind, [int]$StatusCode, [double]$Latency, [int]$Rows, [string]$Message, [bool]$Ok) {

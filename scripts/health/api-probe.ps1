@@ -9,11 +9,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$yamlLib = Join-Path $PSScriptRoot '../lib/import_yaml.ps1' | Resolve-Path
+. $yamlLib
+
 if (-not (Test-Path $ConfigPath)) {
     throw "Observability config not found at $ConfigPath"
 }
 
-$cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Yaml
+$cfg = Import-YamlDocument -Path $ConfigPath
 $budgets = $cfg.health
 $apiBudget = [int]$budgets.api_timeout_ms
 

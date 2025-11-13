@@ -8,6 +8,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$yamlLib = Join-Path $PSScriptRoot '../lib/import_yaml.ps1' | Resolve-Path
+. $yamlLib
+
 if (-not $FusekiUrl) {
     throw 'Fuseki endpoint URL is required. Set EARCRAWLER_FUSEKI_URL or pass -FusekiUrl.'
 }
@@ -16,7 +19,7 @@ if (-not (Test-Path $ConfigPath)) {
     throw "Observability config not found at $ConfigPath"
 }
 
-$cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Yaml
+$cfg = Import-YamlDocument -Path $ConfigPath
 $budgets = $cfg.health
 $pingBudget = [int]$budgets.fuseki_ping_ms
 $selectBudget = [int]$budgets.fuseki_select_ms
