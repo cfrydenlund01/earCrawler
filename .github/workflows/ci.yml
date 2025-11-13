@@ -57,12 +57,13 @@ jobs:
         run: |
           python -m cli.kg_emit --sources ear --sources nsf --in tests\kg\fixtures --out tests\kg\artifacts
           python -m cli.kg_validate --glob "tests\kg\artifacts\*.ttl"
-          python - <<'PY'
+          $code = @'
           import glob
           from rdflib import Graph
-          for p in glob.glob(r"tests\kg\artifacts\*.ttl"):
-              Graph().parse(p, format="turtle")
-          PY
+          for path in glob.glob(r"tests\kg\artifacts\*.ttl"):
+              Graph().parse(path, format="turtle")
+          '@
+          python -c $code
 
   gpu:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

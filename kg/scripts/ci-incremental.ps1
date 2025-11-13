@@ -30,6 +30,7 @@ function Resolve-KgPython {
 }
 
 $python = Resolve-KgPython
+$env:EARCTL_PYTHON = $python
 
 $requirements = Join-Path $repoRoot 'requirements-win.txt'
 if (($env:KG_CI_SKIP_PIP -ne '1') -and (Test-Path $requirements)) {

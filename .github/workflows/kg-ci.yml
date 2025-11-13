@@ -704,6 +704,7 @@ jobs:
         with:
           name: hermetic-artifacts
           path: .
+          merge-multiple: true
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -845,6 +846,7 @@ jobs:
         shell: pwsh
         run: |
           Copy-Item kg/canonical/dataset.nq dataset1.nq
+          Copy-Item dataset1.nq kg/snapshots/dataset.nq -Force
           $snapHashes = @{}
           Get-ChildItem kg/canonical/snapshots -Filter *.srj | ForEach-Object { $snapHashes[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash; Copy-Item $_.FullName ("orig-" + $_.Name) }
           Remove-Item -Recurse -Force kg/canonical
