@@ -25,7 +25,7 @@ def _format_role_permissions(roles: Mapping[str, Iterable[str]]) -> list[str]:
 
 
 def _format_identities(
-    overrides: Mapping[str, Mapping[str, Iterable[str]]]
+    overrides: Mapping[str, Mapping[str, Iterable[str]]],
 ) -> list[str]:
     entries: list[str] = []
     for name in sorted(k for k in overrides if k != "default"):
