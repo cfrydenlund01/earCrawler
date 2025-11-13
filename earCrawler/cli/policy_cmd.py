@@ -8,6 +8,8 @@ import click
 
 from earCrawler.security import identity, policy
 
+_NO_ROLES_HINT = "no explicit roles (falls back to default)"
+
 
 def _format_role_permissions(roles: Mapping[str, Iterable[str]]) -> list[str]:
     formatted: list[str] = []
@@ -31,7 +33,7 @@ def _format_identities(
         if roles:
             entries.append(f"  - {name}: {', '.join(roles)}")
         else:
-            entries.append(f"  - {name}: no explicit roles (falls back to default)")
+            entries.append(f"  - {name}: {_NO_ROLES_HINT}")
     return entries
 
 
