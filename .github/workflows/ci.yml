@@ -9,6 +9,7 @@ on:
 env:
   HF_HUB_DISABLE_PROGRESS_BARS: "1"
   PYTHONUTF8: "1"
+  REPO_SLUG: ${{ toLower(github.repository) }}
 
 permissions:
   contents: read
@@ -135,7 +136,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build API image
-        run: docker build --pull --progress plain -f docker/api.Dockerfile -t ghcr.io/${{ github.repository }}/api:ci .
+        run: docker build --pull --progress plain -f docker/api.Dockerfile -t ghcr.io/${{ env.REPO_SLUG }}/api:ci .
       - name: Install Apptainer
         run: |
           sudo apt-get update
@@ -167,17 +168,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build API image
-        run: docker build -f docker/api.Dockerfile -t ghcr.io/${{ github.repository }}/api:${{ github.ref_name }} .
+        run: docker build -f docker/api.Dockerfile -t ghcr.io/${{ env.REPO_SLUG }}/api:${{ github.ref_name }} .
       - name: Push API image
-        run: docker push ghcr.io/${{ github.repository }}/api:${{ github.ref_name }}
+        run: docker push ghcr.io/${{ env.REPO_SLUG }}/api:${{ github.ref_name }}
       - name: Build RAG image
-        run: docker build -f docker/rag.Dockerfile -t ghcr.io/${{ github.repository }}/rag:${{ github.ref_name }} .
+        run: docker build -f docker/rag.Dockerfile -t ghcr.io/${{ env.REPO_SLUG }}/rag:${{ github.ref_name }} .
       - name: Push RAG image
-        run: docker push ghcr.io/${{ github.repository }}/rag:${{ github.ref_name }}
+        run: docker push ghcr.io/${{ env.REPO_SLUG }}/rag:${{ github.ref_name }}
       - name: Build agent image
-        run: docker build -f docker/mistral.Dockerfile -t ghcr.io/${{ github.repository }}/agent:${{ github.ref_name }} .
+        run: docker build -f docker/mistral.Dockerfile -t ghcr.io/${{ env.REPO_SLUG }}/agent:${{ github.ref_name }} .
       - name: Push agent image
-        run: docker push ghcr.io/${{ github.repository }}/agent:${{ github.ref_name }}
+        run: docker push ghcr.io/${{ env.REPO_SLUG }}/agent:${{ github.ref_name }}
       - name: Run monitor against staging
         shell: pwsh
         run: ./monitor.ps1 -Services @('https://staging/api/health','https://staging/kg/health','https://staging/agent/health')
