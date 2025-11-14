@@ -182,7 +182,7 @@ jobs:
         shell: pwsh
         run: |
           $python = (Get-Command python).Source
-          $proc = Start-Process -FilePath $python -ArgumentList '-m','earCrawler.tests.obs.stub_fuseki_server' -PassThru -WindowStyle Hidden
+          $proc = Start-Process -FilePath $python -ArgumentList '-m','tests.obs.stub_fuseki_server' -PassThru -WindowStyle Hidden
           $proc.Id | Out-File -FilePath 'kg/reports/fuseki.pid' -Encoding ascii
           Start-Sleep -Seconds 2
           Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [fuseki-stub] started pid $($proc.Id)"
@@ -304,6 +304,9 @@ jobs:
       changed: ${{ steps.detect.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Guard versions
         shell: pwsh
         run: python scripts/check_versions.py
@@ -878,6 +881,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Access audit
         shell: pwsh
         env:
