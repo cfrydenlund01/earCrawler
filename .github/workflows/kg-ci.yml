@@ -80,6 +80,7 @@ jobs:
             dist/sbom.cdx.json
             tools/versions.json
             .wheelhouse
+          include-hidden-files: true
 
   api-surface:
     needs: hermetic-setup
@@ -421,6 +422,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install CLI dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-win.txt
       - name: Guard versions
         shell: pwsh
         run: python scripts/check_versions.py

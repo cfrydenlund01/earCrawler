@@ -47,10 +47,14 @@ if ($cfg.api) {
             if ($resp.Content) {
                 try { $body = $resp.Content | ConvertFrom-Json } catch { $body = $null }
             }
-            if ($body -and $body.results) {
-                $rows = ($body.results | Measure-Object).Count
-            } elseif ($body -and $body.total) {
-                $rows = [int]$body.total
+            try {
+                if ($body -and $body.PSObject.Properties['results']) {
+                    $rows = ($body.results | Measure-Object).Count
+                } elseif ($body -and $body.PSObject.Properties['total']) {
+                    $rows = [int]$body.total
+                }
+            } catch {
+                $message = $_.Exception.Message
             }
             $ok = ($status -eq $check.expect_status) -and ($lat -le $check.max_latency_ms) -and ($rows -ge $check.min_results)
             if (-not $ok) {
