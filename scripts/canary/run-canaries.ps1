@@ -7,11 +7,14 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$yamlLib = Join-Path $PSScriptRoot '../lib/import_yaml.ps1' | Resolve-Path
+. $yamlLib
+
 if (-not (Test-Path $ConfigPath)) {
     throw "Canary config not found at $ConfigPath"
 }
 
-$cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Yaml
+$cfg = Import-YamlDocument -Path $ConfigPath
 $results = New-Object System.Collections.Generic.List[object]
 
 function Add-CanaryResult([string]$Name, [string]$Kind, [int]$StatusCode, [double]$Latency, [int]$Rows, [string]$Message, [bool]$Ok) {
@@ -44,10 +47,14 @@ if ($cfg.api) {
             if ($resp.Content) {
                 try { $body = $resp.Content | ConvertFrom-Json } catch { $body = $null }
             }
-            if ($body -and $body.results) {
-                $rows = ($body.results | Measure-Object).Count
-            } elseif ($body -and $body.total) {
-                $rows = [int]$body.total
+            try {
+                if ($body -and $body.PSObject.Properties['results']) {
+                    $rows = ($body.results | Measure-Object).Count
+                } elseif ($body -and $body.PSObject.Properties['total']) {
+                    $rows = [int]$body.total
+                }
+            } catch {
+                $message = $_.Exception.Message
             }
             $ok = ($status -eq $check.expect_status) -and ($lat -le $check.max_latency_ms) -and ($rows -ge $check.min_results)
             if (-not $ok) {

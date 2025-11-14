@@ -79,7 +79,8 @@ jobs:
           path: |
             dist/sbom.cdx.json
             tools/versions.json
-            .wheelhouse/manifest.json
+            .wheelhouse
+          include-hidden-files: true
 
   api-surface:
     needs: hermetic-setup
@@ -182,7 +183,7 @@ jobs:
         shell: pwsh
         run: |
           $python = (Get-Command python).Source
-          $proc = Start-Process -FilePath $python -ArgumentList '-m','earCrawler.tests.obs.stub_fuseki_server' -PassThru -WindowStyle Hidden
+          $proc = Start-Process -FilePath $python -ArgumentList '-m','tests.obs.stub_fuseki_server' -PassThru -WindowStyle Hidden
           $proc.Id | Out-File -FilePath 'kg/reports/fuseki.pid' -Encoding ascii
           Start-Sleep -Seconds 2
           Add-Content -Path $env:MITIGATION_LOG -Value "$(Get-Date -Format o) [fuseki-stub] started pid $($proc.Id)"
@@ -212,7 +213,7 @@ jobs:
         run: scripts/health/fuseki-probe.ps1 -FusekiUrl http://127.0.0.1:3030/ds/query
       - name: API health probe
         shell: pwsh
-        run: scripts/health/api-probe.ps1 -Host 127.0.0.1 -Port 9001
+        run: scripts/health/api-probe.ps1 -ApiHost 127.0.0.1 -Port 9001
       - name: Run canaries
         shell: pwsh
         run: scripts/canary/run-canaries.ps1 -ConfigPath canary/config.yml -ReportDir kg/reports
@@ -225,8 +226,8 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path 'kg/reports/fuseki.pid') {
-            $pid = Get-Content 'kg/reports/fuseki.pid'
-            Stop-Process -Id ([int]$pid) -ErrorAction SilentlyContinue
+            $fusekiPid = Get-Content 'kg/reports/fuseki.pid'
+            Stop-Process -Id ([int]$fusekiPid) -ErrorAction SilentlyContinue
             Remove-Item 'kg/reports/fuseki.pid' -ErrorAction SilentlyContinue
           }
       - name: Upload mitigation log
@@ -304,11 +305,16 @@ jobs:
       changed: ${{ steps.detect.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Guard versions
         shell: pwsh
         run: python scripts/check_versions.py
       - name: Run incremental scan
         shell: pwsh
+        env:
+          INCREMENTAL_SCAN_ONLY: '1'
         run: kg/scripts/ci-incremental.ps1
       - id: detect
         shell: pwsh
@@ -341,7 +347,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -383,7 +391,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -412,6 +422,11 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install CLI dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-win.txt
       - name: Guard versions
         shell: pwsh
         run: python scripts/check_versions.py
@@ -425,7 +440,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -505,7 +522,7 @@ jobs:
           shift
           goto loop
           :run
-          python "%~dp0mock_fuseki.py" !PORT!
+          py -3 "%~dp0mock_fuseki.py" !PORT!
           '@ | Set-Content -Path (Join-Path $bundle 'tools/fuseki/fuseki-server.bat') -Encoding ascii
           @"
           import json
@@ -623,7 +640,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -673,6 +692,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install CLI dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-win.txt
       - name: Install PyInstaller
         run: pip install pyinstaller
       - name: Build EXE
@@ -699,10 +720,21 @@ jobs:
       PYTEST_ALLOW_NETWORK: '0'
     steps:
       - uses: actions/checkout@v4
+      - name: Download hermetic artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: hermetic-artifacts
+          path: .
+          merge-multiple: true
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Resolve spool path
+        shell: pwsh
+        run: |
+          $spool = Join-Path $env:APPDATA 'EarCrawler\spool'
+          "TELEMETRY_SPOOL=$spool" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
       - name: Install deps
         shell: pwsh
         run: scripts/install-from-wheelhouse.ps1
@@ -713,7 +745,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: telemetry-spool
-          path: '${{ env.APPDATA }}\\EarCrawler\\spool'
+          path: ${{ env.TELEMETRY_SPOOL }}
+          if-no-files-found: ignore
 
   gc-dry-run:
     needs: [provenance-checks, telemetry-tests]
@@ -778,7 +811,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -822,19 +857,24 @@ jobs:
         shell: pwsh
         run: scripts/make-manifest.ps1
       - name: Validate manifest schema
+        shell: pwsh
         run: |
-          python - <<'PY'
+          $code = @"
           import json, re
-          m=json.load(open('kg/canonical/manifest.json'))
-          assert 'files' in m
-          for f in m['files']:
-              assert set(f.keys())=={'path','size','sha256'}
-              assert re.fullmatch(r'[0-9a-f]{64}', f['sha256'])
-          PY
+          from pathlib import Path
+          
+          manifest = json.loads(Path('kg/canonical/manifest.json').read_text(encoding='utf-8'))
+          assert 'files' in manifest, "manifest missing 'files'"
+          for entry in manifest['files']:
+              assert set(entry.keys()) == {'path', 'size', 'sha256'}, f"unexpected keys in {entry}"
+              assert re.fullmatch(r'[0-9a-f]{64}', entry['sha256']), f"invalid hash for {entry.get('path')}"
+          "@
+          python -c $code
       - name: Rebuild and compare
         shell: pwsh
         run: |
           Copy-Item kg/canonical/dataset.nq dataset1.nq
+          Copy-Item dataset1.nq kg/snapshots/dataset.nq -Force
           $snapHashes = @{}
           Get-ChildItem kg/canonical/snapshots -Filter *.srj | ForEach-Object { $snapHashes[$_.Name] = (Get-FileHash $_.FullName -Algorithm SHA256).Hash; Copy-Item $_.FullName ("orig-" + $_.Name) }
           Remove-Item -Recurse -Force kg/canonical
@@ -866,6 +906,9 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Access audit
         shell: pwsh
         env:
