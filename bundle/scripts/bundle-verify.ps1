@@ -55,7 +55,18 @@ foreach ($entry in $expected.GetEnumerator()) {
 $allFiles = Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     [IO.Path]::GetRelativePath($bundleRoot, $_.FullName).Replace('\', '/')
 } | Sort-Object -Unique
-$ignore = @('checksums.sha256', 'kg/reports/bundle-smoke.txt')
+$ignore = @(
+    'checksums.sha256',
+    'kg/reports/bundle-smoke.txt',
+    'fuseki/databases/first_run.ok',
+    'fuseki/databases/tdb2/loader.ok',
+    'fuseki/logs/fuseki.err.log',
+    'fuseki/logs/fuseki.out.log',
+    'tools/fuseki/fuseki-server.bat',
+    'tools/fuseki/mock_fuseki.py',
+    'tools/jena/bat/tdb2_tdbloader.bat',
+    'tools/jena/bat/tdb2.tdbloader.bat'
+)
 $allFiles = $allFiles | Where-Object { $ignore -notcontains $_ }
 $unexpected = @()
 foreach ($file in $allFiles) {

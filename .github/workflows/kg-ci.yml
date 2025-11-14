@@ -516,7 +516,7 @@ jobs:
           shift
           goto loop
           :run
-          python "%~dp0mock_fuseki.py" !PORT!
+          py -3 "%~dp0mock_fuseki.py" !PORT!
           '@ | Set-Content -Path (Join-Path $bundle 'tools/fuseki/fuseki-server.bat') -Encoding ascii
           @"
           import json
