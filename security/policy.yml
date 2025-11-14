@@ -29,6 +29,6 @@ overrides:
   test_maintainer:
     roles: ["maintainer"]
   ci_user:
-    roles: ["reader"]
+    roles: ["reader", "operator"]
   default:
     roles: ["reader"]

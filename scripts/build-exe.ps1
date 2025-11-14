@@ -22,6 +22,15 @@ function Resolve-PythonInterpreter {
 $python = Resolve-PythonInterpreter
 $env:EARCTL_PYTHON = $python
 
+# Mitigation for GitHub Actions side-effect in the kg-ci
+# 'package-smoke' workflow: ensure 'click' is importable so
+# PyInstaller can bundle the CLI entrypoint even when the job
+# has not installed full requirements.
+& $python -c "import click" 2>$null
+if ($LASTEXITCODE -ne 0) {
+  & $python -m pip install --disable-pip-version-check click==8.2.1
+}
+
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 $version = & $python -c "from earCrawler import __version__; print(__version__)"
 $version = $version.Trim()
