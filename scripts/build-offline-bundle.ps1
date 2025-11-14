@@ -119,9 +119,11 @@ class RelativePathComparer : System.Collections.IComparer {
     }
 }
 
+$mutableFiles = @('kg/reports/bundle-smoke.txt')
 [System.Collections.ArrayList]$files = [System.Collections.ArrayList]::new()
 Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     $relative = [IO.Path]::GetRelativePath($bundleRoot, $_.FullName).Replace([IO.Path]::DirectorySeparatorChar, [char]'/' )
+    if ($mutableFiles -contains $relative) { return }
     $null = $files.Add([pscustomobject]@{ File = $_; Relative = $relative })
 }
 [string[]]$relativeKeys = $files | ForEach-Object { $_.Relative }

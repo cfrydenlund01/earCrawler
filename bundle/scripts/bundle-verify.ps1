@@ -55,7 +55,7 @@ foreach ($entry in $expected.GetEnumerator()) {
 $allFiles = Get-ChildItem -Path $bundleRoot -Recurse -File | ForEach-Object {
     [IO.Path]::GetRelativePath($bundleRoot, $_.FullName).Replace('\', '/')
 } | Sort-Object -Unique
-$ignore = @('checksums.sha256')
+$ignore = @('checksums.sha256', 'kg/reports/bundle-smoke.txt')
 $allFiles = $allFiles | Where-Object { $ignore -notcontains $_ }
 $unexpected = @()
 foreach ($file in $allFiles) {
