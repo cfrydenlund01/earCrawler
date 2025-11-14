@@ -212,7 +212,7 @@ jobs:
         run: scripts/health/fuseki-probe.ps1 -FusekiUrl http://127.0.0.1:3030/ds/query
       - name: API health probe
         shell: pwsh
-        run: scripts/health/api-probe.ps1 -Host 127.0.0.1 -Port 9001
+        run: scripts/health/api-probe.ps1 -ApiHost 127.0.0.1 -Port 9001
       - name: Run canaries
         shell: pwsh
         run: scripts/canary/run-canaries.ps1 -ConfigPath canary/config.yml -ReportDir kg/reports
@@ -225,8 +225,8 @@ jobs:
         shell: pwsh
         run: |
           if (Test-Path 'kg/reports/fuseki.pid') {
-            $pid = Get-Content 'kg/reports/fuseki.pid'
-            Stop-Process -Id ([int]$pid) -ErrorAction SilentlyContinue
+            $fusekiPid = Get-Content 'kg/reports/fuseki.pid'
+            Stop-Process -Id ([int]$fusekiPid) -ErrorAction SilentlyContinue
             Remove-Item 'kg/reports/fuseki.pid' -ErrorAction SilentlyContinue
           }
       - name: Upload mitigation log
@@ -346,7 +346,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -388,7 +390,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -430,7 +434,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -628,7 +634,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"
@@ -678,6 +686,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install CLI dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements-win.txt
       - name: Install PyInstaller
         run: pip install pyinstaller
       - name: Build EXE
@@ -795,7 +805,9 @@ jobs:
         run: |
           $v = Get-Content tools/versions.json | ConvertFrom-Json
           $jenaVer = $v.jena
+          if ($jenaVer -isnot [string]) { $jenaVer = $jenaVer.version }
           $fusekiVer = $v.fuseki
+          if ($fusekiVer -isnot [string]) { $fusekiVer = $fusekiVer.version }
           New-Item -ItemType Directory -Force -Path tools | Out-Null
           $jenaArchive = "https://archive.apache.org/dist/jena/binaries/apache-jena-$jenaVer.zip"
           $jenaMirror = "https://downloads.apache.org/jena/binaries/apache-jena-$jenaVer.zip"

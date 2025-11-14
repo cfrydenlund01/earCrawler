@@ -31,9 +31,6 @@ Research/
 dir-tree*.txt
 EAR_AI_Training_Proposal.docx
 
-# CI watcher script and output
-ci_watch.ps1
-ci_watch_output.txt
 # Agent guidance file
 AGENTS.md
 

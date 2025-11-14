@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$Host = '127.0.0.1',
+    [Alias('Host')]
+    [string]$ApiHost = '127.0.0.1',
     [int]$Port = 9001,
     [string]$ConfigPath = 'service/config/observability.yml',
     [string]$ReportPath = 'kg/reports/health-api.txt'
@@ -20,7 +21,7 @@ $cfg = Import-YamlDocument -Path $ConfigPath
 $budgets = $cfg.health
 $apiBudget = [int]$budgets.api_timeout_ms
 
-$baseUrl = "http://{0}:{1}" -f $Host, $Port
+$baseUrl = "http://{0}:{1}" -f $ApiHost, $Port
 $report = @("API base URL: $baseUrl")
 
 function Invoke-Probe($Uri, $Method = 'GET', $ExpectStatus = 200, $Body = $null) {

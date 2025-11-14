@@ -2,7 +2,7 @@ param([string]$LockFile = "requirements-win-lock.txt")
 
 $repoRoot = (Resolve-Path "$PSScriptRoot/..").ProviderPath
 $candidateDirs = @(
-    (Join-Path -Path $repoRoot -ChildPath ".wheelhouse")
+    (Join-Path -Path $repoRoot -ChildPath ".wheelhouse"),
     (Join-Path -Path $repoRoot -ChildPath "hermetic-artifacts/.wheelhouse")
 )
 

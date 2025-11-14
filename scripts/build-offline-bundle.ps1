@@ -71,6 +71,16 @@ New-Item -ItemType Directory -Path (Join-Path $bundleRoot 'fuseki/databases') -F
 New-Item -ItemType Directory -Path (Join-Path $bundleRoot 'fuseki/logs') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $bundleRoot 'kg/reports') -Force | Out-Null
 
+# Copy provenance explicitly (should already exist under kg/)
+$provSrc = Join-Path $canonicalPath 'provenance.json'
+Copy-Item -Path $provSrc -Destination (Join-Path $bundleRoot 'provenance.json') -Force
+
+# Create smoke report placeholder if not present
+$smoke = Join-Path $bundleRoot 'kg/reports/bundle-smoke.txt'
+if (-not (Test-Path $smoke)) {
+    "Smoke test pending" | Set-Content -Path $smoke -Encoding utf8
+}
+
 # Write VERSION.txt
 $pyproject = Get-Content (Join-Path $repoRoot 'pyproject.toml')
 $versionLine = $pyproject | Where-Object { $_ -match '^version\s*=\s*"' } | Select-Object -First 1
@@ -144,7 +154,10 @@ $manifest = [ordered]@{
     generated = $timestamp
     files = $manifestEntries
 }
-$manifest | ConvertTo-Json -Depth 5 | Set-Content -Path (Join-Path $bundleRoot 'manifest.json') -Encoding utf8
+$manifestPath = Join-Path $bundleRoot 'manifest.json'
+$manifest | ConvertTo-Json -Depth 5 | Set-Content -Path $manifestPath -Encoding utf8
+$manifestHash = (Get-FileHash -Path $manifestPath -Algorithm SHA256).Hash.ToLower()
+$checksumLines += "$manifestHash  manifest.json"
 $sortedChecksumLines = $checksumLines | Sort-Object
 $sortedChecksumLines | Set-Content -Path (Join-Path $bundleRoot 'checksums.sha256') -Encoding ascii
 
@@ -152,16 +165,6 @@ $sortedChecksumLines | Set-Content -Path (Join-Path $bundleRoot 'checksums.sha25
 $signaturePath = Join-Path $bundleRoot 'manifest.sig.PLACEHOLDER.txt'
 if (-not (Test-Path $signaturePath)) {
     'Placeholder for detached signature.' | Set-Content -Path $signaturePath -Encoding utf8
-}
-
-# Copy provenance explicitly (should already exist under kg/)
-$provSrc = Join-Path $canonicalPath 'provenance.json'
-Copy-Item -Path $provSrc -Destination (Join-Path $bundleRoot 'provenance.json') -Force
-
-# Create smoke report placeholder if not present
-$smoke = Join-Path $bundleRoot 'kg/reports/bundle-smoke.txt'
-if (-not (Test-Path $smoke)) {
-    "Smoke test pending" | Set-Content -Path $smoke -Encoding utf8
 }
 
 Write-Host "Offline bundle staged at $bundleRoot"
