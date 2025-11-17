@@ -363,8 +363,10 @@ jobs:
           Move-Item tools/apache-jena-fuseki-$fusekiVer tools/fuseki
           $jenaPath = (Resolve-Path (Join-Path $PWD 'tools/jena')).Path
           $fusekiPath = (Resolve-Path (Join-Path $PWD 'tools/fuseki')).Path
-          "JENA_HOME=$jenaPath" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
-          "FUSEKI_HOME=$fusekiPath" | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
+          $env:JENA_HOME = $jenaPath
+          $env:FUSEKI_HOME = $fusekiPath
+          Add-Content -Path $Env:GITHUB_ENV -Value "JENA_HOME=$jenaPath"
+          Add-Content -Path $Env:GITHUB_ENV -Value "FUSEKI_HOME=$fusekiPath"
           Test-Path (Join-Path tools/jena 'bat/riot.bat') | Out-Null
           Test-Path (Join-Path tools/jena 'bat/arq.bat') | Out-Null
       - name: Run round-trip and query snapshots
@@ -706,7 +708,7 @@ jobs:
               'name': 'ACME Corp',
               'country': 'US',
               'source_url': 'https://trade.gov/api/acme',
-              'date': '2024-01-01',
+              'date': '2024-01-01T00:00:00Z',
               'sha256': '0' * 64,
           }]
           emit_tradegov_entities(recs, Path('kg'), prov_graph=g)
