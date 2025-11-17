@@ -528,7 +528,7 @@ jobs:
           import json
           import sys
           from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-          from urllib.parse import urlparse, parse_qs
+          from urllib.parse import urlparse
 
 
           class Handler(BaseHTTPRequestHandler):
@@ -565,7 +565,19 @@ jobs:
 
 
           if __name__ == '__main__':
-              port = int(sys.argv[1]) if len(sys.argv) > 1 else 3030
+              port = 3030
+              args = sys.argv[1:]
+              i = 0
+              while i < len(args):
+                  arg = args[i]
+                  if arg == '--port' and i + 1 < len(args):
+                      try:
+                          port = int(args[i + 1])
+                      except ValueError:
+                          pass
+                      i += 2
+                      continue
+                  i += 1
               main(port)
           "@ | Set-Content -Path (Join-Path $bundle 'tools/fuseki/mock_fuseki.py') -Encoding utf8
       - name: Verify bundle checksums
