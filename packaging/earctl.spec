@@ -1,15 +1,24 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from pathlib import Path
+
 from PyInstaller.utils.hooks import collect_submodules
 
 block_cipher = None
+
+security_datas = []
+security_dir = (Path(__file__).resolve().parent.parent / "security")
+if security_dir.exists():
+    for file_path in security_dir.iterdir():
+        if file_path.is_file():
+            security_datas.append((str(file_path), "security"))
 
 
 a = Analysis(
     ['../earCrawler/cli/__main__.py'],
     pathex=['..'],
     binaries=[],
-    datas=[],
+    datas=security_datas,
     hiddenimports=collect_submodules('earCrawler.cli'),
     hookspath=[],
     hooksconfig={},
