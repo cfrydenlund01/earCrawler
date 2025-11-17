@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_submodules
+
 block_cipher = None
 
 
@@ -8,7 +10,7 @@ a = Analysis(
     pathex=['..'],
     binaries=[],
     datas=[],
-    hiddenimports=['earCrawler.cli.bundle'],
+    hiddenimports=collect_submodules('earCrawler.cli'),
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

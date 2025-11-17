@@ -635,7 +635,7 @@ jobs:
           path: tests/fixtures/cassettes/*.yaml
 
   provenance-checks:
-    needs: [incremental-scan, api-contract-tests]
+    needs: [hermetic-setup, incremental-scan, api-contract-tests]
     if: needs.incremental-scan.outputs.changed == 'true'
     runs-on: windows-latest
     env:
@@ -643,9 +643,22 @@ jobs:
       PYTEST_ALLOW_NETWORK: '0'
     steps:
       - uses: actions/checkout@v4
+      - name: Download hermetic artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: hermetic-artifacts
+          path: .
+          merge-multiple: true
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
       - name: Guard versions
         shell: pwsh
         run: python scripts/check_versions.py
+      - name: Install deps
+        shell: pwsh
+        run: scripts/install-from-wheelhouse.ps1
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
