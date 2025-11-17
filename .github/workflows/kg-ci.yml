@@ -522,7 +522,11 @@ jobs:
           shift
           goto loop
           :run
-          py -3 "%~dp0mock_fuseki.py" !PORT!
+          set SCRIPT=%~dp0mock_fuseki.py
+          if not exist "%SCRIPT%" (
+            set SCRIPT=%~dp0tools\fuseki\mock_fuseki.py
+          )
+          py -3 "%SCRIPT%" !PORT!
           '@ | Set-Content -Path (Join-Path $bundle 'tools/fuseki/fuseki-server.bat') -Encoding ascii
           @"
           import json
@@ -671,21 +675,29 @@ jobs:
       - name: Export KG with provenance
         shell: pwsh
         run: |
-          python - <<'PY'
+          @'
           from earCrawler.kg.emit_ear import emit_ear
           from earCrawler.kg.triples import emit_tradegov_entities
           from earCrawler.kg.prov import new_prov_graph, write_prov_files
           from pathlib import Path
+
           g = new_prov_graph()
           fixture = Path('tests/kg/fixtures')
           emit_ear(fixture, Path('kg'), prov_graph=g)
-          recs = [{'id':'acme','name':'ACME Corp','country':'US','source_url':'https://trade.gov/api/acme','date':'2024-01-01','sha256':'0'*64}]
+          recs = [{
+              'id': 'acme',
+              'name': 'ACME Corp',
+              'country': 'US',
+              'source_url': 'https://trade.gov/api/acme',
+              'date': '2024-01-01',
+              'sha256': '0' * 64,
+          }]
           emit_tradegov_entities(recs, Path('kg'), prov_graph=g)
-          write_prov_files(g, Path('kg')/'prov')
-          with open('kg/ear_triples.ttl','w',encoding='utf-8') as f:
+          write_prov_files(g, Path('kg') / 'prov')
+          with open('kg/ear_triples.ttl', 'w', encoding='utf-8') as f:
               f.write(Path('kg/ear.ttl').read_text())
               f.write(Path('kg/tradegov.ttl').read_text())
-          PY
+          '@ | python -
       - name: Run provenance checks
         shell: pwsh
         run: kg/scripts/ci-provenance.ps1
@@ -741,7 +753,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
       - name: Resolve spool path
         shell: pwsh
         run: |
