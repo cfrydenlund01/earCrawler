@@ -365,8 +365,10 @@ jobs:
           $fusekiPath = (Resolve-Path (Join-Path $PWD 'tools/fuseki')).Path
           $env:JENA_HOME = $jenaPath
           $env:FUSEKI_HOME = $fusekiPath
-          Add-Content -Path $Env:GITHUB_ENV -Value "JENA_HOME=$jenaPath"
-          Add-Content -Path $Env:GITHUB_ENV -Value "FUSEKI_HOME=$fusekiPath"
+          @"
+JENA_HOME=$jenaPath
+FUSEKI_HOME=$fusekiPath
+"@ | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           Test-Path (Join-Path tools/jena 'bat/riot.bat') | Out-Null
           Test-Path (Join-Path tools/jena 'bat/arq.bat') | Out-Null
       - name: Run round-trip and query snapshots
