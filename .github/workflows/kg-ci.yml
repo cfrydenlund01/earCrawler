@@ -413,6 +413,14 @@ jobs:
           try { Invoke-WebRequest -Uri $fusekiArchive -OutFile fuseki.zip -ErrorAction Stop } catch { Invoke-WebRequest -Uri $fusekiMirror -OutFile fuseki.zip }
           Expand-Archive fuseki.zip -DestinationPath tools
           Move-Item tools/apache-jena-fuseki-$fusekiVer tools/fuseki
+          $jenaPath = (Resolve-Path (Join-Path $PWD 'tools/jena')).Path
+          $fusekiPath = (Resolve-Path (Join-Path $PWD 'tools/fuseki')).Path
+          $env:JENA_HOME = $jenaPath
+          $env:FUSEKI_HOME = $fusekiPath
+          @"
+          JENA_HOME=$jenaPath
+          FUSEKI_HOME=$fusekiPath
+          "@ | Out-File -FilePath $Env:GITHUB_ENV -Encoding utf8 -Append
           Test-Path (Join-Path tools/jena 'bat/riot.bat') | Out-Null
           Test-Path (Join-Path tools/jena 'bat/arq.bat') | Out-Null
       - name: Run SHACL and OWL smoke tests
