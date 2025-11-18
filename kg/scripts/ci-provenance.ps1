@@ -25,6 +25,9 @@ fuseki_tools.ensure_fuseki()
 "@ -f $repoRoot
 & $python -c $bootstrap | Out-Null
 $jena = Join-Path $repoRoot 'tools/jena'
+$fuseki = Join-Path $repoRoot 'tools/fuseki'
+$env:JENA_HOME = $jena
+$env:FUSEKI_HOME = $fuseki
 $batDir = Join-Path $jena 'bat'
 $env:PATH = "$batDir;$env:PATH"
 
