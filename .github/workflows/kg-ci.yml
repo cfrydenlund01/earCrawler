@@ -812,6 +812,15 @@ jobs:
       - name: Guard versions
         shell: pwsh
         run: python scripts/check_versions.py
+      - name: Download hermetic artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: hermetic-artifacts
+          path: .
+          merge-multiple: true
+      - name: Install CLI dependencies
+        shell: pwsh
+        run: scripts/install-from-wheelhouse.ps1
       - name: Run GC dry-run
         shell: pwsh
         run: kg/scripts/ci-gc.ps1
@@ -833,6 +842,15 @@ jobs:
       - name: Guard versions
         shell: pwsh
         run: python scripts/check_versions.py
+      - name: Download hermetic artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: hermetic-artifacts
+          path: .
+          merge-multiple: true
+      - name: Install CLI dependencies
+        shell: pwsh
+        run: scripts/install-from-wheelhouse.ps1
       - name: Run reconciliation checks
         shell: pwsh
         run: kg/scripts/ci-reconcile.ps1
@@ -854,6 +872,15 @@ jobs:
       - name: Guard versions
         shell: pwsh
         run: python scripts/check_versions.py
+      - name: Download hermetic artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: hermetic-artifacts
+          path: .
+          merge-multiple: true
+      - name: Install CLI dependencies
+        shell: pwsh
+        run: scripts/install-from-wheelhouse.ps1
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
