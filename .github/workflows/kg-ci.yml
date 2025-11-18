@@ -79,6 +79,8 @@ jobs:
           path: |
             dist/sbom.cdx.json
             tools/versions.json
+            requirements-lock.txt
+            requirements-win-lock.txt
             .wheelhouse
           include-hidden-files: true
 
@@ -821,6 +823,14 @@ jobs:
       - name: Install CLI dependencies
         shell: pwsh
         run: scripts/install-from-wheelhouse.ps1
+      - name: Verify CLI dependencies
+        shell: pwsh
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in ("click", "earCrawler.cli"):
+              importlib.import_module(name)
+          PY
       - name: Run GC dry-run
         shell: pwsh
         run: kg/scripts/ci-gc.ps1
@@ -851,6 +861,14 @@ jobs:
       - name: Install CLI dependencies
         shell: pwsh
         run: scripts/install-from-wheelhouse.ps1
+      - name: Verify CLI dependencies
+        shell: pwsh
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in ("click", "earCrawler.cli"):
+              importlib.import_module(name)
+          PY
       - name: Run reconciliation checks
         shell: pwsh
         run: kg/scripts/ci-reconcile.ps1
@@ -881,6 +899,14 @@ jobs:
       - name: Install CLI dependencies
         shell: pwsh
         run: scripts/install-from-wheelhouse.ps1
+      - name: Verify CLI dependencies
+        shell: pwsh
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in ("click", "earCrawler.cli"):
+              importlib.import_module(name)
+          PY
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
