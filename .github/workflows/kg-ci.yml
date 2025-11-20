@@ -830,11 +830,11 @@ jobs:
       - name: Verify CLI dependencies
         shell: pwsh
         run: |
-          python - <<'PY'
+          @'
           import importlib
           for name in ("click", "earCrawler.cli"):
               importlib.import_module(name)
-          PY
+          '@ | python -
       - name: Run GC dry-run
         shell: pwsh
         run: kg/scripts/ci-gc.ps1
@@ -872,11 +872,11 @@ jobs:
       - name: Verify CLI dependencies
         shell: pwsh
         run: |
-          python - <<'PY'
+          @'
           import importlib
           for name in ("click", "earCrawler.cli"):
               importlib.import_module(name)
-          PY
+          '@ | python -
       - name: Run reconciliation checks
         shell: pwsh
         run: kg/scripts/ci-reconcile.ps1
@@ -914,11 +914,11 @@ jobs:
       - name: Verify CLI dependencies
         shell: pwsh
         run: |
-          python - <<'PY'
+          @'
           import importlib
           for name in ("click", "earCrawler.cli"):
               importlib.import_module(name)
-          PY
+          '@ | python -
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
