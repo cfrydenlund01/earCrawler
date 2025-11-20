@@ -829,10 +829,12 @@ jobs:
         run: scripts/install-from-wheelhouse.ps1
       - name: Verify CLI dependencies
         shell: pwsh
-        run: python - <<'PY'
-import importlib
-for name in ("click", "earCrawler.cli"):
-    importlib.import_module(name)
+        run: |
+          python - <<'PY'
+          import importlib
+          for name in ("click", "earCrawler.cli"):
+              importlib.import_module(name)
+          PY
       - name: Run GC dry-run
         shell: pwsh
         run: kg/scripts/ci-gc.ps1
