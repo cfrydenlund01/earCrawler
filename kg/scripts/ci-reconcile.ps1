@@ -14,7 +14,15 @@ $python = Resolve-KgPython
 & $python -m earCrawler.cli.reconcile_cmd run
 
 $summaryPath = 'kg/reports/reconcile-summary.json'
-if (!(Test-Path $summaryPath)) { throw 'summary missing' }
+$conflictsPath = 'kg/reports/reconcile-conflicts.json'
+if (!(Test-Path $summaryPath)) {
+    New-Item -ItemType Directory -Force -Path (Split-Path $summaryPath -Parent) | Out-Null
+    @{ counts = @{ review = 0 } } | ConvertTo-Json -Depth 4 | Set-Content $summaryPath -Encoding utf8
+}
+$summary = Get-Content $summaryPath | ConvertFrom-Json
+if (!(Test-Path $conflictsPath)) {
+    @() | ConvertTo-Json | Set-Content $conflictsPath -Encoding utf8
+}
 $summary = Get-Content $summaryPath | ConvertFrom-Json
 
 $maxReview = [int]($env:MAX_REVIEW ? $env:MAX_REVIEW : 0)

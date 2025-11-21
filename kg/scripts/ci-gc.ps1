@@ -22,12 +22,15 @@ $report = Get-Content 'kg/reports/gc-report.json' | ConvertFrom-Json
 if ($report.errors.Count -gt 0) {
     Write-Error "GC errors: $($report.errors -join ', ')"
 }
-$allowed = @(
-    (Resolve-Path 'kg').Path,
-    (Resolve-Path '.cache/api').Path,
-    "$Env:APPDATA\EarCrawler\spool",
-    "$Env:PROGRAMDATA\EarCrawler\spool"
-)
+$allowed = @()
+$kgPath = Resolve-Path 'kg'
+if ($kgPath) { $allowed += $kgPath.Path }
+foreach ($candidate in @('.cache/api', "$Env:APPDATA\EarCrawler\spool", "$Env:PROGRAMDATA\EarCrawler\spool")) {
+    if (Test-Path $candidate) {
+        $resolved = Resolve-Path $candidate
+        if ($resolved) { $allowed += $resolved.Path }
+    }
+}
 foreach ($cand in $report.candidates) {
     $p = [System.IO.Path]::GetFullPath($cand.path)
     $ok = $false
