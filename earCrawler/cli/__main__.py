@@ -12,26 +12,26 @@ import click
 
 from earCrawler import __version__
 from earCrawler.core.nsf_case_parser import NSFCaseParser
-from .ear_fetch import fetch_entities, fetch_ear, warm_cache
-from . import reports_cli
+from earCrawler.cli.ear_fetch import fetch_entities, fetch_ear, warm_cache
+from earCrawler.cli import reports_cli
 from earCrawler.analytics import reports as analytics_reports
 from earCrawler.kg import fuseki
 from earCrawler.kg.sparql import SPARQLClient
 from earCrawler.kg import emit_ear, emit_nsf
 from earCrawler.telemetry.hooks import install as install_telem
-from .telemetry import telemetry, crash_test
-from .gc import gc
+from earCrawler.cli.telemetry import telemetry, crash_test
+from earCrawler.cli.gc import gc
 
 try:  # optional
-    from . import reconcile_cmd
+    from earCrawler.cli import reconcile_cmd
 except Exception:  # pragma: no cover
     reconcile_cmd = None
 from earCrawler.security import policy
-from .auth import auth
-from .api_service import api as api_cmd
-from .policy_cmd import policy_cmd
-from .audit import audit
-from . import perf
+from earCrawler.cli.auth import auth
+from earCrawler.cli.api_service import api as api_cmd
+from earCrawler.cli.policy_cmd import policy_cmd
+from earCrawler.cli.audit import audit
+from earCrawler.cli import perf
 
 install_telem()
 

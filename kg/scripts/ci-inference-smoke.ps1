@@ -8,16 +8,27 @@ Set-StrictMode -Version Latest
  
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 function Resolve-KgPython {
-    if ($env:EARCTL_PYTHON) {
-        return $env:EARCTL_PYTHON
+    if ($env:EARCTL_PYTHON -and (Test-Path $env:EARCTL_PYTHON)) {
+        return (Resolve-Path $env:EARCTL_PYTHON).Path
     }
-    if (Get-Command py -ErrorAction SilentlyContinue) {
-        return 'py'
+    foreach ($name in 'python', 'python.exe', 'python3', 'python3.exe') {
+        $cmd = Get-Command $name -ErrorAction SilentlyContinue
+        if ($cmd) { return $cmd.Source }
     }
-    if (Get-Command python -ErrorAction SilentlyContinue) {
-        return 'python'
+    $launcher = Get-Command 'py' -ErrorAction SilentlyContinue
+    if ($launcher) {
+        try {
+            $exe = & $launcher.Source -3 -c "import sys; print(sys.executable)"
+            if ($LASTEXITCODE -eq 0 -and $exe) { return $exe.Trim() }
+        } catch {}
     }
-    throw 'Python interpreter not found. Set EARCTL_PYTHON or ensure py/python is on PATH.'
+    if ($env:VIRTUAL_ENV) {
+        $candidate = Join-Path $env:VIRTUAL_ENV 'Scripts/python.exe'
+        if (Test-Path $candidate) { return $candidate }
+        $candidate = Join-Path $env:VIRTUAL_ENV 'bin/python3'
+        if (Test-Path $candidate) { return $candidate }
+    }
+    throw 'Python interpreter not found. Set EARCTL_PYTHON or ensure python is on PATH.'
 }
 $python = Resolve-KgPython
 $args = @('-m', 'earCrawler.pipelines.inference_smoke', '--mode', $Mode)

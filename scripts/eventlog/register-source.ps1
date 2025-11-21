@@ -3,11 +3,11 @@ param(
     [string]$Source = 'EarCrawler'
 )
 
-<#!
+<#
     Requires administrator privileges to register a Windows Event Log source.
     On GitHub runners this may fail with access denied; the script will emit
     a warning but continue without failing the job.
-!>
+#>
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Continue'
