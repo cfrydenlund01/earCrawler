@@ -32,4 +32,4 @@ if (-not $wheelDir) {
     throw "Wheelhouse directory not found (looked in: $expected). Download hermetic-artifacts before installing."
 }
 
-pip install --no-index --find-links $wheelDir --require-hashes -r $LockFile
+python -m pip install --no-index --find-links $wheelDir --require-hashes -r $LockFile
