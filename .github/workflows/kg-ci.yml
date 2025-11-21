@@ -933,11 +933,11 @@ jobs:
       - name: Generate synthetic dataset
         shell: pwsh
         run: |
-          python - <<'PY'
+          @'
           from perf.synth.generator import generate
           from pathlib import Path
           generate('S', Path('perf/synth/out'))
-          PY
+          '@ | python -
       - name: Run perf suite
         shell: pwsh
         run: kg/scripts/perf-run.ps1 -Scale S -Cold -Warm
