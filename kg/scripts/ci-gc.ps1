@@ -1,6 +1,10 @@
 $ErrorActionPreference = 'Stop'
 $repoRoot = Resolve-Path "$PSScriptRoot/../.."
 Set-Location $repoRoot
+if (-not $env:EARCTL_PYTHON -and $env:pythonLocation) {
+    $candidate = Join-Path $env:pythonLocation 'python.exe'
+    if (Test-Path $candidate) { $env:EARCTL_PYTHON = $candidate }
+}
 New-Item -ItemType Directory -Force -Path 'kg/reports' | Out-Null
 function Resolve-KgPython {
     if ($env:EARCTL_PYTHON) { return $env:EARCTL_PYTHON }

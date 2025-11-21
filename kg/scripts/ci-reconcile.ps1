@@ -1,5 +1,9 @@
 $ErrorActionPreference = 'Stop'
 
+if (-not $env:EARCTL_PYTHON -and $env:pythonLocation) {
+    $candidate = Join-Path $env:pythonLocation 'python.exe'
+    if (Test-Path $candidate) { $env:EARCTL_PYTHON = $candidate }
+}
 function Resolve-KgPython {
     if ($env:EARCTL_PYTHON) { return $env:EARCTL_PYTHON }
     if (Get-Command py -ErrorAction SilentlyContinue) { return 'py' }
