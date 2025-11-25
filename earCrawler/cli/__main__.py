@@ -495,7 +495,7 @@ def eval_benchmark(
         **metrics,
         "model_path": model_path,
         "data_file": str(resolved_data_file),
-        "dataset_id": dataset_id or dataset_meta.get("id") if dataset_meta else None,
+        "dataset_id": dataset_id or (dataset_meta.get("id") if dataset_meta else None),
         "dataset_version": dataset_meta.get("version") if dataset_meta else None,
         "task": dataset_meta.get("task") if dataset_meta else None,
         "num_items": len(items),
@@ -506,16 +506,26 @@ def eval_benchmark(
     out_json.write_text(json.dumps(result, indent=2), encoding="utf-8")
 
     # Write a minimal markdown summary for quick inspection.
-    out_md.write_text(
-        "\n".join(
-            [
-                "| Accuracy | Avg Latency (s) | Peak GPU Memory |",
-                "|---------:|----------------:|----------------:|",
-                f"| {result['accuracy']:.4f} | {result['avg_latency']:.4f} | {int(result['peak_gpu_memory'])} |",
-            ]
-        ),
-        encoding="utf-8",
-    )
+    markdown_lines = [
+        "| Accuracy | Label Accuracy | Avg Latency (s) | Peak GPU Memory |",
+        "|---------:|---------------:|----------------:|----------------:|",
+        f"| {result['accuracy']:.4f} | {result.get('label_accuracy', 0.0):.4f} | "
+        f"{result['avg_latency']:.4f} | {int(result['peak_gpu_memory'])} |",
+        "",
+        f"- Dataset: {result.get('dataset_id') or 'n/a'} (task={result.get('task') or 'n/a'})",
+        f"- Unanswerable accuracy: {result.get('unanswerable_accuracy', 0.0):.4f}",
+        f"- KG digest: {result.get('kg_state_digest') or 'n/a'}",
+    ]
+    task_breakdown = result.get("by_task") or {}
+    if task_breakdown:
+        markdown_lines.append("")
+        markdown_lines.append("By-task summary:")
+        for task, stats in sorted(task_breakdown.items()):
+            markdown_lines.append(
+                f"- {task}: accuracy={stats['accuracy']:.4f}, "
+                f"label_accuracy={stats['label_accuracy']:.4f}, count={int(stats['count'])}"
+            )
+    out_md.write_text("\n".join(markdown_lines), encoding="utf-8")
     click.echo(f"Wrote {out_json} and {out_md}")
 
 

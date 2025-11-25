@@ -216,6 +216,68 @@ Environment variables:
 
 ---
 
+## Evaluation & Benchmarks
+
+earCrawler ships a lightweight evaluation harness for Phase E experiments and regression checks.
+
+### Datasets
+
+- Evaluation items live under `eval/` as JSONL files (one JSON object per line) and are indexed by `eval/manifest.json`.
+- The manifest ties datasets to a specific KG snapshot:
+  - `kg_state.manifest_path` and `kg_state.digest` point at `kg/.kgstate/manifest.json` and its hash.
+  - `datasets[]` records entries such as `ear_compliance.v1`, `entity_obligations.v1`, and `unanswerable.v1` with `task`, `file`, `version`, `description`, and `num_items`.
+- Per-item schema (shared across all datasets):
+  - `id` – stable item identifier.
+  - `task` – logical task (`ear_compliance`, `entity_obligation`, `unanswerable`, etc.).
+  - `question` – user-facing question text.
+  - `ground_truth` – object with:
+    - `answer_text` – canonical short answer.
+    - `label` – normalized label for scoring (for example `license_required`, `permitted_with_license`, `prohibited`, `unanswerable`).
+  - `ear_sections` – EAR section IDs relevant to the answer (for example `["EAR-744.6(b)(3)"]`).
+  - `kg_entities` – IRIs of the main KG entities involved, or empty for statute-only questions.
+  - `evidence` – object with:
+    - `doc_spans` – list of `{ "doc_id": "<EAR document ID>", "span_id": "<section/paragraph ID>" }` entries.
+    - `kg_nodes` – IRIs of policy-graph nodes (obligations/exceptions) that encode the decision logic.
+    - `kg_paths` (optional) – identifiers for precomputed reasoning paths used in explainability and KG-walk evaluations.
+
+To add a new dataset:
+
+1. Create `eval/<name>.vX.jsonl` following the schema above, using one JSON object per line.
+2. Append a new entry to `eval/manifest.json` with:
+   - `id` (for example `my_task.v1`),
+   - `task` (for example `my_task`),
+   - `file` (`eval/<name>.vX.jsonl`),
+   - `version` (integer),
+   - `description` and `num_items`.
+3. If the dataset assumes a different KG snapshot, run `py -m earCrawler.utils.kg_state` (or the appropriate helper) to refresh `kg/.kgstate/manifest.json`, then update `kg_state.digest` in `eval/manifest.json` intentionally.
+
+### Running evals via CLI
+
+The CLI exposes a convenience command that wraps the evaluation harness:
+
+```powershell
+$env:EARCTL_USER = 'test_operator'  # if RBAC is enabled
+py -m earCrawler.cli eval-benchmark --dataset-id ear_compliance.v1
+```
+
+By default this:
+
+- Resolves `ear_compliance.v1` from `eval/manifest.json`,
+- Loads the dataset JSONL,
+- Runs the harness with a small baseline model (`sshleifer/tiny-gpt2` by default),
+- Writes metrics + metadata to `dist\eval\ear_compliance.v1.json`,
+- Writes a short Markdown summary to `dist\eval\ear_compliance.v1.md`.
+
+Other useful options:
+
+- `--model-path` – override the HF model or local directory.
+- `--data-file` – bypass the manifest and point directly at a JSONL file.
+- `--out-json`, `--out-md` – customize output locations under `dist\eval\`.
+
+These outputs are suitable for CI artefacts and for logging Phase E endpoints in `Research/decision_log.md`.
+
+---
+
 ## Useful CLI Commands
 
 | Command | What it does |

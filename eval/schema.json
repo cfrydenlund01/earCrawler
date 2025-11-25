@@ -1,14 +1,95 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "EAR QA Item",
+  "title": "EAR Evaluation Item",
   "type": "object",
   "properties": {
-    "id": {"type": "string"},
-    "question": {"type": "string"},
-    "ground_truth": {"type": "string"},
-    "answer_start": {"type": "integer"},
-    "answer_end": {"type": "integer"}
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task": {
+      "type": "string",
+      "minLength": 1
+    },
+    "question": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ground_truth": {
+      "type": "object",
+      "properties": {
+        "answer_text": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": ["answer_text", "label"],
+      "additionalProperties": false
+    },
+    "ear_sections": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "kg_entities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "doc_spans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "doc_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "span_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            },
+            "required": ["doc_id", "span_id"],
+            "additionalProperties": false
+          }
+        },
+        "kg_nodes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "kg_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["doc_spans", "kg_nodes"],
+      "additionalProperties": false
+    }
   },
-  "required": ["id", "question", "ground_truth", "answer_start", "answer_end"],
+  "required": [
+    "id",
+    "task",
+    "question",
+    "ground_truth",
+    "ear_sections",
+    "kg_entities",
+    "evidence"
+  ],
   "additionalProperties": false
 }
