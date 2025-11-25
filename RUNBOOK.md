@@ -67,6 +67,7 @@ Windows notes
 - Location: evaluation JSONL files live under `eval/` and are indexed by `eval/manifest.json`. The manifest records:
   - `kg_state.digest`: the KG snapshot hash from `kg/.kgstate/manifest.json` that the datasets were curated against.
   - `datasets[]`: entries with `id` (e.g. `ear_compliance.v1`), `task` (e.g. `ear_compliance`, `entity_obligation`, `unanswerable`), `file`, `version`, `description`, and `num_items`.
+- Referential references: the manifest also includes `references.sections`, `references.kg_nodes`, and `references.kg_paths`. These lists describe the curated EAR sections and KG policy nodes that the evaluation slices cover. `python eval/validate_datasets.py` checks both the JSON schema *and* that every `doc_spans` and `kg_nodes` reference maps to these curated entries before CI passes.
 - Per-item JSONL schema (one object per line):
   - `id` (string) – stable item identifier.
   - `task` (string) – logical task name (`ear_compliance`, `entity_obligation`, `unanswerable`, etc.).
@@ -81,6 +82,12 @@ Windows notes
     - `kg_nodes` (array of strings) – IRIs of policy-graph nodes (obligations, exceptions) that encode the decision logic.
     - `kg_paths` (optional array of strings) – identifiers for precomputed reasoning paths used in explainability/graph-walk evaluations.
 - The evaluation harness expects exactly this shape and treats unknown extra keys as opaque; keep the schema stable when adding new datasets and bump the dataset `id`/`version` when you need to change semantics.
+- CLI helpers:
+  - Run `python eval/validate_datasets.py` locally (or watch CI) to catch schema or referential errors early.
+  - `py -m earCrawler.cli eval-benchmark --dataset-id <id>` writes metrics to `dist/eval/<id>.json` and Markdown summaries to `dist/eval/<id>.md`. Optional flags:
+    - `--explainability-artifacts`: asserts per-task coverage and writes aggregated evidence (doc spans, KG nodes, KG paths) to `<stem>.evidence.json` for explainability reviews.
+    - `--min-accuracy` / `--min-label-accuracy`: leave unset for diagnostics; when provided, the command exits non-zero if the run regresses below the threshold (useful for release gates or bespoke workflows).
+  - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.
 
 ## Toolchain maintenance
 

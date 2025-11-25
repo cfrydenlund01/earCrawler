@@ -8,6 +8,7 @@ import platform
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Dict, Any, Set
 
 import click
 
@@ -115,6 +116,39 @@ cli.add_command(integrity_cli.integrity, name="integrity")
 corpus_cli = importlib.import_module("earCrawler.cli.corpus")
 cli.add_command(corpus_cli.corpus, name="corpus")
 cli.add_command(api_cmd, name="api")
+
+
+def _collect_evidence_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
+    tasks: Set[str] = set()
+    doc_spans: Set[tuple[str, str]] = set()
+    kg_nodes: Set[str] = set()
+    kg_paths: Set[str] = set()
+    for item in items:
+        task = str(item.get("task") or "").strip()
+        if task:
+            tasks.add(task)
+        evidence = item.get("evidence") or {}
+        for span in evidence.get("doc_spans", []):
+            doc_id = str(span.get("doc_id") or "").strip()
+            span_id = str(span.get("span_id") or "").strip()
+            if doc_id and span_id:
+                doc_spans.add((doc_id, span_id))
+        for node in evidence.get("kg_nodes", []):
+            node_str = str(node or "").strip()
+            if node_str:
+                kg_nodes.add(node_str)
+        for path in evidence.get("kg_paths", []):
+            path_str = str(path or "").strip()
+            if path_str:
+                kg_paths.add(path_str)
+    return {
+        "tasks": sorted(tasks),
+        "doc_spans": [
+            {"doc_id": doc, "span_id": span} for doc, span in sorted(doc_spans)
+        ],
+        "kg_nodes": sorted(kg_nodes),
+        "kg_paths": sorted(kg_paths),
+    }
 
 
 @cli.command(name="crawl")
@@ -424,6 +458,23 @@ cli.add_command(kg_query, name="kg-query")
     show_default=True,
     help="Where to write a short Markdown summary.",
 )
+@click.option(
+    "--explainability-artifacts",
+    is_flag=True,
+    help="Emit aggregated evidence artifacts and assert by-task coverage.",
+)
+@click.option(
+    "--min-accuracy",
+    type=float,
+    default=None,
+    help="Fail if overall accuracy falls below this threshold.",
+)
+@click.option(
+    "--min-label-accuracy",
+    type=float,
+    default=None,
+    help="Fail if label accuracy falls below this threshold.",
+)
 def eval_benchmark(
     dataset_id: str | None,
     data_file: Path | None,
@@ -431,6 +482,9 @@ def eval_benchmark(
     model_path: str,
     out_json: Path,
     out_md: Path,
+    explainability_artifacts: bool,
+    min_accuracy: float | None,
+    min_label_accuracy: float | None,
 ) -> None:
     """Run the evaluation harness against a dataset and emit metrics + metadata."""
 
@@ -440,9 +494,9 @@ def eval_benchmark(
     if manifest.exists():
         try:
             manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
-            kg_digest = (
-                manifest_obj.get("kg_state", {}) or {}
-            ).get("digest")  # type: ignore[assignment]
+            kg_digest = (manifest_obj.get("kg_state", {}) or {}).get(
+                "digest"
+            )  # type: ignore[assignment]
             if dataset_id:
                 ds_entries = manifest_obj.get("datasets", [])
                 for entry in ds_entries:
@@ -526,7 +580,42 @@ def eval_benchmark(
                 f"label_accuracy={stats['label_accuracy']:.4f}, count={int(stats['count'])}"
             )
     out_md.write_text("\n".join(markdown_lines), encoding="utf-8")
+
+    if explainability_artifacts:
+        summary = _collect_evidence_summary(items)
+        dataset_tasks = set(summary["tasks"])
+        by_task = set(result.get("by_task", {}).keys())
+        missing_tasks = dataset_tasks.difference(by_task)
+        if missing_tasks:
+            raise click.ClickException(
+                f"Missing tasks in metrics output: {', '.join(sorted(missing_tasks))}"
+            )
+        evidence_payload = {
+            "dataset_id": result.get("dataset_id") or dataset_id or "n/a",
+            "kg_state_digest": result.get("kg_state_digest"),
+            **summary,
+        }
+        evidence_path = out_json.with_name(f"{out_json.stem}.evidence.json")
+        evidence_path.write_text(
+            json.dumps(evidence_payload, indent=2), encoding="utf-8"
+        )
+        click.echo(f"Wrote {evidence_path}")
+
+    threshold_errors = []
+    if min_accuracy is not None and result["accuracy"] < float(min_accuracy):
+        threshold_errors.append(
+            f"accuracy {result['accuracy']:.4f} < required {float(min_accuracy):.4f}"
+        )
+    if min_label_accuracy is not None and result.get("label_accuracy", 0.0) < float(
+        min_label_accuracy
+    ):
+        threshold_errors.append(
+            f"label_accuracy {result.get('label_accuracy', 0.0):.4f} < required {float(min_label_accuracy):.4f}"
+        )
+
     click.echo(f"Wrote {out_json} and {out_md}")
+    if threshold_errors:
+        raise click.ClickException("; ".join(threshold_errors))
 
 
 @cli.command(name="kg-emit")

@@ -10,7 +10,14 @@ from earCrawler.utils import import_guard
 LABEL_PATTERNS = [
     (
         "prohibited",
-        ["is prohibited", "are prohibited", "not permitted", "cannot export", "ban", "prohibited export"],
+        [
+            "is prohibited",
+            "are prohibited",
+            "not permitted",
+            "cannot export",
+            "ban",
+            "prohibited export",
+        ],
     ),
     (
         "license_required",
