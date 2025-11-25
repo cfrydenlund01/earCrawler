@@ -1,2 +1,1 @@
 -r requirements.in
-pywin32==306 ; sys_platform == "win32"

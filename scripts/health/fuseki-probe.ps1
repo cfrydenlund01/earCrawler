@@ -8,6 +8,9 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
+$yamlLib = Join-Path $PSScriptRoot '../lib/import_yaml.ps1' | Resolve-Path
+. $yamlLib
+
 if (-not $FusekiUrl) {
     throw 'Fuseki endpoint URL is required. Set EARCRAWLER_FUSEKI_URL or pass -FusekiUrl.'
 }
@@ -16,7 +19,7 @@ if (-not (Test-Path $ConfigPath)) {
     throw "Observability config not found at $ConfigPath"
 }
 
-$cfg = Get-Content $ConfigPath -Raw | ConvertFrom-Yaml
+$cfg = Import-YamlDocument -Path $ConfigPath
 $budgets = $cfg.health
 $pingBudget = [int]$budgets.fuseki_ping_ms
 $selectBudget = [int]$budgets.fuseki_select_ms
@@ -44,18 +47,22 @@ $query = 'SELECT (1 AS ?ok) WHERE { } LIMIT 1'
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $selectOk = $false
 try {
-    $selectResponse = Invoke-WebRequest -Uri $FusekiUrl -UseBasicParsing -TimeoutSec ([Math]::Ceiling($selectBudget / 1000.0)) -Method Post -Body $query -ContentType 'application/sparql-query'
-    $sw.Stop()
-    $selectMs = [math]::Round($sw.Elapsed.TotalMilliseconds, 2)
-    $reportLines += "Select latency: $selectMs ms (budget $selectBudget ms)"
-    $selectOk = ($selectResponse.StatusCode -eq 200) -and ($selectMs -le $selectBudget)
-    try {
-        $json = $selectResponse.Content | ConvertFrom-Json
-        $rows = ($json.results.bindings | Measure-Object).Count
-        $reportLines += "Rows returned: $rows"
-        if ($rows -lt 0) { $selectOk = $false }
-    } catch {
-        $reportLines += "Failed to parse select response: $($_.Exception.Message)"
+$selectResponse = Invoke-WebRequest -Uri $FusekiUrl -UseBasicParsing -TimeoutSec ([Math]::Ceiling($selectBudget / 1000.0)) -Method Post -Body $query -ContentType 'application/sparql-query'
+$sw.Stop()
+$selectMs = [math]::Round($sw.Elapsed.TotalMilliseconds, 2)
+$reportLines += "Select latency: $selectMs ms (budget $selectBudget ms)"
+$selectOk = ($selectResponse.StatusCode -eq 200) -and ($selectMs -le $selectBudget)
+try {
+    $raw = $selectResponse.Content
+    if ($raw -is [byte[]]) {
+        $raw = [System.Text.Encoding]::UTF8.GetString($raw)
+    }
+    $json = $raw | ConvertFrom-Json
+    $rows = ($json.results.bindings | Measure-Object).Count
+    $reportLines += "Rows returned: $rows"
+    if ($rows -lt 0) { $selectOk = $false }
+} catch {
+    $reportLines += "Failed to parse select response: $($_.Exception.Message)"
         $selectOk = $false
     }
 } catch {

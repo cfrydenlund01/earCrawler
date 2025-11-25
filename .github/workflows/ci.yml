@@ -9,7 +9,7 @@ on:
 env:
   HF_HUB_DISABLE_PROGRESS_BARS: "1"
   PYTHONUTF8: "1"
-  REPO_SLUG: ${{ toLower(github.repository) }}
+  REPO_SLUG: ${{ github.repository }}
 
 permissions:
   contents: read
@@ -57,12 +57,13 @@ jobs:
         run: |
           python -m cli.kg_emit --sources ear --sources nsf --in tests\kg\fixtures --out tests\kg\artifacts
           python -m cli.kg_validate --glob "tests\kg\artifacts\*.ttl"
-          python - <<'PY'
+          $code = @'
           import glob
           from rdflib import Graph
-          for p in glob.glob(r"tests\kg\artifacts\*.ttl"):
-              Graph().parse(p, format="turtle")
-          PY
+          for path in glob.glob(r"tests\kg\artifacts\*.ttl"):
+              Graph().parse(path, format="turtle")
+          '@
+          python -c $code
 
   gpu:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -136,7 +137,9 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build API image
-        run: docker build --pull --progress plain -f docker/api.Dockerfile -t ghcr.io/${{ env.REPO_SLUG }}/api:ci .
+        run: |
+          repo="${REPO_SLUG,,}"
+          docker build --pull --progress plain -f docker/api.Dockerfile -t "ghcr.io/${repo}/api:ci" .
       - name: Install Apptainer
         run: |
           sudo apt-get update
@@ -168,17 +171,35 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build API image
-        run: docker build -f docker/api.Dockerfile -t ghcr.io/${{ env.REPO_SLUG }}/api:${{ github.ref_name }} .
+        shell: pwsh
+        run: |
+          $repo = $env:REPO_SLUG.ToLower()
+          docker build -f docker/api.Dockerfile -t "ghcr.io/$repo/api:${{ github.ref_name }}" .
       - name: Push API image
-        run: docker push ghcr.io/${{ env.REPO_SLUG }}/api:${{ github.ref_name }}
+        shell: pwsh
+        run: |
+          $repo = $env:REPO_SLUG.ToLower()
+          docker push "ghcr.io/$repo/api:${{ github.ref_name }}"
       - name: Build RAG image
-        run: docker build -f docker/rag.Dockerfile -t ghcr.io/${{ env.REPO_SLUG }}/rag:${{ github.ref_name }} .
+        shell: pwsh
+        run: |
+          $repo = $env:REPO_SLUG.ToLower()
+          docker build -f docker/rag.Dockerfile -t "ghcr.io/$repo/rag:${{ github.ref_name }}" .
       - name: Push RAG image
-        run: docker push ghcr.io/${{ env.REPO_SLUG }}/rag:${{ github.ref_name }}
+        shell: pwsh
+        run: |
+          $repo = $env:REPO_SLUG.ToLower()
+          docker push "ghcr.io/$repo/rag:${{ github.ref_name }}"
       - name: Build agent image
-        run: docker build -f docker/mistral.Dockerfile -t ghcr.io/${{ env.REPO_SLUG }}/agent:${{ github.ref_name }} .
+        shell: pwsh
+        run: |
+          $repo = $env:REPO_SLUG.ToLower()
+          docker build -f docker/mistral.Dockerfile -t "ghcr.io/$repo/agent:${{ github.ref_name }}" .
       - name: Push agent image
-        run: docker push ghcr.io/${{ env.REPO_SLUG }}/agent:${{ github.ref_name }}
+        shell: pwsh
+        run: |
+          $repo = $env:REPO_SLUG.ToLower()
+          docker push "ghcr.io/$repo/agent:${{ github.ref_name }}"
       - name: Run monitor against staging
         shell: pwsh
         run: ./monitor.ps1 -Services @('https://staging/api/health','https://staging/kg/health','https://staging/agent/health')

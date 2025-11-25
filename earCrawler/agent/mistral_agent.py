@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, TYPE_CHECKING
+from typing import List, Optional, TYPE_CHECKING, Protocol
 
 from earCrawler.utils.import_guard import import_optional
 
@@ -26,6 +26,14 @@ if TYPE_CHECKING:  # pragma: no cover - hints only
 
 if TYPE_CHECKING:  # pragma: no cover - imported for type checkers only
     from .long_context_pipeline import LongContextPipeline
+
+
+class Retriever(Protocol):
+    def query(self, query: str, k: int = ...) -> List[str]: ...
+
+
+class LegalBERT(Protocol):
+    def filter(self, query: str, contexts: List[str]) -> List[str]: ...
 
 
 DEFAULT_MODEL = "mistralai/Mistral-7B-v0.1"
