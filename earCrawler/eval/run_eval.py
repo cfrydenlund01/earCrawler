@@ -1,9 +1,10 @@
 import argparse
 import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
-from earCrawler.utils.import_guard import import_optional
+from earCrawler.utils import import_guard
 
 
 def parse_args() -> argparse.Namespace:
@@ -29,8 +30,8 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_model(model_path: str):
-    transformers = import_optional("transformers", ["transformers"])
-    peft = import_optional("peft", ["peft"])
+    transformers = import_guard.import_optional("transformers", ["transformers"])
+    peft = import_guard.import_optional("peft", ["peft"])
 
     tokenizer = transformers.AutoTokenizer.from_pretrained(model_path)
     model = transformers.AutoModelForCausalLM.from_pretrained(
@@ -39,13 +40,14 @@ def load_model(model_path: str):
     try:
         model = peft.PeftModel.from_pretrained(model, model_path)
     except Exception:
+        # Adapters are optional; fall back to the base model if loading fails.
         pass
     model.eval()
     return tokenizer, model
 
 
 def evaluate(model, tokenizer, data):
-    torch = import_optional("torch", ["torch"])
+    torch = import_guard.import_optional("torch", ["torch"])
     device = next(model.parameters()).device
     if torch.cuda.is_available():
         torch.cuda.reset_peak_memory_stats()
@@ -84,9 +86,19 @@ def main() -> None:
         data = [json.loads(line) for line in f]
     tokenizer, model = load_model(args.model_path)
     metrics = evaluate(model, tokenizer, data)
+
+    # Include minimal run metadata alongside core metrics for research logging.
+    result = {
+        **metrics,
+        "model_path": args.model_path,
+        "data_file": str(data_file),
+        "num_items": len(data),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
     out_path = Path(args.output_file)
     with out_path.open("w", encoding="utf-8") as f:
-        json.dump(metrics, f, indent=2)
+        json.dump(result, f, indent=2)
 
 
 if __name__ == "__main__":

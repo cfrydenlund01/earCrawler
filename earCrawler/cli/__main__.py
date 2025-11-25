@@ -6,6 +6,7 @@ import importlib
 import json
 import platform
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import click
@@ -32,6 +33,8 @@ from earCrawler.cli.api_service import api as api_cmd
 from earCrawler.cli.policy_cmd import policy_cmd
 from earCrawler.cli.audit import audit
 from earCrawler.cli import perf
+
+from earCrawler.eval import run_eval as eval_core
 
 install_telem()
 
@@ -379,6 +382,141 @@ def kg_query(endpoint, file, sparql, form, out):
 
 
 cli.add_command(kg_query, name="kg-query")
+
+
+@cli.command(name="eval-benchmark")
+@click.option(
+    "--dataset-id",
+    type=str,
+    help="Dataset ID from eval/manifest.json (e.g., entity_obligations.v1).",
+)
+@click.option(
+    "--data-file",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Override dataset path (JSONL). If omitted, resolves from manifest.",
+)
+@click.option(
+    "--manifest",
+    type=click.Path(path_type=Path),
+    default=Path("eval") / "manifest.json",
+    show_default=True,
+    help="Path to eval manifest describing datasets and KG state.",
+)
+@click.option(
+    "--model-path",
+    type=str,
+    default="sshleifer/tiny-gpt2",
+    show_default=True,
+    help="Model to evaluate (HF hub path or local directory).",
+)
+@click.option(
+    "--out-json",
+    type=click.Path(path_type=Path),
+    default=Path("dist") / "eval" / "benchmark.json",
+    show_default=True,
+    help="Where to write metrics+metadata JSON.",
+)
+@click.option(
+    "--out-md",
+    type=click.Path(path_type=Path),
+    default=Path("dist") / "eval" / "benchmark.md",
+    show_default=True,
+    help="Where to write a short Markdown summary.",
+)
+def eval_benchmark(
+    dataset_id: str | None,
+    data_file: Path | None,
+    manifest: Path,
+    model_path: str,
+    out_json: Path,
+    out_md: Path,
+) -> None:
+    """Run the evaluation harness against a dataset and emit metrics + metadata."""
+
+    # Resolve dataset metadata from manifest if needed.
+    dataset_meta: dict[str, object] | None = None
+    kg_digest: str | None = None
+    if manifest.exists():
+        try:
+            manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
+            kg_digest = (
+                manifest_obj.get("kg_state", {}) or {}
+            ).get("digest")  # type: ignore[assignment]
+            if dataset_id:
+                ds_entries = manifest_obj.get("datasets", [])
+                for entry in ds_entries:
+                    if entry.get("id") == dataset_id:
+                        dataset_meta = entry
+                        break
+        except Exception as exc:  # pragma: no cover - manifest read errors
+            raise click.ClickException(f"Failed to read manifest: {exc}")
+
+    resolved_data_file = data_file
+    if resolved_data_file is None:
+        if dataset_meta and dataset_meta.get("file"):
+            candidate = Path(str(dataset_meta["file"]))
+            if candidate.is_absolute():
+                resolved_data_file = candidate
+            elif candidate.exists():
+                resolved_data_file = candidate
+            else:
+                resolved_data_file = manifest.parent / candidate
+        else:
+            resolved_data_file = Path("eval") / "pilot_items.jsonl"
+
+    if not resolved_data_file.exists():
+        raise click.ClickException(f"Dataset not found: {resolved_data_file}")
+
+    # Load dataset
+    try:
+        items: list[dict[str, object]] = []
+        with resolved_data_file.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                items.append(json.loads(line))
+    except Exception as exc:
+        raise click.ClickException(f"Failed to load dataset: {exc}")
+
+    # Load model and evaluate
+    try:
+        tokenizer, model = eval_core.load_model(model_path)
+    except RuntimeError as exc:
+        # Surface optional dependency guidance cleanly.
+        raise click.ClickException(str(exc))
+    metrics = eval_core.evaluate(model, tokenizer, items)
+
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    out_md.parent.mkdir(parents=True, exist_ok=True)
+
+    result = {
+        **metrics,
+        "model_path": model_path,
+        "data_file": str(resolved_data_file),
+        "dataset_id": dataset_id or dataset_meta.get("id") if dataset_meta else None,
+        "dataset_version": dataset_meta.get("version") if dataset_meta else None,
+        "task": dataset_meta.get("task") if dataset_meta else None,
+        "num_items": len(items),
+        "kg_state_digest": kg_digest,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    out_json.write_text(json.dumps(result, indent=2), encoding="utf-8")
+
+    # Write a minimal markdown summary for quick inspection.
+    out_md.write_text(
+        "\n".join(
+            [
+                "| Accuracy | Avg Latency (s) | Peak GPU Memory |",
+                "|---------:|----------------:|----------------:|",
+                f"| {result['accuracy']:.4f} | {result['avg_latency']:.4f} | {int(result['peak_gpu_memory'])} |",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    click.echo(f"Wrote {out_json} and {out_md}")
 
 
 @cli.command(name="kg-emit")
