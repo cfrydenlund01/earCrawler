@@ -223,9 +223,10 @@ earCrawler ships a lightweight evaluation harness for Phase E experiments and re
 ### Datasets
 
 - Evaluation items live under `eval/` as JSONL files (one JSON object per line) and are indexed by `eval/manifest.json`.
-- The manifest ties datasets to a specific KG snapshot:
+- The manifest ties datasets to a specific KG snapshot **and** the curated references they rely on:
   - `kg_state.manifest_path` and `kg_state.digest` point at `kg/.kgstate/manifest.json` and its hash.
   - `datasets[]` records entries such as `ear_compliance.v1`, `entity_obligations.v1`, and `unanswerable.v1` with `task`, `file`, `version`, `description`, and `num_items`.
+  - `references.sections`, `references.kg_nodes`, and `references.kg_paths` enumerate the EAR sections and KG nodes/paths used in the eval slices. `python eval/validate_datasets.py` verifies that every dataset item references only these curated entries in addition to passing the JSON schema.
 - Per-item schema (shared across all datasets):
   - `id` – stable item identifier.
   - `task` – logical task (`ear_compliance`, `entity_obligation`, `unanswerable`, etc.).
@@ -249,7 +250,8 @@ To add a new dataset:
    - `file` (`eval/<name>.vX.jsonl`),
    - `version` (integer),
    - `description` and `num_items`.
-3. If the dataset assumes a different KG snapshot, run `py -m earCrawler.utils.kg_state` (or the appropriate helper) to refresh `kg/.kgstate/manifest.json`, then update `kg_state.digest` in `eval/manifest.json` intentionally.
+3. Update `references.sections`, `references.kg_nodes`, and `references.kg_paths` if your dataset introduces new EAR sections or policy nodes so that referential validation succeeds.
+4. If the dataset assumes a different KG snapshot, run `py -m earCrawler.utils.kg_state` (or the appropriate helper) to refresh `kg/.kgstate/manifest.json`, then update `kg_state.digest` in `eval/manifest.json` intentionally.
 
 ### Running evals via CLI
 
@@ -273,6 +275,10 @@ Other useful options:
 - `--model-path` – override the HF model or local directory.
 - `--data-file` – bypass the manifest and point directly at a JSONL file.
 - `--out-json`, `--out-md` – customize output locations under `dist\eval\`.
+- `--explainability-artifacts` – in addition to the normal summary, assert the metrics cover every task in the dataset and write `dist\eval\<stem>.evidence.json` with the aggregated doc spans, KG nodes, and KG paths observed during the run (useful when auditing explainability payloads).
+- `--min-accuracy` / `--min-label-accuracy` – optional thresholds that keep the artefacts but cause the command to exit non-zero if the run regresses below the specified target (handy for release-specific gates).
+
+To log the results in `Research/decision_log.md`, run `python scripts/eval/log_eval_summary.py dist/eval/*.json` to emit a markdown-ready set of bullet points for all benchmark outputs in one go. This helper accepts one or many metrics files, making it easy to paste consolidated summaries into the research log.
 
 These outputs are suitable for CI artefacts and for logging Phase E endpoints in `Research/decision_log.md`.
 

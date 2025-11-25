@@ -28,5 +28,26 @@
       "description": "Questions that must be declined because they fall outside the modeled EAR scope or lack sufficient evidence.",
       "num_items": 2
     }
-  ]
+  ],
+  "references": {
+    "sections": {
+      "EAR-736": ["736.2(b)"],
+      "EAR-740": ["740.1", "740.9(a)(2)"],
+      "EAR-742": ["742.4(a)(1)"],
+      "EAR-744": ["744.6(b)(3)"],
+      "EAR-746": ["746.4(a)"]
+    },
+    "kg_nodes": [
+      "https://example.org/ear#obligation/license_required_744_6_b_3",
+      "https://example.org/ear#obligation/license_required_746_4_a",
+      "https://example.org/ear#obligation/license_required_742_4_a_1",
+      "https://example.org/ear#exception/740_9_a_2",
+      "https://example.org/ear#exception/740_1"
+    ],
+    "kg_paths": [
+      "path:acme_all_to_NK_v1",
+      "path:acme_hpc_to_CN_obligation_chain_v1",
+      "path:acme_laptop_to_FR_exception_v1"
+    ]
+  }
 }

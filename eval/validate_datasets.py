@@ -4,7 +4,7 @@ import argparse
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Iterator, Sequence
+from typing import Dict, Iterator, Sequence, Set, Tuple, Any
 
 from jsonschema import Draft7Validator
 
@@ -37,6 +37,16 @@ def _resolve_dataset_file(manifest_path: Path, entry_file: str) -> Path:
     return (manifest_path.parent / candidate).resolve()
 
 
+def _load_references(manifest: dict) -> Tuple[Dict[str, Set[str]], Set[str], Set[str]]:
+    references = manifest.get("references", {}) or {}
+    sections_map: Dict[str, Set[str]] = {}
+    for doc_id, spans in (references.get("sections", {}) or {}).items():
+        sections_map[doc_id] = {str(value) for value in spans or []}
+    kg_nodes = {str(value) for value in (references.get("kg_nodes") or [])}
+    kg_paths = {str(value) for value in (references.get("kg_paths") or [])}
+    return sections_map, kg_nodes, kg_paths
+
+
 def _iter_dataset_entries(
     manifest: dict,
     manifest_path: Path,
@@ -64,6 +74,71 @@ def _iter_items(path: Path) -> Iterator[tuple[int, dict]]:
             yield idx, obj
 
 
+def _validate_doc_spans(
+    *,
+    dataset_id: str,
+    file_path: Path,
+    line_no: int,
+    evidence: dict,
+    section_map: Dict[str, Set[str]],
+) -> Iterator[ValidationIssue]:
+    for span in evidence.get("doc_spans", []):
+        doc_id = str(span.get("doc_id") or "")
+        span_id = str(span.get("span_id") or "")
+        if not doc_id or not span_id:
+            continue
+        allowed = section_map.get(doc_id)
+        if not allowed:
+            yield ValidationIssue(
+                dataset_id=dataset_id,
+                file=file_path,
+                line=line_no,
+                message=f"doc_id '{doc_id}' not registered in manifest references",
+                instance_path="evidence/doc_spans",
+            )
+        elif span_id not in allowed:
+            yield ValidationIssue(
+                dataset_id=dataset_id,
+                file=file_path,
+                line=line_no,
+                message=f"span_id '{span_id}' missing from manifest for doc_id '{doc_id}'",
+                instance_path="evidence/doc_spans",
+            )
+
+
+def _validate_kg_refs(
+    *,
+    dataset_id: str,
+    file_path: Path,
+    line_no: int,
+    evidence: dict,
+    kg_nodes: Set[str],
+    kg_paths: Set[str],
+) -> Iterator[ValidationIssue]:
+    if kg_nodes:
+        for node in evidence.get("kg_nodes", []):
+            node_str = str(node or "")
+            if node_str and node_str not in kg_nodes:
+                yield ValidationIssue(
+                    dataset_id=dataset_id,
+                    file=file_path,
+                    line=line_no,
+                    message=f"kg_node '{node_str}' not registered in manifest references",
+                    instance_path="evidence/kg_nodes",
+                )
+    if kg_paths:
+        for path in evidence.get("kg_paths", []):
+            path_str = str(path or "")
+            if path_str and path_str not in kg_paths:
+                yield ValidationIssue(
+                    dataset_id=dataset_id,
+                    file=file_path,
+                    line=line_no,
+                    message=f"kg_path '{path_str}' not registered in manifest references",
+                    instance_path="evidence/kg_paths",
+                )
+
+
 def validate_datasets(
     manifest_path: Path | None = None,
     schema_path: Path | None = None,
@@ -74,6 +149,7 @@ def validate_datasets(
 
     manifest = _load_json(manifest_path)
     validator = _load_schema(schema_path)
+    section_map, kg_nodes, kg_paths = _load_references(manifest)
 
     issues: list[ValidationIssue] = []
     for dataset_id, file_path in _iter_dataset_entries(manifest, manifest_path, dataset_ids):
@@ -99,6 +175,26 @@ def validate_datasets(
                         instance_path="/".join(str(p) for p in error.path),
                     )
                 )
+            evidence: dict[str, Any] = item.get("evidence", {}) or {}
+            issues.extend(
+                _validate_doc_spans(
+                    dataset_id=dataset_id,
+                    file_path=file_path,
+                    line_no=line_no,
+                    evidence=evidence,
+                    section_map=section_map,
+                )
+            )
+            issues.extend(
+                _validate_kg_refs(
+                    dataset_id=dataset_id,
+                    file_path=file_path,
+                    line_no=line_no,
+                    evidence=evidence,
+                    kg_nodes=kg_nodes,
+                    kg_paths=kg_paths,
+                )
+            )
     return issues
 
 
