@@ -61,7 +61,26 @@ Windows notes
 ## Integrity Gate
 - Validate graph integrity before export or load via `py -m earCrawler.cli integrity check <ttl>`.
 - Any non-zero violation counters cause the command to exit with a failure code; treat this as a hard stop for downstream export, load, or deployment stages.
-- Typical violations include missing provenance links, namespace drift, or orphaned part nodes—inspect the emitted report to trace the offending triples.
+- Typical violations include missing provenance links, namespace drift, or orphaned part nodes-inspect the emitted report to trace the offending triples.
+
+## Evaluation datasets & schema
+- Location: evaluation JSONL files live under `eval/` and are indexed by `eval/manifest.json`. The manifest records:
+  - `kg_state.digest`: the KG snapshot hash from `kg/.kgstate/manifest.json` that the datasets were curated against.
+  - `datasets[]`: entries with `id` (e.g. `ear_compliance.v1`), `task` (e.g. `ear_compliance`, `entity_obligation`, `unanswerable`), `file`, `version`, `description`, and `num_items`.
+- Per-item JSONL schema (one object per line):
+  - `id` (string) – stable item identifier.
+  - `task` (string) – logical task name (`ear_compliance`, `entity_obligation`, `unanswerable`, etc.).
+  - `question` (string) – user-facing question text.
+  - `ground_truth` (object):
+    - `answer_text` (string) – canonical short answer.
+    - `label` (string) – normalized label (`license_required`, `no_license_required`, `permitted`, `permitted_with_license`, `prohibited`, `unanswerable`, etc.).
+  - `ear_sections` (array of strings) – EAR section IDs that determine the answer (for example `["EAR-744.6(b)(3)"]`).
+  - `kg_entities` (array of strings) – IRIs of the main KG entities involved (for example `["https://example.org/ear#entity/acme"]`), or empty when the item is purely statute-level.
+  - `evidence` (object):
+    - `doc_spans` (array) – items of the form `{ "doc_id": "<EAR document ID>", "span_id": "<section/paragraph ID>" }` that should be sufficient to justify the answer.
+    - `kg_nodes` (array of strings) – IRIs of policy-graph nodes (obligations, exceptions) that encode the decision logic.
+    - `kg_paths` (optional array of strings) – identifiers for precomputed reasoning paths used in explainability/graph-walk evaluations.
+- The evaluation harness expects exactly this shape and treats unknown extra keys as opaque; keep the schema stable when adding new datasets and bump the dataset `id`/`version` when you need to change semantics.
 
 ## Toolchain maintenance
 

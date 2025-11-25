@@ -64,6 +64,20 @@ jobs:
               Graph().parse(path, format="turtle")
           '@
           python -c $code
+      - name: Validate evaluation datasets
+        run: python eval/validate_datasets.py
+      - name: Eval benchmark (ear_compliance.v1)
+        env:
+          EARCTL_USER: test_operator
+        run: |
+          python -m earCrawler.cli eval-benchmark --dataset-id ear_compliance.v1 --out-json dist/eval/ear_compliance.v1.json --out-md dist/eval/ear_compliance.v1.md
+      - name: Upload eval artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-benchmark
+          path: dist/eval
+          if-no-files-found: ignore
 
   gpu:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

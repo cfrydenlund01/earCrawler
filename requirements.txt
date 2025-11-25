@@ -7,6 +7,7 @@ datasets==2.20.0; sys_platform != "win32"
 faiss-cpu==1.8.0; sys_platform != "win32"
 fastapi==0.116.1
 flake8==7.1.0
+jsonschema==4.23.0
 httpx==0.28.1
 keyring==24.3.1
 lxml==5.2.2
