@@ -152,7 +152,9 @@ def validate_datasets(
     section_map, kg_nodes, kg_paths = _load_references(manifest)
 
     issues: list[ValidationIssue] = []
-    for dataset_id, file_path in _iter_dataset_entries(manifest, manifest_path, dataset_ids):
+    for dataset_id, file_path in _iter_dataset_entries(
+        manifest, manifest_path, dataset_ids
+    ):
         if not file_path.exists():
             issues.append(
                 ValidationIssue(
@@ -199,7 +201,9 @@ def validate_datasets(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description="Validate evaluation datasets against schema.")
+    parser = argparse.ArgumentParser(
+        description="Validate evaluation datasets against schema."
+    )
     parser.add_argument(
         "--manifest",
         type=Path,

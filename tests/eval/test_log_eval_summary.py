@@ -17,12 +17,8 @@ def test_log_eval_summary_multiple(tmp_path: Path) -> None:
         "dataset_id": "ds1",
         "task": "task1",
     }
-    path1.write_text(
-        json.dumps(template | {"dataset_id": "ds1"}), encoding="utf-8"
-    )
-    path2.write_text(
-        json.dumps(template | {"dataset_id": "ds2"}), encoding="utf-8"
-    )
+    path1.write_text(json.dumps(template | {"dataset_id": "ds1"}), encoding="utf-8")
+    path2.write_text(json.dumps(template | {"dataset_id": "ds2"}), encoding="utf-8")
     output = summarize_metrics([path1, path2])
     assert "ds1" in output and "ds2" in output
     assert output.startswith("Eval summaries:")

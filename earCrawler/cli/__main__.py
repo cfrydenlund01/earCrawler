@@ -143,7 +143,9 @@ def _collect_evidence_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
                 kg_paths.add(path_str)
     return {
         "tasks": sorted(tasks),
-        "doc_spans": [{"doc_id": doc, "span_id": span} for doc, span in sorted(doc_spans)],
+        "doc_spans": [
+            {"doc_id": doc, "span_id": span} for doc, span in sorted(doc_spans)
+        ],
         "kg_nodes": sorted(kg_nodes),
         "kg_paths": sorted(kg_paths),
     }
@@ -492,9 +494,9 @@ def eval_benchmark(
     if manifest.exists():
         try:
             manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
-            kg_digest = (
-                manifest_obj.get("kg_state", {}) or {}
-            ).get("digest")  # type: ignore[assignment]
+            kg_digest = (manifest_obj.get("kg_state", {}) or {}).get(
+                "digest"
+            )  # type: ignore[assignment]
             if dataset_id:
                 ds_entries = manifest_obj.get("datasets", [])
                 for entry in ds_entries:
@@ -594,7 +596,9 @@ def eval_benchmark(
             **summary,
         }
         evidence_path = out_json.with_name(f"{out_json.stem}.evidence.json")
-        evidence_path.write_text(json.dumps(evidence_payload, indent=2), encoding="utf-8")
+        evidence_path.write_text(
+            json.dumps(evidence_payload, indent=2), encoding="utf-8"
+        )
         click.echo(f"Wrote {evidence_path}")
 
     threshold_errors = []
