@@ -1,0 +1,32 @@
+{
+  "kg_state": {
+    "manifest_path": "kg/.kgstate/manifest.json",
+    "digest": "9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff"
+  },
+  "datasets": [
+    {
+      "id": "entity_obligations.v1",
+      "task": "entity_obligation",
+      "file": "eval/entity_obligations.v1.jsonl",
+      "version": 1,
+      "description": "Entity-level obligation questions for a fixed ACME universe, with links to EAR sections and KG policy nodes/paths.",
+      "num_items": 3
+    },
+    {
+      "id": "ear_compliance.v1",
+      "task": "ear_compliance",
+      "file": "eval/ear_compliance.v1.jsonl",
+      "version": 1,
+      "description": "Statute-level EAR compliance questions anchored to specific sections.",
+      "num_items": 3
+    },
+    {
+      "id": "unanswerable.v1",
+      "task": "unanswerable",
+      "file": "eval/unanswerable.v1.jsonl",
+      "version": 1,
+      "description": "Questions that must be declined because they fall outside the modeled EAR scope or lack sufficient evidence.",
+      "num_items": 2
+    }
+  ]
+}
