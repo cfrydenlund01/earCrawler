@@ -5,11 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 import hashlib
 import json
+import logging
 import os
 import shutil
 import urllib.request
 import zipfile
 from urllib.error import HTTPError
+
+logger = logging.getLogger(__name__)
 
 
 def _java_executable(home: Path) -> Path:
@@ -96,8 +99,13 @@ def ensure_jena(download: bool = True, version: str | None = None) -> Path:
         if _valid_install(env_home):
             os.environ["JENA_HOME"] = str(env_home)
             return env_home
-        raise RuntimeError(
-            "JENA_HOME is set but does not look like a valid Apache Jena installation"
+        if not download:
+            raise RuntimeError(
+                "JENA_HOME is set but does not look like a valid Apache Jena installation"
+            )
+        logger.warning(
+            "JENA_HOME is set but invalid; falling back to managed download (%s)",
+            env_home,
         )
 
     versions = _load_versions(root)

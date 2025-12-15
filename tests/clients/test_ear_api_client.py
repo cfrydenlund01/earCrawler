@@ -75,12 +75,14 @@ def test_sparql_and_rag_payloads():
     responses = [
         _StubResponse(payload={"head": {}, "results": {}}),
         _StubResponse(payload={"trace_id": "abc", "results": []}),
+        _StubResponse(payload={"trace_id": "xyz", "answer": "ok"}),
     ]
     session = _StubSession(responses)
     client = EarCrawlerApiClient("http://localhost:9001", session=session)
 
     client.run_template("search_entities", parameters={"q": "foo", "limit": 1})
     client.rag_query("export controls", top_k=2, include_lineage=True)
+    client.rag_answer("export controls", top_k=1)
 
     assert session.calls[0]["json"] == {
         "template": "search_entities",
@@ -90,6 +92,11 @@ def test_sparql_and_rag_payloads():
         "query": "export controls",
         "top_k": 2,
         "include_lineage": True,
+    }
+    assert session.calls[2]["json"] == {
+        "query": "export controls",
+        "top_k": 1,
+        "include_lineage": False,
     }
 
 

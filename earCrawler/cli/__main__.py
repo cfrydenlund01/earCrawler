@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, Any, Set
 
 import click
+import requests
 
 from earCrawler import __version__
 from earCrawler.core.nsf_case_parser import NSFCaseParser
@@ -36,6 +37,11 @@ from earCrawler.cli.audit import audit
 from earCrawler.cli import perf
 
 from earCrawler.eval import run_eval as eval_core
+from api_clients.llm_client import LLMProviderError
+from earCrawler.rag.pipeline import answer_with_rag
+from api_clients.federalregister_client import FederalRegisterClient
+from api_clients.tradegov_client import TradeGovClient
+from earCrawler.rag.retriever import Retriever
 
 install_telem()
 
@@ -418,6 +424,242 @@ def kg_query(endpoint, file, sparql, form, out):
 cli.add_command(kg_query, name="kg-query")
 
 
+def _iter_jsonl(path: Path) -> list[dict]:
+    items: list[dict] = []
+    with path.open("r", encoding="utf-8") as handle:
+        for line in handle:
+            stripped = line.strip()
+            if stripped:
+                items.append(json.loads(stripped))
+    return items
+
+
+@cli.group(name="eval")
+def eval_group() -> None:
+    """Evaluation utilities."""
+
+
+@eval_group.command(name="verify-evidence")
+@click.option(
+    "--manifest",
+    type=click.Path(path_type=Path),
+    default=Path("eval") / "manifest.json",
+    show_default=True,
+    help="Eval manifest describing dataset files.",
+)
+@click.option(
+    "--corpus",
+    type=click.Path(path_type=Path),
+    default=Path("data") / "fr_sections.jsonl",
+    show_default=True,
+    help="Corpus JSONL to validate references against.",
+)
+@click.option(
+    "--dataset-id",
+    default="all",
+    show_default=True,
+    help="Dataset id to verify, or 'all' for every entry in the manifest.",
+)
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=Path("dist") / "eval" / "evidence_report.json",
+    show_default=True,
+    help="Where to write the evidence resolution report.",
+)
+def eval_verify_evidence(manifest: Path, corpus: Path, dataset_id: str, out: Path) -> None:
+    """Gate eval datasets by verifying evidence ⇄ corpus alignment."""
+
+    try:
+        manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
+    except Exception as exc:  # pragma: no cover - manifest parsing errors
+        raise click.ClickException(f"Failed to read manifest: {exc}")
+
+    dataset_entries = manifest_obj.get("datasets", [])
+    if dataset_id != "all":
+        dataset_entries = [entry for entry in dataset_entries if entry.get("id") == dataset_id]
+        if not dataset_entries:
+            raise click.ClickException(f"Dataset not found: {dataset_id}")
+
+    try:
+        from earCrawler.eval.evidence_resolver import load_corpus_index, resolve_dataset
+    except Exception as exc:  # pragma: no cover - import failures
+        raise click.ClickException(str(exc))
+
+    try:
+        corpus_index = load_corpus_index(corpus)
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc))
+    report: dict[str, object] = {
+        "corpus_path": str(corpus),
+        "datasets": [],
+    }
+    missing_sections: set[str] = set()
+    missing_spans: set[str] = set()
+
+    for entry in dataset_entries:
+        ds_id = entry.get("id")
+        data_file = Path(entry.get("file"))
+        if not data_file.is_absolute():
+            data_file = manifest.parent / data_file
+        if not data_file.exists():
+            raise click.ClickException(f"Dataset not found: {data_file}")
+        items = _iter_jsonl(data_file)
+        ds_report = resolve_dataset(ds_id, items, corpus_index)
+        ds_report["file"] = str(data_file)
+        report["datasets"].append(ds_report)
+        missing_sections.update(ds_report["missing_sections"])
+        missing_spans.update(ds_report["missing_spans"])
+        click.echo(
+            f"{ds_id}: missing_sections={len(ds_report['missing_sections'])}, "
+            f"missing_spans={len(ds_report['missing_spans'])}"
+        )
+
+    report["summary"] = {
+        "missing_sections": sorted(missing_sections),
+        "missing_spans": sorted(missing_spans),
+    }
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    if missing_sections or missing_spans:
+        raise click.ClickException("evidence verification failed")
+
+
+@eval_group.command(name="build-kg-expansion")
+@click.option(
+    "--manifest",
+    type=click.Path(path_type=Path),
+    default=Path("eval") / "manifest.json",
+    show_default=True,
+    help="Eval manifest to harvest referenced sections and KG hints.",
+)
+@click.option(
+    "--corpus",
+    type=click.Path(path_type=Path),
+    default=Path("data") / "fr_sections.jsonl",
+    show_default=True,
+    help="Corpus JSONL containing section text.",
+)
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=Path("data") / "kg_expansion.json",
+    show_default=True,
+    help="Destination JSON file for KG expansion mapping.",
+)
+def build_kg_expansion(manifest: Path, corpus: Path, out: Path) -> None:
+    """Generate the file-backed KG expansion mapping."""
+
+    try:
+        from earCrawler.rag.kg_expansion_builder import build_expansion_mapping, write_expansion_mapping
+    except Exception as exc:  # pragma: no cover - import failures
+        raise click.ClickException(str(exc))
+    mapping = build_expansion_mapping(corpus, manifest)
+    write_expansion_mapping(out, mapping)
+    click.echo(f"Wrote {out} ({len(mapping)} sections)")
+
+
+@eval_group.command(name="run-rag")
+@click.option(
+    "--manifest",
+    type=click.Path(path_type=Path),
+    default=Path("eval") / "manifest.json",
+    show_default=True,
+    help="Eval manifest describing datasets and KG state.",
+)
+@click.option(
+    "--dataset-id",
+    default=None,
+    help="Optional dataset id to run; defaults to all entries in the manifest.",
+)
+@click.option(
+    "--provider",
+    default="groq",
+    show_default=True,
+    help="LLM provider override (defaults to Groq).",
+)
+@click.option(
+    "--model",
+    default="llama-3.3-70b-versatile",
+    show_default=True,
+    help="LLM model identifier for the provider.",
+)
+@click.option(
+    "--top-k",
+    type=int,
+    default=5,
+    show_default=True,
+    help="Number of contexts to retrieve before generation.",
+)
+@click.option(
+    "--max-items",
+    type=int,
+    default=None,
+    help="Optional cap on items per dataset (useful for smoke tests).",
+)
+@click.option(
+    "--semantic/--no-semantic",
+    default=True,
+    show_default=True,
+    help="Whether to include semantic accuracy in the metrics.",
+)
+@click.option(
+    "--out-dir",
+    type=click.Path(path_type=Path),
+    default=Path("dist") / "eval",
+    show_default=True,
+    help="Base directory for metrics outputs.",
+)
+def eval_run_rag(
+    manifest: Path,
+    dataset_id: str | None,
+    provider: str,
+    model: str,
+    top_k: int,
+    max_items: int | None,
+    semantic: bool,
+    out_dir: Path,
+) -> None:
+    """Run RAG-based evals for each dataset in the manifest."""
+
+    try:
+        manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
+    except Exception as exc:  # pragma: no cover - manifest parsing errors
+        raise click.ClickException(f"Failed to read manifest: {exc}")
+
+    dataset_entries = manifest_obj.get("datasets", []) or []
+    if dataset_id:
+        dataset_entries = [entry for entry in dataset_entries if entry.get("id") == dataset_id]
+        if not dataset_entries:
+            raise click.ClickException(f"Dataset not found: {dataset_id}")
+
+    try:
+        from scripts.eval import eval_rag_llm
+    except Exception as exc:  # pragma: no cover - import failures
+        raise click.ClickException(str(exc))
+
+    for entry in dataset_entries:
+        ds_id = entry.get("id")
+        safe_model = eval_rag_llm._safe_name(model or "default")
+        out_json = Path(out_dir) / f"{ds_id}.rag.{provider}.{safe_model}.json"
+        out_md = Path(out_dir) / f"{ds_id}.rag.{provider}.{safe_model}.md"
+        try:
+            eval_rag_llm.evaluate_dataset(
+                ds_id,
+                manifest_path=manifest,
+                llm_provider=provider,
+                llm_model=model,
+                top_k=top_k,
+                max_items=max_items,
+                out_json=out_json,
+                out_md=out_md,
+                semantic=semantic,
+            )
+        except Exception as exc:  # pragma: no cover - bubbled to CLI
+            raise click.ClickException(str(exc))
+        click.echo(f"{ds_id}: wrote {out_json}")
+
+
 @cli.command(name="eval-benchmark")
 @click.option(
     "--dataset-id",
@@ -660,6 +902,239 @@ def kg_emit(sources: tuple[str, ...], in_dir: Path, out_dir: Path) -> None:
             click.echo(f"{src}: {count} triples -> {out_path}")
         except Exception as exc:
             raise click.ClickException(str(exc))
+
+
+@cli.group()
+@policy.require_role("reader")
+@policy.enforce
+def llm() -> None:
+    """LLM-backed helpers (multi-provider)."""
+
+
+@llm.command(name="ask")
+@click.option(
+    "--llm-provider",
+    type=click.Choice(["nvidia_nim", "groq"]),
+    default=None,
+    help="LLM provider (overrides config/llm_secrets.env).",
+)
+@click.option(
+    "--llm-model",
+    type=str,
+    default=None,
+    help="LLM model identifier for the chosen provider.",
+)
+@click.option(
+    "--top-k",
+    type=int,
+    default=5,
+    show_default=True,
+    help="Number of retrieved contexts to pass to the LLM.",
+)
+@click.argument("question", type=str)
+def llm_ask(llm_provider: str | None, llm_model: str | None, top_k: int, question: str) -> None:
+    """Answer a question using the RAG pipeline and selected provider/model."""
+
+    try:
+        result = answer_with_rag(
+            question,
+            provider=llm_provider,
+            model=llm_model,
+            top_k=top_k,
+        )
+    except LLMProviderError as exc:
+        raise click.ClickException(str(exc))
+    click.echo(json.dumps(result, ensure_ascii=False, indent=2))
+
+
+@cli.command(name="fr-fetch")
+@click.option(
+    "--section",
+    "-s",
+    "sections",
+    multiple=True,
+    help="EAR section identifier to search (e.g., 744.6(b)(3)). Repeatable.",
+)
+@click.option(
+    "--query",
+    help="Free-text query to send to Federal Register (falls back to sections when omitted).",
+)
+@click.option(
+    "--per-page",
+    type=int,
+    default=2,
+    show_default=True,
+    help="Max results to collect per section/query.",
+)
+@click.option(
+    "--out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("data") / "fr_sections.jsonl",
+    show_default=True,
+    help="Destination JSONL file.",
+)
+def fr_fetch(sections: tuple[str, ...], query: str | None, per_page: int, out: Path) -> None:
+    """Fetch EAR-related passages from the Federal Register and store them for indexing."""
+
+    if not sections and not query:
+        raise click.ClickException("Provide at least one --section or a --query.")
+
+    client = FederalRegisterClient()
+    out.parent.mkdir(parents=True, exist_ok=True)
+
+    def _records_for(term: str) -> list[dict]:
+        try:
+            docs = client.get_ear_articles(term, per_page=per_page)
+        except Exception as exc:
+            click.echo(f"Warning: failed to fetch '{term}' from Federal Register: {exc}", err=True)
+            # Fallback to the public JSON API directly to avoid client-level checks.
+            try:
+                resp = requests.get(
+                    "https://www.federalregister.gov/api/v1/documents.json",
+                    params={"per_page": per_page, "conditions[term]": term},
+                    headers={"Accept": "application/json"},
+                    timeout=20,
+                )
+                resp.raise_for_status()
+                data = resp.json()
+                docs = []
+                for item in data.get("results", []):
+                    detail_url = f"https://www.federalregister.gov/api/v1/documents/{item.get('document_number')}.json"
+                    detail = requests.get(detail_url, headers={"Accept": "application/json"}, timeout=20)
+                    detail.raise_for_status()
+                    detail_json = detail.json()
+                    text = (
+                        detail_json.get("body_html")
+                        or detail_json.get("body_text")
+                        or item.get("abstract")
+                        or " ".join(item.get("excerpts") or [])
+                        or ""
+                    )
+                    docs.append(
+                        {
+                            "id": item.get("document_number"),
+                            "title": item.get("title"),
+                            "publication_date": item.get("publication_date"),
+                            "source_url": item.get("html_url") or item.get("url"),
+                            "text": text,
+                            "provider": "federalregister.gov",
+                        }
+                    )
+            except Exception as inner_exc:  # pragma: no cover - network dependent
+                click.echo(f"Warning: fallback fetch for '{term}' also failed: {inner_exc}", err=True)
+                return []
+        records: list[dict] = []
+        for doc in docs:
+            text = (doc.get("text") or "").strip()
+            if not text:
+                continue
+            section_id = term.strip()
+            records.append(
+                {
+                    "id": f"EAR-{section_id}",
+                    "section": section_id,
+                    "span_id": section_id,
+                    "title": doc.get("title"),
+                    "text": text,
+                    "source_url": doc.get("source_url"),
+                    "provider": doc.get("provider", "federalregister.gov"),
+                }
+            )
+        return records
+
+    collected: list[dict] = []
+    if query:
+        collected.extend(_records_for(query))
+    for sec in sections:
+        collected.extend(_records_for(sec))
+
+    if not collected:
+        raise click.ClickException("No records fetched from Federal Register.")
+
+    with out.open("w", encoding="utf-8") as fh:
+        for rec in collected:
+            fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+    click.echo(f"Wrote {len(collected)} records -> {out}")
+
+
+@cli.group()
+def rag_index() -> None:
+    """RAG index maintenance helpers."""
+
+
+@rag_index.command(name="build")
+@click.option(
+    "--input",
+    "input_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="JSONL file containing passages with 'text' and 'section'.",
+)
+@click.option(
+    "--index-path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("data") / "faiss" / "index.faiss",
+    show_default=True,
+    help="Destination FAISS index path.",
+)
+@click.option(
+    "--model-name",
+    type=str,
+    default="all-MiniLM-L12-v2",
+    show_default=True,
+    help="SentenceTransformer model name.",
+)
+@click.option(
+    "--reset/--no-reset",
+    default=True,
+    show_default=True,
+    help="Reset existing index/metadata before building.",
+)
+def rag_index_build(input_path: Path, index_path: Path, model_name: str, reset: bool) -> None:
+    """Build a FAISS index from a JSONL corpus."""
+
+    if reset:
+        index_path.parent.mkdir(parents=True, exist_ok=True)
+        for path in (index_path, index_path.with_suffix(".pkl")):
+            if path.exists():
+                path.unlink()
+
+    docs: list[dict] = []
+    with input_path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                item = json.loads(stripped)
+            except json.JSONDecodeError:
+                continue
+            text = (item.get("text") or item.get("body") or "").strip()
+            if not text:
+                continue
+            docs.append(
+                {
+                    "id": item.get("id") or item.get("section") or item.get("span_id"),
+                    "section": item.get("section"),
+                    "span_id": item.get("span_id"),
+                    "text": text,
+                    "source_url": item.get("source_url"),
+                    "provider": item.get("provider"),
+                    "title": item.get("title"),
+                }
+            )
+
+    if not docs:
+        raise click.ClickException("No documents with text found in input.")
+
+    retriever = Retriever(
+        TradeGovClient(),
+        FederalRegisterClient(),
+        model_name=model_name,
+        index_path=index_path,
+    )
+    retriever.add_documents(docs)
+    click.echo(f"Indexed {len(docs)} documents -> {index_path} (+ metadata {index_path.with_suffix('.pkl')})")
 
 
 def main() -> None:  # pragma: no cover - CLI entrypoint

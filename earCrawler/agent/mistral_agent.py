@@ -189,12 +189,24 @@ class Agent:
                 summarized.append(context)
         return summarized
 
-    def answer(self, query: str, k: int = 5) -> str:
-        contexts = self.retriever.query(query, k=k)
-        contexts = self._filter_contexts(query, contexts)
-        contexts = self._summarize_contexts(contexts)
+    def _prepare_contexts(
+        self, query: str, k: int, contexts: Optional[List[str]] = None
+    ) -> List[str]:
+        base_contexts = contexts if contexts is not None else self.retriever.query(query, k=k)
+        filtered = self._filter_contexts(query, base_contexts)
+        return self._summarize_contexts(filtered)
+
+    def answer_with_contexts(
+        self, query: str, k: int = 5, contexts: Optional[List[str]] = None
+    ) -> tuple[str, List[str]]:
+        contexts = self._prepare_contexts(query, k, contexts)
         prompt = self._build_prompt(query, contexts)
         inputs = self.tokenizer(prompt, return_tensors="pt")
         outputs = self.model.generate(**inputs, max_new_tokens=128)
         text = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
-        return text
+        answer = text[len(prompt) :].strip() or text
+        return answer, contexts
+
+    def answer(self, query: str, k: int = 5) -> str:
+        answer, _ = self.answer_with_contexts(query, k=k)
+        return answer

@@ -10,6 +10,8 @@ from .rag import (
     RagSource,
     RagLineageReference,
     CacheState,
+    RagGeneratedResponse,
+    RetrievedDocument,
 )
 
 __all__ = [
@@ -28,4 +30,6 @@ __all__ = [
     "RagSource",
     "RagLineageReference",
     "CacheState",
+    "RagGeneratedResponse",
+    "RetrievedDocument",
 ]

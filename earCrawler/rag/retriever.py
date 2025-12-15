@@ -194,7 +194,15 @@ class Retriever:
         metadata = self._load_metadata()
         distances, indices = index.search(vector, k)
         results: List[dict] = []
-        for idx in indices[0]:
+        for distance, idx in zip(distances[0], indices[0]):
+            if idx < 0:
+                continue
             if 0 <= idx < len(metadata):
-                results.append(metadata[idx])
+                doc = dict(metadata[idx])
+                if "score" not in doc:
+                    try:
+                        doc["score"] = float(1.0 / (1.0 + float(distance)))
+                    except Exception:
+                        doc["score"] = 0.0
+                results.append(doc)
         return results

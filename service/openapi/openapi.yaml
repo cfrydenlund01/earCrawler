@@ -199,6 +199,65 @@ components:
         include_lineage:
           type: boolean
           default: false
+    RetrievedDocument:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Source identifier
+        score:
+          type: number
+        title:
+          type: string
+        url:
+          type: string
+        section:
+          type: string
+        provider:
+          type: string
+    RagGeneratedResponse:
+      type: object
+      required:
+        [
+          trace_id,
+          latency_ms,
+          question,
+          cache,
+          rag_enabled,
+          mistral_enabled,
+          contexts,
+          retrieved,
+        ]
+      properties:
+        trace_id:
+          type: string
+        latency_ms:
+          type: number
+        question:
+          type: string
+        answer:
+          type: string
+          nullable: true
+        contexts:
+          type: array
+          items:
+            type: string
+        retrieved:
+          type: array
+          items:
+            $ref: '#/components/schemas/RetrievedDocument'
+        model:
+          type: string
+          nullable: true
+        rag_enabled:
+          type: boolean
+        mistral_enabled:
+          type: boolean
+        disabled_reason:
+          type: string
+          nullable: true
+        cache:
+          $ref: '#/components/schemas/CacheState'
     SparqlProxyRequest:
       type: object
       required: [template]
@@ -372,6 +431,37 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RagResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+  /v1/rag/answer:
+    post:
+      summary: Generate an answer using the Mistral RAG agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RagQueryRequest'
+      security:
+        - ApiKey: []
+        - {}
+      responses:
+        '200':
+          description: Generated answer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RagGeneratedResponse'
+        '503':
+          description: RAG or Mistral disabled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RagGeneratedResponse'
         '429':
           description: Rate limit exceeded
           content:

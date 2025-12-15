@@ -140,7 +140,10 @@ def test_query_returns_docs(monkeypatch, tmp_path):
     docs = [{"text": "a"}, {"text": "b"}]
     r.add_documents(docs)
     result = r.query("hi", k=2)
-    assert result == docs[:2]
+    assert result == [
+        {**docs[0], "score": 1.0},
+        {**docs[1], "score": 1.0},
+    ]
 
 
 def test_query_no_index(monkeypatch, tmp_path):

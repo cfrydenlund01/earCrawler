@@ -31,6 +31,8 @@ Research/
 dir-tree*.txt
 EAR_AI_Training_Proposal.docx
 
+# Local LLM secrets
+config/llm_secrets.env
+
 # Agent guidance file
 AGENTS.md
-
