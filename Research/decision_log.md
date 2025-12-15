@@ -94,3 +94,17 @@ Artifacts:
 - docs/api/readme.md (updated)
 - scripts/checksums.ps1 (updated)
 
+## 2025-12-10T21:22:52Z - Phase E baseline (tiny-gpt2) - pass
+Baseline eval runs for ear_compliance.v1, entity_obligations.v1, and unanswerable.v1 using sshleifer/tiny-gpt2; metrics and summaries emitted under dist/eval/.
+Artifacts:
+- dist/eval/ear_compliance.v1.baseline.tiny-gpt2.json (exists)
+- dist/eval/ear_compliance.v1.baseline.tiny-gpt2.md (exists)
+- dist/eval/entity_obligations.v1.baseline.tiny-gpt2.json (exists)
+- dist/eval/entity_obligations.v1.baseline.tiny-gpt2.md (exists)
+- dist/eval/unanswerable.v1.baseline.tiny-gpt2.json (exists)
+- dist/eval/unanswerable.v1.baseline.tiny-gpt2.md (exists)
+Notes:
+- Eval summaries:
+  - [2025-12-10T21:22:04.853044+00:00] dataset=ear_compliance.v1 task=ear_compliance model=sshleifer/tiny-gpt2 accuracy=0.0000 label_accuracy=0.0000 unanswerable_accuracy=0.0000 kg_digest=9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff file=dist\\eval\\ear_compliance.v1.baseline.tiny-gpt2.json
+  - [2025-12-10T21:22:18.086624+00:00] dataset=entity_obligations.v1 task=entity_obligation model=sshleifer/tiny-gpt2 accuracy=0.0000 label_accuracy=0.0000 unanswerable_accuracy=0.0000 kg_digest=9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff file=dist\\eval\\entity_obligations.v1.baseline.tiny-gpt2.json
+  - [2025-12-10T21:22:30.054252+00:00] dataset=unanswerable.v1 task=unanswerable model=sshleifer/tiny-gpt2 accuracy=0.0000 label_accuracy=0.0000 unanswerable_accuracy=0.0000 kg_digest=9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff file=dist\\eval\\unanswerable.v1.baseline.tiny-gpt2.json

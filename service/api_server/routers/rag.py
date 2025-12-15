@@ -4,20 +4,30 @@ import math
 import time
 
 from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
 
 from ..fuseki import FusekiGateway
+from ..mistral_support import MistralService
 from ..schemas import (
     CacheState,
     LineageEdge,
     ProblemDetails,
     RagAnswer,
+    RagGeneratedResponse,
     RagLineageReference,
     RagQueryRequest,
     RagResponse,
+    RetrievedDocument,
     RagSource,
 )
-from ..rag_support import RagQueryCache, RetrieverProtocol
-from .dependencies import get_gateway, get_rag_cache, get_retriever, rate_limit
+from ..rag_support import RagQueryCache, RetrieverProtocol, NullRetriever
+from .dependencies import (
+    get_gateway,
+    get_rag_cache,
+    get_retriever,
+    get_mistral_service,
+    rate_limit,
+)
 
 router = APIRouter(prefix="/v1", tags=["rag"])
 
@@ -135,6 +145,107 @@ def _coerce_score(value: object) -> float:
     if num < 0:
         num = 0.0
     return round(num, 4)
+
+
+def _to_retrieved_document(doc: dict) -> RetrievedDocument:
+    return RetrievedDocument(
+        id=_maybe_str(doc.get("id") or doc.get("entity_id") or doc.get("section")),
+        score=_coerce_score(doc.get("score")),
+        title=_maybe_str(doc.get("title") or doc.get("label")),
+        url=_maybe_str(doc.get("source_url") or doc.get("url")),
+        section=_maybe_str(doc.get("section")),
+        provider=_maybe_str(doc.get("provider")),
+    )
+
+
+@router.post(
+    "/rag/answer",
+    response_model=RagGeneratedResponse,
+    responses={
+        429: {"model": ProblemDetails},
+        503: {"model": RagGeneratedResponse},
+    },
+)
+async def rag_answer(
+    payload: RagQueryRequest,
+    request: Request,
+    retriever: RetrieverProtocol = Depends(get_retriever),
+    cache: RagQueryCache = Depends(get_rag_cache),
+    mistral_service: MistralService | None = Depends(get_mistral_service),
+    _: None = Depends(rate_limit("rag")),
+) -> JSONResponse:
+    start = time.perf_counter()
+    cache_key = payload.cache_key()
+    rag_enabled = not isinstance(retriever, NullRetriever)
+
+    documents: list[dict] = []
+    cache_hit = False
+    expires_at = None
+    if rag_enabled:
+        cached = cache.get(cache_key)
+        cache_hit = cached is not None
+        documents = cached if cache_hit else retriever.query(
+            payload.query, k=payload.top_k
+        )
+        expires_at = cache.expires_at(cache_key) if cache_hit else cache.put(
+            cache_key, documents
+        )
+
+    disabled_reason = None
+    contexts: list[str] = []
+    answer: str | None = None
+    status_code = 200
+    model_label = None
+    mistral_enabled = bool(mistral_service and mistral_service.enabled)
+
+    if not rag_enabled:
+        disabled_reason = "RAG retriever disabled; set EARCRAWLER_API_ENABLE_RAG=1"
+        status_code = 503
+    elif mistral_service is None:
+        disabled_reason = "Mistral agent unavailable"
+        status_code = 503
+    elif not mistral_service.enabled:
+        disabled_reason = mistral_service.disabled_reason or "Mistral agent disabled"
+        status_code = 503
+    else:
+        try:
+            result = mistral_service.generate(
+                payload.query, k=payload.top_k, documents=documents
+            )
+            answer = result.answer
+            contexts = result.contexts
+            model_label = mistral_service.model_label
+            if result.error or not answer:
+                disabled_reason = result.error or "Mistral agent did not return an answer"
+                mistral_enabled = False
+                status_code = 503
+        except Exception as exc:  # pragma: no cover - defensive
+            disabled_reason = str(exc)
+            mistral_enabled = False
+            status_code = 503
+
+    trace_id = getattr(request.state, "trace_id", "")
+    latency_ms = round((time.perf_counter() - start) * 1000, 3)
+    cache_state = CacheState(
+        hit=cache_hit if rag_enabled else False, expires_at=expires_at
+    )
+    retrieved = [_to_retrieved_document(doc) for doc in documents]
+    response = RagGeneratedResponse(
+        trace_id=trace_id,
+        latency_ms=latency_ms,
+        question=payload.query,
+        answer=answer,
+        contexts=contexts,
+        retrieved=retrieved,
+        model=model_label,
+        rag_enabled=rag_enabled,
+        mistral_enabled=mistral_enabled,
+        disabled_reason=disabled_reason,
+        cache=cache_state,
+    )
+    return JSONResponse(
+        status_code=status_code, content=response.model_dump(mode="json")
+    )
 
 
 __all__ = ["router"]

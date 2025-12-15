@@ -5,6 +5,7 @@ from fastapi import Depends, Request
 from ..fuseki import FusekiGateway
 from ..limits import RateLimiter, enforce_rate_limits
 from ..rag_support import RagQueryCache, RetrieverProtocol
+from ..mistral_support import MistralService
 
 
 def get_gateway(request: Request) -> FusekiGateway:
@@ -35,3 +36,7 @@ def get_rag_cache(request: Request) -> RagQueryCache:
 
 def get_retriever(request: Request) -> RetrieverProtocol:
     return request.app.state.rag_retriever
+
+
+def get_mistral_service(request: Request) -> MistralService | None:
+    return getattr(request.app.state, "mistral_service", None)

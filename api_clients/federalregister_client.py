@@ -64,6 +64,9 @@ class FederalRegisterClient:
         self.user_agent = get_secret(
             "FEDERALREGISTER_USER_AGENT", fallback="earCrawler/0.9"
         )
+        base_url_override = os.getenv("FR_BASE_URL")
+        if base_url_override:
+            self.BASE_URL = base_url_override.rstrip("/")
         ttl_env = os.getenv("FR_CACHE_TTL_SECONDS")
         ttl_seconds = int(ttl_env) if ttl_env else None
         max_env = os.getenv("FR_CACHE_MAX_ENTRIES")
@@ -104,11 +107,24 @@ class FederalRegisterClient:
             _logger.error("api.budget_exceeded", url=url, limit=self.request_limit)
             raise
         resp.raise_for_status()
-        if "application/json" not in resp.headers.get("Content-Type", ""):
+        content_type = resp.headers.get("Content-Type", "")
+        if "application/json" not in content_type.lower():
+            # Some FR edges return an HTML anti-bot page (e.g., https://unblock.federalregister.gov)
+            # when the api.* host is blocked. Retry once against the www host if we have not already.
+            alt_host = "https://www.federalregister.gov/api/v1"
+            if not resp.url.startswith(alt_host):
+                alt_url = resp.url.replace("https://api.federalregister.gov/v1", alt_host)
+                _logger.warning(
+                    "api.invalid_content_type_retry",
+                    url=resp.url,
+                    alt_url=alt_url,
+                    content_type=content_type,
+                )
+                return self._get_json(alt_url, params)
             _logger.error(
                 "api.invalid_content_type",
-                url=url,
-                content_type=resp.headers.get("Content-Type", ""),
+                url=resp.url,
+                content_type=content_type,
             )
             raise FederalRegisterError(f"Non-JSON response from FR at {resp.url}")
         try:

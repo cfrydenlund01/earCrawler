@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import logging
 import os
+from pathlib import Path
 from typing import Protocol
 
 logger = logging.getLogger(__name__)
@@ -49,8 +50,18 @@ def load_retriever() -> RetrieverProtocol:
         logger.warning("Failed to import retriever dependencies: %s", exc)
         return NullRetriever()
 
+    index_override = os.getenv("EARCRAWLER_FAISS_INDEX")
+    model_override = os.getenv("EARCRAWLER_FAISS_MODEL")
+    index_path = Path(index_override) if index_override else Path("data") / "faiss" / "index.faiss"
+    model_name = model_override or "all-MiniLM-L12-v2"
+
     try:
-        return Retriever(TradeGovClient(), FederalRegisterClient())
+        return Retriever(
+            TradeGovClient(),
+            FederalRegisterClient(),
+            model_name=model_name,
+            index_path=index_path,
+        )
     except Exception as exc:  # pragma: no cover - heavy deps may fail at runtime
         logger.error("Unable to initialize retriever; falling back to stub: %s", exc)
         return NullRetriever()

@@ -99,6 +99,17 @@ class EarCrawlerApiClient:
         }
         return self._request("POST", "/v1/rag/query", json=payload)
 
+    def rag_answer(
+        self, query: str, *, top_k: int = 3
+    ) -> dict[str, Any]:
+        """Call the ``/v1/rag/answer`` endpoint backed by the Mistral agent."""
+        payload = {
+            "query": query,
+            "top_k": top_k,
+            "include_lineage": False,
+        }
+        return self._request("POST", "/v1/rag/answer", json=payload)
+
     # --------------------------------------------------------------#
     # Resource lifecycle
     def close(self) -> None:

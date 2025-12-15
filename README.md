@@ -130,6 +130,55 @@ Environment variables:
 
 ---
 
+## RAG / Mistral Agent
+
+The Mistral QLoRA agent can answer questions over retrieved EAR/FR passages. Heavy model downloads are opt-in and guarded by environment variables:
+
+```powershell
+$env:EARCTL_USER = 'test_operator'
+$env:EARCRAWLER_API_ENABLE_RAG = '1'
+$env:EARCRAWLER_API_ENABLE_MISTRAL = '1'
+# Optional: override defaults
+# $env:EARCRAWLER_MISTRAL_MODEL = 'mistralai/Mistral-7B-Instruct-v0.2'
+# $env:EARCRAWLER_MISTRAL_USE_4BIT = '0'  # disable 4-bit quantization
+py -m earCrawler.cli api start
+```
+
+Call the agent-backed endpoint:
+
+```powershell
+Invoke-WebRequest `
+  -Uri http://127.0.0.1:9001/v1/rag/answer `
+  -Method Post `
+  -Headers @{'Content-Type'='application/json'} `
+  -Body (@{ query = 'Do laptops to France need a license?'; top_k = 3 } | ConvertTo-Json) |
+  Select-Object -ExpandProperty Content
+```
+
+The response includes `question`, `answer`, `contexts` (the passages passed to the agent), `retrieved` (document metadata), `model`, and flags `rag_enabled` / `mistral_enabled` indicating whether the full stack is active.
+
+---
+
+## RAG + Remote LLM Evaluation
+
+You can score the existing eval datasets (`eval/*.jsonl`) through the RAG pipeline using remote providers (Groq or NVIDIA NIM). Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys in `config/llm_secrets.env` or your environment. The defaults come from `earCrawler/config/llm_secrets.py`, but you can override them if a model is decommissioned (e.g., Groq `mixtral-8x7b-32768`).
+
+Examples:
+
+```powershell
+$env:EARCRAWLER_ENABLE_REMOTE_LLM = '1'
+# Override model if needed (Groq example)
+# $env:GROQ_MODEL = 'llama-3.1-8b-instant'
+
+python scripts/eval/eval_rag_llm.py --dataset-id ear_compliance.v1 --llm-provider groq --llm-model llama-3.1-8b-instant
+python scripts/eval/eval_rag_llm.py --dataset-id entity_obligations.v1 --llm-provider nvidia_nim
+python scripts/eval/eval_rag_llm.py --dataset-id unanswerable.v1 --llm-provider groq --max-items 2
+```
+
+Outputs land under `dist/eval/` with filenames like `<dataset>.rag.<provider>.<model>.json`/`.md`. Metrics include accuracy, label accuracy, unanswerable accuracy, grounded_rate (section overlap), by-task breakdowns, provider/model metadata, and per-item records (with any LLM errors captured without stopping the run).
+
+---
+
 ## Preparing Fuseki & The Knowledge Graph
 
 1. **Ensure Jena is available**  
@@ -294,6 +343,16 @@ These outputs are suitable for CI artefacts and for logging Phase E endpoints in
 | `py -m earCrawler.cli warm-cache` | Primes the Trade.gov cache. |
 | `py -m earCrawler.cli telemetry enable` | Enables local telemetry spooling. |
 | `py -m earCrawler.cli perf ...` | Synthetic dataset generation and latency gates (requires the `perf/` fixtures on disk). |
+| `py -m earCrawler.cli llm ask --llm-provider groq "What does EAR regulate?"` | Run a RAG-backed LLM query (requires `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider keys). |
+
+## Optional LLM Providers (NVIDIA NIM, Groq)
+
+- Create `config/llm_secrets.env` from `config/llm_secrets.example.env` and fill in provider keys/models. The file is git-ignored and only supplements the usual env/Windows Credential Store secrets.
+- Enable remote calls explicitly: `set EARCRAWLER_ENABLE_REMOTE_LLM=1` (default is disabled for CI/offline safety).
+- Choose provider/model per call via CLI (defaults from `config/llm_secrets.env` are typically `GROQ_MODEL=mixtral-8x7b-32768` and `NVIDIA_NIM_MODEL=mistral-7b-instruct-v0.2`):
+  - `py -m earCrawler.cli llm ask --llm-provider groq --llm-model mixtral-8x7b-32768 "Can ACME export laptops to France?"`
+  - `py -m earCrawler.cli llm ask --llm-provider nvidia_nim --llm-model mistral-7b-instruct-v0.2 "Are Huawei exports restricted under EAR?"`
+- Requests use OpenAI-style `/chat/completions` endpoints with soft call budgets (configure with `LLM_MAX_CALLS` or `LLM_<PROVIDER>_MAX_CALLS`).
 
 Run `py -m earCrawler.cli COMMAND --help` for detailed options.
 

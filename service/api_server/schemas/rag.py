@@ -62,3 +62,45 @@ class RagResponse(BaseModel):
     query: str
     cache: CacheState
     results: List[RagAnswer]
+
+
+class RetrievedDocument(BaseModel):
+    id: Optional[str] = Field(default=None, description="Source identifier")
+    score: Optional[float] = Field(default=None, description="Retriever score")
+    title: Optional[str] = Field(default=None, description="Document title")
+    url: Optional[str] = Field(default=None, description="Canonical URL")
+    section: Optional[str] = Field(default=None, description="Section/citation")
+    provider: Optional[str] = Field(default=None, description="Upstream provider")
+
+
+class RagGeneratedResponse(BaseModel):
+    trace_id: str = Field(..., description="Trace identifier for correlating logs")
+    latency_ms: float = Field(..., description="Measured latency for the request")
+    question: str = Field(..., description="Original user query")
+    answer: Optional[str] = Field(
+        default=None, description="Generated answer from the Mistral agent"
+    )
+    contexts: List[str] = Field(
+        default_factory=list,
+        description="Plain-text contexts passed to the Mistral agent",
+    )
+    retrieved: List[RetrievedDocument] = Field(
+        default_factory=list,
+        description="Raw retrieval metadata for transparency",
+    )
+    model: Optional[str] = Field(
+        default=None, description="Model identifier used for generation"
+    )
+    rag_enabled: bool = Field(
+        ...,
+        description="True when FAISS/SentenceTransformers RAG is enabled",
+    )
+    mistral_enabled: bool = Field(
+        ...,
+        description="True when the Mistral agent is loaded and ready",
+    )
+    disabled_reason: Optional[str] = Field(
+        default=None,
+        description="Reason when rag_enabled or mistral_enabled are false",
+    )
+    cache: CacheState

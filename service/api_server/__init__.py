@@ -74,6 +74,7 @@ def create_app(
     fuseki_client: Optional[FusekiClient] = None,
     retriever: Optional[RetrieverProtocol] = None,
     rag_cache: Optional[RagQueryCache] = None,
+    mistral_service: Optional[object] = None,
 ) -> FastAPI:
     settings = settings or ApiSettings.from_env()
     registry = registry or TemplateRegistry.load_default()
@@ -193,6 +194,15 @@ def create_app(
     app.state.request_logger = json_logger
     app.state.rag_cache = rag_cache or RagQueryCache()
     app.state.rag_retriever = retriever or load_retriever()
+    if mistral_service is None:
+        try:
+            from .mistral_support import load_mistral_service
+        except Exception:  # pragma: no cover - optional heavy import
+            app.state.mistral_service = None
+        else:
+            app.state.mistral_service = load_mistral_service(app.state.rag_retriever)
+    else:
+        app.state.mistral_service = mistral_service
 
     router = build_router()
     app.include_router(router)

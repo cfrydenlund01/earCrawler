@@ -5,11 +5,14 @@ from __future__ import annotations
 from pathlib import Path
 import hashlib
 import json
+import logging
 import os
 import shutil
 import urllib.request
 import zipfile
 from urllib.error import HTTPError
+
+logger = logging.getLogger(__name__)
 
 
 def get_fuseki_home(root: Path = Path(".")) -> Path:
@@ -47,8 +50,13 @@ def ensure_fuseki(download: bool = True, version: str | None = None) -> Path:
         env_home = Path(env_override).expanduser()
         if _valid_install(env_home):
             return env_home
-        raise RuntimeError(
-            "FUSEKI_HOME is set but does not look like a valid Apache Jena Fuseki installation"
+        if not download:
+            raise RuntimeError(
+                "FUSEKI_HOME is set but does not look like a valid Apache Jena Fuseki installation"
+            )
+        logger.warning(
+            "FUSEKI_HOME is set but invalid; falling back to managed download (%s)",
+            env_home,
         )
 
     versions = _load_versions(root)
