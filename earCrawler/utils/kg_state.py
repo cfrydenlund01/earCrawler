@@ -21,6 +21,8 @@ INCLUDE_GLOBS = [
 ]
 
 EXCLUDE_GLOBS = [
+    "**/__pycache__/**",
+    "**/*.pyc",
     "kg/prov/**",
     "kg/.kgstate/**",
     "kg/snapshots/**",

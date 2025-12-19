@@ -3,6 +3,9 @@ param(
     [string]$OutputDir = "kg/canonical"
 )
 
+# Write UTF-8 without BOM for stable, cross-shell outputs.
+$utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
 # Ensure output directory
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 New-Item -ItemType Directory -Force -Path (Join-Path $OutputDir 'snapshots') | Out-Null
@@ -32,9 +35,12 @@ function ConvertTo-CanonicalJson($obj) {
 # Sort dataset.nq if present
 $datasetSrc = Join-Path $SnapshotDir 'dataset.nq'
 if (Test-Path $datasetSrc) {
-    $lines = Get-Content $datasetSrc | Sort-Object
+    $lines = Get-Content $datasetSrc
+    if ($lines) {
+        [Array]::Sort($lines, [System.StringComparer]::Ordinal)
+    }
     $datasetDest = Join-Path $OutputDir 'dataset.nq'
-    $lines | Set-Content -Path $datasetDest -Encoding utf8
+    [IO.File]::WriteAllLines($datasetDest, $lines, $utf8NoBom)
 }
 
 # Normalize JSON snapshots
@@ -46,7 +52,8 @@ Get-ChildItem -Path $SnapshotDir -Filter *.srj -Recurse | ForEach-Object {
     New-Item -ItemType Directory -Force -Path $destDir | Out-Null
     $json = Get-Content $_.FullName -Raw | ConvertFrom-Json -AsHashtable
     $canon = ConvertTo-CanonicalJson $json
-    $canon | ConvertTo-Json -Depth 100 | Set-Content -Path $dest -Encoding utf8
+    $payload = $canon | ConvertTo-Json -Depth 100
+    [IO.File]::WriteAllText($dest, $payload, $utf8NoBom)
 }
 
 # versions.json with tool hash
@@ -55,7 +62,8 @@ if (Test-Path $toolsPath) {
     $hash = (Get-FileHash $toolsPath -Algorithm SHA256).Hash.ToLower()
     $tools = Get-Content $toolsPath -Raw | ConvertFrom-Json
     $versions = [ordered]@{ tools = $tools; tools_sha256 = $hash }
-    $versions | ConvertTo-Json -Depth 10 | Set-Content -Path (Join-Path $OutputDir 'versions.json') -Encoding utf8
+    $payload = $versions | ConvertTo-Json -Depth 10
+    [IO.File]::WriteAllText((Join-Path $OutputDir 'versions.json'), $payload, $utf8NoBom)
 }
 
 # Set fixed timestamps

@@ -4,9 +4,9 @@
   "results": {
     "bindings": [
       { 
-        "s": { "type": "bnode" , "value": "b0" } ,
-        "p": { "type": "uri" , "value": "http://www.w3.org/ns/shacl#minCount" } ,
-        "o": { "type": "literal" , "datatype": "http://www.w3.org/2001/XMLSchema#integer" , "value": "1" }
+        "s": { "type": "uri" , "value": "http://example.org/ear/Case" } ,
+        "p": { "type": "uri" , "value": "http://www.w3.org/1999/02/22-rdf-syntax-ns#type" } ,
+        "o": { "type": "uri" , "value": "http://www.w3.org/2000/01/rdf-schema#Class" }
       }
     ]
   }

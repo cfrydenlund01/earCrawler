@@ -1,0 +1,112 @@
+{
+  "EAR-736.2(b)": {
+    "label_hints": [
+      "https://example.org/ear#exception/740_1",
+      "https://example.org/ear#exception/740_9_a_2",
+      "https://example.org/ear#obligation/license_required_742_4_a_1",
+      "https://example.org/ear#obligation/license_required_744_6_b_3",
+      "https://example.org/ear#obligation/license_required_746_4_a",
+      "path:acme_all_to_NK_v1",
+      "path:acme_hpc_to_CN_obligation_chain_v1",
+      "path:acme_laptop_to_FR_exception_v1"
+    ],
+    "related_sections": [
+      "EAR-736"
+    ],
+    "source": "https://www.federalregister.gov/documents/2024/12/13/2024-29187/order-renewing-temporary-denial-of-export-privileges-siberian-airlinesdba-s7-airlines",
+    "text": "R e g u l a t i o n s   b y   o p e r a t i n g   m u l t i p l e   a i r c r a f t   s u b j e c t   t o   t h e   E A R   a n d   c l a s s i f i e d   u n d e r   E C C N   9 A 9 9 1 . < s p a n   c l a s s = \" m a t c h \" > b < / s p a n >   o n   f l i g h t s   i n t o   R u s s i a   a f t e r   M a r c h   2 , ",
+    "title": "Order Renewing Temporary Denial of Export Privileges: Siberian Airlinesd/b/a S7 Airlines"
+  },
+  "EAR-740.1": {
+    "label_hints": [
+      "https://example.org/ear#exception/740_1",
+      "https://example.org/ear#exception/740_9_a_2",
+      "https://example.org/ear#obligation/license_required_742_4_a_1",
+      "https://example.org/ear#obligation/license_required_744_6_b_3",
+      "https://example.org/ear#obligation/license_required_746_4_a",
+      "path:acme_all_to_NK_v1",
+      "path:acme_hpc_to_CN_obligation_chain_v1",
+      "path:acme_laptop_to_FR_exception_v1"
+    ],
+    "related_sections": [
+      "EAR-740",
+      "EAR-740.9(a)(2)"
+    ],
+    "source": "https://www.federalregister.gov/documents/2023/12/08/2023-26681/proposed-enhancements-and-simplification-of-license-exception-strategic-trade-authorization-sta",
+    "text": "In this rulemaking, the Bureau of Industry and Security (BIS) proposes revising License Exception Strategic Trade Authorization (STA) under the Export Administration Regulations (EAR). The purpose of these changes is to encourage additional use of License Exception STA for ally and partner countries. BIS proposes speci",
+    "title": "Proposed Enhancements and Simplification of License Exception Strategic Trade Authorization (STA)"
+  },
+  "EAR-740.9(a)(2)": {
+    "label_hints": [
+      "https://example.org/ear#exception/740_1",
+      "https://example.org/ear#exception/740_9_a_2",
+      "https://example.org/ear#obligation/license_required_742_4_a_1",
+      "https://example.org/ear#obligation/license_required_744_6_b_3",
+      "https://example.org/ear#obligation/license_required_746_4_a",
+      "path:acme_all_to_NK_v1",
+      "path:acme_hpc_to_CN_obligation_chain_v1",
+      "path:acme_laptop_to_FR_exception_v1"
+    ],
+    "related_sections": [
+      "EAR-740",
+      "EAR-740.1"
+    ],
+    "source": "https://www.federalregister.gov/documents/2025/09/02/2025-16724/relaxing-export-controls-for-syria",
+    "text": "In this final rule, the Bureau of Industry and Security (BIS) makes changes to the Syria export control measures under the Export Administration Regulations (EAR), consistent with Executive Order (E.O.) 14312, Providing for the Revocation of Syria Sanctions, which directed the removal of sanctions on Syria. This final ",
+    "title": "Relaxing Export Controls for Syria"
+  },
+  "EAR-742.4(a)(1)": {
+    "label_hints": [
+      "https://example.org/ear#exception/740_1",
+      "https://example.org/ear#exception/740_9_a_2",
+      "https://example.org/ear#obligation/license_required_742_4_a_1",
+      "https://example.org/ear#obligation/license_required_744_6_b_3",
+      "https://example.org/ear#obligation/license_required_746_4_a",
+      "path:acme_all_to_NK_v1",
+      "path:acme_hpc_to_CN_obligation_chain_v1",
+      "path:acme_laptop_to_FR_exception_v1"
+    ],
+    "related_sections": [
+      "EAR-742"
+    ],
+    "source": "https://www.federalregister.gov/documents/2024/12/27/2024-30723/commerce-control-list-additions-and-revisions-implementation-of-controls-on-advanced-technologies",
+    "text": "On September 6, 2024, BIS published in the Federal Register an interim final rule entitled \"Commerce Control List Additions and Revisions; Implementation of Controls on Advanced Technologies Consistent with Controls Implemented by International Partners\" (RIN 0694-AJ60) that contained inadvertent errors. This rule corr",
+    "title": "Commerce Control List Additions and Revisions; Implementation of Controls on Advanced Technologies Consistent With Controls Implemented by International Partners; Correction"
+  },
+  "EAR-744.6(b)(3)": {
+    "label_hints": [
+      "https://example.org/ear#exception/740_1",
+      "https://example.org/ear#exception/740_9_a_2",
+      "https://example.org/ear#obligation/license_required_742_4_a_1",
+      "https://example.org/ear#obligation/license_required_744_6_b_3",
+      "https://example.org/ear#obligation/license_required_746_4_a",
+      "path:acme_all_to_NK_v1",
+      "path:acme_hpc_to_CN_obligation_chain_v1",
+      "path:acme_laptop_to_FR_exception_v1"
+    ],
+    "related_sections": [
+      "EAR-744"
+    ],
+    "source": "https://www.federalregister.gov/documents/2024/07/29/2024-16496/end-use-and-end-user-based-export-controls-including-us-persons-activities-controls-military-and",
+    "text": "The Department of Commerce, Bureau of Industry and Security (BIS), seeks public comment on proposed changes to existing restrictions under the Export Administration Regulations (EAR) on military and intelligence end uses and end users and related U.S. persons activities controls, as well as the proposed addition of a m",
+    "title": "End-Use and End-User Based Export Controls, Including U.S. Persons Activities Controls: Military and Intelligence End Uses and End Users"
+  },
+  "EAR-746.4(a)": {
+    "label_hints": [
+      "https://example.org/ear#exception/740_1",
+      "https://example.org/ear#exception/740_9_a_2",
+      "https://example.org/ear#obligation/license_required_742_4_a_1",
+      "https://example.org/ear#obligation/license_required_744_6_b_3",
+      "https://example.org/ear#obligation/license_required_746_4_a",
+      "path:acme_all_to_NK_v1",
+      "path:acme_hpc_to_CN_obligation_chain_v1",
+      "path:acme_laptop_to_FR_exception_v1"
+    ],
+    "related_sections": [
+      "EAR-746"
+    ],
+    "source": "https://www.federalregister.gov/documents/2024/02/16/2024-03255/north-korea-sanctions-regulations",
+    "text": "The Department of the Treasury's Office of Foreign Assets Control (OFAC) is amending the North Korea Sanctions Regulations to modify a general license that authorizes certain transactions in support of specified humanitarian activities of nongovernmental organizations. Additionally, OFAC is adding general licenses to a",
+    "title": "North Korea Sanctions Regulations"
+  }
+}

@@ -49,6 +49,14 @@ jobs:
         run: python -m earCrawler.pipelines.build_ttl
       - name: SHACL gate on bundle
         run: python -m earCrawler.validation.validate_shapes
+      - name: Phase B baseline drift gate
+        shell: pwsh
+        run: |
+          kg/scripts/phase-b-freeze.ps1
+          git diff --exit-code -- kg/baseline
+      - name: Phase B determinism check
+        shell: pwsh
+        run: scripts/rebuild-compare.ps1 -Version ci
       - name: Conditional Fuseki load (skipped in CI)
         run: echo "Skipping network load in CI"
 
