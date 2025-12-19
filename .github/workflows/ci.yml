@@ -45,6 +45,13 @@ jobs:
       - name: Tests
         run: pytest -q --disable-warnings --maxfail=1
 
+      - name: Corpus determinism gate (offline fixtures)
+        shell: pwsh
+        env:
+          EARCTL_USER: test_operator
+          SOURCE_DATE_EPOCH: "946684800"
+        run: pwsh scripts/ci-corpus-determinism.ps1
+
       - name: Build TTL bundle
         run: python -m earCrawler.pipelines.build_ttl
       - name: SHACL gate on bundle
