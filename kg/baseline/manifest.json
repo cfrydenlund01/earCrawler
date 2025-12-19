@@ -1,0 +1,89 @@
+{
+  "files": [
+    {
+      "path": "kg\\baseline\\dataset.nq",
+      "size": 10,
+      "sha256": "448c27372401805b602cd0488d6946e2bc9900a68e51e150963943391c0b70f1"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\classes_count.srj",
+      "size": 233,
+      "sha256": "17bd1377e9e7f8e279b570912c8c30fa8782464c7e214a473285c85ccac9cf82"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\infer_domain_range_ask.srj",
+      "size": 39,
+      "sha256": "0c9e39249b525f1025d635d61bd42036050e039da1004b2ae91b84ab95a8fb6d"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\infer_equivalence_ask.srj",
+      "size": 39,
+      "sha256": "0c9e39249b525f1025d635d61bd42036050e039da1004b2ae91b84ab95a8fb6d"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\infer_report_select.srj",
+      "size": 83,
+      "sha256": "e6cac463f0333f9c9351fa6327f6799430878567fe4498907061f37910d17185"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\infer_subclass_ask.srj",
+      "size": 39,
+      "sha256": "0c9e39249b525f1025d635d61bd42036050e039da1004b2ae91b84ab95a8fb6d"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\lineage_activity_integrity.srj",
+      "size": 39,
+      "sha256": "0c9e39249b525f1025d635d61bd42036050e039da1004b2ae91b84ab95a8fb6d"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\lineage_min_required.srj",
+      "size": 229,
+      "sha256": "d8eb2fc5d55c59abc15289976bfe8aa28637e8eb418599597d6bd1537b0f907a"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\lineage_source_consistency.srj",
+      "size": 153,
+      "sha256": "005fcb04145999dddd5f1b6e9778ae4ba4dfa888de0071aa315529d2918663a1"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\reasoner_ask_domain_range.srj",
+      "size": 39,
+      "sha256": "0c9e39249b525f1025d635d61bd42036050e039da1004b2ae91b84ab95a8fb6d"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\reasoner_ask_equivalence.srj",
+      "size": 39,
+      "sha256": "0c9e39249b525f1025d635d61bd42036050e039da1004b2ae91b84ab95a8fb6d"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\reasoner_ask_subclass.srj",
+      "size": 39,
+      "sha256": "0c9e39249b525f1025d635d61bd42036050e039da1004b2ae91b84ab95a8fb6d"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\reconcile_collisions.srj",
+      "size": 85,
+      "sha256": "30edb3f48bcce28c457e6fbf7e20019b1a2807986ad57670abfc1106aebbb2ae"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\reconcile_unmerged_duplicates.srj",
+      "size": 83,
+      "sha256": "e6cac463f0333f9c9351fa6327f6799430878567fe4498907061f37910d17185"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\sample.srj",
+      "size": 25,
+      "sha256": "c3ae8967f754a620d8c143be160e97b190a4215025365257f14ddab363bcb3c5"
+    },
+    {
+      "path": "kg\\baseline\\snapshots\\smoke.srj",
+      "size": 449,
+      "sha256": "0721da866cb4d6a4f8f659ed7cc3ddd3359913981b711247c6429f3c4bb8a50a"
+    },
+    {
+      "path": "kg\\baseline\\versions.json",
+      "size": 619,
+      "sha256": "4cd76860f0d0c7b807eaf6b00b6ca8bc95affbfd53299bdbeb3fbfc255fbace2"
+    }
+  ]
+}

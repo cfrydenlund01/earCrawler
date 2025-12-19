@@ -12,6 +12,8 @@ build/
 kg/.kgstate/
 kg/canonical/*
 !kg/canonical/aliases.json
+# KG baseline (tracked, deterministic artifacts)
+!kg/baseline/**
 kg/delta/
 kg/reconcile/decisions.jsonl.gz
 kg/reconcile/idmap.csv

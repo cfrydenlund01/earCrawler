@@ -1,0 +1,141 @@
+I am now working on a different computer, and can't see my tasks. The last task was to create a small manifest.json. The task was completed. Summarize the latest completion and give me the next steps.
+
+
+
+I am now working on a different computer, and can't see my tasks. The last task was to create a small manifest.json. The task was completed. Summarize the latest completion and give me the next steps.
+
+
+You now have a minimal export manifest wired in: earCrawler.kg.export_profiles.export_profiles() (exposed via py -m earCrawler.cli bundle export-profiles) writes four artifacts (TTL, NT, and their .gz variants) plus a small manifest.json and matching checksums.sha256 in the same schema as the example at demo/bundle/manifest.json.
+
+Next steps:
+
+Run a real export from kg/ear.ttl with py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem dataset and confirm manifest.json and checksums.sha256 look correct.
+Plug manifest.json into your downstream ingestion/integrity checks (e.g., have the integrity gate or job scripts verify hashes/sizes before models consume the files).
+Update RUNBOOK.md/internal docs to reference the new export+manifest flow and how to regenerate/verify it from a clean checkout.
+I don't have an ear.ttl yet. Should I use the api to get 744, since I used Part 744 for the jsonl documents in eval/
+
+
+You don’t get ear.ttl from the API facade (py -m earCrawler.cli api start) — that API sits on top of a KG you already loaded. kg/ear.ttl is produced by the crawler/emit pipeline, not fetched.
+
+Given your evals are about Part 744, a good next step is to build a small EAR graph seeded with 744-focused text:
+
+Set an operator identity (once per shell):
+$env:EARCTL_USER = 'test_operator'
+Fetch EAR text that mentions Part 744 from the Federal Register:
+py -m earCrawler.cli fetch-ear --term "15 CFR Part 744" --out-dir kg/source/ear
+This writes kg/source/ear/ear_corpus.jsonl.
+Emit kg/ear.ttl from that corpus:
+py -m earCrawler.cli kg-emit --sources ear --in kg/source/ear --out kg
+After this you’ll have kg/ear.ttl aligned (roughly) with the 744 content you just fetched.
+Then you can either:
+
+Load it into Fuseki and hit it via the API:
+py -m earCrawler.cli kg-load --ttl kg\ear.ttl --db db
+py -m earCrawler.cli kg-serve --db db --dataset /ear
+py -m earCrawler.cli api start
+Or export profiles for the model side:
+py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem dataset
+So: yes, you should call into the Federal Register client (via fetch-ear) with a 744-focused term to get a minimal EAR corpus, then emit kg/ear.ttl from that, rather than expecting the API facade to hand you ear.ttl directly.
+
+(.venv) PS D:\AI\earCrawler> py -m earCrawler.cli fetch-ear --term "15 CFR Part 744" --out-dir kg/source/ear
+
+{"details":{"user_agent":"earCrawler[path]"},"event":"api.client.init","level":"INFO","service":"federalregister-client","ts":"2025-11-24T20:55:13.349363+00:00"}
+{"details":{"params":{"conditions[term]":"15 CFR Part 744","per_page":"1"},"url":"https:[path]"},"event":"api.request","level":"INFO","service":"federalregister-client","ts":"2025-11-24T20:55:13.350329+00:00"}
+{"details":{"content_type":"text[path] charset=utf-8","url":"https:[path]"},"event":"api.invalid_content_type","level":"ERROR","service":"federalregister-client","ts":"2025-11-24T20:55:14.196952+00:00"}
+Traceback (most recent call last):
+File "<frozen runpy>", line 198, in run_module_as_main
+File "<frozen runpy>", line 88, in run_code
+File "D:\AI\earCrawler\earCrawler\cli_main.py", line 433, in <module>
+main()
+File "D:\AI\earCrawler\earCrawler\cli_main.py", line 429, in main
+cli()
+File "D:\AI\earCrawler.venv\Lib\site-packages\click\core.py", line 1442, in call
+return self.main(*args, **kwargs)
+^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler.venv\Lib\site-packages\click\core.py", line 1363, in main
+rv = self.invoke(ctx)
+^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler.venv\Lib\site-packages\click\core.py", line 1830, in invoke
+return process_result(sub_ctx.command.invoke(sub_ctx))
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler.venv\Lib\site-packages\click\core.py", line 1226, in invoke
+return ctx.invoke(self.callback, **ctx.params)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler.venv\Lib\site-packages\click\core.py", line 794, in invoke
+return callback(*args, **kwargs)
+^^^^^^^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler\earCrawler\cli\ear_fetch.py", line 37, in fetch_ear
+fetch_ear_corpus(term, client=client, out_dir=out_dir)
+File "D:\AI\earCrawler\earCrawler\kg\emit_ear.py", line 33, in fetch_ear_corpus
+articles = client.get_ear_articles(term_or_citation, per_page=1)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler\api_clients\federalregister_client.py", line 135, in get_ear_articles
+data = self.get_json(url, params)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler.venv\Lib\site-packages\tenacity_init.py", line 289, in wrapped_f
+return self(f, *args, **kw)
+^^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler.venv\Lib\site-packages\tenacity_init.py", line 379, in call
+do = self.iter(retry_state=retry_state)
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler.venv\Lib\site-packages\tenacity_init_.py", line 314, in iter
+return fut.result()
+^^^^^^^^^^^^
+File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\concurrent\futures_base.py", line 449, in result
+return self.__get_result()
+^^^^^^^^^^^^^^^^^^^
+File "C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.12_3.12.2800.0_x64__qbz5n2kfra8p0\Lib\concurrent\futures_base.py", line 401, in __get_result
+raise self.exception
+File "D:\AI\earCrawler.venv\Lib\site-packages\tenacity_init.py", line 382, in call
+result = fn(*args, **kwargs)
+^^^^^^^^^^^^^^^^^^^
+File "D:\AI\earCrawler\api_clients\federalregister_client.py", line 113, in _get_json
+raise FederalRegisterError(f"Non-JSON response from FR at {resp.url}")
+api_clients.federalregister_client.FederalRegisterError: Non-JSON response from FR at https://unblock.federalregister.gov
+
+
+The fetch failed because Federal Register returned an HTML “unblock” page (api.invalid_content_type), not JSON—likely their bot filter didn’t like our default UA. Two options:
+
+Try again with a browsery User-Agent so the client gets JSON:
+$env:FEDERALREGISTER_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) earCrawler/0.9'
+py -m earCrawler.cli fetch-ear --term "15 CFR Part 744" --out-dir kg/source/ear
+py -m earCrawler.cli kg-emit --sources ear --in kg/source/ear --out kg
+That should produce kg/ear.ttl.
+
+If the API stays blocked or you just want a seed ear.ttl for 744, create a tiny corpus manually and emit:
+@'
+{"sha256":"testhash1","source_url":"https://example.gov/fr/744","date":"2024-01-01","id":"2024-00001","section":"1","text":"Part 744 applies to end-user and end-use controls."}
+'@ | Set-Content -Encoding utf8 kg/source/ear/ear_corpus.jsonl
+py -m earCrawler.cli kg-emit --sources ear --in kg/source/ear --out kg
+Then export profiles if needed:
+
+py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem dataset
+If you still see HTML responses after setting the UA, let me know and we can add a fallback scraper or adjust the client to follow the unblock flow.
+
+Look like the data populated in dist/exports. Check to ensure the output is consistant with the projected output.
+
+
+Everything in dist/exports matches the documented/exported shape:
+
+Files present are exactly the expected set from the RUNBOOK: dataset.ttl, dataset.nt, dataset.ttl.gz, dataset.nt.gz, manifest.json, checksums.sha256.
+manifest.json has one entry per artifact keyed by filename, each with size and sha256; I recomputed the hashes/sizes and all four entries match the actual files.
+checksums.sha256 contains one line per artifact with the same SHA-256 values as in manifest.json, and the lines are sorted.
+So your export in dist/exports is consistent with the projected output and the implementation of export_profiles.
+
+What are the next steps for research and this project?
+
+
+Research next steps
+
+Clarify 2–3 concrete research questions (e.g., “Does KG+FR context reduce hallucinations for Part 744 export-control questions vs text-only RAG?”).
+Build a real eval set in eval/ anchored on Part 744 (and maybe a second part), with: question, authoritative answer text, citation(s) into EAR/FR, and category (classification, hypothetical scenario, edge case, etc.).
+Design ablation experiments: (a) FR text only vs FR+KG; (b) with vs without provenance; (c) API-only vs offline bundle, and define simple metrics (exact match / F1 + a graded “safety/accuracy” rubric).
+Catalog failure modes (missing citation, wrong part, overconfident hallucination) from a small pilot run and turn those into targeted scenarios for future experiments.
+Project next steps
+
+Stabilize EAR ingestion: fix the Federal Register API path (user agent / unblock issue) or generate a small frozen EAR corpus for parts 744/736 and keep it under kg/source/ear for reproducible runs.
+Produce and adopt a canonical kg/ear.ttl (or kg/ear_triples.ttl), load it into Fuseki (kg-load + kg-serve), and confirm that the API facade (py -m earCrawler.cli api start) can answer basic Part 744 queries.
+Build a minimal end-to-end “answerer” script: given a question (or CSL/PDF-derived variables), run SPARQL over the KG + FR anchors, assemble a prompt (with citations) for Legal-BERT/Mistral, and emit an HTML-ready JSON payload.
+Hook the export bundle you just validated into that script (read from dist/exports/dataset.* and manifest.json instead of live Fuseki), so you have an air-gapped, fully deterministic path for experiments.
+Expand observability for this pipeline: log each run (question, retrieved IRIs, FR docs, model outputs, scores) under run/logs/ so you can later mine it for error analysis and paper figures.
+If you’d like, next I can sketch that minimal “answerer” script wired to your dist/exports bundle and an API/LLM stub so you can start running pilot questions.

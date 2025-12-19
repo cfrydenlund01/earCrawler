@@ -160,6 +160,28 @@ Properties: `ear:hasSection`, `ear:hasParagraph`, `ear:cites`, `dct:source`, `dc
 - Schema and SHACL shapes are frozen at **v1.0.0** (`earCrawler.kg.ontology.KG_SCHEMA_VERSION`) with matching metadata embedded at the head of `earCrawler/kg/shapes.ttl` and `earCrawler/kg/shapes_prov.ttl`.
 - Deterministic export hashes for `kg/ear.ttl` live in `kg/ear_export_manifest.json`. Regenerate with `py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem ear` and update the manifest intentionally when the ontology changes.
 
+### Phase B Baseline Freeze & Drift Gate
+- The canonical KG baseline is tracked under `kg/baseline` (dataset + SRJ snapshots + manifest/checksums). It is intentionally minimal to avoid large binaries while still detecting KG drift.
+- Baseline regeneration is deterministic given the same inputs and `SOURCE_DATE_EPOCH` (default `946684800`).
+- CI enforces no drift by rebuilding the baseline and running `git diff --exit-code -- kg/baseline`, plus a separate determinism check that rebuilds twice.
+
+Regenerate/update the baseline intentionally:
+```powershell
+pwsh kg/scripts/phase-b-freeze.ps1
+git diff -- kg/baseline
+```
+
+Verify the baseline is locked (no drift):
+```powershell
+pwsh kg/scripts/phase-b-freeze.ps1
+git diff --exit-code -- kg/baseline
+```
+
+Run the determinism check locally:
+```powershell
+pwsh scripts/rebuild-compare.ps1 -Version ci
+```
+
 ### Warmers & budgets
 - `perf/warmers/warm_queries.json` primes lookup, aggregation, and join query groups (each query carries a `# @group` comment).
 - Run `pwsh kg/scripts/cache-warm.ps1` against a Fuseki endpoint before collecting performance reports so that the budgets in `perf/config/perf_budgets.yml` see warm caches.
