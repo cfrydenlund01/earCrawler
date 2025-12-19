@@ -139,6 +139,8 @@ Use the Windows `py` launcher so paths resolve correctly on PowerShell:
 - Use `--live` during scheduled jobs to hit production sources; fixture runs keep CI deterministic.
 - Outputs land under `data\*_corpus.jsonl`, `data\manifest.json`, and `data\checksums.sha256` and are stable across reruns with the same inputs.
 - These commands require the `operator` (or `maintainer`) role defined in `security\policy.yml`; set `EARCTL_USER=test_operator` during local testing if needed.
+- Routine verification (byte-for-byte determinism + provenance validation) is enforced by `scripts/ci-corpus-determinism.ps1` and runs in CI.
+  - Local: `pwsh scripts/ci-corpus-determinism.ps1`
 
 ## Reporting
 Generate analytics over stored corpora:

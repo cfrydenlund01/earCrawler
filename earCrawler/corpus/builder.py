@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import shutil
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -38,6 +39,14 @@ class DocMeta:
 
 
 def _now() -> datetime:
+    epoch = os.getenv("SOURCE_DATE_EPOCH")
+    if epoch:
+        try:
+            return datetime.fromtimestamp(int(epoch), tz=timezone.utc).replace(
+                microsecond=0
+            )
+        except (TypeError, ValueError, OSError):
+            pass
     return datetime.now(timezone.utc).replace(microsecond=0)
 
 
@@ -498,7 +507,7 @@ def _write_records(path: Path, records: Sequence[dict]) -> None:
         ),
     )
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
+    with path.open("w", encoding="utf-8", newline="\n") as handle:
         for record in ordered:
             handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
 
@@ -544,13 +553,15 @@ def _write_manifest(out_dir: Path) -> dict:
             }
         )
     manifest_path = out_dir / "manifest.json"
-    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    with manifest_path.open("w", encoding="utf-8", newline="\n") as handle:
+        handle.write(json.dumps(manifest, indent=2) + "\n")
     checksum_items = [(fp.name, _file_sha256(fp)) for fp in corpus_files]
     checksum_items.append(("manifest.json", _file_sha256(manifest_path)))
     checksum_lines = (
         "\n".join(f"{sha}  {name}" for name, sha in sorted(checksum_items)) + "\n"
     )
-    (out_dir / "checksums.sha256").write_text(checksum_lines, encoding="utf-8")
+    with (out_dir / "checksums.sha256").open("w", encoding="utf-8", newline="\n") as h:
+        h.write(checksum_lines)
     return manifest
 
 
