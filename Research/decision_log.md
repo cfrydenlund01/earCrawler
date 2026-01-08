@@ -214,3 +214,14 @@ Implications / next steps before a 100-QA CLI test:
 - Add timeouts + retry policy for remote calls and classify failures separately from model errors (so “API outage” doesn’t look like “model wrong”).
 - Freeze the evaluation contract: pin provider/model, retrieval params, and dataset/KG digest; store these in the emitted metadata and in the CI job output.
 
+## 2026-01-08T21:58:00Z - Eval v2 datasets - pass
+Added ear_compliance.v2 (100 items), entity_obligations.v2 (100 items), and unanswerable.v2 (20 items); updated eval/manifest.json references for new kg_nodes and kg_paths; validated datasets (eval/validate_datasets.py) and evidence alignment (earCrawler.cli eval verify-evidence) with 0 missing; pytest subset passed.
+Artifacts:
+- eval/ear_compliance.v2.jsonl (exists)
+- eval/entity_obligations.v2.jsonl (exists)
+- eval/unanswerable.v2.jsonl (exists)
+- eval/manifest.json (exists)
+- dist/eval/evidence_report.json (exists)
+- data/kg_expansion.json (exists)
+Env: {"dal": "false", "platform": "nt", "system": "Windows_NT", "tacc": "false", "windows": "true"}
+
