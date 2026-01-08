@@ -468,7 +468,7 @@ def eval_group() -> None:
     help="Where to write the evidence resolution report.",
 )
 def eval_verify_evidence(manifest: Path, corpus: Path, dataset_id: str, out: Path) -> None:
-    """Gate eval datasets by verifying evidence ⇄ corpus alignment."""
+    """Gate eval datasets by verifying evidence <-> corpus alignment."""
 
     try:
         manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
