@@ -151,7 +151,43 @@ def expand_with_kg(section_ids: Iterable[str]) -> list[dict]:
     return expansions
 
 
-def _build_prompt(question: str, contexts: List[str]) -> list[dict]:
+def _build_prompt(
+    question: str,
+    contexts: List[str],
+    *,
+    label_schema: str | None = None,
+) -> list[dict]:
+    if label_schema == "truthiness":
+        allowed_labels = "true, false, unanswerable"
+        system = (
+            "You are an expert on Export Administration Regulations (EAR). "
+            "Answer ONLY using the provided regulation excerpts and knowledge-graph context. "
+            "Cite EAR section IDs when possible. If the answer is not determinable from the "
+            "provided text, say so explicitly.\n\n"
+            "Truthiness labeling (MUST match exactly):\n"
+            f"- Allowed labels: {allowed_labels}\n"
+            "- Definitions:\n"
+            "  - true: the statement in the question is supported by the provided context.\n"
+            "  - false: the statement is not supported or is contradicted by the provided context.\n"
+            "  - unanswerable: the provided context is insufficient to decide true vs false.\n\n"
+            "Respond in STRICT JSON with this exact shape and no extra text:\n"
+            "{\n"
+            '  \"answer_text\": \"<short answer>\",\n'
+            '  \"label\": \"<one of: '
+            + allowed_labels
+            + '>\",\n'
+            '  \"justification\": \"<1-3 sentence rationale citing EAR sections>\"\n'
+            "}\n"
+        )
+        context_block = (
+            "\n\n".join(contexts) if contexts else "No supporting context provided."
+        )
+        user = f"Context:\n{context_block}\n\nQuestion: {question}\nAnswer JSON:"
+        return [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
+
     allowed_labels = (
         "license_required, no_license_required, exception_applies, "
         "permitted_with_license, permitted, prohibited, unanswerable"
@@ -227,6 +263,7 @@ def answer_with_rag(
     question: str,
     *,
     task: str | None = None,
+    label_schema: str | None = None,
     provider: str | None = None,
     model: str | None = None,
     top_k: int = 5,
@@ -262,7 +299,7 @@ def answer_with_rag(
     prompt_question = question
     if task:
         prompt_question = f"(task={task}) {question}"
-    prompt = _build_prompt(prompt_question, contexts)
+    prompt = _build_prompt(prompt_question, contexts, label_schema=label_schema)
 
     try:
         raw_answer = generate_chat(prompt, provider=provider, model=model)

@@ -225,3 +225,14 @@ Artifacts:
 - data/kg_expansion.json (exists)
 Env: {"dal": "false", "platform": "nt", "system": "Windows_NT", "tacc": "false", "windows": "true"}
 
+## 2026-01-08T22:26:04Z - Eval v2 truthiness label schema - pass
+Confirmed v2 eval datasets already constitute the requested JSON QA set (ear_compliance.v2=100, entity_obligations.v2=100, plus unanswerable.v2=20); no separate 100-QA dataset needed. Fixed RAG prompt/eval label-schema mismatch by adding an explicit truthiness schema (true/false/unanswerable) for items whose ground_truth.label is true/false; v2 RAG smoke (max-items=5 each) now yields label_accuracy=1.0 for ear_compliance.v2 and entity_obligations.v2, and unanswerable_accuracy=1.0 for unanswerable.v2 (KG digest e5e98b3...).
+Artifacts:
+- dist/eval/ear_compliance.v2.rag.groq.llama-3.3-70b-versatile.json (exists)
+- dist/eval/entity_obligations.v2.rag.groq.llama-3.3-70b-versatile.json (exists)
+- dist/eval/unanswerable.v2.rag.groq.llama-3.3-70b-versatile.json (exists)
+- dist/eval/ear_compliance.v2.rag.groq.llama-3.3-70b-versatile.md (exists)
+- dist/eval/entity_obligations.v2.rag.groq.llama-3.3-70b-versatile.md (exists)
+- dist/eval/unanswerable.v2.rag.groq.llama-3.3-70b-versatile.md (exists)
+Env: {"dal": "false", "max_items": 5, "model": "llama-3.3-70b-versatile", "platform": "nt", "provider": "groq", "system": "Windows_NT", "tacc": "false", "windows": "true"}
+

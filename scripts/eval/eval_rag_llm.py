@@ -22,6 +22,8 @@ _ALLOWED_LABELS = {
     "permitted",
     "prohibited",
     "unanswerable",
+    "true",
+    "false",
 }
 
 
@@ -157,9 +159,13 @@ def evaluate_dataset(
 
         start = time.perf_counter()
         try:
+            label_schema = None
+            if gt_label in {"true", "false"}:
+                label_schema = "truthiness"
             rag_result = answer_with_rag(
                 question,
                 task=task or None,
+                label_schema=label_schema,
                 provider=provider,
                 model=model,
                 top_k=top_k,

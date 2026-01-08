@@ -22,3 +22,20 @@ def test_log_eval_summary_multiple(tmp_path: Path) -> None:
     output = summarize_metrics([path1, path2])
     assert "ds1" in output and "ds2" in output
     assert output.startswith("Eval summaries:")
+
+
+def test_log_eval_summary_accepts_run_rag_payload(tmp_path: Path) -> None:
+    metrics_path = tmp_path / "rag.json"
+    payload = {
+        "accuracy": 0.1,
+        "label_accuracy": 0.2,
+        "unanswerable_accuracy": 0.3,
+        "model": "groq-model",
+        "kg_state_digest": "digest",
+        "timestamp": "2025-01-01T00:00:00Z",
+        "dataset_id": "ds1",
+        "task": "task1",
+    }
+    metrics_path.write_text(json.dumps(payload), encoding="utf-8")
+    output = summarize_metrics([metrics_path])
+    assert "model=groq-model" in output

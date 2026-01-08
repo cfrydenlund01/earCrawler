@@ -12,7 +12,7 @@ def format_summary(metrics: dict, metrics_path: Path) -> str:
     accuracy = metrics.get("accuracy", 0.0)
     label_accuracy = metrics.get("label_accuracy", 0.0)
     unanswerable_accuracy = metrics.get("unanswerable_accuracy", 0.0)
-    model = metrics.get("model_path") or "n/a"
+    model = metrics.get("model_path") or metrics.get("model") or "n/a"
     kg_digest = metrics.get("kg_state_digest") or "n/a"
     timestamp = metrics.get("timestamp") or "n/a"
     return (
