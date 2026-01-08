@@ -13,6 +13,14 @@
       "num_items": 3
     },
     {
+      "id": "entity_obligations.v2",
+      "task": "entity_obligation",
+      "file": "eval/entity_obligations.v2.jsonl",
+      "version": 2,
+      "description": "Expanded entity-level obligation QA (true/false) anchored to Parts 736, 740, 742, and 744.",
+      "num_items": 100
+    },
+    {
       "id": "ear_compliance.v1",
       "task": "ear_compliance",
       "file": "eval/ear_compliance.v1.jsonl",
@@ -21,12 +29,28 @@
       "num_items": 3
     },
     {
+      "id": "ear_compliance.v2",
+      "task": "ear_compliance",
+      "file": "eval/ear_compliance.v2.jsonl",
+      "version": 2,
+      "description": "Expanded statute-level EAR compliance QA (true/false) anchored to Parts 736, 740, 742, and 744.",
+      "num_items": 100
+    },
+    {
       "id": "unanswerable.v1",
       "task": "unanswerable",
       "file": "eval/unanswerable.v1.jsonl",
       "version": 1,
       "description": "Questions that must be declined because they fall outside the modeled EAR scope or lack sufficient evidence.",
       "num_items": 2
+    },
+    {
+      "id": "unanswerable.v2",
+      "task": "unanswerable",
+      "file": "eval/unanswerable.v2.jsonl",
+      "version": 2,
+      "description": "Expanded unanswerable set (out-of-scope or insufficient evidence) to harden refusal behavior.",
+      "num_items": 20
     }
   ],
   "references": {
@@ -42,12 +66,44 @@
       "https://example.org/ear#obligation/license_required_746_4_a",
       "https://example.org/ear#obligation/license_required_742_4_a_1",
       "https://example.org/ear#exception/740_9_a_2",
-      "https://example.org/ear#exception/740_1"
+      "https://example.org/ear#exception/740_1",
+      "https://example.org/ear#exception/tmp_740_9_a_2_reserved",
+      "https://example.org/ear#policy/ns_column_1_742_4_a_1"
     ],
     "kg_paths": [
       "path:acme_all_to_NK_v1",
       "path:acme_hpc_to_CN_obligation_chain_v1",
-      "path:acme_laptop_to_FR_exception_v1"
+      "path:acme_laptop_to_FR_exception_v1",
+      "path:entity/acme_736_2b_F_v2",
+      "path:entity/acme_736_2b_T_v2",
+      "path:entity/acme_740_1_F_v2",
+      "path:entity/acme_740_1_T_v2",
+      "path:entity/acme_740_9a2_F_v2",
+      "path:entity/acme_740_9a2_T_v2",
+      "path:entity/acme_742_4a1_F_v2",
+      "path:entity/acme_742_4a1_T_v2",
+      "path:entity/acme_744_6b3_F_v2",
+      "path:entity/acme_744_6b3_T_v2",
+      "path:entity/orchid_736_2b_F_v2",
+      "path:entity/orchid_736_2b_T_v2",
+      "path:entity/orchid_740_1_F_v2",
+      "path:entity/orchid_740_1_T_v2",
+      "path:entity/orchid_740_9a2_F_v2",
+      "path:entity/orchid_740_9a2_T_v2",
+      "path:entity/orchid_742_4a1_F_v2",
+      "path:entity/orchid_742_4a1_T_v2",
+      "path:entity/orchid_744_6b3_F_v2",
+      "path:entity/orchid_744_6b3_T_v2",
+      "path:entity/zenith_736_2b_F_v2",
+      "path:entity/zenith_736_2b_T_v2",
+      "path:entity/zenith_740_1_F_v2",
+      "path:entity/zenith_740_1_T_v2",
+      "path:entity/zenith_740_9a2_F_v2",
+      "path:entity/zenith_740_9a2_T_v2",
+      "path:entity/zenith_742_4a1_F_v2",
+      "path:entity/zenith_742_4a1_T_v2",
+      "path:entity/zenith_744_6b3_F_v2",
+      "path:entity/zenith_744_6b3_T_v2"
     ]
   }
 }
