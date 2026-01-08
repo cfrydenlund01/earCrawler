@@ -164,3 +164,53 @@ Additional steps before implementing a 100-QA (50 true / 50 untrue) CLI test:
 - Ensure the eval path is runnable in automation: configure `config/llm_secrets.env` (or Windows Credential Store) with `GROQ_API_KEY`/`NVIDIA_NIM_API_KEY`, and set `EARCRAWLER_ENABLE_REMOTE_LLM=1` for the test job.
 - Add a dataset format for QA prompts with expected outcomes and a scoring rubric (exact label match + evidence/groundedness checks); wire it into `earctl eval` so it can run in CI with a single command.
 
+## 2026-01-08T19:26:06Z - Validation + RAG smoke rerun (ear_compliance.v1, max-items=5) - degraded
+Ran the requested quick validation pass and re-ran the RAG smoke on `ear_compliance.v1`. Unit/integration tests are now green locally (Java/tooling issues addressed), but the RAG eval still cannot generate answers because the Groq API key is not configured.
+
+Validation:
+- `python eval/validate_datasets.py` -> `All evaluation datasets validated successfully.`
+- `pytest -q` -> 217 passed, 5 skipped (Java 17+ available; network-restricted tests skipped as designed).
+
+RAG smoke:
+- Command: `earctl eval run-rag --dataset-id ear_compliance.v1 --max-items 5`
+- Provider/model: groq / llama-3.3-70b-versatile (default)
+- Items: 3, top_k=5
+- Results: 3/3 failed with `GROQ_API_KEY is not configured` (remote LLM enabled via `EARCRAWLER_ENABLE_REMOTE_LLM=1`)
+- Metrics (dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.md): accuracy=0.0000, label_accuracy=0.0000, unanswerable_accuracy=0.0000, grounded_rate=0.0000, semantic_accuracy=0.0000, avg_latency=32.0657s
+- KG digest: 9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff
+Artifacts:
+- dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.json (exists)
+- dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.md (exists)
+
+Next steps before a 100-QA (50 true / 50 untrue) CLI test:
+- Wire secrets for the eval job: set `GROQ_API_KEY` (or configure `NVIDIA_NIM_*`) and keep `EARCRAWLER_ENABLE_REMOTE_LLM=1`; decide how/where secrets are injected (env vs Windows Credential Store vs CI secrets).
+- Define the “untrue” contract precisely (unanswerable vs explicitly false vs “insufficient evidence”), and enforce a consistent CLI output schema (label + rationale + citations).
+- Make the run deterministic enough to be actionable: pin model/provider, snapshot KG/corpus (record digest), fix retrieval params, and capture tool/model versions in emitted metadata.
+- Add/confirm scoring + failure modes: label accuracy, abstention correctness, citation/groundedness checks, and clear handling for API failures/timeouts (distinguish infra errors vs model mistakes).
+- Create the QA dataset in `eval/datasets/` with a stable manifest entry, and add a CI target that runs `earctl eval run-rag` (or a QA-specific command) end-to-end on the 100 items and emits a summary file for gating.
+
+## 2026-01-08T19:41:46Z - RAG smoke with Groq key configured (ear_compliance.v1, max-items=5) - pass (quality low)
+Re-ran the same RAG smoke after configuring `GROQ_API_KEY` via `config/llm_secrets.env` (git-ignored). The eval ran end-to-end with remote LLM calls and produced metrics, but answer scoring is strict (exact string match), so “accuracy” remains 0.0 even though labels and semantic similarity are high.
+
+RAG smoke:
+- Command: `earctl eval run-rag --dataset-id ear_compliance.v1 --max-items 5`
+- Provider/model: groq / llama-3.3-70b-versatile
+- Items: 3, top_k=5
+- Errors: 0/3 (remote LLM calls succeeded)
+- Metrics (dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.md):
+  - accuracy=0.0000 (exact-match vs ground_truth_answer)
+  - label_accuracy=1.0000
+  - grounded_rate=0.3333
+  - semantic_accuracy=1.0000 (SequenceMatcher >=0.6)
+  - avg_latency=29.5083s
+- KG digest: 9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff
+Artifacts:
+- dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.json (exists)
+- dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.md (exists)
+
+Implications / next steps before a 100-QA CLI test:
+- Decide the primary score: if QA is about compliance labels, gate on `label_accuracy` (+ groundedness) rather than exact answer-string equality, or add an answer normalization/semantic judge mode for “accuracy”.
+- Tighten grounding: for “true/untrue” QA, require citations that include the expected section span(s); measure and gate on grounded_rate and/or evidence overlap.
+- Add timeouts + retry policy for remote calls and classify failures separately from model errors (so “API outage” doesn’t look like “model wrong”).
+- Freeze the evaluation contract: pin provider/model, retrieval params, and dataset/KG digest; store these in the emitted metadata and in the CI job output.
+
