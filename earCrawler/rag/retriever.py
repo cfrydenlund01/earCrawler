@@ -51,10 +51,12 @@ class Retriever:
         self.fedreg_client = fedreg_client
         global SentenceTransformer
         if SentenceTransformer is None:
-            sentence_transformers = import_optional(
-                "sentence_transformers", ["sentence-transformers"]
+            # Import the concrete module to avoid pulling optional training-time
+            # imports from the package root.
+            st_module = import_optional(
+                "sentence_transformers.SentenceTransformer", ["sentence-transformers"]
             )
-            SentenceTransformer = sentence_transformers.SentenceTransformer
+            SentenceTransformer = st_module.SentenceTransformer
         self.model = SentenceTransformer(model_name)  # type: ignore[misc]
         self.index_path = Path(index_path)
         self.meta_path = self.index_path.with_suffix(".pkl")

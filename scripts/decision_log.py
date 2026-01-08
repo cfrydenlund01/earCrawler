@@ -1,7 +1,7 @@
 import argparse
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 research = Path.cwd() / "Research"
@@ -12,9 +12,9 @@ log_path = research / "decision_log.md"
 def append_entry(
     step: str, status: str, summary: str, artifacts: list[str], env: dict[str, str]
 ) -> None:
-    ts = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+    ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     lines = []
-    lines.append(f"## {ts} — {step} — {status}")
+    lines.append(f"## {ts} - {step} - {status}")
     if summary:
         lines.append(summary)
     if artifacts:

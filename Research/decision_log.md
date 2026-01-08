@@ -108,3 +108,30 @@ Notes:
   - [2025-12-10T21:22:04.853044+00:00] dataset=ear_compliance.v1 task=ear_compliance model=sshleifer/tiny-gpt2 accuracy=0.0000 label_accuracy=0.0000 unanswerable_accuracy=0.0000 kg_digest=9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff file=dist\\eval\\ear_compliance.v1.baseline.tiny-gpt2.json
   - [2025-12-10T21:22:18.086624+00:00] dataset=entity_obligations.v1 task=entity_obligation model=sshleifer/tiny-gpt2 accuracy=0.0000 label_accuracy=0.0000 unanswerable_accuracy=0.0000 kg_digest=9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff file=dist\\eval\\entity_obligations.v1.baseline.tiny-gpt2.json
   - [2025-12-10T21:22:30.054252+00:00] dataset=unanswerable.v1 task=unanswerable model=sshleifer/tiny-gpt2 accuracy=0.0000 label_accuracy=0.0000 unanswerable_accuracy=0.0000 kg_digest=9c42fa4e9fc2ebfe8a206d0d03a9d100da08e1ddc0c012f7969eac3c0ad06cff file=dist\\eval\\unanswerable.v1.baseline.tiny-gpt2.json
+## 2026-01-07T22:38:18Z — Offline bundle build automation — pass
+Updated scripts/build-offline-bundle.ps1 to accept canonical KG directories that contain dataset.nq (or dataset.ttl) without requiring provenance.json; verified by building a bundle to dist/offline_bundle_test.
+Artifacts:
+- scripts/build-offline-bundle.ps1 (exists)
+- dist/offline_bundle_test/manifest.json (exists)
+- dist/offline_bundle_test/checksums.sha256 (exists)
+Env: {"dal": "false", "platform": "nt", "system": "Windows_NT", "tacc": "false", "windows": "true"}
+
+## 2026-01-07T22:40:21Z - Phase B baseline drift gate - pass
+Verified baseline rebuild is stable: ran pwsh kg/scripts/phase-b-freeze.ps1 and confirmed no content diff vs tracked kg/baseline.
+Artifacts:
+- kg/scripts/phase-b-freeze.ps1 (exists)
+- kg/baseline/manifest.json (exists)
+- kg/baseline/checksums.sha256 (exists)
+- kg/baseline/dataset.nq (exists)
+Env: {"dal": "false", "platform": "nt", "system": "Windows_NT", "tacc": "false", "windows": "true"}
+
+## 2026-01-08T16:38:13Z - Refetch 736/740/742/744/746 FR corpus + rebuild retrieval artifacts - pass
+Refetched Federal Register passages for 736.2(b), 740.1, 740.9(a)(2), 742.4(a)(1), 744.6(b)(3), 746.4(a) into data/fr_sections.jsonl (18 records, per-page=3). Evidence gate now passes (0 missing) and kg_expansion.json regenerated; FAISS index rebuilt from the refreshed corpus.
+Artifacts:
+- data/fr_sections.jsonl (exists)
+- dist/eval/evidence_report.json (exists)
+- data/kg_expansion.json (exists)
+- data/faiss/index.faiss (exists)
+- data/faiss/index.pkl (exists)
+Env: {"dal": "false", "platform": "nt", "system": "Windows_NT", "tacc": "false", "windows": "true"}
+

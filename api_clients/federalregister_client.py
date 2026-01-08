@@ -53,7 +53,8 @@ class FederalRegisterError(Exception):
 class FederalRegisterClient:
     """Client for the Federal Register API."""
 
-    BASE_URL = "https://api.federalregister.gov/v1"
+    # Federal Register JSON API base. Endpoints are exposed as `*.json` paths.
+    BASE_URL = "https://www.federalregister.gov/api/v1"
 
     def __init__(
         self, *, session: requests.Session | None = None, cache_dir: Path | None = None
@@ -145,7 +146,7 @@ class FederalRegisterClient:
 
     def get_ear_articles(self, term: str, *, per_page: int = 5) -> List[Dict[str, str]]:
         """Return normalized EAR article records for ``term``."""
-        url = f"{self.BASE_URL}/documents"
+        url = f"{self.BASE_URL}/documents.json"
         params = {"per_page": str(per_page), "conditions[term]": term}
         try:
             data = self._get_json(url, params)
@@ -154,10 +155,18 @@ class FederalRegisterClient:
             return []
         results: List[Dict[str, str]] = []
         for doc in data.get("results", []):
-            text = self._clean_text(doc.get("body_html") or doc.get("body_text") or "")
+            doc_id = str(doc.get("document_number") or doc.get("id") or "")
+            text_raw = doc.get("body_html") or doc.get("body_text") or ""
+            if not text_raw and doc_id:
+                # List results often omit body text; fetch the detail JSON when needed.
+                detail = self.get_document(doc_id) or {}
+                text_raw = detail.get("body_html") or detail.get("body_text") or ""
+            if not text_raw:
+                text_raw = doc.get("abstract") or " ".join(doc.get("excerpts") or []) or ""
+            text = self._clean_text(text_raw)
             results.append(
                 {
-                    "id": str(doc.get("document_number") or doc.get("id") or ""),
+                    "id": doc_id,
                     "title": doc.get("title", ""),
                     "publication_date": doc.get("publication_date", ""),
                     "source_url": doc.get("html_url") or doc.get("url") or "",
@@ -168,7 +177,7 @@ class FederalRegisterClient:
 
     def get_article_text(self, doc_id: str) -> str:
         """Return cleaned text for a Federal Register document."""
-        url = f"{self.BASE_URL}/documents/{doc_id}"
+        url = f"{self.BASE_URL}/documents/{doc_id}.json"
         try:
             data = self._get_json(url, params={})
         except requests.RequestException as exc:
@@ -185,7 +194,7 @@ class FederalRegisterClient:
         per_page: int = 100,
         page: int | None = None,
     ) -> List[Dict]:
-        url = f"{self.BASE_URL}/documents"
+        url = f"{self.BASE_URL}/documents.json"
         params = {"conditions[any]": query, "per_page": str(per_page)}
         if page is not None:
             params["page"] = str(page)
@@ -199,7 +208,7 @@ class FederalRegisterClient:
         return data.get("results", [])
 
     def get_document(self, doc_number: str):
-        url = f"{self.BASE_URL}/documents/{doc_number}"
+        url = f"{self.BASE_URL}/documents/{doc_number}.json"
         try:
             return self._get_json(url, params={})
         except requests.RequestException as exc:

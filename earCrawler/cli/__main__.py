@@ -499,8 +499,11 @@ def eval_verify_evidence(manifest: Path, corpus: Path, dataset_id: str, out: Pat
 
     for entry in dataset_entries:
         ds_id = entry.get("id")
-        data_file = Path(entry.get("file"))
-        if not data_file.is_absolute():
+        raw_file = entry.get("file")
+        if not raw_file:
+            raise click.ClickException(f"Dataset entry missing file: {ds_id}")
+        data_file = Path(str(raw_file))
+        if not data_file.is_absolute() and not data_file.exists():
             data_file = manifest.parent / data_file
         if not data_file.exists():
             raise click.ClickException(f"Dataset not found: {data_file}")

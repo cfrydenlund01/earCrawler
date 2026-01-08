@@ -57,7 +57,7 @@ def _resolve_dataset_paths(manifest: Mapping[str, object], manifest_path: Path) 
         if not raw:
             continue
         candidate = Path(str(raw))
-        if not candidate.is_absolute():
+        if not candidate.is_absolute() and not candidate.exists():
             candidate = manifest_path.parent / candidate
         paths.append(candidate)
     return paths

@@ -10,12 +10,10 @@ if (-not (Test-Path $canonicalPath)) {
     throw "Canonical directory not found: $CanonicalDir"
 }
 
-$requiredFiles = @('dataset.nq', 'dataset.ttl', 'provenance.json')
-foreach ($file in $requiredFiles) {
-    $path = Join-Path $canonicalPath $file
-    if (-not (Test-Path $path)) {
-        throw "Missing canonical artifact: $file"
-    }
+$datasetNq = Join-Path $canonicalPath 'dataset.nq'
+$datasetTtl = Join-Path $canonicalPath 'dataset.ttl'
+if ((-not (Test-Path $datasetNq)) -and (-not (Test-Path $datasetTtl))) {
+    throw "Missing canonical dataset artifact: expected dataset.nq or dataset.ttl under $CanonicalDir"
 }
 
 $bundleRoot = Join-Path $repoRoot $OutputDir
@@ -73,7 +71,9 @@ New-Item -ItemType Directory -Path (Join-Path $bundleRoot 'kg/reports') -Force |
 
 # Copy provenance explicitly (should already exist under kg/)
 $provSrc = Join-Path $canonicalPath 'provenance.json'
-Copy-Item -Path $provSrc -Destination (Join-Path $bundleRoot 'provenance.json') -Force
+if (Test-Path $provSrc) {
+    Copy-Item -Path $provSrc -Destination (Join-Path $bundleRoot 'provenance.json') -Force
+}
 
 # Create smoke report placeholder if not present
 $smoke = Join-Path $bundleRoot 'kg/reports/bundle-smoke.txt'
