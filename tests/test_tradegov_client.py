@@ -1,10 +1,14 @@
+import os
 import keyring
 import pytest
 
 from api_clients.tradegov_client import search_entities
 
 
-SKIP = keyring.get_password("EAR_AI", "TRADEGOV_API_KEY") is None
+SKIP = (
+    os.getenv("PYTEST_ALLOW_NETWORK", "0") != "1"
+    or keyring.get_password("EAR_AI", "TRADEGOV_API_KEY") is None
+)
 
 
 @pytest.mark.skipif(SKIP, reason="No Trade.gov subscription key")

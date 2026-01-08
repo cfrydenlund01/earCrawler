@@ -53,8 +53,10 @@ class FederalRegisterError(Exception):
 class FederalRegisterClient:
     """Client for the Federal Register API."""
 
-    # Federal Register JSON API base. Endpoints are exposed as `*.json` paths.
-    BASE_URL = "https://www.federalregister.gov/api/v1"
+    # Federal Register JSON API base.
+    # The stable API host is ``api.federalregister.gov``; ``www`` is used only
+    # as a fallback when the API host is blocked and returns HTML.
+    BASE_URL = "https://api.federalregister.gov/v1"
 
     def __init__(
         self, *, session: requests.Session | None = None, cache_dir: Path | None = None
@@ -146,7 +148,7 @@ class FederalRegisterClient:
 
     def get_ear_articles(self, term: str, *, per_page: int = 5) -> List[Dict[str, str]]:
         """Return normalized EAR article records for ``term``."""
-        url = f"{self.BASE_URL}/documents.json"
+        url = f"{self.BASE_URL}/documents"
         params = {"per_page": str(per_page), "conditions[term]": term}
         try:
             data = self._get_json(url, params)
@@ -177,7 +179,7 @@ class FederalRegisterClient:
 
     def get_article_text(self, doc_id: str) -> str:
         """Return cleaned text for a Federal Register document."""
-        url = f"{self.BASE_URL}/documents/{doc_id}.json"
+        url = f"{self.BASE_URL}/documents/{doc_id}"
         try:
             data = self._get_json(url, params={})
         except requests.RequestException as exc:
@@ -194,7 +196,7 @@ class FederalRegisterClient:
         per_page: int = 100,
         page: int | None = None,
     ) -> List[Dict]:
-        url = f"{self.BASE_URL}/documents.json"
+        url = f"{self.BASE_URL}/documents"
         params = {"conditions[any]": query, "per_page": str(per_page)}
         if page is not None:
             params["page"] = str(page)
@@ -208,7 +210,7 @@ class FederalRegisterClient:
         return data.get("results", [])
 
     def get_document(self, doc_number: str):
-        url = f"{self.BASE_URL}/documents/{doc_number}.json"
+        url = f"{self.BASE_URL}/documents/{doc_number}"
         try:
             return self._get_json(url, params={})
         except requests.RequestException as exc:

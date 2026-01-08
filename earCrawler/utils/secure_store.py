@@ -26,7 +26,9 @@ def get_secret(name: str, *, fallback: str | None = None) -> str:
     if env:
         return env
     if keyring is not None:  # pragma: no cover - platform specific
-        for service in ("earCrawler", "EAR_AI"):
+        # Keep in sync with earCrawler.security.cred_store.SERVICE so secrets
+        # written via `earctl auth set-secret` are readable by the runtime.
+        for service in ("EarCrawler", "earCrawler", "EAR_AI"):
             try:
                 value = keyring.get_password(service, name)
                 if value:
