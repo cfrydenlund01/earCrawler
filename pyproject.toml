@@ -36,7 +36,7 @@ kg-validate = "cli.kg_validate:main"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["earCrawler*", "api_clients*", "perf*", "cli*"]
+include = ["earCrawler*", "api_clients*", "perf*", "cli*", "scripts*"]
 namespaces = true
 
 [tool.setuptools.package-data]

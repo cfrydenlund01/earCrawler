@@ -135,3 +135,32 @@ Artifacts:
 - data/faiss/index.pkl (exists)
 Env: {"dal": "false", "platform": "nt", "system": "Windows_NT", "tacc": "false", "windows": "true"}
 
+## 2026-01-08T17:06:32Z - RAG eval CLI smoke (ear_compliance.v1, max-items=5) - degraded
+Quick validation + smoke run for `earctl eval run-rag` on a single dataset. The CLI path is functional but the remote LLM provider is not configured on this machine, so all scored items failed (metrics are therefore 0.0000 across the board).
+
+Validation:
+- `python eval/validate_datasets.py` -> `All evaluation datasets validated successfully.`
+- `pytest -q` -> fails during collection because Java 17+ is required for inference/KG/SHACL-related tests (4 collection errors).
+
+RAG smoke:
+- Command: `earctl eval run-rag --dataset-id ear_compliance.v1 --max-items 5`
+- Provider/model: groq / llama-3.3-70b-versatile (default)
+- Items: 3 (from `dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.md`)
+- Results: 3/3 failed with `GROQ_API_KEY is not configured` (remote LLM enabled via `EARCRAWLER_ENABLE_REMOTE_LLM=1`)
+- Metrics: accuracy=0.0000, label_accuracy=0.0000, unanswerable_accuracy=0.0000, grounded_rate=0.0000, semantic_accuracy=0.0000, avg_latency=6.1701s
+Artifacts:
+- dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.json (exists, 3 failed items)
+- dist/eval/ear_compliance.v1.rag.groq.llama-3.3-70b-versatile.md (exists)
+
+Code fix (to unblock the CLI import path):
+- `earctl eval run-rag` previously failed with `No module named 'scripts.eval'` when running from an installed console script (repo root not on `sys.path`).
+- Updated packaging config to ship the `scripts` package so `from scripts.eval import ...` works when `earctl` is installed.
+Artifacts:
+- pyproject.toml (updated: include `scripts*` in setuptools package discovery)
+
+Additional steps before implementing a 100-QA (50 true / 50 untrue) CLI test:
+- Decide “untrue” contract: unanswerable vs explicitly false, and required CLI behavior (e.g., abstain + cite evidence vs label false).
+- Provision deterministic test infra: stable KG/corpus snapshot (record KG digest), stable retrieval params, and fixed model/provider/version.
+- Ensure the eval path is runnable in automation: configure `config/llm_secrets.env` (or Windows Credential Store) with `GROQ_API_KEY`/`NVIDIA_NIM_API_KEY`, and set `EARCRAWLER_ENABLE_REMOTE_LLM=1` for the test job.
+- Add a dataset format for QA prompts with expected outcomes and a scoring rubric (exact label match + evidence/groundedness checks); wire it into `earctl eval` so it can run in CI with a single command.
+
