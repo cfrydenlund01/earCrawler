@@ -663,6 +663,166 @@ def eval_run_rag(
         click.echo(f"{ds_id}: wrote {out_json}")
 
 
+@eval_group.command(name="fr-coverage")
+@click.option(
+    "--manifest",
+    type=click.Path(path_type=Path),
+    default=Path("eval") / "manifest.json",
+    show_default=True,
+    help="Eval manifest describing dataset files.",
+)
+@click.option(
+    "--corpus",
+    type=click.Path(path_type=Path),
+    default=Path("data") / "fr_sections.jsonl",
+    show_default=True,
+    help="Corpus JSONL to validate references against.",
+)
+@click.option(
+    "--dataset-id",
+    default="all",
+    show_default=True,
+    help="Dataset id to check, or 'all' for every entry in the manifest.",
+)
+@click.option(
+    "--retrieval-k",
+    type=int,
+    default=10,
+    show_default=True,
+    help="Top-k to search in the FAISS retriever when computing ranks.",
+)
+@click.option(
+    "--max-items",
+    type=int,
+    default=None,
+    help="Optional cap on items per dataset (useful for smoke checks).",
+)
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=Path("dist") / "eval" / "fr_coverage_report.json",
+    show_default=True,
+    help="Where to write the FR coverage report.",
+)
+@click.option(
+    "--fail/--no-fail",
+    default=True,
+    show_default=True,
+    help="Whether to return non-zero when coverage checks fail.",
+)
+def eval_fr_coverage(
+    manifest: Path,
+    corpus: Path,
+    dataset_id: str,
+    retrieval_k: int,
+    max_items: int | None,
+    out: Path,
+    fail: bool,
+) -> None:
+    """Check FR section coverage + retriever ranks for eval datasets."""
+
+    try:
+        from earCrawler.eval.coverage_checks import build_fr_coverage_report
+    except Exception as exc:  # pragma: no cover - import failures
+        raise click.ClickException(str(exc))
+
+    try:
+        report = build_fr_coverage_report(
+            manifest=manifest,
+            corpus=corpus,
+            dataset_id=dataset_id,
+            retrieval_k=retrieval_k,
+            max_items=max_items,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc))
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+
+    summary = report.get("summary") or {}
+    missing_in_corpus = int(summary.get("missing_in_corpus") or 0)
+    missing_in_retrieval = int(summary.get("missing_in_retrieval") or 0)
+    click.echo(
+        f"{dataset_id}: missing_in_corpus={missing_in_corpus}, missing_in_retrieval={missing_in_retrieval}"
+    )
+    if fail and (missing_in_corpus or missing_in_retrieval):
+        raise click.ClickException("FR coverage check failed")
+
+
+@eval_group.command(name="check-grounding")
+@click.option(
+    "--eval-json",
+    "eval_json",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Eval JSON emitted by `earctl eval run-rag`.",
+)
+@click.option(
+    "--min-grounded-rate",
+    type=float,
+    default=1.0,
+    show_default=True,
+    help="Minimum grounded_rate required to pass.",
+)
+@click.option(
+    "--min-expected-hit-rate",
+    type=float,
+    default=1.0,
+    show_default=True,
+    help="Minimum expected-section-hit-rate required to pass.",
+)
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=Path("dist") / "eval" / "grounding_contract_report.json",
+    show_default=True,
+    help="Where to write the grounding contract report.",
+)
+@click.option(
+    "--fail/--no-fail",
+    default=True,
+    show_default=True,
+    help="Whether to return non-zero when thresholds are not met.",
+)
+def eval_check_grounding(
+    eval_json: Path,
+    min_grounded_rate: float,
+    min_expected_hit_rate: float,
+    out: Path,
+    fail: bool,
+) -> None:
+    """Validate label correctness implies grounded retrieval."""
+
+    try:
+        from earCrawler.eval.coverage_checks import build_grounding_contract_report
+    except Exception as exc:  # pragma: no cover - import failures
+        raise click.ClickException(str(exc))
+
+    try:
+        report = build_grounding_contract_report(
+            eval_json=eval_json,
+            min_grounded_rate=min_grounded_rate,
+            min_expected_hit_rate=min_expected_hit_rate,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc))
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+
+    summary = report.get("summary") or {}
+    click.echo(
+        "grounded_rate={:.4f} expected_hit_rate={:.4f} contract_pass_rate={:.4f}".format(
+            float(summary.get("grounded_rate") or 0.0),
+            float(summary.get("expected_section_hit_rate") or 0.0),
+            float(summary.get("contract_pass_rate") or 0.0),
+        )
+    )
+    if fail and not report.get("thresholds_ok"):
+        raise click.ClickException("grounding contract check failed")
+
+
 @cli.command(name="eval-benchmark")
 @click.option(
     "--dataset-id",

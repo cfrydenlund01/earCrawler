@@ -1,0 +1,781 @@
+{
+  "version": 1,
+  "questions": [
+    {
+      "id": "purpose.l1.component",
+      "category": "Purpose (L1)",
+      "difficulty": 1,
+      "prompt": "What is earCrawler primarily described as in the repo's main README?",
+      "options": [
+        "A web UI for EAR-QA that renders compliance dashboards",
+        "A crawling + knowledge-graph component that powers EAR-QA",
+        "A GPU-only fine-tuning toolkit for Mistral models",
+        "A database migration tool for Apache Jena"
+      ],
+      "answer_index": 1,
+      "explanation": "The README describes earCrawler as the crawling and knowledge-graph component that powers the EAR-QA system.",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "earCrawler is the crawling and knowledge-graph component",
+          "note": "Top README opening description."
+        }
+      ]
+    },
+    {
+      "id": "purpose.l2.capabilities",
+      "category": "Purpose (L2)",
+      "difficulty": 2,
+      "prompt": "Which pair of external sources does earCrawler provide lightweight clients for (per README)?",
+      "options": [
+        "Trade.gov and the Federal Register",
+        "SEC EDGAR and arXiv",
+        "Westlaw and LexisNexis",
+        "OpenCorporates and Wikidata"
+      ],
+      "answer_index": 0,
+      "explanation": "The README explicitly calls out Trade.gov and the Federal Register clients.",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "clients for Trade.gov and the Federal Register",
+          "note": "Repo overview section."
+        }
+      ]
+    },
+    {
+      "id": "prereq.java",
+      "category": "Setup/Prereqs",
+      "difficulty": 2,
+      "prompt": "Which prerequisite is required specifically because of Apache Jena?",
+      "options": [
+        "Node.js 20+",
+        "Java 11+ JDK",
+        "Rust toolchain",
+        "PostgreSQL 16"
+      ],
+      "answer_index": 1,
+      "explanation": "Apache Jena requires a Java runtime; the README calls out Java 11+.",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "Java 11+ JDK (required for Apache Jena",
+          "note": "Prerequisites list."
+        }
+      ]
+    },
+    {
+      "id": "cli.entrypoint",
+      "category": "CLI",
+      "difficulty": 1,
+      "prompt": "What is the primary console script installed for this repo's CLI?",
+      "options": [
+        "earctl",
+        "earcrawler",
+        "earkg",
+        "earqa"
+      ],
+      "answer_index": 0,
+      "explanation": "`pyproject.toml` installs the CLI as the `earctl` console script.",
+      "sources": [
+        {
+          "path": "pyproject.toml",
+          "find": "[project.scripts]",
+          "note": "Look for the `earctl = ...` entry."
+        }
+      ]
+    },
+    {
+      "id": "cli.module.invoke",
+      "category": "CLI",
+      "difficulty": 2,
+      "prompt": "If you want to invoke commands without relying on PATH shims, which invocation style does the README recommend?",
+      "options": [
+        "python -m earCrawler.cli ...",
+        "python earCrawler/cli/__main__.py ...",
+        "earCrawler --run ...",
+        "pipx run earCrawler ..."
+      ],
+      "answer_index": 0,
+      "explanation": "The README notes you can use `python -m earCrawler.cli ...` (or `py -m ...`) to avoid PATH issues.",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "py -m earCrawler.cli",
+          "note": "CLI Basics section."
+        }
+      ]
+    },
+    {
+      "id": "rbac.policy.file",
+      "category": "Security/RBAC",
+      "difficulty": 1,
+      "prompt": "Where is the CLI role-to-command mapping defined?",
+      "options": [
+        "security/policy.yml",
+        "docs/privacy/telemetry_policy.md",
+        "service/openapi/openapi.yaml",
+        "pyproject.toml"
+      ],
+      "answer_index": 0,
+      "explanation": "The role mapping and command allowlists live in `security/policy.yml`.",
+      "sources": [
+        {
+          "path": "security/policy.yml",
+          "find": "roles:",
+          "note": "Policy file is short; scan roles/commands/overrides."
+        }
+      ]
+    },
+    {
+      "id": "rbac.identity.env",
+      "category": "Security/RBAC",
+      "difficulty": 2,
+      "prompt": "Which environment variable is used to impersonate a built-in test identity for CLI role testing?",
+      "options": [
+        "EARCRAWLER_USER",
+        "EARCTL_USER",
+        "EAR_IDENTITY",
+        "EAR_ROLE"
+      ],
+      "answer_index": 1,
+      "explanation": "The README and `policy` command help text describe `EARCTL_USER` for identity overrides.",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "EARCTL_USER",
+          "note": "RBAC section shows test identities usage."
+        },
+        {
+          "path": "earCrawler/cli/policy_cmd.py",
+          "find": "Set EARCTL_USER",
+          "note": "Policy CLI help string."
+        }
+      ]
+    },
+    {
+      "id": "rbac.default.role",
+      "category": "Security/RBAC",
+      "difficulty": 3,
+      "prompt": "According to `security/policy.yml`, what is the default role when no overrides apply?",
+      "options": [
+        "admin",
+        "maintainer",
+        "operator",
+        "reader"
+      ],
+      "answer_index": 3,
+      "explanation": "`security/policy.yml` includes an `overrides.default.roles` entry set to `reader`.",
+      "sources": [
+        {
+          "path": "security/policy.yml",
+          "find": "default:",
+          "note": "Overrides section includes the default identity."
+        }
+      ]
+    },
+    {
+      "id": "kg.jena.location",
+      "category": "Knowledge Graph",
+      "difficulty": 2,
+      "prompt": "When the CLI auto-installs Apache Jena on Windows, where does it place the toolchain by default?",
+      "options": [
+        "tools/jena",
+        "db/jena",
+        "kg/jena",
+        "dist/jena"
+      ],
+      "answer_index": 0,
+      "explanation": "Docs and CLI help text state Jena is auto-downloaded under `tools/jena`.",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "download it into `tools/jena`",
+          "note": "Preparing Fuseki & The Knowledge Graph section."
+        },
+        {
+          "path": "earCrawler/cli/__main__.py",
+          "find": "auto-downloaded to .\\tools\\jena",
+          "note": "kg-serve command docstring."
+        }
+      ]
+    },
+    {
+      "id": "kg.serve.dataset.default",
+      "category": "Knowledge Graph",
+      "difficulty": 2,
+      "prompt": "What is the default dataset path used by the `kg-serve` command?",
+      "options": [
+        "/kg",
+        "/ear",
+        "/dataset",
+        "/sparql"
+      ],
+      "answer_index": 1,
+      "explanation": "`kg-serve` defaults to `--dataset /ear`.",
+      "sources": [
+        {
+          "path": "earCrawler/cli/__main__.py",
+          "find": "default=\"/ear\"",
+          "note": "kg-serve option definition."
+        }
+      ]
+    },
+    {
+      "id": "kg.query.endpoint.default",
+      "category": "Knowledge Graph",
+      "difficulty": 3,
+      "prompt": "What is the default SPARQL endpoint used by `kg-query`?",
+      "options": [
+        "http://localhost:3030/ear/sparql",
+        "http://localhost:9001/v1/sparql",
+        "http://127.0.0.1:3030/sparql",
+        "http://localhost:3030/sparql"
+      ],
+      "answer_index": 0,
+      "explanation": "`kg-query` defaults the endpoint to `http://localhost:3030/ear/sparql`.",
+      "sources": [
+        {
+          "path": "earCrawler/cli/__main__.py",
+          "find": "default=\"http://localhost:3030/ear/sparql\"",
+          "note": "kg-query option definition."
+        }
+      ]
+    },
+    {
+      "id": "kg.schema.version",
+      "category": "Knowledge Graph",
+      "difficulty": 3,
+      "prompt": "What is the pinned KG schema version constant in `earCrawler.kg.ontology`?",
+      "options": [
+        "0.2.5",
+        "1.0.0",
+        "2025.11",
+        "5.3.0"
+      ],
+      "answer_index": 1,
+      "explanation": "`earCrawler.kg.ontology.KG_SCHEMA_VERSION` is set to `1.0.0`.",
+      "sources": [
+        {
+          "path": "earCrawler/kg/ontology.py",
+          "find": "KG_SCHEMA_VERSION = \"1.0.0\"",
+          "note": "Ontology helper module."
+        }
+      ]
+    },
+    {
+      "id": "api.pid.file",
+      "category": "API Facade",
+      "difficulty": 2,
+      "prompt": "Where does the README say the API facade writes PID files?",
+      "options": [
+        "run/api.pid",
+        "kg/reports/api.pid",
+        "service/pids/api.pid",
+        "dist/api.pid"
+      ],
+      "answer_index": 1,
+      "explanation": "The README explicitly states PID files are written to `kg/reports/api.pid`.",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "PID files are written to `kg/reports/api.pid`",
+          "note": "Starting The API Facade section."
+        }
+      ]
+    },
+    {
+      "id": "api.contract.canonical",
+      "category": "API Facade",
+      "difficulty": 2,
+      "prompt": "What is the source-of-truth OpenAPI specification file for the facade?",
+      "options": [
+        "docs/api/openapi.json",
+        "service/openapi/openapi.yaml",
+        "service/templates/registry.json",
+        "docs/api/postman_collection.json"
+      ],
+      "answer_index": 1,
+      "explanation": "The API docs identify `service/openapi/openapi.yaml` as the canonical spec reviewed in CI.",
+      "sources": [
+        {
+          "path": "docs/api/readme.md",
+          "find": "Canonical spec: `service/openapi/openapi.yaml`",
+          "note": "Contract Artifacts section."
+        }
+      ]
+    },
+    {
+      "id": "api.rate.limits",
+      "category": "API Facade",
+      "difficulty": 4,
+      "prompt": "What is the documented anonymous rate limit for the API facade?",
+      "options": [
+        "30 requests/min (burst 10)",
+        "60 requests/min (burst 30)",
+        "120 requests/min (burst 20)",
+        "Unlimited (no rate limits)"
+      ],
+      "answer_index": 0,
+      "explanation": "The API readme documents anonymous `ip:*` quotas as 30 req/min with burst 10.",
+      "sources": [
+        {
+          "path": "docs/api/readme.md",
+          "find": "Anonymous (ip:*): **30 requests/min**, burst 10",
+          "note": "Budgets and Limits section."
+        }
+      ]
+    },
+    {
+      "id": "telemetry.default",
+      "category": "Telemetry/Privacy",
+      "difficulty": 2,
+      "prompt": "What is the default telemetry behavior?",
+      "options": [
+        "Telemetry is enabled by default and uploads on every run",
+        "Telemetry is disabled by default and must be explicitly enabled",
+        "Telemetry is enabled only in CI",
+        "Telemetry is enabled only when `EARCTL_USER` is set"
+      ],
+      "answer_index": 1,
+      "explanation": "Telemetry is opt-in; policy says it is disabled by default.",
+      "sources": [
+        {
+          "path": "docs/privacy/telemetry_policy.md",
+          "find": "By default telemetry is disabled",
+          "note": "Telemetry Policy doc."
+        }
+      ]
+    },
+    {
+      "id": "telemetry.redaction.keys",
+      "category": "Telemetry/Privacy",
+      "difficulty": 3,
+      "prompt": "Which list best matches the keys the telemetry subsystem says it stores?",
+      "options": [
+        "Full HTTP payloads, file contents, and access tokens",
+        "`command`, `duration_ms`, `exit_code`, `version`, `os`, `python`, `device_id`, `event`, `ts`, and `error`",
+        "`prompt`, `completion`, `api_key`, and `trace`",
+        "`username`, `email`, and `password_hash`"
+      ],
+      "answer_index": 1,
+      "explanation": "The redaction rules doc enumerates the only keys that are stored.",
+      "sources": [
+        {
+          "path": "docs/privacy/redaction_rules.md",
+          "find": "Only the following keys are ever stored:",
+          "note": "End of the Redaction Rules doc."
+        }
+      ]
+    },
+    {
+      "id": "eval.manifest.location",
+      "category": "Evaluation",
+      "difficulty": 1,
+      "prompt": "Where are evaluation datasets indexed and described?",
+      "options": [
+        "eval/manifest.json",
+        "tests/fixtures/manifest.json",
+        "kg/ear_export_manifest.json",
+        "Research/index.json"
+      ],
+      "answer_index": 0,
+      "explanation": "The evaluation manifest lives at `eval/manifest.json` and lists datasets + references.",
+      "sources": [
+        {
+          "path": "eval/manifest.json",
+          "find": "\"datasets\"",
+          "note": "The manifest includes datasets and references."
+        }
+      ]
+    },
+    {
+      "id": "eval.kg_state.digest",
+      "category": "Evaluation",
+      "difficulty": 4,
+      "prompt": "In `eval/manifest.json`, what does `kg_state.digest` represent?",
+      "options": [
+        "The SHA256 of the installed Git binary",
+        "The KG snapshot hash the datasets were curated against",
+        "The checksum of the OpenAPI contract zip",
+        "The hash of the telemetry spool directory"
+      ],
+      "answer_index": 1,
+      "explanation": "The manifest records the KG snapshot hash the datasets were curated against.",
+      "sources": [
+        {
+          "path": "RUNBOOK.md",
+          "find": "kg_state.digest",
+          "note": "Evaluation datasets & schema section explains it."
+        },
+        {
+          "path": "eval/manifest.json",
+          "find": "\"kg_state\"",
+          "note": "The digest is stored under `kg_state`."
+        }
+      ]
+    },
+    {
+      "id": "eval.validator.script",
+      "category": "Evaluation",
+      "difficulty": 2,
+      "prompt": "Which script validates eval JSONL datasets against the JSON schema and reference lists?",
+      "options": [
+        "eval/validate_datasets.py",
+        "scripts/benchmark.py",
+        "earCrawler/eval/run_eval.py",
+        "scripts/research_gate.py"
+      ],
+      "answer_index": 0,
+      "explanation": "`eval/validate_datasets.py` loads `eval/schema.json` and checks `doc_spans` / `kg_nodes` / `kg_paths` against the manifest references.",
+      "sources": [
+        {
+          "path": "eval/validate_datasets.py",
+          "find": "Validate evaluation datasets against schema",
+          "note": "Script header / argparse description."
+        }
+      ]
+    },
+    {
+      "id": "eval.cli.coverage_checks",
+      "category": "Evaluation",
+      "difficulty": 3,
+      "prompt": "Which `earctl eval` subcommands are intended to (1) verify FR corpus coverage + FAISS ranks and (2) enforce the grounding contract on a run-rag JSON output?",
+      "options": [
+        "`earctl eval fr-coverage` and `earctl eval check-grounding`",
+        "`earctl eval build-kg-expansion` and `earctl eval-benchmark`",
+        "`earctl eval verify-evidence` and `earctl diagnose`",
+        "`earctl corpus validate` and `earctl kg-query`"
+      ],
+      "answer_index": 0,
+      "explanation": "`fr-coverage` checks corpus presence + retriever ranks for expected sections, while `check-grounding` gates label correctness + expected section hits on an eval JSON file.",
+      "sources": [
+        {
+          "path": "earCrawler/cli/__main__.py",
+          "find": "command(name=\"fr-coverage\")",
+          "note": "Eval CLI command definition."
+        },
+        {
+          "path": "earCrawler/cli/__main__.py",
+          "find": "command(name=\"check-grounding\")",
+          "note": "Eval CLI command definition."
+        }
+      ]
+    },
+    {
+      "id": "packaging.release.scripts",
+      "category": "Packaging/Release",
+      "difficulty": 3,
+      "prompt": "Which set of PowerShell scripts does the runbook list as the core build steps for release packaging?",
+      "options": [
+        "scripts/lint.ps1, scripts/test.ps1, scripts/deploy.ps1",
+        "scripts/build-wheel.ps1, scripts/build-exe.ps1, scripts/make-installer.ps1",
+        "scripts/api-start.ps1, scripts/api-stop.ps1, scripts/api-smoke.ps1",
+        "scripts/research_index.py, scripts/research_update.py, scripts/research_gate.py"
+      ],
+      "answer_index": 1,
+      "explanation": "The runbook calls out building wheel, exe, and installer as the core packaging steps.",
+      "sources": [
+        {
+          "path": "RUNBOOK.md",
+          "find": "Run `pwsh scripts/build-wheel.ps1`, `pwsh scripts/build-exe.ps1`, and `pwsh scripts/make-installer.ps1`",
+          "note": "Release packaging section."
+        }
+      ]
+    },
+    {
+      "id": "packaging.inno.setup",
+      "category": "Packaging/Release",
+      "difficulty": 4,
+      "prompt": "Which tool does the runbook mention for building the Windows installer (`.iss` compilation)?",
+      "options": [
+        "WiX Toolset (candle.exe)",
+        "Inno Setup (iscc.exe)",
+        "NSIS (makensis.exe)",
+        "MSIExec (msiexec.exe)"
+      ],
+      "answer_index": 1,
+      "explanation": "The runbook references Inno Setup and the `iscc.exe` compiler.",
+      "sources": [
+        {
+          "path": "RUNBOOK.md",
+          "find": "Inno Setup (iscc.exe)",
+          "note": "Windows notes under Release packaging."
+        }
+      ]
+    },
+    {
+      "id": "deps.gpu.extra",
+      "category": "Dependencies",
+      "difficulty": 3,
+      "prompt": "How does the README suggest installing the optional GPU / inference extras?",
+      "options": [
+        "python -m pip install -e .[gpu]",
+        "python -m pip install --no-deps -e .",
+        "python -m pip install -r requirements-lock.txt",
+        "python -m pip install earCrawler[gpu]==latest"
+      ],
+      "answer_index": 0,
+      "explanation": "The README shows installing extras with `pip install -e .[gpu]` (or using the GPU requirements file on Linux).",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "pip install -e .[gpu]",
+          "note": "GPU / inference extras callout."
+        }
+      ]
+    },
+    {
+      "id": "kgvalidate.entrypoint",
+      "category": "CLI",
+      "difficulty": 4,
+      "prompt": "Which `pyproject.toml` console script entry points at `cli.kg_validate:main`?",
+      "options": [
+        "kg-validate",
+        "kg-emit",
+        "kg-load",
+        "kg-serve"
+      ],
+      "answer_index": 0,
+      "explanation": "`pyproject.toml` defines `kg-validate = \"cli.kg_validate:main\"`.",
+      "sources": [
+        {
+          "path": "pyproject.toml",
+          "find": "kg-validate = \"cli.kg_validate:main\"",
+          "note": "Project scripts section."
+        }
+      ]
+    },
+    {
+      "id": "research.index.script",
+      "category": "Research",
+      "difficulty": 2,
+      "prompt": "Which script builds/updates the Research document index and caches?",
+      "options": [
+        "scripts/research_index.py",
+        "scripts/check_versions.py",
+        "scripts/build-wheel.ps1",
+        "scripts/benchmark.py"
+      ],
+      "answer_index": 0,
+      "explanation": "Research AGENTS guidelines require running `py scripts/research_index.py`, producing `Research/index.json` and `Research/knowledge_cache.json`.",
+      "sources": [
+        {
+          "path": "Research/AGENTS.md",
+          "find": "py scripts/research_index.py",
+          "note": "Required Startup Routine section."
+        }
+      ]
+    },
+    {
+      "id": "repo.tests.location",
+      "category": "Tests/CI",
+      "difficulty": 1,
+      "prompt": "Where is the main pytest test suite located?",
+      "options": [
+        "spec/",
+        "tests/",
+        "qa/",
+        "unittest/"
+      ],
+      "answer_index": 1,
+      "explanation": "The repository uses `pytest` with tests under `tests/`.",
+      "sources": [
+        {
+          "path": "pytest.ini",
+          "find": "testpaths",
+          "note": "pytest config points at tests."
+        }
+      ]
+    },
+    {
+      "id": "cli.kg_query.exclusive_inputs",
+      "category": "CLI",
+      "difficulty": 3,
+      "prompt": "In `kg-query`, what input constraint is enforced for `--file` and `--sparql`?",
+      "options": [
+        "Both must be provided together",
+        "At least one must be provided (either is fine)",
+        "Exactly one must be provided",
+        "Neither may be provided; it only runs built-in templates"
+      ],
+      "answer_index": 2,
+      "explanation": "`kg-query` raises a usage error when both (or neither) `--file` and `--sparql` are provided.",
+      "sources": [
+        {
+          "path": "earCrawler/cli/__main__.py",
+          "find": "Provide exactly one of --file or --sparql",
+          "note": "kg-query implementation."
+        }
+      ]
+    },
+    {
+      "id": "cli.crawl.live.default_off",
+      "category": "CLI",
+      "difficulty": 2,
+      "prompt": "What is the default behavior of the `crawl` command regarding live HTTP fetching?",
+      "options": [
+        "Live fetching is always enabled",
+        "Live fetching is enabled only for EAR",
+        "Live fetching is disabled by default; `--live` must be set",
+        "Live fetching is disabled permanently in all environments"
+      ],
+      "answer_index": 2,
+      "explanation": "`crawl` defaults `--live` to false and only enables it when the flag is provided.",
+      "sources": [
+        {
+          "path": "earCrawler/cli/__main__.py",
+          "find": "Enable live HTTP fetching (disabled by default).",
+          "note": "crawl option help string."
+        }
+      ]
+    },
+    {
+      "id": "cli.corpus.fixtures.default",
+      "category": "CLI",
+      "difficulty": 3,
+      "prompt": "When running `earctl corpus build` without `--live`, what is the default fixtures directory?",
+      "options": [
+        "fixtures/",
+        "tests/fixtures",
+        "data/fixtures",
+        "Research/fixtures"
+      ],
+      "answer_index": 1,
+      "explanation": "The corpus CLI defaults fixtures to `tests/fixtures` when not running live.",
+      "sources": [
+        {
+          "path": "earCrawler/cli/corpus.py",
+          "find": "default=Path(\"tests/fixtures\")",
+          "note": "corpus build option definition."
+        }
+      ]
+    },
+    {
+      "id": "readme.sparql.prefixes",
+      "category": "Knowledge Graph",
+      "difficulty": 2,
+      "prompt": "Why can the SPARQL templates under `earCrawler/sparql/` be sent to Fuseki without extra preprocessing?",
+      "options": [
+        "They are compiled into bytecode before use",
+        "They include the required prefix block already",
+        "Fuseki automatically infers all prefixes",
+        "They use only fully-expanded IRIs and no prefixes"
+      ],
+      "answer_index": 1,
+      "explanation": "The README notes the templates include the required prefixes.",
+      "sources": [
+        {
+          "path": "README.md",
+          "find": "SPARQL templates in `earCrawler/sparql/` include the required prefixes",
+          "note": "Preparing Fuseki & The Knowledge Graph note."
+        }
+      ]
+    },
+    {
+      "id": "api.templates.location",
+      "category": "API Facade",
+      "difficulty": 3,
+      "prompt": "Where does the API facade keep the allowlisted SPARQL templates it will execute?",
+      "options": [
+        "earCrawler/sparql/",
+        "service/templates/",
+        "docs/api/",
+        "security/policy.yml"
+      ],
+      "answer_index": 1,
+      "explanation": "The API docs say endpoints mirror allowlisted SPARQL templates stored under `service/templates/`.",
+      "sources": [
+        {
+          "path": "docs/api/readme.md",
+          "find": "templates stored under `service/templates/`",
+          "note": "Read-only API Surface section."
+        }
+      ]
+    },
+    {
+      "id": "api.timeout",
+      "category": "API Facade",
+      "difficulty": 4,
+      "prompt": "What is the documented per-request timeout budget for the API facade?",
+      "options": [
+        "500 ms",
+        "2 seconds",
+        "5 seconds",
+        "60 seconds"
+      ],
+      "answer_index": 2,
+      "explanation": "The API docs list a per-request timeout of 5 seconds.",
+      "sources": [
+        {
+          "path": "docs/api/readme.md",
+          "find": "Per-request timeout: **5 seconds**",
+          "note": "Budgets and Limits section."
+        }
+      ]
+    },
+    {
+      "id": "runbook.telemetry.config.path",
+      "category": "Telemetry/Privacy",
+      "difficulty": 4,
+      "prompt": "Where does the runbook say the telemetry config file lives on Windows?",
+      "options": [
+        "%APPDATA%\\\\EarCrawler\\\\telemetry.json",
+        "%LOCALAPPDATA%\\\\EarCrawler\\\\telemetry.json",
+        "kg/reports/telemetry.json",
+        "docs/privacy/telemetry.json"
+      ],
+      "answer_index": 0,
+      "explanation": "Telemetry Operations in the runbook references `%APPDATA%\\\\EarCrawler\\\\telemetry.json`.",
+      "sources": [
+        {
+          "path": "RUNBOOK.md",
+          "find": "%APPDATA%\\EarCrawler\\telemetry.json",
+          "note": "Telemetry Operations section."
+        }
+      ]
+    },
+    {
+      "id": "runbook.integrity.gate",
+      "category": "Knowledge Graph",
+      "difficulty": 3,
+      "prompt": "Which command does the runbook describe as the integrity gate before export/load?",
+      "options": [
+        "py -m earCrawler.cli integrity check <ttl>",
+        "py -m earCrawler.cli kg-query --ask \"ASK {}\"",
+        "pwsh scripts/monitor-deltas.ps1",
+        "py eval/validate_datasets.py"
+      ],
+      "answer_index": 0,
+      "explanation": "The runbook describes `integrity check` as a hard stop when violations are present.",
+      "sources": [
+        {
+          "path": "RUNBOOK.md",
+          "find": "Integrity Gate",
+          "note": "Integrity Gate section."
+        }
+      ]
+    },
+    {
+      "id": "runbook.lockfiles.pip_compile",
+      "category": "Dependencies",
+      "difficulty": 4,
+      "prompt": "Which tool does the runbook use to regenerate hashed lockfiles for requirements?",
+      "options": [
+        "pip-compile --generate-hashes",
+        "pip freeze > requirements.txt",
+        "poetry lock --no-update",
+        "pipenv lock --clear"
+      ],
+      "answer_index": 0,
+      "explanation": "The runbook shows regenerating lockfiles via `pip-compile --generate-hashes ...`.",
+      "sources": [
+        {
+          "path": "RUNBOOK.md",
+          "find": "pip-compile --generate-hashes",
+          "note": "Regenerating lockfiles with hashes section."
+        }
+      ]
+    }
+  ]
+}
