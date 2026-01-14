@@ -4,6 +4,9 @@ from __future__ import annotations
 
 import json
 import os
+import random
+import re
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
@@ -18,6 +21,12 @@ _logger = JsonLogger("llm-client")
 
 class LLMProviderError(RuntimeError):
     """Raised when an LLM provider call cannot be completed."""
+
+
+_RETRYABLE_STATUS_CODES_DEFAULT = {429}
+_RETRY_AFTER_RE = re.compile(
+    r"try again in\\s+(?P<seconds>\\d+(?:\\.\\d+)?)s", re.IGNORECASE
+)
 
 
 @dataclass
@@ -41,6 +50,23 @@ def _choose_base_url(provider: str, configured: str) -> str:
     return ""
 
 
+def _parse_retry_after_seconds(resp: requests.Response, detail: str) -> float | None:
+    retry_after = resp.headers.get("Retry-After")
+    if retry_after:
+        try:
+            return float(retry_after)
+        except ValueError:
+            return None
+
+    match = _RETRY_AFTER_RE.search(detail or "")
+    if match:
+        try:
+            return float(match.group("seconds"))
+        except ValueError:
+            return None
+    return None
+
+
 def _chat_request(
     session: requests.Session,
     provider: str,
@@ -51,6 +77,10 @@ def _chat_request(
     *,
     timeout: float,
     request_limit: int | None,
+    retry_max_attempts: int,
+    retry_base_seconds: float,
+    retry_max_seconds: float,
+    retry_jitter_seconds: float,
 ) -> ChatResult:
     if not api_key:
         raise LLMProviderError(
@@ -80,30 +110,59 @@ def _chat_request(
         limit=request_limit,
     )
 
-    try:
-        with budget.consume(f"llm:{provider}", limit=request_limit):
-            resp = session.post(url, headers=headers, json=payload, timeout=timeout)
-    except budget.BudgetExceededError as exc:
-        raise LLMProviderError(str(exc)) from exc
-    except requests.RequestException as exc:
-        _logger.error("llm.http_error", provider=provider, error=str(exc))
-        raise LLMProviderError(f"HTTP error calling {provider}: {exc}") from exc
-
-    if resp.status_code >= 400:
-        detail = resp.text
+    max_attempts = max(1, int(retry_max_attempts))
+    for attempt in range(1, max_attempts + 1):
         try:
-            detail = json.dumps(resp.json())
-        except Exception:
-            pass
-        _logger.error(
-            "llm.http_status",
-            provider=provider,
-            status=resp.status_code,
-            body=detail,
-        )
-        raise LLMProviderError(
-            f"{provider} responded with {resp.status_code}: {detail}"
-        )
+            with budget.consume(f"llm:{provider}", limit=request_limit):
+                resp = session.post(
+                    url, headers=headers, json=payload, timeout=timeout
+                )
+        except budget.BudgetExceededError as exc:
+            raise LLMProviderError(str(exc)) from exc
+        except requests.RequestException as exc:
+            _logger.error("llm.http_error", provider=provider, error=str(exc))
+            raise LLMProviderError(f"HTTP error calling {provider}: {exc}") from exc
+
+        if resp.status_code >= 400:
+            detail = resp.text
+            try:
+                detail = json.dumps(resp.json())
+            except Exception:
+                pass
+
+            retryable = resp.status_code in _RETRYABLE_STATUS_CODES_DEFAULT
+            if retryable and attempt < max_attempts:
+                retry_after = _parse_retry_after_seconds(resp, detail)
+                backoff = retry_after
+                if backoff is None:
+                    backoff = min(
+                        float(retry_max_seconds),
+                        float(retry_base_seconds) * (2 ** (attempt - 1)),
+                    )
+                backoff += random.uniform(0.0, float(retry_jitter_seconds))
+
+                _logger.warning(
+                    "llm.retry",
+                    provider=provider,
+                    status=resp.status_code,
+                    attempt=attempt,
+                    max_attempts=max_attempts,
+                    sleep_seconds=backoff,
+                )
+                time.sleep(backoff)
+                continue
+
+            _logger.error(
+                "llm.http_status",
+                provider=provider,
+                status=resp.status_code,
+                body=detail,
+            )
+            raise LLMProviderError(
+                f"{provider} responded with {resp.status_code}: {detail}"
+            )
+
+        break
 
     try:
         data = resp.json()
@@ -146,6 +205,11 @@ def generate_chat(
         os.getenv("LLM_TIMEOUT_SECONDS", "30")
     )
 
+    retry_max_attempts = int(os.getenv("LLM_RETRY_MAX_ATTEMPTS", "5"))
+    retry_base_seconds = float(os.getenv("LLM_RETRY_BASE_SECONDS", "1.0"))
+    retry_max_seconds = float(os.getenv("LLM_RETRY_MAX_SECONDS", "30.0"))
+    retry_jitter_seconds = float(os.getenv("LLM_RETRY_JITTER_SECONDS", "0.25"))
+
     result = _chat_request(
         session=session,
         provider=provider_cfg.provider,
@@ -155,6 +219,10 @@ def generate_chat(
         messages=messages,
         timeout=resolved_timeout,
         request_limit=provider_cfg.request_limit,
+        retry_max_attempts=retry_max_attempts,
+        retry_base_seconds=retry_base_seconds,
+        retry_max_seconds=retry_max_seconds,
+        retry_jitter_seconds=retry_jitter_seconds,
     )
     return result.content
 

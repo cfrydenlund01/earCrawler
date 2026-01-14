@@ -55,3 +55,52 @@ def test_generate_chat_success(monkeypatch):
     result = generate_chat([{"role": "user", "content": "ping"}])
     assert result == "pong"
     assert fake_post.called
+
+
+def test_generate_chat_retries_on_429(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "dummy")
+    monkeypatch.setenv("LLM_RETRY_MAX_ATTEMPTS", "3")
+    monkeypatch.setenv("LLM_RETRY_BASE_SECONDS", "0.0")
+    monkeypatch.setenv("LLM_RETRY_MAX_SECONDS", "0.0")
+    monkeypatch.setenv("LLM_RETRY_JITTER_SECONDS", "0.0")
+
+    calls = {"count": 0}
+
+    class Resp429:
+        status_code = 429
+        headers = {"Retry-After": "0"}
+        text = "rate limited"
+
+        def json(self):
+            return {
+                "error": {
+                    "message": "Rate limit reached. Please try again in 0s."
+                }
+            }
+
+    class Resp200:
+        status_code = 200
+        headers = {}
+        text = ""
+
+        def json(self):
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    def fake_post(self, url, headers=None, json=None, timeout=None):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return Resp429()
+        return Resp200()
+
+    sleeps: list[float] = []
+
+    import api_clients.llm_client as llm_client
+
+    monkeypatch.setattr(requests.Session, "post", fake_post, raising=True)
+    monkeypatch.setattr(llm_client.time, "sleep", lambda s: sleeps.append(s), raising=True)
+
+    result = generate_chat([{"role": "user", "content": "ping"}])
+    assert result == "pong"
+    assert calls["count"] == 2
+    assert len(sleeps) == 1
