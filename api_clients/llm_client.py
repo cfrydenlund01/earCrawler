@@ -27,6 +27,7 @@ _RETRYABLE_STATUS_CODES_DEFAULT = {429}
 _RETRY_AFTER_RE = re.compile(
     r"try again in\\s+(?P<seconds>\\d+(?:\\.\\d+)?)s", re.IGNORECASE
 )
+_LAST_REQUEST_AT = 0.0
 
 
 @dataclass
@@ -111,9 +112,23 @@ def _chat_request(
     )
 
     max_attempts = max(1, int(retry_max_attempts))
+    min_interval_seconds = float(os.getenv("LLM_MIN_INTERVAL_SECONDS", "0.0"))
+    max_wait_seconds = float(retry_max_seconds)
     for attempt in range(1, max_attempts + 1):
         try:
             with budget.consume(f"llm:{provider}", limit=request_limit):
+                if min_interval_seconds > 0:
+                    global _LAST_REQUEST_AT
+                    now = time.monotonic()
+                    sleep_for = min_interval_seconds - (now - _LAST_REQUEST_AT)
+                    if sleep_for > 0:
+                        _logger.info(
+                            "llm.throttle",
+                            provider=provider,
+                            sleep_seconds=sleep_for,
+                        )
+                        time.sleep(sleep_for)
+                    _LAST_REQUEST_AT = time.monotonic()
                 resp = session.post(
                     url, headers=headers, json=payload, timeout=timeout
                 )
@@ -139,7 +154,9 @@ def _chat_request(
                         float(retry_max_seconds),
                         float(retry_base_seconds) * (2 ** (attempt - 1)),
                     )
+                backoff = min(float(max_wait_seconds), float(backoff))
                 backoff += random.uniform(0.0, float(retry_jitter_seconds))
+                backoff = min(float(max_wait_seconds), float(backoff))
 
                 _logger.warning(
                     "llm.retry",

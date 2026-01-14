@@ -104,3 +104,47 @@ def test_generate_chat_retries_on_429(monkeypatch):
     assert result == "pong"
     assert calls["count"] == 2
     assert len(sleeps) == 1
+
+
+def test_generate_chat_throttles_between_calls(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "dummy")
+    monkeypatch.setenv("LLM_MIN_INTERVAL_SECONDS", "10.0")
+    monkeypatch.setenv("LLM_RETRY_MAX_ATTEMPTS", "1")
+
+    class Resp200:
+        status_code = 200
+        headers = {}
+        text = ""
+
+        def json(self):
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    def fake_post(self, url, headers=None, json=None, timeout=None):
+        return Resp200()
+
+    import api_clients.llm_client as llm_client
+
+    # Simulate a second call occurring shortly after the first.
+    t = {"now": 0.0}
+
+    def fake_monotonic():
+        return t["now"]
+
+    sleeps: list[float] = []
+
+    def fake_sleep(seconds: float):
+        sleeps.append(seconds)
+        t["now"] += seconds
+
+    monkeypatch.setattr(requests.Session, "post", fake_post, raising=True)
+    monkeypatch.setattr(llm_client.time, "monotonic", fake_monotonic, raising=True)
+    monkeypatch.setattr(llm_client.time, "sleep", fake_sleep, raising=True)
+
+    # First call at t=0 (no throttle expected).
+    assert generate_chat([{"role": "user", "content": "ping"}]) == "pong"
+    # Advance time a bit, but not enough to satisfy the min interval.
+    t["now"] += 2.0
+    # Second call should sleep for ~8s to reach 10s since last request.
+    assert generate_chat([{"role": "user", "content": "ping"}]) == "pong"
+    assert sleeps and sleeps[-1] == pytest.approx(8.0, abs=1e-6)
