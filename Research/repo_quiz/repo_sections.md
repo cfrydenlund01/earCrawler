@@ -75,6 +75,9 @@ Common workflows:
 - `earctl eval fr-coverage`
 - `earctl eval check-grounding`
 
+Eval scoring notes:
+- `earctl eval run-rag` uses semantic answer scoring by default (`--answer-score-mode semantic`) so `accuracy` reflects meaning instead of exact string equality; for binary true/false QA, use `label_accuracy` as the primary metric.
+
 Release packaging (PowerShell):
 - `pwsh scripts/build-wheel.ps1`
 - `pwsh scripts/build-exe.ps1`

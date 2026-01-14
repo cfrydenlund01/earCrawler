@@ -601,6 +601,20 @@ def build_kg_expansion(manifest: Path, corpus: Path, out: Path) -> None:
     help="Optional cap on items per dataset (useful for smoke tests).",
 )
 @click.option(
+    "--answer-score-mode",
+    type=click.Choice(["semantic", "normalized", "exact"]),
+    default="semantic",
+    show_default=True,
+    help="How to score answer correctness for `accuracy` (default: semantic).",
+)
+@click.option(
+    "--semantic-threshold",
+    type=float,
+    default=0.6,
+    show_default=True,
+    help="Threshold for semantic matching (SequenceMatcher ratio).",
+)
+@click.option(
     "--semantic/--no-semantic",
     default=True,
     show_default=True,
@@ -620,6 +634,8 @@ def eval_run_rag(
     model: str,
     top_k: int,
     max_items: int | None,
+    answer_score_mode: str,
+    semantic_threshold: float,
     semantic: bool,
     out_dir: Path,
 ) -> None:
@@ -656,6 +672,8 @@ def eval_run_rag(
                 max_items=max_items,
                 out_json=out_json,
                 out_md=out_md,
+                answer_score_mode=answer_score_mode,
+                semantic_threshold=semantic_threshold,
                 semantic=semantic,
             )
         except Exception as exc:  # pragma: no cover - bubbled to CLI

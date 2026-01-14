@@ -463,6 +463,32 @@
       ]
     },
     {
+      "id": "eval.answer_score_mode.default",
+      "category": "Evaluation",
+      "difficulty": 3,
+      "prompt": "By default, how does `earctl eval run-rag` score answer correctness for the `accuracy` metric?",
+      "options": [
+        "Semantic similarity (`--answer-score-mode semantic`)",
+        "Exact string equality (`--answer-score-mode exact`)",
+        "Normalized string equality (`--answer-score-mode normalized`)",
+        "It does not compute `accuracy`; only labels are scored"
+      ],
+      "answer_index": 0,
+      "explanation": "The default `--answer-score-mode` is `semantic`, so `accuracy` tracks meaning rather than strict string equality; for binary true/false QA, `label_accuracy` is intended as the primary metric.",
+      "sources": [
+        {
+          "path": "earCrawler/cli/__main__.py",
+          "find": "--answer-score-mode",
+          "note": "Eval CLI option default."
+        },
+        {
+          "path": "scripts/eval/eval_rag_llm.py",
+          "find": "default=\"semantic\"",
+          "note": "Evaluator default scoring mode."
+        }
+      ]
+    },
+    {
       "id": "packaging.release.scripts",
       "category": "Packaging/Release",
       "difficulty": 3,

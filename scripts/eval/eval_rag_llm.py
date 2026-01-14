@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -103,6 +104,47 @@ def _safe_name(value: str) -> str:
     return value.replace("/", "-").replace(":", "-")
 
 
+_ANSWER_SCORE_MODES = ("semantic", "normalized", "exact")
+
+
+def _normalize_answer_text(text: str) -> str:
+    value = (text or "").strip()
+    if not value:
+        return ""
+    value = re.sub(r"^(answer|final answer)\s*:\s*", "", value, flags=re.IGNORECASE)
+    value = value.casefold()
+    value = re.sub(r"\s+", " ", value).strip()
+    value = value.strip(" \t\n\r\"'`")
+    value = value.strip(" .,:;!?")
+    return value
+
+
+def _semantic_match_ratio(a: str, b: str) -> float:
+    import difflib
+
+    return difflib.SequenceMatcher(None, a.casefold(), b.casefold()).ratio()
+
+
+def _answer_is_correct(
+    gt_answer: str,
+    pred_answer: str,
+    *,
+    mode: str,
+    semantic_threshold: float = 0.6,
+) -> bool:
+    if not gt_answer:
+        return False
+    if not pred_answer:
+        return False
+    if mode == "exact":
+        return pred_answer == gt_answer
+    if mode == "normalized":
+        return _normalize_answer_text(pred_answer) == _normalize_answer_text(gt_answer)
+    if mode == "semantic":
+        return _semantic_match_ratio(pred_answer, gt_answer) >= semantic_threshold
+    raise ValueError(f"Unknown answer score mode: {mode}")
+
+
 def evaluate_dataset(
     dataset_id: str,
     *,
@@ -113,6 +155,8 @@ def evaluate_dataset(
     max_items: int | None,
     out_json: Path,
     out_md: Path,
+    answer_score_mode: str = "semantic",
+    semantic_threshold: float = 0.6,
     semantic: bool = False,
 ) -> tuple[Path, Path]:
     manifest = _load_manifest(manifest_path)
@@ -131,14 +175,22 @@ def evaluate_dataset(
     latencies: List[float] = []
 
     correct = 0
+    answer_total = 0
     label_correct = 0
     label_total = 0
     unanswerable_correct = 0
     unanswerable_total = 0
     grounded_hits = 0
     semantic_hits = 0
+    truthiness_items = 0
 
     by_task_raw: Dict[str, Dict[str, float]] = {}
+
+    mode = (answer_score_mode or "").strip().lower() or "semantic"
+    if mode not in _ANSWER_SCORE_MODES:
+        raise ValueError(f"Unsupported --answer-score-mode: {mode}")
+    if semantic_threshold <= 0 or semantic_threshold > 1:
+        raise ValueError("semantic_threshold must be in (0, 1]")
 
     for idx, item in enumerate(_iter_items(data_path)):
         if max_items is not None and idx >= max_items:
@@ -198,21 +250,27 @@ def evaluate_dataset(
         if grounded:
             grounded_hits += 1
 
-        if semantic and gt_answer and answer:
-            import difflib
+        answer_correct = _answer_is_correct(
+            gt_answer,
+            answer,
+            mode=mode,
+            semantic_threshold=semantic_threshold,
+        )
+        if gt_answer:
+            answer_total += 1
+            if answer_correct:
+                correct += 1
 
-            ratio = difflib.SequenceMatcher(
-                None, gt_answer.lower(), answer.lower()
-            ).ratio()
-            if ratio >= 0.6:
+        if semantic and gt_answer and answer:
+            if _semantic_match_ratio(answer, gt_answer) >= semantic_threshold:
                 semantic_hits += 1
 
-        if answer == gt_answer:
-            correct += 1
         if gt_label:
             label_total += 1
             if pred_label == gt_label:
                 label_correct += 1
+            if gt_label in {"true", "false"}:
+                truthiness_items += 1
         if gt_label == "unanswerable":
             unanswerable_total += 1
             if pred_label == "unanswerable":
@@ -230,7 +288,7 @@ def evaluate_dataset(
                 },
             )
             stats["count"] += 1
-            if answer == gt_answer:
+            if answer_correct:
                 stats["answer_correct"] += 1
             if gt_label:
                 stats["label_total"] += 1
@@ -259,14 +317,19 @@ def evaluate_dataset(
         )
 
     num_items = len(results)
-    accuracy = correct / num_items if num_items else 0.0
+    accuracy = correct / answer_total if answer_total else 0.0
     label_accuracy = label_correct / label_total if label_total else 0.0
     unanswerable_accuracy = (
         unanswerable_correct / unanswerable_total if unanswerable_total else 0.0
     )
     grounded_rate = grounded_hits / num_items if num_items else 0.0
-    semantic_accuracy = semantic_hits / num_items if num_items else 0.0
+    semantic_accuracy = semantic_hits / answer_total if answer_total else 0.0
     avg_latency = sum(latencies) / len(latencies) if latencies else 0.0
+    primary_metric = (
+        "label_accuracy"
+        if truthiness_items and truthiness_items == label_total
+        else "accuracy"
+    )
 
     by_task: Dict[str, Dict[str, float]] = {}
     for task_name, stats in by_task_raw.items():
@@ -292,6 +355,9 @@ def evaluate_dataset(
         "top_k": top_k,
         "kg_state_digest": kg_digest,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "answer_score_mode": mode,
+        "semantic_threshold": semantic_threshold,
+        "primary_metric": primary_metric,
         "accuracy": accuracy,
         "label_accuracy": label_accuracy,
         "unanswerable_accuracy": unanswerable_accuracy,
@@ -313,6 +379,9 @@ def evaluate_dataset(
         f"- Dataset: {dataset_id} (task={dataset_meta.get('task')})",
         f"- Provider/model: {provider} / {model}",
         f"- Items: {num_items}, top_k={top_k}",
+        f"- Primary metric: {primary_metric}",
+        f"- Answer scoring: {mode}"
+        + (f" (threshold={semantic_threshold:.2f})" if mode == "semantic" else ""),
         f"- KG digest: {kg_digest or 'n/a'}",
     ]
     if by_task:
@@ -327,7 +396,9 @@ def evaluate_dataset(
             )
     if semantic:
         lines.append("")
-        lines.append(f"- Semantic accuracy (SequenceMatcher >=0.6): {semantic_accuracy:.4f}")
+        lines.append(
+            f"- Semantic accuracy (SequenceMatcher >={semantic_threshold:.2f}): {semantic_accuracy:.4f}"
+        )
     out_md.write_text("\n".join(lines), encoding="utf-8")
     return out_json, out_md
 
@@ -371,9 +442,21 @@ def main(argv: list[str] | None = None) -> int:
         help="Optional cap on number of items to evaluate.",
     )
     parser.add_argument(
+        "--answer-score-mode",
+        choices=list(_ANSWER_SCORE_MODES),
+        default="semantic",
+        help="How to score answer correctness for `accuracy` (default: semantic).",
+    )
+    parser.add_argument(
+        "--semantic-threshold",
+        type=float,
+        default=0.6,
+        help="Threshold for semantic matching (SequenceMatcher ratio).",
+    )
+    parser.add_argument(
         "--semantic",
         action="store_true",
-        help="Include a simple semantic accuracy signal (SequenceMatcher >= 0.6).",
+        help="Include a semantic accuracy signal (SequenceMatcher >= threshold).",
     )
     parser.add_argument(
         "--out-json",
@@ -410,6 +493,8 @@ def main(argv: list[str] | None = None) -> int:
             max_items=args.max_items,
             out_json=out_json,
             out_md=out_md,
+            answer_score_mode=args.answer_score_mode,
+            semantic_threshold=args.semantic_threshold,
             semantic=args.semantic,
         )
     except Exception as exc:  # pragma: no cover - surfaced as CLI failure

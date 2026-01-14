@@ -78,6 +78,8 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
         max_items,
         out_json,
         out_md,
+        answer_score_mode,
+        semantic_threshold,
         semantic,
     ):
         out_json.parent.mkdir(parents=True, exist_ok=True)
@@ -91,6 +93,8 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
                 "top_k": top_k,
                 "semantic": semantic,
                 "max_items": max_items,
+                "answer_score_mode": answer_score_mode,
+                "semantic_threshold": semantic_threshold,
                 "manifest": Path(manifest_path),
             }
         )
@@ -123,6 +127,8 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
     assert calls[0]["dataset_id"] == "ds1"
     assert calls[0]["top_k"] == 2
     assert calls[0]["semantic"] is True
+    assert calls[0]["answer_score_mode"] == "semantic"
+    assert calls[0]["semantic_threshold"] == 0.6
     assert calls[0]["manifest"] == manifest_path
     assert (out_dir / "ds1.rag.groq.llama-3.3-70b-versatile.json").exists()
 

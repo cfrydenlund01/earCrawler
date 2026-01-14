@@ -214,6 +214,12 @@ Implications / next steps before a 100-QA CLI test:
 - Add timeouts + retry policy for remote calls and classify failures separately from model errors (so “API outage” doesn’t look like “model wrong”).
 - Freeze the evaluation contract: pin provider/model, retrieval params, and dataset/KG digest; store these in the emitted metadata and in the CI job output.
 
+## 2026-01-14T21:44:42Z - Eval scoring mode update - pass
+Updated `earctl eval run-rag` to default to semantic answer scoring (`--answer-score-mode semantic`) so `accuracy` reflects meaning rather than exact string equality; kept `label_accuracy` as the intended primary metric for binary true/false QA (also emitted as `primary_metric` in the eval JSON/MD).
+Notes:
+- Switch back to strict behavior with `--answer-score-mode exact`, or use `--answer-score-mode normalized` to ignore case/punctuation/whitespace.
+- `--semantic-threshold` controls the SequenceMatcher ratio threshold used for semantic scoring.
+
 ## 2026-01-08T21:58:00Z - Eval v2 datasets - pass
 Added ear_compliance.v2 (100 items), entity_obligations.v2 (100 items), and unanswerable.v2 (20 items); updated eval/manifest.json references for new kg_nodes and kg_paths; validated datasets (eval/validate_datasets.py) and evidence alignment (earCrawler.cli eval verify-evidence) with 0 missing; pytest subset passed.
 Artifacts:
