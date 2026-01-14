@@ -242,3 +242,32 @@ Artifacts:
 - dist/eval/unanswerable.v2.rag.groq.llama-3.3-70b-versatile.md (exists)
 Env: {"dal": "false", "max_items": 5, "model": "llama-3.3-70b-versatile", "platform": "nt", "provider": "groq", "system": "Windows_NT", "tacc": "false", "windows": "true"}
 
+## 2026-01-14T22:05:48Z - v2 QA analysis (20-item sample) - partial (rate-limited)
+Ran a larger v2 QA sample (max-items=20) plus FR coverage and grounding-contract checks. Dataset validation passes, but Groq TPM rate limiting (HTTP 429) causes many per-item failures; interpret label/grounding metrics below as degraded by infra errors rather than pure model quality.
+
+Validation:
+- `py eval/validate_datasets.py` (pass)
+
+FR coverage (retrieval_k=10, FAISS; reports in dist/eval/):
+- ear_compliance.v2: expected_sections=100, missing_in_retrieval=36, median_retrieval_rank=1.0
+- entity_obligations.v2: expected_sections=100, missing_in_retrieval=20, median_retrieval_rank=1.5
+- unanswerable.v2: expected_sections=0
+
+RAG sample runs (provider/model: groq/llama-3.3-70b-versatile, top_k=5, kg_digest=e5e98b355356537bca1482634b722d908b3e0f8ed1ef943253f7e61dbc685f7a):
+- ear_compliance.v2: errors=5/20 (429), label_accuracy=0.60, grounded_rate=0.45; grounding-contract: expected_hit_rate=0.45, contract_pass_rate=0.40
+- entity_obligations.v2: errors=13/20 (429), label_accuracy=0.30, grounded_rate=0.25; grounding-contract: expected_hit_rate=0.25, contract_pass_rate=0.20
+- unanswerable.v2: errors=15/20 (429), unanswerable_accuracy=0.25
+
+Artifacts:
+- dist/eval/fr_coverage_ear_compliance_v2.json (exists)
+- dist/eval/fr_coverage_entity_obligations_v2.json (exists)
+- dist/eval/fr_coverage_unanswerable_v2.json (exists)
+- dist/eval/grounding_ear_compliance_v2.json (exists)
+- dist/eval/grounding_entity_obligations_v2.json (exists)
+- dist/eval/run_rag_v2_sample_20260114.txt (exists)
+
+Next steps before treating this as a reliable QA gate:
+- Add 429-aware retry/backoff (or enforce per-minute token budgeting) so infra limits don’t appear as model errors; re-run with max-items=20 after stabilization.
+- Address FR coverage gaps (missing expected section in top-10 retrieval for 36% and 20% of items): consider raising `top_k`, improving query formulation, and/or rebuilding FAISS with better chunking/metadata to surface expected sections.
+- Decide gating thresholds for the grounding contract (e.g., min grounded_rate and expected_hit_rate) and run them on a full 100-item pass once rate limiting is controlled.
+
