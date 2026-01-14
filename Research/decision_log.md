@@ -271,3 +271,10 @@ Next steps before treating this as a reliable QA gate:
 - Address FR coverage gaps (missing expected section in top-10 retrieval for 36% and 20% of items): consider raising `top_k`, improving query formulation, and/or rebuilding FAISS with better chunking/metadata to surface expected sections.
 - Decide gating thresholds for the grounding contract (e.g., min grounded_rate and expected_hit_rate) and run them on a full 100-item pass once rate limiting is controlled.
 
+## 2026-01-14T23:17:26Z - v2 QA sample rerun attempt - blocked (Groq TPD quota)
+Implemented LLM-side throttling + 429 retry/backoff controls, then attempted to re-run the v2 20-item sample after deleting the prior v2 outputs.
+Outcome: Groq began returning 429s for tokens-per-day (TPD) quota exhaustion (e.g., “Limit 100000, Used ~99k, Requested ~1.2k; try again in ~3–10 minutes”), so the rerun could not complete and did not emit new `dist/eval/*.v2.rag.*` artifacts.
+Next actions:
+- Wait for TPD budget to replenish (or upgrade Groq tier), then rerun the v2 sample.
+- Alternatively rerun with a smaller max-items (e.g., 5) until quota is healthy again, or switch provider/model.
+
