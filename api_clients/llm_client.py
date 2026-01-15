@@ -68,6 +68,15 @@ def _parse_retry_after_seconds(resp: requests.Response, detail: str) -> float | 
     return None
 
 
+def _is_retryable_429(detail: str) -> bool:
+    """Return True when a 429 is likely transient (e.g., TPM), False for hard quotas (e.g., TPD)."""
+
+    detail_lower = (detail or "").lower()
+    if "tokens per day" in detail_lower or "tpd" in detail_lower:
+        return False
+    return True
+
+
 def _chat_request(
     session: requests.Session,
     provider: str,
@@ -146,6 +155,8 @@ def _chat_request(
                 pass
 
             retryable = resp.status_code in _RETRYABLE_STATUS_CODES_DEFAULT
+            if retryable and resp.status_code == 429 and not _is_retryable_429(detail):
+                retryable = False
             if retryable and attempt < max_attempts:
                 retry_after = _parse_retry_after_seconds(resp, detail)
                 backoff = retry_after

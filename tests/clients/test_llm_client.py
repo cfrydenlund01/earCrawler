@@ -148,3 +148,49 @@ def test_generate_chat_throttles_between_calls(monkeypatch):
     # Second call should sleep for ~8s to reach 10s since last request.
     assert generate_chat([{"role": "user", "content": "ping"}]) == "pong"
     assert sleeps and sleeps[-1] == pytest.approx(8.0, abs=1e-6)
+
+
+def test_generate_chat_does_not_retry_on_tpd_429(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.setenv("GROQ_API_KEY", "dummy")
+    monkeypatch.setenv("LLM_RETRY_MAX_ATTEMPTS", "3")
+    monkeypatch.setenv("LLM_RETRY_BASE_SECONDS", "0.0")
+    monkeypatch.setenv("LLM_RETRY_MAX_SECONDS", "0.0")
+    monkeypatch.setenv("LLM_RETRY_JITTER_SECONDS", "0.0")
+
+    calls = {"count": 0}
+
+    class Resp429TPD:
+        status_code = 429
+        headers = {"Retry-After": "0"}
+        text = "rate limited"
+
+        def json(self):
+            return {
+                "error": {
+                    "message": "Rate limit reached on tokens per day (TPD): Limit 100000, Used 99999, Requested 10. Please try again in 60s."
+                }
+            }
+
+    class Resp200:
+        status_code = 200
+        headers = {}
+        text = ""
+
+        def json(self):
+            return {"choices": [{"message": {"content": "pong"}}]}
+
+    def fake_post(self, url, headers=None, json=None, timeout=None):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return Resp429TPD()
+        return Resp200()
+
+    import api_clients.llm_client as llm_client
+
+    monkeypatch.setattr(requests.Session, "post", fake_post, raising=True)
+    monkeypatch.setattr(llm_client.time, "sleep", lambda s: None, raising=True)
+
+    with pytest.raises(LLMProviderError):
+        generate_chat([{"role": "user", "content": "ping"}])
+    assert calls["count"] == 1
