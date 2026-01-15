@@ -278,3 +278,19 @@ Next actions:
 - Wait for TPD budget to replenish (or upgrade Groq tier), then rerun the v2 sample.
 - Alternatively rerun with a smaller max-items (e.g., 5) until quota is healthy again, or switch provider/model.
 
+## 2026-01-15T22:10:39Z - v2 QA round-robin smoke (max-items=5 each) - pass (throttled)
+Re-ran the QA smoke in a round-robin order (ear_compliance.v2 -> entity_obligations.v2 -> unanswerable.v2) with `--max-items 5` per dataset using an LLM throttle (`LLM_MIN_INTERVAL_SECONDS=12`). This completed with 0/5 errors for each dataset (no Groq 429s observed in this run).
+
+Summaries (provider/model: groq/llama-3.3-70b-versatile, top_k=5, kg_digest=e5e98b3...):
+- ear_compliance.v2: label_accuracy=1.00, grounded_rate=0.20; grounding-contract expected_hit_rate=0.20, contract_pass_rate=0.20
+- entity_obligations.v2: label_accuracy=1.00, grounded_rate=0.80; grounding-contract expected_hit_rate=0.80, contract_pass_rate=0.80
+- unanswerable.v2: unanswerable_accuracy=1.00
+
+Artifacts:
+- dist/eval/ear_compliance.v2.rag.groq.llama-3.3-70b-versatile.json (exists)
+- dist/eval/entity_obligations.v2.rag.groq.llama-3.3-70b-versatile.json (exists)
+- dist/eval/unanswerable.v2.rag.groq.llama-3.3-70b-versatile.json (exists)
+- dist/eval/grounding_ear_compliance_v2.json (exists)
+- dist/eval/grounding_entity_obligations_v2.json (exists)
+- dist/eval/run_rag_v2_roundrobin_20260114.txt (exists)
+
