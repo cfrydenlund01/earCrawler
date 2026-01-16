@@ -49,7 +49,7 @@ def _expected_sections_for_item(item: Mapping[str, object]) -> list[str]:
     return sorted(expected)
 
 
-def build_fr_coverage_report(
+def build_ecfr_coverage_report(
     *,
     manifest: Path,
     corpus: Path,
@@ -60,11 +60,11 @@ def build_fr_coverage_report(
         Callable[[str, int], Sequence[Mapping[str, object]]] | None
     ) = None,
 ) -> dict[str, object]:
-    """Build a report that checks FR section coverage + FAISS retrievability.
+    """Build a report that checks section coverage + FAISS retrievability.
 
     Intended behavior
     - Enumerate expected EAR sections from each dataset item (ear_sections + evidence.doc_spans).
-    - Verify each expected section exists in the FR corpus (data/fr_sections.jsonl).
+    - Verify each expected section exists in the corpus JSONL.
     - Query the FAISS retriever with the question and record the rank (1-based) of each expected section.
     """
 
@@ -189,6 +189,12 @@ def build_fr_coverage_report(
         "median_retrieval_rank": (median(hit_ranks) if hit_ranks else None),
     }
     return report
+
+
+def build_fr_coverage_report(*args, **kwargs) -> dict[str, object]:
+    """Backwards-compatible alias; prefer build_ecfr_coverage_report()."""
+
+    return build_ecfr_coverage_report(*args, **kwargs)
 
 
 def build_grounding_contract_report(

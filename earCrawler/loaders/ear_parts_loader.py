@@ -183,7 +183,7 @@ def load_parts_from_fr(
         changed = prov.record(
             f"https://ear.example.org/part/{part}",
             source_url=(first.source_url if first else ""),
-            provider_domain="federalregister.gov",
+            provider_domain="ecfr.gov",
             content_hash=content_hash,
             retrieved_at=first.publication_date if first else None,
             request_url=first.source_url if first else None,

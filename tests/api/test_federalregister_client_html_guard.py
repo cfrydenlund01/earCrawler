@@ -17,5 +17,5 @@ def test_html_guard(monkeypatch) -> None:
     response.json.side_effect = AssertionError("json() should not be called")
     monkeypatch.setattr(client.session, "get", Mock(return_value=response))
     with pytest.raises(FederalRegisterError):
-        client._get_json("https://api.federalregister.gov/v1/test", params={})
+        client._get_json("https://api.federalregister.gov/v1/ecfr/test", params={})
     response.json.assert_not_called()

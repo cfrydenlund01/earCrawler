@@ -30,7 +30,7 @@ def _ensure_retriever(retriever: object | None = None):
         index_path = (
             Path(index_override)
             if index_override
-            else Path("data") / "faiss" / "index.faiss"
+            else Path("data") / "faiss" / "ecfr.index.faiss"
         )
         model_name = model_override or "all-MiniLM-L12-v2"
         return Retriever(

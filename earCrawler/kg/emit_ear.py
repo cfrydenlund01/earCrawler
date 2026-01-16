@@ -108,7 +108,7 @@ def emit_ear(
                         prov_graph,
                         para_iri,
                         source_url=source,
-                        provider_domain="federalregister.gov",
+                        provider_domain="ecfr.gov",
                         request_url=source,
                         generated_at=date_str,
                         response_sha256=para_hash,

@@ -99,6 +99,7 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
         answer_score_mode,
         semantic_threshold,
         semantic,
+        **kwargs,
     ):
         out_json.parent.mkdir(parents=True, exist_ok=True)
         out_json.write_text("{}", encoding="utf-8")
@@ -114,6 +115,7 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
                 "answer_score_mode": answer_score_mode,
                 "semantic_threshold": semantic_threshold,
                 "manifest": Path(manifest_path),
+                "kwargs": kwargs,
             }
         )
         return out_json, out_md

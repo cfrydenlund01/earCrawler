@@ -168,6 +168,13 @@ def evaluate_dataset(
     answer_score_mode: str = "semantic",
     semantic_threshold: float = 0.6,
     semantic: bool = False,
+    ensure_sections: bool = False,
+    corpus_path: Path = Path("data") / "ecfr_sections.jsonl",
+    index_path: Path = Path("data") / "faiss" / "ecfr.index.faiss",
+    index_model_name: str = "all-MiniLM-L12-v2",
+    fr_per_page: int = 2,
+    refresh_sections: bool = False,
+    update_index: bool = True,
 ) -> tuple[Path, Path]:
     manifest = _load_manifest(manifest_path)
     kg_digest = (manifest.get("kg_state", {}) or {}).get("digest")
@@ -202,9 +209,40 @@ def evaluate_dataset(
     if semantic_threshold <= 0 or semantic_threshold > 1:
         raise ValueError("semantic_threshold must be in (0, 1]")
 
+    items: list[dict] = []
     for idx, item in enumerate(_iter_items(data_path)):
         if max_items is not None and idx >= max_items:
             break
+        items.append(item)
+
+    if ensure_sections:
+        try:
+            from earCrawler.rag.ensure_sections import ensure_ecfr_sections
+        except Exception as exc:
+            raise RuntimeError(f"Failed to import ensure_sections: {exc}") from exc
+
+        needed: set[str] = set()
+        for item in items:
+            for sec in item.get("ear_sections") or []:
+                if sec:
+                    needed.add(str(sec))
+            evidence = item.get("evidence") or {}
+            for span in evidence.get("doc_spans") or []:
+                span_id = span.get("span_id")
+                if span_id:
+                    needed.add(str(span_id))
+
+        ensure_ecfr_sections(
+            sorted(needed),
+            corpus_path=corpus_path,
+            index_path=index_path,
+            model_name=index_model_name,
+            per_page=fr_per_page,
+            refresh=refresh_sections,
+            update_index=update_index,
+        )
+
+    for idx, item in enumerate(items):
         question = item.get("question", "")
         ground_truth = item.get("ground_truth", {}) or {}
         gt_answer = (ground_truth.get("answer_text") or "").strip()

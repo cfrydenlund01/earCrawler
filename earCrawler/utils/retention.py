@@ -201,7 +201,7 @@ def run_gc(
         ],
         "cache": [
             Path(".cache/api/tradegov"),
-            Path(".cache/api/federalregister"),
+            Path(".cache/api/ecfr"),
         ],
         "kg": [
             Path("kg/reports"),

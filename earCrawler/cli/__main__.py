@@ -450,7 +450,7 @@ def eval_group() -> None:
 @click.option(
     "--corpus",
     type=click.Path(path_type=Path),
-    default=Path("data") / "fr_sections.jsonl",
+    default=Path("data") / "ecfr_sections.jsonl",
     show_default=True,
     help="Corpus JSONL to validate references against.",
 )
@@ -543,7 +543,7 @@ def eval_verify_evidence(
 @click.option(
     "--corpus",
     type=click.Path(path_type=Path),
-    default=Path("data") / "fr_sections.jsonl",
+    default=Path("data") / "ecfr_sections.jsonl",
     show_default=True,
     help="Corpus JSONL containing section text.",
 )
@@ -634,6 +634,52 @@ def build_kg_expansion(manifest: Path, corpus: Path, out: Path) -> None:
     show_default=True,
     help="Base directory for metrics outputs.",
 )
+@click.option(
+    "--ensure-sections/--no-ensure-sections",
+    default=True,
+    show_default=True,
+    help="Fetch referenced sections from eCFR and update the local RAG index before running.",
+)
+@click.option(
+    "--corpus",
+    type=click.Path(path_type=Path),
+    default=Path("data") / "ecfr_sections.jsonl",
+    show_default=True,
+    help="eCFR-backed corpus JSONL used for indexing.",
+)
+@click.option(
+    "--index-path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("data") / "faiss" / "ecfr.index.faiss",
+    show_default=True,
+    help="FAISS index path to update when ensuring sections.",
+)
+@click.option(
+    "--index-model-name",
+    type=str,
+    default="all-MiniLM-L12-v2",
+    show_default=True,
+    help="SentenceTransformer model name for the FAISS index.",
+)
+@click.option(
+    "--fr-per-page",
+    type=int,
+    default=2,
+    show_default=True,
+    help="Max eCFR search results to fetch per section term (fallback only).",
+)
+@click.option(
+    "--refresh-sections/--no-refresh-sections",
+    default=False,
+    show_default=True,
+    help="Fetch even when a section already exists in the corpus.",
+)
+@click.option(
+    "--update-index/--no-update-index",
+    default=True,
+    show_default=True,
+    help="Whether to also update the FAISS index with newly fetched passages.",
+)
 def eval_run_rag(
     manifest: Path,
     dataset_id: str | None,
@@ -645,6 +691,13 @@ def eval_run_rag(
     semantic_threshold: float,
     semantic: bool,
     out_dir: Path,
+    ensure_sections: bool,
+    corpus: Path,
+    index_path: Path,
+    index_model_name: str,
+    fr_per_page: int,
+    refresh_sections: bool,
+    update_index: bool,
 ) -> None:
     """Run RAG-based evals for each dataset in the manifest."""
 
@@ -684,6 +737,13 @@ def eval_run_rag(
                 answer_score_mode=answer_score_mode,
                 semantic_threshold=semantic_threshold,
                 semantic=semantic,
+                ensure_sections=ensure_sections,
+                corpus_path=corpus,
+                index_path=index_path,
+                index_model_name=index_model_name,
+                fr_per_page=fr_per_page,
+                refresh_sections=refresh_sections,
+                update_index=update_index,
             )
         except Exception as exc:  # pragma: no cover - bubbled to CLI
             raise click.ClickException(str(exc))
@@ -701,7 +761,7 @@ def eval_run_rag(
 @click.option(
     "--corpus",
     type=click.Path(path_type=Path),
-    default=Path("data") / "fr_sections.jsonl",
+    default=Path("data") / "ecfr_sections.jsonl",
     show_default=True,
     help="Corpus JSONL to validate references against.",
 )
@@ -729,7 +789,7 @@ def eval_run_rag(
     type=click.Path(path_type=Path),
     default=Path("dist") / "eval" / "fr_coverage_report.json",
     show_default=True,
-    help="Where to write the FR coverage report.",
+    help="Where to write the coverage report.",
 )
 @click.option(
     "--fail/--no-fail",
@@ -746,15 +806,15 @@ def eval_fr_coverage(
     out: Path,
     fail: bool,
 ) -> None:
-    """Check FR section coverage + retriever ranks for eval datasets."""
+    """Check section coverage + retriever ranks for eval datasets."""
 
     try:
-        from earCrawler.eval.coverage_checks import build_fr_coverage_report
+        from earCrawler.eval.coverage_checks import build_ecfr_coverage_report
     except Exception as exc:  # pragma: no cover - import failures
         raise click.ClickException(str(exc))
 
     try:
-        report = build_fr_coverage_report(
+        report = build_ecfr_coverage_report(
             manifest=manifest,
             corpus=corpus,
             dataset_id=dataset_id,
@@ -774,7 +834,7 @@ def eval_fr_coverage(
         f"{dataset_id}: missing_in_corpus={missing_in_corpus}, missing_in_retrieval={missing_in_retrieval}"
     )
     if fail and (missing_in_corpus or missing_in_retrieval):
-        raise click.ClickException("FR coverage check failed")
+        raise click.ClickException("coverage check failed")
 
 
 @eval_group.command(name="check-grounding")
@@ -1121,11 +1181,36 @@ def llm() -> None:
     show_default=True,
     help="Number of retrieved contexts to pass to the LLM.",
 )
+@click.option(
+    "--auto-fetch-sections/--no-auto-fetch-sections",
+    default=False,
+    show_default=True,
+    help="If the question cites EAR sections (e.g., 736.2(b)), fetch matching FR passages and update the local index first.",
+)
 @click.argument("question", type=str)
 def llm_ask(
-    llm_provider: str | None, llm_model: str | None, top_k: int, question: str
+    llm_provider: str | None,
+    llm_model: str | None,
+    top_k: int,
+    auto_fetch_sections: bool,
+    question: str,
 ) -> None:
     """Answer a question using the RAG pipeline and selected provider/model."""
+
+    if auto_fetch_sections:
+        try:
+            from earCrawler.rag.ensure_sections import (
+                ensure_ecfr_sections,
+                extract_section_mentions,
+            )
+        except Exception as exc:  # pragma: no cover
+            raise click.ClickException(str(exc))
+        cited = extract_section_mentions(question)
+        if cited:
+            try:
+                ensure_ecfr_sections(cited)
+            except Exception as exc:
+                raise click.ClickException(str(exc))
 
     try:
         result = answer_with_rag(
@@ -1149,7 +1234,7 @@ def llm_ask(
 )
 @click.option(
     "--query",
-    help="Free-text query to send to Federal Register (falls back to sections when omitted).",
+    help="Free-text query to send to eCFR (falls back to sections when omitted).",
 )
 @click.option(
     "--per-page",
@@ -1161,14 +1246,14 @@ def llm_ask(
 @click.option(
     "--out",
     type=click.Path(dir_okay=False, path_type=Path),
-    default=Path("data") / "fr_sections.jsonl",
+    default=Path("data") / "ecfr_sections.jsonl",
     show_default=True,
     help="Destination JSONL file.",
 )
 def fr_fetch(
     sections: tuple[str, ...], query: str | None, per_page: int, out: Path
 ) -> None:
-    """Fetch EAR-related passages from the Federal Register and store them for indexing."""
+    """Fetch EAR-related passages from eCFR and store them for indexing."""
 
     if not sections and not query:
         raise click.ClickException("Provide at least one --section or a --query.")
@@ -1176,82 +1261,43 @@ def fr_fetch(
     client = FederalRegisterClient()
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    def _records_for(term: str) -> list[dict]:
+    def _records_for(term: str, *, section_id: str) -> list[dict]:
         try:
             docs = client.get_ear_articles(term, per_page=per_page)
         except Exception as exc:
             click.echo(
-                f"Warning: failed to fetch '{term}' from Federal Register: {exc}",
+                f"Warning: failed to fetch '{term}' from eCFR: {exc}",
                 err=True,
             )
-            # Fallback to the public JSON API directly to avoid client-level checks.
-            try:
-                resp = requests.get(
-                    "https://www.federalregister.gov/api/v1/documents.json",
-                    params={"per_page": per_page, "conditions[term]": term},
-                    headers={"Accept": "application/json"},
-                    timeout=20,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-                docs = []
-                for item in data.get("results", []):
-                    detail_url = f"https://www.federalregister.gov/api/v1/documents/{item.get('document_number')}.json"
-                    detail = requests.get(
-                        detail_url, headers={"Accept": "application/json"}, timeout=20
-                    )
-                    detail.raise_for_status()
-                    detail_json = detail.json()
-                    text = (
-                        detail_json.get("body_html")
-                        or detail_json.get("body_text")
-                        or item.get("abstract")
-                        or " ".join(item.get("excerpts") or [])
-                        or ""
-                    )
-                    docs.append(
-                        {
-                            "id": item.get("document_number"),
-                            "title": item.get("title"),
-                            "publication_date": item.get("publication_date"),
-                            "source_url": item.get("html_url") or item.get("url"),
-                            "text": text,
-                            "provider": "federalregister.gov",
-                        }
-                    )
-            except Exception as inner_exc:  # pragma: no cover - network dependent
-                click.echo(
-                    f"Warning: fallback fetch for '{term}' also failed: {inner_exc}",
-                    err=True,
-                )
-                return []
+            return []
         records: list[dict] = []
         for doc in docs:
             text = (doc.get("text") or "").strip()
             if not text:
                 continue
-            section_id = term.strip()
+            doc_id = str(doc.get("id") or "").strip()
             records.append(
                 {
-                    "id": f"EAR-{section_id}",
+                    "id": f"EAR-{section_id}:{doc_id}" if doc_id else f"EAR-{section_id}",
+                    "doc_id": doc_id,
                     "section": section_id,
                     "span_id": section_id,
                     "title": doc.get("title"),
                     "text": text,
                     "source_url": doc.get("source_url"),
-                    "provider": doc.get("provider", "federalregister.gov"),
+                    "provider": doc.get("provider", "ecfr.gov"),
                 }
             )
         return records
 
     collected: list[dict] = []
     if query:
-        collected.extend(_records_for(query))
+        collected.extend(_records_for(query, section_id=query.strip()))
     for sec in sections:
-        collected.extend(_records_for(sec))
+        collected.extend(_records_for(sec, section_id=sec.strip()))
 
     if not collected:
-        raise click.ClickException("No records fetched from Federal Register.")
+        raise click.ClickException("No records fetched from eCFR.")
 
     with out.open("w", encoding="utf-8") as fh:
         for rec in collected:
@@ -1340,6 +1386,90 @@ def rag_index_build(
     retriever.add_documents(docs)
     click.echo(
         f"Indexed {len(docs)} documents -> {index_path} (+ metadata {index_path.with_suffix('.pkl')})"
+    )
+
+
+@rag_index.command(name="ensure-sections")
+@click.option(
+    "--section",
+    "-s",
+    "sections",
+    multiple=True,
+    required=True,
+    help="EAR section identifier(s) to ensure are present (e.g., EAR-736.2(b)). Repeatable.",
+)
+@click.option(
+    "--corpus",
+    type=click.Path(path_type=Path),
+    default=Path("data") / "ecfr_sections.jsonl",
+    show_default=True,
+    help="eCFR-backed corpus JSONL to append to.",
+)
+@click.option(
+    "--index-path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("data") / "faiss" / "ecfr.index.faiss",
+    show_default=True,
+    help="FAISS index to update (incremental).",
+)
+@click.option(
+    "--model-name",
+    type=str,
+    default="all-MiniLM-L12-v2",
+    show_default=True,
+    help="SentenceTransformer model name for embeddings.",
+)
+@click.option(
+    "--per-page",
+    type=int,
+    default=2,
+    show_default=True,
+    help="Max eCFR search results to fetch per section term (fallback only).",
+)
+@click.option(
+    "--refresh/--no-refresh",
+    default=False,
+    show_default=True,
+    help="Fetch even if the section already exists in the corpus.",
+)
+@click.option(
+    "--update-index/--no-update-index",
+    default=True,
+    show_default=True,
+    help="Whether to also update the FAISS index with newly fetched passages.",
+)
+def rag_ensure_sections(
+    sections: tuple[str, ...],
+    corpus: Path,
+    index_path: Path,
+    model_name: str,
+    per_page: int,
+    refresh: bool,
+    update_index: bool,
+) -> None:
+    """Fetch missing section context from eCFR and update the RAG index."""
+
+    try:
+        from earCrawler.rag.ensure_sections import ensure_ecfr_sections
+    except Exception as exc:  # pragma: no cover
+        raise click.ClickException(str(exc))
+
+    try:
+        result = ensure_ecfr_sections(
+            sections,
+            corpus_path=corpus,
+            index_path=index_path,
+            model_name=model_name,
+            per_page=per_page,
+            refresh=refresh,
+            update_index=update_index,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc))
+
+    click.echo(
+        f"sections={len(result.normalized_sections)} missing_before={len(result.missing_before)} "
+        f"fetched_records={result.fetched_records} added_to_index={result.added_to_index}"
     )
 
 
