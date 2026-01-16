@@ -17,7 +17,12 @@ def test_verify_evidence_cli_success(tmp_path: Path) -> None:
     _write_jsonl(
         corpus_path,
         [
-            {"id": "EAR-740.1", "section": "740.1", "text": "License Exceptions intro", "source_url": "http://example/740"},
+            {
+                "id": "EAR-740.1",
+                "section": "740.1",
+                "text": "License Exceptions intro",
+                "source_url": "http://example/740",
+            },
         ],
     )
     dataset_path = tmp_path / "dataset.jsonl"
@@ -33,7 +38,8 @@ def test_verify_evidence_cli_success(tmp_path: Path) -> None:
     )
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
-        json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}), encoding="utf-8"
+        json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}),
+        encoding="utf-8",
     )
 
     runner = CliRunner()
@@ -59,10 +65,22 @@ def test_verify_evidence_cli_success(tmp_path: Path) -> None:
 
 def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
     dataset_path = tmp_path / "dataset.jsonl"
-    _write_jsonl(dataset_path, [{"id": "q1", "question": "?", "ground_truth": {}, "ear_sections": [], "evidence": {}}])
+    _write_jsonl(
+        dataset_path,
+        [
+            {
+                "id": "q1",
+                "question": "?",
+                "ground_truth": {},
+                "ear_sections": [],
+                "evidence": {},
+            }
+        ],
+    )
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
-        json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}), encoding="utf-8"
+        json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}),
+        encoding="utf-8",
     )
 
     calls: list[dict] = []
@@ -160,16 +178,24 @@ def test_fr_coverage_cli_records_ranks(monkeypatch, tmp_path: Path) -> None:
     )
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
-        json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}), encoding="utf-8"
+        json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}),
+        encoding="utf-8",
     )
 
     from earCrawler.rag import pipeline as rag_pipeline
 
-    monkeypatch.setattr(rag_pipeline, "_ensure_retriever", lambda *args, **kwargs: object())
+    monkeypatch.setattr(
+        rag_pipeline, "_ensure_retriever", lambda *args, **kwargs: object()
+    )
 
     def fake_retrieve(question: str, top_k: int = 5, *, retriever=None):
         return [
-            {"section_id": "EAR-736.2(b)", "text": "irrelevant", "score": 0.9, "raw": {}},
+            {
+                "section_id": "EAR-736.2(b)",
+                "text": "irrelevant",
+                "score": 0.9,
+                "raw": {},
+            },
             {"section_id": "EAR-740.1", "text": "hit", "score": 0.8, "raw": {}},
         ][:top_k]
 

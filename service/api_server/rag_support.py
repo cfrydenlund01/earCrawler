@@ -52,7 +52,11 @@ def load_retriever() -> RetrieverProtocol:
 
     index_override = os.getenv("EARCRAWLER_FAISS_INDEX")
     model_override = os.getenv("EARCRAWLER_FAISS_MODEL")
-    index_path = Path(index_override) if index_override else Path("data") / "faiss" / "index.faiss"
+    index_path = (
+        Path(index_override)
+        if index_override
+        else Path("data") / "faiss" / "index.faiss"
+    )
     model_name = model_override or "all-MiniLM-L12-v2"
 
     try:

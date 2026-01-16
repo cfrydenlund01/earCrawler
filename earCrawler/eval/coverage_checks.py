@@ -18,7 +18,9 @@ def _iter_jsonl(path: Path) -> Iterable[dict]:
             yield json.loads(stripped)
 
 
-def _resolve_dataset_path(manifest_path: Path, dataset_entry: Mapping[str, object]) -> Path:
+def _resolve_dataset_path(
+    manifest_path: Path, dataset_entry: Mapping[str, object]
+) -> Path:
     raw_file = dataset_entry.get("file")
     if not raw_file:
         raise ValueError(f"Dataset entry missing file: {dataset_entry.get('id')}")
@@ -54,7 +56,9 @@ def build_fr_coverage_report(
     dataset_id: str = "all",
     retrieval_k: int = 10,
     max_items: int | None = None,
-    retrieve_context: Callable[[str, int], Sequence[Mapping[str, object]]] | None = None,
+    retrieve_context: (
+        Callable[[str, int], Sequence[Mapping[str, object]]] | None
+    ) = None,
 ) -> dict[str, object]:
     """Build a report that checks FR section coverage + FAISS retrievability.
 
@@ -67,14 +71,19 @@ def build_fr_coverage_report(
     manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
     dataset_entries = manifest_obj.get("datasets", []) or []
     if dataset_id != "all":
-        dataset_entries = [entry for entry in dataset_entries if entry.get("id") == dataset_id]
+        dataset_entries = [
+            entry for entry in dataset_entries if entry.get("id") == dataset_id
+        ]
         if not dataset_entries:
             raise ValueError(f"Dataset not found: {dataset_id}")
 
     corpus_index = load_corpus_index(corpus)
 
     if retrieve_context is None:
-        from earCrawler.rag.pipeline import _ensure_retriever, retrieve_regulation_context
+        from earCrawler.rag.pipeline import (
+            _ensure_retriever,
+            retrieve_regulation_context,
+        )
 
         if _ensure_retriever() is None:
             raise RuntimeError(
@@ -114,7 +123,9 @@ def build_fr_coverage_report(
                 break
             question = str(item.get("question") or "")
             expected_sections = _expected_sections_for_item(item)
-            missing_in_corpus = [sec for sec in expected_sections if sec not in corpus_index]
+            missing_in_corpus = [
+                sec for sec in expected_sections if sec not in corpus_index
+            ]
 
             retrieved = list(retrieve_context(question, retrieval_k))
             retrieved_sections: list[str] = []
@@ -159,7 +170,9 @@ def build_fr_coverage_report(
                 "expected_sections": ds_expected,
                 "missing_in_corpus": ds_missing_in_corpus,
                 "missing_in_retrieval": ds_missing_in_retrieval,
-                "median_retrieval_rank": (median(ds_rank_hits) if ds_rank_hits else None),
+                "median_retrieval_rank": (
+                    median(ds_rank_hits) if ds_rank_hits else None
+                ),
             },
         }
         report["datasets"].append(dataset_report)
@@ -261,13 +274,17 @@ def build_grounding_contract_report(
             "grounded_rate": grounded_rate,
             "expected_section_hit_rate": expected_hit_rate,
             "contract_total": contract_total,
-            "contract_pass_rate": (contract_pass / contract_total if contract_total else 0.0),
+            "contract_pass_rate": (
+                contract_pass / contract_total if contract_total else 0.0
+            ),
             "min_grounded_rate": min_grounded_rate,
             "min_expected_hit_rate": min_expected_hit_rate,
         },
         "failures": failures,
     }
-    thresholds_ok = grounded_rate >= min_grounded_rate and expected_hit_rate >= min_expected_hit_rate
+    thresholds_ok = (
+        grounded_rate >= min_grounded_rate
+        and expected_hit_rate >= min_expected_hit_rate
+    )
     report["thresholds_ok"] = thresholds_ok
     return report
-

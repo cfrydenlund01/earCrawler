@@ -116,7 +116,9 @@ class FederalRegisterClient:
             # when the api.* host is blocked. Retry once against the www host if we have not already.
             alt_host = "https://www.federalregister.gov/api/v1"
             if not resp.url.startswith(alt_host):
-                alt_url = resp.url.replace("https://api.federalregister.gov/v1", alt_host)
+                alt_url = resp.url.replace(
+                    "https://api.federalregister.gov/v1", alt_host
+                )
                 _logger.warning(
                     "api.invalid_content_type_retry",
                     url=resp.url,
@@ -164,7 +166,9 @@ class FederalRegisterClient:
                 detail = self.get_document(doc_id) or {}
                 text_raw = detail.get("body_html") or detail.get("body_text") or ""
             if not text_raw:
-                text_raw = doc.get("abstract") or " ".join(doc.get("excerpts") or []) or ""
+                text_raw = (
+                    doc.get("abstract") or " ".join(doc.get("excerpts") or []) or ""
+                )
             text = self._clean_text(text_raw)
             results.append(
                 {

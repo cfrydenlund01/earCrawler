@@ -184,11 +184,13 @@ async def rag_answer(
     if rag_enabled:
         cached = cache.get(cache_key)
         cache_hit = cached is not None
-        documents = cached if cache_hit else retriever.query(
-            payload.query, k=payload.top_k
+        documents = (
+            cached if cache_hit else retriever.query(payload.query, k=payload.top_k)
         )
-        expires_at = cache.expires_at(cache_key) if cache_hit else cache.put(
-            cache_key, documents
+        expires_at = (
+            cache.expires_at(cache_key)
+            if cache_hit
+            else cache.put(cache_key, documents)
         )
 
     disabled_reason = None
@@ -216,7 +218,9 @@ async def rag_answer(
             contexts = result.contexts
             model_label = mistral_service.model_label
             if result.error or not answer:
-                disabled_reason = result.error or "Mistral agent did not return an answer"
+                disabled_reason = (
+                    result.error or "Mistral agent did not return an answer"
+                )
                 mistral_enabled = False
                 status_code = 503
         except Exception as exc:  # pragma: no cover - defensive

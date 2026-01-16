@@ -73,7 +73,9 @@ def load_corpus_index(path: Path) -> dict[str, list[Mapping[str, object]]]:
     for key in list(index.keys()):
         index[key] = sorted(
             index[key],
-            key=lambda rec: str(rec.get("id") or rec.get("title") or rec.get("section") or ""),
+            key=lambda rec: str(
+                rec.get("id") or rec.get("title") or rec.get("section") or ""
+            ),
         )
     return index
 
@@ -102,7 +104,9 @@ def resolve_item(
     item_id = str(item.get("id") or "")
     sections_raw: Sequence[object] = item.get("ear_sections") or []
     normalized_sections = {
-        _normalize_section_id(sec): str(sec) for sec in sections_raw if _normalize_section_id(sec)
+        _normalize_section_id(sec): str(sec)
+        for sec in sections_raw
+        if _normalize_section_id(sec)
     }
 
     resolved_sections = []

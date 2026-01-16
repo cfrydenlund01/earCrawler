@@ -15,8 +15,18 @@ def test_resolve_dataset_matches_corpus(tmp_path: Path) -> None:
     _write_jsonl(
         corpus_path,
         [
-            {"id": "EAR-740.1", "section": "740.1", "text": "License Exceptions intro", "source_url": "http://example/740"},
-            {"id": "EAR-742.4(a)(1)", "section": "742.4(a)(1)", "text": "A license is required.", "source_url": "http://example/742"},
+            {
+                "id": "EAR-740.1",
+                "section": "740.1",
+                "text": "License Exceptions intro",
+                "source_url": "http://example/740",
+            },
+            {
+                "id": "EAR-742.4(a)(1)",
+                "section": "742.4(a)(1)",
+                "text": "A license is required.",
+                "source_url": "http://example/742",
+            },
         ],
     )
     items = [
@@ -39,7 +49,11 @@ def test_resolve_dataset_flags_missing_sections_and_spans(tmp_path: Path) -> Non
     _write_jsonl(
         corpus_path,
         [
-            {"id": "EAR-744.6(b)(3)", "section": "744.6(b)(3)", "text": "U.S. persons controls."},
+            {
+                "id": "EAR-744.6(b)(3)",
+                "section": "744.6(b)(3)",
+                "text": "U.S. persons controls.",
+            },
         ],
     )
     items = [

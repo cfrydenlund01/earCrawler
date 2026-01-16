@@ -138,9 +138,7 @@ def _chat_request(
                         )
                         time.sleep(sleep_for)
                     _LAST_REQUEST_AT = time.monotonic()
-                resp = session.post(
-                    url, headers=headers, json=payload, timeout=timeout
-                )
+                resp = session.post(url, headers=headers, json=payload, timeout=timeout)
         except budget.BudgetExceededError as exc:
             raise LLMProviderError(str(exc)) from exc
         except requests.RequestException as exc:
@@ -195,10 +193,7 @@ def _chat_request(
     try:
         data = resp.json()
         content = (
-            data.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content", "")
-            .strip()
+            data.get("choices", [{}])[0].get("message", {}).get("content", "").strip()
         )
     except Exception as exc:
         raise LLMProviderError(f"Failed to parse {provider} response: {exc}") from exc
@@ -229,8 +224,10 @@ def generate_chat(
 
     session = requests.Session()
     session.trust_env = False
-    resolved_timeout = timeout if timeout is not None else float(
-        os.getenv("LLM_TIMEOUT_SECONDS", "30")
+    resolved_timeout = (
+        timeout
+        if timeout is not None
+        else float(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
     )
 
     retry_max_attempts = int(os.getenv("LLM_RETRY_MAX_ATTEMPTS", "5"))

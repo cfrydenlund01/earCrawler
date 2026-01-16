@@ -36,6 +36,7 @@ def test_generate_chat_missing_key(monkeypatch):
 def test_generate_chat_success(monkeypatch):
     monkeypatch.setenv("LLM_PROVIDER", "groq")
     monkeypatch.setenv("GROQ_API_KEY", "dummy")
+
     # Ensure we don't hit the network.
     def fake_post(self, url, headers=None, json=None, timeout=None):
         class Resp:
@@ -73,11 +74,7 @@ def test_generate_chat_retries_on_429(monkeypatch):
         text = "rate limited"
 
         def json(self):
-            return {
-                "error": {
-                    "message": "Rate limit reached. Please try again in 0s."
-                }
-            }
+            return {"error": {"message": "Rate limit reached. Please try again in 0s."}}
 
     class Resp200:
         status_code = 200
@@ -98,7 +95,9 @@ def test_generate_chat_retries_on_429(monkeypatch):
     import api_clients.llm_client as llm_client
 
     monkeypatch.setattr(requests.Session, "post", fake_post, raising=True)
-    monkeypatch.setattr(llm_client.time, "sleep", lambda s: sleeps.append(s), raising=True)
+    monkeypatch.setattr(
+        llm_client.time, "sleep", lambda s: sleeps.append(s), raising=True
+    )
 
     result = generate_chat([{"role": "user", "content": "ping"}])
     assert result == "pong"

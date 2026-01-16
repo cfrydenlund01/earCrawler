@@ -76,9 +76,7 @@ class MistralService:
                 model_name=model_name, use_4bit=use_4bit
             )
             adapter = TextContextRetriever(retriever)
-            self.agent = Agent(
-                retriever=adapter, model=model, tokenizer=tokenizer
-            )
+            self.agent = Agent(retriever=adapter, model=model, tokenizer=tokenizer)
             self.adapter = adapter
             adapter_label = "QLoRA"
             quant_label = "4-bit" if use_4bit else "full precision"
@@ -128,10 +126,15 @@ class MistralService:
 
         final_contexts = list(used_contexts or [])
         final_documents = (
-            list(documents or []) if documents is not None else self.adapter.last_documents
+            list(documents or [])
+            if documents is not None
+            else self.adapter.last_documents
         )
         return MistralAgentResult(
-            answer=answer, contexts=final_contexts, documents=final_documents, error=None
+            answer=answer,
+            contexts=final_contexts,
+            documents=final_documents,
+            error=None,
         )
 
 

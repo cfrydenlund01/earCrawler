@@ -27,7 +27,11 @@ def _ensure_retriever(retriever: object | None = None):
     try:
         index_override = os.getenv("EARCRAWLER_FAISS_INDEX")
         model_override = os.getenv("EARCRAWLER_FAISS_MODEL")
-        index_path = Path(index_override) if index_override else Path("data") / "faiss" / "index.faiss"
+        index_path = (
+            Path(index_override)
+            if index_override
+            else Path("data") / "faiss" / "index.faiss"
+        )
         model_name = model_override or "all-MiniLM-L12-v2"
         return Retriever(
             TradeGovClient(),
@@ -172,11 +176,9 @@ def _build_prompt(
             "  - unanswerable: the provided context is insufficient to decide true vs false.\n\n"
             "Respond in STRICT JSON with this exact shape and no extra text:\n"
             "{\n"
-            '  \"answer_text\": \"<short answer>\",\n'
-            '  \"label\": \"<one of: '
-            + allowed_labels
-            + '>\",\n'
-            '  \"justification\": \"<1-3 sentence rationale citing EAR sections>\"\n'
+            '  "answer_text": "<short answer>",\n'
+            '  "label": "<one of: ' + allowed_labels + '>",\n'
+            '  "justification": "<1-3 sentence rationale citing EAR sections>"\n'
             "}\n"
         )
         context_block = (
@@ -227,26 +229,24 @@ def _build_prompt(
         "Question: Can a controlled item be exported without a license if a License Exception applies under the EAR?\n"
         "Answer JSON:\n"
         "{\n"
-        '  \"answer_text\": \"Yes, if a License Exception applies the export can proceed without a license.\",\n'
-        '  \"label\": \"exception_applies\",\n'
-        '  \"justification\": \"A License Exception under EAR-740.1 permits export without a license when its conditions are met.\"\n'
+        '  "answer_text": "Yes, if a License Exception applies the export can proceed without a license.",\n'
+        '  "label": "exception_applies",\n'
+        '  "justification": "A License Exception under EAR-740.1 permits export without a license when its conditions are met."\n'
         "}\n"
         "Example B (permitted with license):\n"
         "Context: [EAR-742.4(a)(1)] A license is required to export certain high-performance computers to China.\n"
         "Question: Can ACME export a high-performance computer to China without a license?\n"
         "Answer JSON:\n"
         "{\n"
-        '  \"answer_text\": \"No, a license is required before exporting that item to China.\",\n'
-        '  \"label\": \"permitted_with_license\",\n'
-        '  \"justification\": \"EAR-742.4(a)(1) indicates a license is required for this export; therefore it is only permitted with a license.\"\n'
+        '  "answer_text": "No, a license is required before exporting that item to China.",\n'
+        '  "label": "permitted_with_license",\n'
+        '  "justification": "EAR-742.4(a)(1) indicates a license is required for this export; therefore it is only permitted with a license."\n'
         "}\n\n"
         "Respond in STRICT JSON with this exact shape and no extra text:\n"
         "{\n"
-        '  \"answer_text\": \"<short answer>\",\n'
-        '  \"label\": \"<one of: '
-        + allowed_labels
-        + '>\",\n'
-        '  \"justification\": \"<1-3 sentence rationale citing EAR sections>\"\n'
+        '  "answer_text": "<short answer>",\n'
+        '  "label": "<one of: ' + allowed_labels + '>",\n'
+        '  "justification": "<1-3 sentence rationale citing EAR sections>"\n'
         "}\n"
     )
     context_block = (

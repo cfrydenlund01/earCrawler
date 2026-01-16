@@ -30,7 +30,9 @@ class _StubRetriever:
 
 
 class _StubMistralService:
-    def __init__(self, enabled: bool, answer: str | None = None, error: str | None = None):
+    def __init__(
+        self, enabled: bool, answer: str | None = None, error: str | None = None
+    ):
         self.enabled = enabled
         self.disabled_reason = error
         self.model_label = "stub-mistral"
@@ -40,7 +42,9 @@ class _StubMistralService:
 
     def generate(self, query: str, *, k: int, documents=None) -> MistralAgentResult:
         self.calls.append((query, k))
-        contexts = [str(doc.get("text")) for doc in (documents or []) if doc.get("text")]
+        contexts = [
+            str(doc.get("text")) for doc in (documents or []) if doc.get("text")
+        ]
         return MistralAgentResult(
             answer=self.answer,
             contexts=contexts,
@@ -49,7 +53,9 @@ class _StubMistralService:
         )
 
 
-def _app(stub_retriever: _StubRetriever, mistral_service: _StubMistralService | None = None) -> TestClient:
+def _app(
+    stub_retriever: _StubRetriever, mistral_service: _StubMistralService | None = None
+) -> TestClient:
     responses = {
         "lineage_by_id": [
             {

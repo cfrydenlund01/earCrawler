@@ -192,7 +192,9 @@ class Agent:
     def _prepare_contexts(
         self, query: str, k: int, contexts: Optional[List[str]] = None
     ) -> List[str]:
-        base_contexts = contexts if contexts is not None else self.retriever.query(query, k=k)
+        base_contexts = (
+            contexts if contexts is not None else self.retriever.query(query, k=k)
+        )
         filtered = self._filter_contexts(query, base_contexts)
         return self._summarize_contexts(filtered)
 

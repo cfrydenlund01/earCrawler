@@ -54,7 +54,10 @@ def _normalize_pred_label(
                 "permitted_with_license",
                 "license_required",
             }:
-                return "permitted", "normalized_by_license_exception_signal(entity_obligation)"
+                return (
+                    "permitted",
+                    "normalized_by_license_exception_signal(entity_obligation)",
+                )
         else:
             if label in {
                 "permitted",
@@ -66,9 +69,14 @@ def _normalize_pred_label(
 
     if task == "entity_obligation" and "without a license" in question_l:
         if label == "license_required":
-            return "permitted_with_license", "normalized_license_required_to_permitted_with_license"
+            return (
+                "permitted_with_license",
+                "normalized_license_required_to_permitted_with_license",
+            )
 
-    if task == "ear_compliance" and ("need a license" in question_l or "license required" in question_l):
+    if task == "ear_compliance" and (
+        "need a license" in question_l or "license required" in question_l
+    ):
         if label == "prohibited":
             return "license_required", "normalized_prohibited_to_license_required"
 
@@ -79,7 +87,9 @@ def _load_manifest(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _resolve_dataset(manifest: dict, dataset_id: str, manifest_path: Path) -> tuple[dict, Path]:
+def _resolve_dataset(
+    manifest: dict, dataset_id: str, manifest_path: Path
+) -> tuple[dict, Path]:
     for entry in manifest.get("datasets", []):
         if entry.get("id") == dataset_id:
             file = Path(entry["file"])
@@ -369,7 +379,9 @@ def evaluate_dataset(
     }
 
     out_json.parent.mkdir(parents=True, exist_ok=True)
-    out_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    out_json.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
 
     lines = [
         "| Accuracy | Label Accuracy | Unanswerable Accuracy | Grounded Rate | Avg Latency (s) |",
@@ -478,8 +490,12 @@ def main(argv: list[str] | None = None) -> int:
     provider = cfg.provider.provider
     model = cfg.provider.model
     safe_model = _safe_name(model or "default")
-    default_json = Path("dist") / "eval" / f"{args.dataset_id}.rag.{provider}.{safe_model}.json"
-    default_md = Path("dist") / "eval" / f"{args.dataset_id}.rag.{provider}.{safe_model}.md"
+    default_json = (
+        Path("dist") / "eval" / f"{args.dataset_id}.rag.{provider}.{safe_model}.json"
+    )
+    default_md = (
+        Path("dist") / "eval" / f"{args.dataset_id}.rag.{provider}.{safe_model}.md"
+    )
     out_json = args.out_json or default_json
     out_md = args.out_md or default_md
 

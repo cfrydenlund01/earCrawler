@@ -467,7 +467,9 @@ def eval_group() -> None:
     show_default=True,
     help="Where to write the evidence resolution report.",
 )
-def eval_verify_evidence(manifest: Path, corpus: Path, dataset_id: str, out: Path) -> None:
+def eval_verify_evidence(
+    manifest: Path, corpus: Path, dataset_id: str, out: Path
+) -> None:
     """Gate eval datasets by verifying evidence <-> corpus alignment."""
 
     try:
@@ -477,7 +479,9 @@ def eval_verify_evidence(manifest: Path, corpus: Path, dataset_id: str, out: Pat
 
     dataset_entries = manifest_obj.get("datasets", [])
     if dataset_id != "all":
-        dataset_entries = [entry for entry in dataset_entries if entry.get("id") == dataset_id]
+        dataset_entries = [
+            entry for entry in dataset_entries if entry.get("id") == dataset_id
+        ]
         if not dataset_entries:
             raise click.ClickException(f"Dataset not found: {dataset_id}")
 
@@ -554,7 +558,10 @@ def build_kg_expansion(manifest: Path, corpus: Path, out: Path) -> None:
     """Generate the file-backed KG expansion mapping."""
 
     try:
-        from earCrawler.rag.kg_expansion_builder import build_expansion_mapping, write_expansion_mapping
+        from earCrawler.rag.kg_expansion_builder import (
+            build_expansion_mapping,
+            write_expansion_mapping,
+        )
     except Exception as exc:  # pragma: no cover - import failures
         raise click.ClickException(str(exc))
     mapping = build_expansion_mapping(corpus, manifest)
@@ -648,7 +655,9 @@ def eval_run_rag(
 
     dataset_entries = manifest_obj.get("datasets", []) or []
     if dataset_id:
-        dataset_entries = [entry for entry in dataset_entries if entry.get("id") == dataset_id]
+        dataset_entries = [
+            entry for entry in dataset_entries if entry.get("id") == dataset_id
+        ]
         if not dataset_entries:
             raise click.ClickException(f"Dataset not found: {dataset_id}")
 
@@ -1113,7 +1122,9 @@ def llm() -> None:
     help="Number of retrieved contexts to pass to the LLM.",
 )
 @click.argument("question", type=str)
-def llm_ask(llm_provider: str | None, llm_model: str | None, top_k: int, question: str) -> None:
+def llm_ask(
+    llm_provider: str | None, llm_model: str | None, top_k: int, question: str
+) -> None:
     """Answer a question using the RAG pipeline and selected provider/model."""
 
     try:
@@ -1154,7 +1165,9 @@ def llm_ask(llm_provider: str | None, llm_model: str | None, top_k: int, questio
     show_default=True,
     help="Destination JSONL file.",
 )
-def fr_fetch(sections: tuple[str, ...], query: str | None, per_page: int, out: Path) -> None:
+def fr_fetch(
+    sections: tuple[str, ...], query: str | None, per_page: int, out: Path
+) -> None:
     """Fetch EAR-related passages from the Federal Register and store them for indexing."""
 
     if not sections and not query:
@@ -1167,7 +1180,10 @@ def fr_fetch(sections: tuple[str, ...], query: str | None, per_page: int, out: P
         try:
             docs = client.get_ear_articles(term, per_page=per_page)
         except Exception as exc:
-            click.echo(f"Warning: failed to fetch '{term}' from Federal Register: {exc}", err=True)
+            click.echo(
+                f"Warning: failed to fetch '{term}' from Federal Register: {exc}",
+                err=True,
+            )
             # Fallback to the public JSON API directly to avoid client-level checks.
             try:
                 resp = requests.get(
@@ -1181,7 +1197,9 @@ def fr_fetch(sections: tuple[str, ...], query: str | None, per_page: int, out: P
                 docs = []
                 for item in data.get("results", []):
                     detail_url = f"https://www.federalregister.gov/api/v1/documents/{item.get('document_number')}.json"
-                    detail = requests.get(detail_url, headers={"Accept": "application/json"}, timeout=20)
+                    detail = requests.get(
+                        detail_url, headers={"Accept": "application/json"}, timeout=20
+                    )
                     detail.raise_for_status()
                     detail_json = detail.json()
                     text = (
@@ -1202,7 +1220,10 @@ def fr_fetch(sections: tuple[str, ...], query: str | None, per_page: int, out: P
                         }
                     )
             except Exception as inner_exc:  # pragma: no cover - network dependent
-                click.echo(f"Warning: fallback fetch for '{term}' also failed: {inner_exc}", err=True)
+                click.echo(
+                    f"Warning: fallback fetch for '{term}' also failed: {inner_exc}",
+                    err=True,
+                )
                 return []
         records: list[dict] = []
         for doc in docs:
@@ -1271,7 +1292,9 @@ def rag_index() -> None:
     show_default=True,
     help="Reset existing index/metadata before building.",
 )
-def rag_index_build(input_path: Path, index_path: Path, model_name: str, reset: bool) -> None:
+def rag_index_build(
+    input_path: Path, index_path: Path, model_name: str, reset: bool
+) -> None:
     """Build a FAISS index from a JSONL corpus."""
 
     if reset:
@@ -1315,7 +1338,9 @@ def rag_index_build(input_path: Path, index_path: Path, model_name: str, reset: 
         index_path=index_path,
     )
     retriever.add_documents(docs)
-    click.echo(f"Indexed {len(docs)} documents -> {index_path} (+ metadata {index_path.with_suffix('.pkl')})")
+    click.echo(
+        f"Indexed {len(docs)} documents -> {index_path} (+ metadata {index_path.with_suffix('.pkl')})"
+    )
 
 
 def main() -> None:  # pragma: no cover - CLI entrypoint

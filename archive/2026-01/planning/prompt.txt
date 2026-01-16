@@ -1,0 +1,184 @@
+Lets try and complete the project. The end product = ingest PDF or CSL variables -> Mistral parses -> Legal-BERT queries EAR -> Mistral summarizes. You are an expert python engineer and designer; the next steps will complete coding for this end product -- minus GUI, but frame output to be easily redirected to an HTML GUI. Ensure a Windows-first environment, and secrets stay in Windows Credential Store; no hardcoding.
+
+How each step advances the pipeline
+ B.28 Provenance and delta loads:
+	1) Add a provenance layer that records source, retrieval time, and hash for every entity and part created from the Trade.gov Data API and Federal Register API.
+	2) Make transforms emit provenance facts alongside business data, so every triple is traceable to an input record or FR notice.
+	3) Add delta logic that recomputes hashes and only writes changes. This preserves history, reduces churn, and keeps SPARQL upserts idempotent.
+	4) Extend tests to compare two runs with identical inputs and assert no graph change on the second run.
+	5) CI gate fails if provenance is missing or if a second build without input changes alters output artifacts.
+	6) Docs: define what constitutes "same row," how hashes are formed, and how operators audit a triple back to the source.
+ B.29 Deterministic IRIs and canonicalization:
+	1) Freeze IRI construction rules for ent: and part: so identifiers remain stable across runs and machines.
+	2) Insert a canonicalization pass that normalizes names, country markings, and program labels before any RDF is produced.
+	3) Add a small mapping registry for known alias corrections and deprecation notices when a canonical form replaces an older one.
+	4) Tests assert that the same upstream input yields the same IRIs, and that known variants collapse to one canonical node.
+	5) CI checks for namespace drift and for accidental introduction of non-canonical IRIs.
+ B.30 Entity resolution (dedup):
+	1) Introduce a deterministic dedup phase that merges obvious duplicates from Trade.gov results before graph write.
+	2) Record merge decisions with audit facts so Mistral can display "why this record merged" when summarizing.
+	3) Keep merges reversible by preserving source nodes and adding equivalence links to the surviving canonical node.
+	4) Tests include synthetic collisions that exercise match rules and ensure no data loss on merge.
+	5) CI flags unmerged duplicates that exceed a strict threshold to prevent silent bloat.
+ B.31 FR text ingestion and citation links:
+	1) Expand the Federal Register client usage to pull minimal, high-signal text slices and metadata for EAR topics.
+	2) Store per-document anchors and link them to relevant part: nodes to provide Legal-BERT with authoritative passages.
+	3) Maintain lightweight indices that map parts to document anchors for quick prompt assembly.
+	4) Tests validate that each stored part has at least one referenced FR anchor when present in the source set.
+	5) CI asserts that FR ingestion never bypasses the client module and that every anchor is tied to a part IRI.
+ B.32 Mention extraction upgrade:
+	1) Replace substring checks with token and pattern logic to detect when entities are mentioned in FR passages or PDFs.
+	2) Introduce false-positive guardrails with stoplists and context windows.
+	3) Emit graded "mention strength" and keep it in the graph so Mistral can pre-rank what Legal-BERT should read first.
+	4) Tests cover precision/recall on a labeled sample and guard against regressions.
+	5) CI publishes a small metrics report for mention quality; builds fail if quality drops below a floor.
+ B.33 Policy-aware linking rules:
+	1) Encode transparent, testable links between certain EAR parts and screening programs as advisory hints.
+	2) Keep rules data-driven and isolated, so they can be updated without code changes.
+	3) Use these hints to prioritize which parts Legal-BERT queries when entity context is sparse.
+	4) Tests assert that rule outputs are deterministic and never override facts derived from APIs.
+	5) CI checks that the rule set is valid, versioned, and documented.
+ B.34 Batch jobs and Windows Task Scheduler:
+	1) Package repeatable jobs that call the Trade.gov Data API and Federal Register API through existing clients on a schedule.
+	2) Ensure each job writes structured logs and rotates files on Windows.
+	3) Add a dry-run mode that exercises transforms without loading the graph.
+	4) Tests validate exit codes, log presence, and skip behavior when upstream APIs are unreachable.
+	5) CI includes a smoke run of the job entry points in dry-run mode.
+ B.35 Caching and retries:
+	1) Introduce a request cache keyed by normalized URL and headers to reduce calls to the Trade.gov Data API and Federal Register API.
+	2) Add bounded retry strategies for rate limits and transient failures, recorded in structured logs.
+	3) Ensure cache can be warmed by batch jobs and invalidated by delta detection.
+	4) Tests simulate 429/5xx paths and confirm correct backoff and cache hits.
+	5) CI enforces upper bounds on calls during unit tests to prevent accidental network chatter.
+ B.36 Observability:
+	1) Standardize logging fields: run id, input hash, step, duration, outcome.
+	2) Capture per-phase timings and counts to a minimal JSON summary artifact that Mistral can read for progress feedback.
+	3) Add trace IDs that flow from ingestion to graph write so a PDF's path is reconstructible.
+	4) Tests assert presence and format of logs and summaries.
+	5) CI publishes summaries as artifacts for each run.
+
+ B.37 Access control and secrets:
+	1) Centralize secret retrieval so all modules read keys from one place tied to the Windows Credential Store.
+	2) Add guards that redact secrets in all logs and errors.
+	3) Introduce a static check that fails builds if any code references disallowed secret patterns.
+	4) Tests verify that missing secrets cause clear, actionable failures.
+	5) CI runs the static secret scan and blocks merges on violations.
+ B.38 RDF export profiles:
+	1) Produce multiple export flavors from the same build: compact Turtle for inspection, line-based N-Triples for bulk, gz variants for transport.
+	2) Attach checksums and manifest files so downstream consumers verify integrity.
+	3) Keep filenames and manifests stable so Mistral and Legal-BERT loaders can subscribe to a known pattern.
+	4) Tests confirm round-trip parse for each profile and checksum correctness.
+	5) CI publishes exports as artifacts and verifies manifests.
+ B.39 Graph integrity checks:
+	1) Add SPARQL sanity queries that detect orphans, missing labels, cross-namespace leaks, and unexpected class counts.
+	2) Run checks after validation and before any optional load.
+	3) Emit a human-readable failure report that points at offending IRIs.
+	4) Tests seed small bad graphs and ensure the checker catches them.
+	5) CI fails on any integrity violation and stores the report for inspection.
+ B.40 Admin CLI (Windows-first):
+	1) Provide a single command surface for build, validate, export, load, stats.
+	2) Ensure every action supports quiet and verbose modes for integration with schedulers and humans.
+	3) Include help texts and short examples tailored to Windows shells.
+	4) Tests cover argument parsing and command chaining.
+	4) CI invokes the CLI for the main happy-path sequence up to, but not including, network loads.
+ B.41 Performance pass:	
+	1) Batch graph writes, stream serializers, and reduce per-record overhead across transforms.
+	2) Cache stable lookups and precompute small indices used frequently by mention extraction and rule evaluation.
+	3) Add timing benchmarks and set sensible targets for build and validate stages on Windows hardware.
+	4) Tests include performance assertions at moderate input sizes.
+	5) CI records timings and warns if regressions exceed a threshold.
+
+Assumptions:
+ Simplifation:
+	1) Simplify code whenever possible.
+	2) Ensure instructions in README.md are produced in the correct format and order.
+ Desicion making:
+	1) If steps or code are found inconsistent with the goals in phase A-F in the attached file, ensure compliance with the phases.
+	2) Proactively align written plans with the current Windows-first reality and defer DAL/TACC dependencies behind explicit access gates.
+ 
+
+Flow alignment to your architecture
+ Inputs:
+	1) PDF or CSL variables.
+ Levers added by B.28, B.41:
+	1) Clean, deduped entity graph with provenance (B.28, B.30).
+	2) FR/EAR linkage and lightweight policy hints (B.31, B.33).
+	3) Reliable, scheduled, and cached crawls (B.34, B.35).
+	4) Safe, observable ops (B.36, B.37).
+	5) Export formats and CLI for model ingestion (B.38-B.40).
+	6) Throughput headroom (B.41).
+ Outputs consumed by models:
+	1) Validated TTL/NT exports and SPARQL endpoints keyed by stable IRIs.
+	2) Evidence URIs and citations for Legal-BERT prompts.
+	3) Ranked candidate sets for Mistral to summarize.
+
+ Pitfalls to watch:
+	1) Keep Trade.gov Data API and Federal Register API calls inside client modules only.
+	2) Enforce SHACL gate before any load to Fuseki.
+	3) Namespace stability: never change ent: or part: once canonicalized.
+	4) Windows Task Scheduler must run with a profile that can read secrets from the Windows Credential Store.
+	5) Avoid duplicate packages: keep a single top-level `api_clients/` package and remove any mirrored module trees.
+
+Additional Instructions:
+ Precondition:
+	1) Read attached file under "Methodology & Work Plan" for all phases A-F.
+	2) Ensure documents and code are synchronized to reflect B.28-B.41 in a Windows-first environment.
+ Errors:
+	1) After each step in "How each step advances the pipeline" run pytest -x, analyze, diagnose, and fix any errors, failures, or warnings.
+
+Documentation deliverables (single-prompt capable):
+ D.1 Redlined Proposal Addendum:
+	1) Open `EAR_AI_Training_Proposal.docx` and append an Addendum titled "Windows-First Interim Phase (B.28-B.41)".
+	2) Mark inserted content as additions (red text or track-changes) and document:
+	   - Scope: Windows-first milestones; provenance, deterministic IRIs, scheduler, caching, observability, CLI.
+	   - Dependencies: DAL/TACC access explicitly gated for Phases C-F.
+	   - Milestone gating: Deliver B.28-B.41 before HPC onboarding.
+	3) Save as `EAR_AI_Training_Proposal_redlined.docx` without overwriting the original.
+
+ D.2 Short Roadmap (internal):
+	1) Generate `Short Roadmap.docx` that maps each B-step (B.28-B.41) to current modules and repos (e.g., provenance -> `earCrawler/transforms`, IRIs/canonicalization -> `earCrawler/kg`, scheduler -> `scripts/*`, CLI -> `earCrawler/cli`).
+	2) Include acceptance criteria and test hooks per step.
+	3) Target Windows execution only; no DAL/TACC assumptions.
+
+Codebase hygiene (apply once):
+ H.1 Consolidate API clients:
+	1) Keep `api_clients/` at the repository root as the single package of record.
+	2) Update imports from `earCrawler.api_clients.*` to `api_clients.*` throughout the codebase and tests.
+	3) Ensure packaging includes `api_clients*` in `pyproject.toml`.
+	4) Delete the duplicate `earCrawler/api_clients/` tree.
+	5) Run `pytest -x` and fix any import fallout.
+
+
+Documentation deliverables (additions):
+ D.3 Admin/Jobs Runbooks:
+	- Document CLI jobs: `py -m earCrawler.cli jobs run {tradegov|federalregister} [--dry-run] [--quiet]`.
+	- PowerShell wrappers: `scripts/jobs/run_tradegov_ingest.ps1`, `scripts/jobs/run_federalregister_anchor.ps1`.
+	- Artifacts: logs and JSON run summaries under `run/logs/`.
+	- Status: Documented in `RUNBOOK.md` (see "Scheduled Jobs & Admin Runs").
+ D.4 Export Profiles:
+	- Command: `py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem dataset`.
+	- Outputs: `dataset.ttl`, `dataset.nt`, `dataset.ttl.gz`, `dataset.nt.gz`, `manifest.json`, `checksums.sha256`.
+	- Status: Documented in `RUNBOOK.md` (see "Export Profiles").
+ D.5 Integrity Gate:
+	- Command: `py -m earCrawler.cli integrity check <ttl>`; any non-zero counters fail the gate.
+	- Violations block export/load and CI.
+	- Status: Documented in `RUNBOOK.md` (see "Integrity Gate").
+
+Codebase hygiene (additions):
+ H.2 API budgets & retries:
+	- Enforce `FR_MAX_CALLS` and `TRADEGOV_MAX_CALLS` budgets in clients; bounded retries via tenacity; caching via `HTTPCache`.
+	- Status: Enforced in `api_clients/tradegov_client.py` and `api_clients/federalregister_client.py` with structured logging and enhanced cache keys.
+ H.3 Observability:
+	- Jobs and admin commands emit per-run JSON summaries with run_id, steps, durations, and statuses stored under `run/logs/`.
+	- Status: `earCrawler/cli/admin.py` now writes run summaries; coverage asserted in `tests/cli/test_admin_cli.py`.
+
+Operator quick reference:
+	- `py -m earCrawler.cli jobs run tradegov --dry-run`
+	- `py -m earCrawler.cli jobs run federalregister --dry-run`
+	- `py -m earCrawler.cli integrity check dist/exports/dataset.ttl`
+	- `py -m earCrawler.cli bundle export-profiles --ttl kg/ear.ttl --out dist/exports --stem dataset`
+	- `py -m earCrawler.cli admin stats --iterations 1`
+
+Errors (tightened acceptance):
+	- `pytest -x` passes with no failures and no unapproved warnings.
+	- Integrity violations and export manifest mismatches are hard errors.

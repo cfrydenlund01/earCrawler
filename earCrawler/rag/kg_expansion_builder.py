@@ -45,12 +45,16 @@ def _load_corpus_index(corpus_path: Path) -> dict[str, list[dict]]:
     for key in list(index.keys()):
         index[key] = sorted(
             index[key],
-            key=lambda rec: str(rec.get("id") or rec.get("title") or rec.get("section") or ""),
+            key=lambda rec: str(
+                rec.get("id") or rec.get("title") or rec.get("section") or ""
+            ),
         )
     return index
 
 
-def _resolve_dataset_paths(manifest: Mapping[str, object], manifest_path: Path) -> list[Path]:
+def _resolve_dataset_paths(
+    manifest: Mapping[str, object], manifest_path: Path
+) -> list[Path]:
     paths: list[Path] = []
     for entry in manifest.get("datasets", []) or []:
         raw = entry.get("file")
@@ -63,7 +67,9 @@ def _resolve_dataset_paths(manifest: Mapping[str, object], manifest_path: Path) 
     return paths
 
 
-def _collect_targets(manifest_path: Path) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]]]:
+def _collect_targets(
+    manifest_path: Path,
+) -> tuple[set[str], dict[str, set[str]], dict[str, set[str]]]:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     targets: set[str] = set()
     related: dict[str, set[str]] = defaultdict(set)

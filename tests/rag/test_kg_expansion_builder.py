@@ -15,8 +15,18 @@ def test_build_expansion_mapping_uses_manifest_refs(tmp_path: Path) -> None:
     _write_jsonl(
         corpus_path,
         [
-            {"id": "EAR-740.1", "section": "740.1", "text": "License exceptions overview", "source_url": "http://example/740"},
-            {"id": "EAR-740.9(a)(2)", "section": "740.9(a)(2)", "text": "Temporary exports allowed.", "source_url": "http://example/7409"},
+            {
+                "id": "EAR-740.1",
+                "section": "740.1",
+                "text": "License exceptions overview",
+                "source_url": "http://example/740",
+            },
+            {
+                "id": "EAR-740.9(a)(2)",
+                "section": "740.9(a)(2)",
+                "text": "Temporary exports allowed.",
+                "source_url": "http://example/7409",
+            },
         ],
     )
     dataset_path = tmp_path / "dataset.jsonl"
@@ -26,7 +36,11 @@ def test_build_expansion_mapping_uses_manifest_refs(tmp_path: Path) -> None:
             {
                 "id": "item-1",
                 "ear_sections": ["EAR-740.1"],
-                "evidence": {"kg_nodes": ["node-ds"], "kg_paths": ["path-ds"], "doc_spans": [{"doc_id": "EAR-740", "span_id": "740.1"}]},
+                "evidence": {
+                    "kg_nodes": ["node-ds"],
+                    "kg_paths": ["path-ds"],
+                    "doc_spans": [{"doc_id": "EAR-740", "span_id": "740.1"}],
+                },
             }
         ],
     )

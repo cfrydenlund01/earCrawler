@@ -97,7 +97,9 @@ def evaluate_groundedness(
         "grounded_rate": grounded_rate,
         "results": results,
     }
-    out_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    out_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
     return out_path
 
 

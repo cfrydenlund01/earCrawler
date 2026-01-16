@@ -56,7 +56,9 @@ def _parse_env_file(path: Path) -> Dict[str, str]:
     return values
 
 
-def load_llm_secrets(path: Path | None = None, *, override_existing: bool = False) -> None:
+def load_llm_secrets(
+    path: Path | None = None, *, override_existing: bool = False
+) -> None:
     """Load optional secrets file.
 
     Parameters
