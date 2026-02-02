@@ -13,19 +13,10 @@ from typing import Any, Dict, Iterable, List
 from api_clients.llm_client import LLMProviderError
 from earCrawler.config.llm_secrets import get_llm_config
 from earCrawler.eval.label_inference import infer_label
+from earCrawler.rag.output_schema import DEFAULT_ALLOWED_LABELS
 from earCrawler.rag.pipeline import answer_with_rag
 
-_ALLOWED_LABELS = {
-    "license_required",
-    "no_license_required",
-    "exception_applies",
-    "permitted_with_license",
-    "permitted",
-    "prohibited",
-    "unanswerable",
-    "true",
-    "false",
-}
+_ALLOWED_LABELS = DEFAULT_ALLOWED_LABELS
 
 
 def _normalize_pred_label(
@@ -183,6 +174,7 @@ def evaluate_dataset(
     grounded_hits = 0
     semantic_hits = 0
     truthiness_items = 0
+    output_failures = 0
 
     by_task_raw: Dict[str, Dict[str, float]] = {}
 
@@ -202,12 +194,24 @@ def evaluate_dataset(
         task = str(item.get("task", "") or "").strip()
         ear_sections = item.get("ear_sections") or []
 
-        answer = ""
+        answer: str | None = None
         pred_label = "unknown"
         pred_label_raw = pred_label
         label_norm: str | None = None
+        justification: str | None = None
         used_sections: List[str] = []
         error: str | None = None
+        retrieval_warnings: list[dict[str, object]] = []
+        retrieval_empty = False
+        retrieval_empty_reason: str | None = None
+        output_ok = True
+        output_error: dict | None = None
+        raw_answer: str | None = None
+        status = "ok"
+        citations: list[dict] | None = None
+        evidence_okay: dict | None = None
+        assumptions: list[str] | None = None
+        citation_span_ids: list[str] | None = None
 
         start = time.perf_counter()
         try:
@@ -221,24 +225,43 @@ def evaluate_dataset(
                 provider=provider,
                 model=model,
                 top_k=top_k,
+                strict_retrieval=False,
+                strict_output=True,
             )
-            answer = (rag_result.get("answer") or "").strip()
+            raw_answer = rag_result.get("raw_answer")
+            output_ok = bool(rag_result.get("output_ok", True))
+            output_error = rag_result.get("output_error")
+            answer = (rag_result.get("answer") or "").strip() if output_ok else ""
             used_sections = list(rag_result.get("used_sections") or [])
+            retrieval_warnings = list(rag_result.get("retrieval_warnings") or [])
+            retrieval_empty = bool(rag_result.get("retrieval_empty"))
+            retrieval_empty_reason = rag_result.get("retrieval_empty_reason")
+            citations = rag_result.get("citations")
+            evidence_okay = rag_result.get("evidence_okay")
+            assumptions = rag_result.get("assumptions")
+            citation_span_ids = rag_result.get("citation_span_ids")
             # Prefer structured label from the JSON contract when present.
-            structured_label = (rag_result.get("label") or "").strip().lower()
             justification = (rag_result.get("justification") or "").strip() or None
-            if structured_label:
-                pred_label = structured_label
+            if not output_ok:
+                status = "failed_output_schema"
+                output_failures += 1
+                error = (output_error or {}).get("message") if output_error else "invalid_output_schema"
+                pred_label = "invalid_output"
+                pred_label_raw = pred_label
             else:
-                pred_label = infer_label(answer)
-            pred_label_raw = pred_label
-            pred_label, label_norm = _normalize_pred_label(
-                pred_label_raw,
-                task=task,
-                question=question,
-                answer=answer,
-                justification=justification,
-            )
+                structured_label = (rag_result.get("label") or "").strip().lower()
+                if structured_label:
+                    pred_label = structured_label
+                else:
+                    pred_label = infer_label(answer)
+                pred_label_raw = pred_label
+                pred_label, label_norm = _normalize_pred_label(
+                    pred_label_raw,
+                    task=task,
+                    question=question,
+                    answer=answer,
+                    justification=justification,
+                )
         except LLMProviderError as exc:
             error = str(exc)
         except Exception as exc:  # pragma: no cover - defensive
@@ -313,6 +336,17 @@ def evaluate_dataset(
                 "used_sections": used_sections,
                 "evidence": item.get("evidence"),
                 "error": error,
+                "status": status,
+                "output_ok": output_ok,
+                "output_error": output_error,
+                "raw_answer": raw_answer,
+                "citations": citations,
+                "evidence_okay": evidence_okay,
+                "assumptions": assumptions,
+                "citation_span_ids": citation_span_ids,
+                "retrieval_warnings": retrieval_warnings,
+                "retrieval_empty": retrieval_empty,
+                "retrieval_empty_reason": retrieval_empty_reason,
             }
         )
 
@@ -365,6 +399,8 @@ def evaluate_dataset(
         "semantic_accuracy": semantic_accuracy if semantic else None,
         "avg_latency": avg_latency,
         "by_task": by_task,
+        "output_failures": output_failures,
+        "output_failure_rate": output_failures / num_items if num_items else 0.0,
         "results": results,
     }
 

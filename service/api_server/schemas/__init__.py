@@ -12,6 +12,9 @@ from .rag import (
     CacheState,
     RagGeneratedResponse,
     RetrievedDocument,
+    OutputError,
+    RagCitation,
+    EvidenceOkay,
 )
 
 __all__ = [
@@ -32,4 +35,7 @@ __all__ = [
     "CacheState",
     "RagGeneratedResponse",
     "RetrievedDocument",
+    "OutputError",
+    "RagCitation",
+    "EvidenceOkay",
 ]

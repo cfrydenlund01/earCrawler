@@ -56,12 +56,46 @@ class CacheState(BaseModel):
     )
 
 
+class OutputError(BaseModel):
+    code: str = Field(..., description="Stable error code for client handling")
+    message: str = Field(..., description="Human-readable error message")
+    details: Optional[dict] = Field(
+        default=None, description="Optional key-level metadata (e.g., offending key)"
+    )
+    raw_preview: Optional[str] = Field(
+        default=None, description="Truncated raw LLM output for debugging"
+    )
+    raw_len: Optional[int] = Field(
+        default=None, description="Length of the raw LLM output"
+    )
+
+
+class RagCitation(BaseModel):
+    section_id: str = Field(..., description="Section/citation identifier (e.g., EAR-740.1)")
+    quote: str = Field(..., description="Verbatim quote that must be a substring of the retrieved contexts")
+    span_id: Optional[str] = Field(
+        default=None, description="Optional doc/span identifier for auditability"
+    )
+
+
+class EvidenceOkay(BaseModel):
+    ok: bool = Field(..., description="True when the response is grounded and follows the contract")
+    reasons: List[str] = Field(default_factory=list, description="Machine-readable reasons for ok/failed checks")
+
+
 class RagResponse(BaseModel):
     trace_id: str = Field(..., description="Trace identifier for correlating logs")
     latency_ms: float = Field(..., description="Measured latency for the request")
     query: str
     cache: CacheState
     results: List[RagAnswer]
+    retrieval_empty: bool = Field(
+        default=False, description="True when retrieval returned zero hits"
+    )
+    retrieval_empty_reason: Optional[str] = Field(
+        default=None,
+        description="Reason for an empty retrieval result (no_hits, retriever_error, retriever_disabled)",
+    )
 
 
 class RetrievedDocument(BaseModel):
@@ -107,3 +141,36 @@ class RagGeneratedResponse(BaseModel):
         description="Reason when rag_enabled or llm_enabled are false",
     )
     cache: CacheState
+    retrieval_empty: bool = Field(
+        default=False, description="True when retrieval returned zero hits"
+    )
+    retrieval_empty_reason: Optional[str] = Field(
+        default=None,
+        description="Reason for an empty retrieval result (no_hits, retriever_error, retriever_disabled)",
+    )
+    output_ok: bool = Field(
+        default=True, description="True when LLM output matched the strict JSON schema"
+    )
+    output_error: Optional[OutputError] = Field(
+        default=None,
+        description="Structured schema or provider error when output_ok is false",
+    )
+    raw_answer: Optional[str] = Field(
+        default=None, description="Raw LLM response prior to parsing/validation"
+    )
+    label: Optional[str] = Field(
+        default=None, description="Structured label parsed from the LLM output"
+    )
+    justification: Optional[str] = Field(
+        default=None, description="Structured justification parsed from the LLM output"
+    )
+    citations: List[RagCitation] = Field(
+        default_factory=list, description="Machine-checkable citations with verbatim quotes"
+    )
+    evidence_okay: Optional[EvidenceOkay] = Field(
+        default=None, description="Model-provided evidence self-check for auditability"
+    )
+    assumptions: List[str] = Field(
+        default_factory=list,
+        description="Explicit assumptions; non-empty assumptions generally require label=unanswerable unless supported",
+    )

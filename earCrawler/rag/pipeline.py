@@ -10,32 +10,86 @@ from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
 from pathlib import Path
 import os
+from earCrawler.rag.output_schema import (
+    DEFAULT_ALLOWED_LABELS,
+    TRUTHINESS_LABELS,
+    OutputSchemaError,
+    parse_strict_answer_json,
+)
 from earCrawler.utils.log_json import JsonLogger
 
 _logger = JsonLogger("rag-pipeline")
 
 
-def _ensure_retriever(retriever: object | None = None):
+def _warn_from_exc(exc: BaseException) -> dict[str, object]:
+    """Normalize retriever errors into a stable warning payload."""
+
+    code = getattr(exc, "code", "retriever_error")
+    metadata = getattr(exc, "metadata", {}) or {}
+    return {
+        "code": code,
+        "message": str(exc),
+        "metadata": dict(metadata),
+    }
+
+
+def _ensure_retriever(
+    retriever: object | None = None,
+    *,
+    strict: bool = True,
+    warnings: list[dict[str, object]] | None = None,
+):
     if retriever is not None:
         return retriever
     try:
-        from earCrawler.rag.retriever import Retriever  # lazy import
+        from earCrawler.rag.retriever import (  # lazy import
+            Retriever,
+            RetrieverError,
+            describe_retriever_config,
+        )
     except Exception as exc:  # pragma: no cover - optional deps
-        _logger.warning("rag.retriever.import_failed", error=str(exc))
+        _logger.error("rag.retriever.import_failed", error=str(exc))
+        if strict:
+            raise
+        if warnings is not None:
+            warnings.append(_warn_from_exc(exc))
         return None
     try:
         index_override = os.getenv("EARCRAWLER_FAISS_INDEX")
         model_override = os.getenv("EARCRAWLER_FAISS_MODEL")
-        index_path = Path(index_override) if index_override else Path("data") / "faiss" / "index.faiss"
+        index_path = (
+            Path(index_override)
+            if index_override
+            else Path("data") / "faiss" / "index.faiss"
+        )
         model_name = model_override or "all-MiniLM-L12-v2"
-        return Retriever(
+        retriever_obj = Retriever(
             TradeGovClient(),
             FederalRegisterClient(),
             model_name=model_name,
             index_path=index_path,
         )
+        _logger.info(
+            "rag.retriever.ready",
+            details={"retriever": describe_retriever_config(retriever_obj)},
+        )
+        return retriever_obj
+    except RetrieverError as exc:
+        _logger.error(
+            "rag.retriever.init_failed",
+            details={"retriever_error": _warn_from_exc(exc)},
+        )
+        if strict:
+            raise
+        if warnings is not None:
+            warnings.append(_warn_from_exc(exc))
+        return None
     except Exception as exc:  # pragma: no cover - runtime failures
-        _logger.warning("rag.retriever.init_failed", error=str(exc))
+        _logger.error("rag.retriever.init_failed", error=str(exc))
+        if strict:
+            raise
+        if warnings is not None:
+            warnings.append(_warn_from_exc(exc))
         return None
 
 
@@ -58,6 +112,10 @@ def _normalize_section_id(value: object | None) -> str | None:
     if not raw:
         return None
     if raw.upper().startswith("EAR-"):
+        # Allow doc_id-style values that carry a stable suffix (for example
+        # "EAR-736.2(b)#...") while keeping citation ids canonical.
+        if "#" in raw:
+            raw = raw.split("#", 1)[0].strip()
         return raw
     match = _EAR_SECTION_RE.match(raw)
     if match:
@@ -66,21 +124,68 @@ def _normalize_section_id(value: object | None) -> str | None:
 
 
 def retrieve_regulation_context(
-    query: str, top_k: int = 5, *, retriever: object | None = None
+    query: str,
+    top_k: int = 5,
+    *,
+    retriever: object | None = None,
+    strict: bool = True,
+    warnings: list[dict[str, object]] | None = None,
 ) -> list[dict]:
     """Return top-k regulation snippets using the existing FAISS-backed retriever."""
 
-    r = _ensure_retriever(retriever)
+    warning_list = warnings if warnings is not None else []
+    try:
+        from earCrawler.rag.retriever import RetrieverError
+    except Exception:
+        RetrieverError = Exception  # type: ignore[assignment]
+
+    try:
+        r = _ensure_retriever(retriever, strict=strict, warnings=warning_list)
+    except RetrieverError as exc:
+        _logger.error(
+            "rag.retriever.unavailable", details={"retriever_error": _warn_from_exc(exc)}
+        )
+        if strict:
+            raise
+        warning_list.append(_warn_from_exc(exc))
+        return []
+    except Exception as exc:  # pragma: no cover - defensive
+        _logger.error("rag.retriever.unavailable", error=str(exc))
+        if strict:
+            raise
+        warning_list.append(_warn_from_exc(exc))
+        return []
+
     if r is None:
         return []
-    docs = r.query(query, k=top_k)
+    try:
+        docs = r.query(query, k=top_k)
+    except RetrieverError as exc:
+        _logger.error(
+            "rag.retrieval.failed", details={"retriever_error": _warn_from_exc(exc)}
+        )
+        if strict:
+            raise
+        warning_list.append(_warn_from_exc(exc))
+        return []
+    except Exception as exc:  # pragma: no cover - defensive
+        _logger.error("rag.retrieval.failed", error=str(exc))
+        if strict:
+            raise
+        warning_list.append(_warn_from_exc(exc))
+        return []
     results: list[dict] = []
     for doc in docs:
         text = _extract_text(doc)
         if not text:
             continue
         section_id = _normalize_section_id(
-            doc.get("section") or doc.get("id") or doc.get("entity_id") or ""
+            doc.get("section_id")
+            or doc.get("section")
+            or doc.get("doc_id")
+            or doc.get("id")
+            or doc.get("entity_id")
+            or ""
         )
         results.append(
             {
@@ -171,12 +276,21 @@ def _build_prompt(
             "  - unanswerable: the provided context is insufficient to decide true vs false.\n\n"
             "Respond in STRICT JSON with this exact shape and no extra text:\n"
             "{\n"
-            '  \"answer_text\": \"<short answer>\",\n'
             '  \"label\": \"<one of: '
             + allowed_labels
             + '>\",\n'
-            '  \"justification\": \"<1-3 sentence rationale citing EAR sections>\"\n'
-            "}\n"
+            '  \"answer_text\": \"<short answer>\",\n'
+            "  \"citations\": [\n"
+            "    {\"section_id\": \"EAR-<id>\", \"quote\": \"<verbatim substring from Context>\", \"span_id\": \"<optional>\"}\n"
+            "  ],\n"
+            "  \"evidence_okay\": {\"ok\": true, \"reasons\": [\"<brief machine-checkable reasons>\"]},\n"
+            "  \"assumptions\": []\n"
+            "}\n\n"
+            "Grounding rules (MUST follow):\n"
+            "- Every citation.quote MUST be an exact substring of the provided Context (verbatim).\n"
+            "- If you cannot provide at least one grounded quote for the key claim, set label=unanswerable.\n"
+            "- If label=unanswerable, answer_text MUST include a short refusal and a retrieval-guidance hint (e.g., missing ECCN/destination/end-use).\n"
+            "- evidence_okay.ok MUST be true when you followed these rules.\n"
         )
         context_block = (
             "\n\n".join(contexts) if contexts else "No supporting context provided."
@@ -226,27 +340,45 @@ def _build_prompt(
         "Question: Can a controlled item be exported without a license if a License Exception applies under the EAR?\n"
         "Answer JSON:\n"
         "{\n"
-        '  \"answer_text\": \"Yes, if a License Exception applies the export can proceed without a license.\",\n'
         '  \"label\": \"exception_applies\",\n'
-        '  \"justification\": \"A License Exception under EAR-740.1 permits export without a license when its conditions are met.\"\n'
+        '  \"answer_text\": \"Yes. Insufficient evidence to apply conditions unless the cited exception applies; if it does, the export can proceed without a license.\",\n'
+        "  \"citations\": [\n"
+        "    {\"section_id\": \"EAR-740.1\", \"quote\": \"License Exceptions describe conditions where exports may be made without a license.\", \"span_id\": \"\"}\n"
+        "  ],\n"
+        "  \"evidence_okay\": {\"ok\": true, \"reasons\": [\"citation_quote_is_substring_of_context\"]},\n"
+        "  \"assumptions\": []\n"
         "}\n"
         "Example B (permitted with license):\n"
         "Context: [EAR-742.4(a)(1)] A license is required to export certain high-performance computers to China.\n"
         "Question: Can ACME export a high-performance computer to China without a license?\n"
         "Answer JSON:\n"
         "{\n"
-        '  \"answer_text\": \"No, a license is required before exporting that item to China.\",\n'
         '  \"label\": \"permitted_with_license\",\n'
-        '  \"justification\": \"EAR-742.4(a)(1) indicates a license is required for this export; therefore it is only permitted with a license.\"\n'
+        '  \"answer_text\": \"No. The activity is only permitted with a license based on the provided excerpt.\",\n'
+        "  \"citations\": [\n"
+        "    {\"section_id\": \"EAR-742.4(a)(1)\", \"quote\": \"A license is required to export certain high-performance computers to China.\", \"span_id\": \"\"}\n"
+        "  ],\n"
+        "  \"evidence_okay\": {\"ok\": true, \"reasons\": [\"citation_quote_is_substring_of_context\"]},\n"
+        "  \"assumptions\": []\n"
         "}\n\n"
         "Respond in STRICT JSON with this exact shape and no extra text:\n"
         "{\n"
-        '  \"answer_text\": \"<short answer>\",\n'
         '  \"label\": \"<one of: '
         + allowed_labels
         + '>\",\n'
-        '  \"justification\": \"<1-3 sentence rationale citing EAR sections>\"\n'
-        "}\n"
+        '  \"answer_text\": \"<short answer>\",\n'
+        "  \"citations\": [\n"
+        "    {\"section_id\": \"EAR-<id>\", \"quote\": \"<verbatim substring from Context>\", \"span_id\": \"<optional>\"}\n"
+        "  ],\n"
+        "  \"evidence_okay\": {\"ok\": true, \"reasons\": [\"<brief machine-checkable reasons>\"]},\n"
+        "  \"assumptions\": []\n"
+        "}\n\n"
+        "Grounding rules (MUST follow):\n"
+        "- Every citation.quote MUST be an exact substring of the provided Context (verbatim).\n"
+        "- If you cannot provide at least one grounded quote for the key claim, set label=unanswerable.\n"
+        "- If label=unanswerable, answer_text MUST include a short refusal and a retrieval-guidance hint (e.g., missing ECCN/destination/end-use).\n"
+        "- If assumptions is non-empty, label MUST be unanswerable unless each assumption is directly supported by the Context.\n"
+        "- evidence_okay.ok MUST be true when you followed these rules.\n"
     )
     context_block = (
         "\n\n".join(contexts) if contexts else "No supporting context provided."
@@ -267,12 +399,25 @@ def answer_with_rag(
     model: str | None = None,
     top_k: int = 5,
     retriever: object | None = None,
+    strict_retrieval: bool = True,
+    strict_output: bool = True,
 ) -> dict:
     """Run retrieval + optional KG expansion + LLM generation."""
 
-    import json
-
-    docs = retrieve_regulation_context(question, top_k=top_k, retriever=retriever)
+    retrieval_warnings: list[dict[str, object]] = []
+    docs = retrieve_regulation_context(
+        question,
+        top_k=top_k,
+        retriever=retriever,
+        strict=strict_retrieval,
+        warnings=retrieval_warnings,
+    )
+    retrieval_empty = len(docs) == 0
+    retrieval_empty_reason = (
+        (retrieval_warnings[-1]["code"] if retrieval_warnings else "no_hits")
+        if retrieval_empty
+        else None
+    )
     section_ids = [d["section_id"] for d in docs if d.get("section_id")]
     kg_expansion = expand_with_kg(section_ids)
     contexts: list[str] = []
@@ -306,30 +451,75 @@ def answer_with_rag(
         _logger.error("rag.answer.failed", error=str(exc))
         raise
 
-    answer_text = raw_answer
+    raw_answer = str(raw_answer)
+    answer_text: str | None = None
     label: str | None = None
-    justification: str | None = None
+    justification: str | None = None  # backward-compat derived from citations
+    citations: list[dict] | None = None
+    assumptions: list[str] | None = None
+    evidence_okay: dict | None = None
+    citation_span_ids: list[str] | None = None
+    output_ok = True
+    output_error: dict | None = None
 
     try:
-        parsed = json.loads(raw_answer)
-        if isinstance(parsed, dict):
-            answer_text = str(parsed.get("answer_text") or "").strip() or answer_text
-            label_value = (parsed.get("label") or "").strip().lower()
-            label = label_value or None
-            just_value = (parsed.get("justification") or "").strip()
-            justification = just_value or None
-    except Exception:
-        # Fall back to treating the entire response as plain text.
-        pass
+        allowed_labels = (
+            TRUTHINESS_LABELS if label_schema == "truthiness" else DEFAULT_ALLOWED_LABELS
+        )
+        parsed = parse_strict_answer_json(
+            raw_answer,
+            allowed_labels=allowed_labels,
+            context="\n\n".join(contexts),
+        )
+        answer_text = str(parsed["answer_text"])
+        label = str(parsed["label"])
+        citations = list(parsed.get("citations") or [])
+        assumptions = list(parsed.get("assumptions") or [])
+        evidence_okay = dict(parsed.get("evidence_okay") or {})
+        # Derived: compact human-readable trace for older callers.
+        justification = " ".join(
+            f"[{c.get('section_id')}] {c.get('quote')}"
+            for c in (citations or [])
+            if c.get("section_id") and c.get("quote")
+        ).strip() or None
+        citation_span_ids = sorted(
+            {
+                str(c.get("span_id")).strip()
+                for c in (citations or [])
+                if isinstance(c.get("span_id"), str) and str(c.get("span_id")).strip()
+            }
+        )
+    except OutputSchemaError as exc:
+        output_ok = False
+        output_error = exc.as_dict()
+        if not strict_output:
+            answer_text = raw_answer
+        else:
+            answer_text = None
+            label = None
+            justification = None
+            citations = None
+            assumptions = None
+            evidence_okay = None
+            citation_span_ids = None
 
     return {
         "question": question,
         "answer": answer_text,
         "label": label,
         "justification": justification,
+        "citations": citations,
+        "evidence_okay": evidence_okay,
+        "assumptions": assumptions,
+        "citation_span_ids": citation_span_ids,
         "used_sections": section_ids,
         "raw_context": "\n\n".join(contexts),
         "raw_answer": raw_answer,
+        "retrieval_warnings": retrieval_warnings,
+        "retrieval_empty": retrieval_empty,
+        "retrieval_empty_reason": retrieval_empty_reason,
+        "output_ok": output_ok,
+        "output_error": output_error,
     }
 
 
