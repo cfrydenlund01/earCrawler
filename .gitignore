@@ -32,6 +32,8 @@ Research/
 *.egg-info/
 dir-tree*.txt
 EAR_AI_Training_Proposal.docx
+docs/*Code_Improvement_Plan*.docx
+docs/*Work_Timeline*.xlsx
 
 # Local LLM secrets
 config/llm_secrets.env
