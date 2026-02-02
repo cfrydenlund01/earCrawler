@@ -10,9 +10,12 @@ from typing import Dict, Tuple
 from earCrawler.utils.secure_store import get_secret
 
 
+_SUPPORTED_PROVIDERS = frozenset({"groq", "nvidia_nim"})
+
 _DEFAULTS = {
     "nvidia_nim": {
-        "model": "mistral-7b-instruct-v0.2",
+        # Intentionally blank: NIM model IDs vary by deployment.
+        "model": "",
         "base_url": "",
     },
     "groq": {
@@ -127,6 +130,11 @@ def get_llm_config(
     provider = (
         (provider_override or os.getenv("LLM_PROVIDER") or "groq").strip().lower()
     )
+    if provider not in _SUPPORTED_PROVIDERS:
+        supported = ", ".join(sorted(_SUPPORTED_PROVIDERS))
+        raise ValueError(
+            f"Unsupported LLM_PROVIDER={provider!r}. Supported providers: {supported}."
+        )
     provider, model = _resolve_provider_model(provider, model_override)
 
     defaults = _DEFAULTS.get(provider, {})

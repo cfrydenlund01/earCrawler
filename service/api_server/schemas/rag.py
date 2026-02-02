@@ -78,11 +78,11 @@ class RagGeneratedResponse(BaseModel):
     latency_ms: float = Field(..., description="Measured latency for the request")
     question: str = Field(..., description="Original user query")
     answer: Optional[str] = Field(
-        default=None, description="Generated answer from the Mistral agent"
+        default=None, description="Generated answer from the configured remote LLM provider"
     )
     contexts: List[str] = Field(
         default_factory=list,
-        description="Plain-text contexts passed to the Mistral agent",
+        description="Plain-text contexts passed to the LLM",
     )
     retrieved: List[RetrievedDocument] = Field(
         default_factory=list,
@@ -91,16 +91,19 @@ class RagGeneratedResponse(BaseModel):
     model: Optional[str] = Field(
         default=None, description="Model identifier used for generation"
     )
+    provider: Optional[str] = Field(
+        default=None, description="Remote LLM provider used for generation"
+    )
     rag_enabled: bool = Field(
         ...,
         description="True when FAISS/SentenceTransformers RAG is enabled",
     )
-    mistral_enabled: bool = Field(
+    llm_enabled: bool = Field(
         ...,
-        description="True when the Mistral agent is loaded and ready",
+        description="True when remote LLM generation is enabled and configured",
     )
     disabled_reason: Optional[str] = Field(
         default=None,
-        description="Reason when rag_enabled or mistral_enabled are false",
+        description="Reason when rag_enabled or llm_enabled are false",
     )
     cache: CacheState

@@ -26,7 +26,9 @@ KEY_FILES = {
     ],
     "retrieval": [
         "earCrawler/rag/retriever.py:1",
-        "earCrawler/agent/mistral_agent.py:1",
+        "earCrawler/rag/pipeline.py:1",
+        "api_clients/llm_client.py:1",
+        "earCrawler/config/llm_secrets.py:1",
     ],
     "observability": [
         "docs/proposal/observability.md:1",

@@ -145,10 +145,8 @@
 - Package earCrawler as installable CLI with console-script entry-point (v0.1.0).
 - Implement RAG Retriever using all-MiniLM-L12-v2 and FAISS. [#VERSION]
 - Add FastAPI KG service with safe SPARQL query and SHACL-validated inserts. [#VERSION]
-- Add Legal-BERT fine-tuning using PEFT/LoRA adapters. [#VERSION]
-- Add Mistral-7B QLoRA instruction-tuned agent with LoRA adapters. [#VERSION]
-- Add end-to-end benchmark script integrating LoRA and QLoRA components. [#VERSION]
-- Finalize production Docker images and monitoring for LoRA/QLoRA pipeline. [#VERSION]
+- Add remote OpenAI-compatible LLM client for RAG answering (Groq/NVIDIA NIM). [#VERSION]
+- Finalize production Docker images and monitoring for the API/RAG pipeline. [#VERSION]
 
 v0.6.0 – B.6: RIOT validation, TDB2 round-trip with isomorphism fallback, deterministic SPARQL snapshots, Fuseki smoke query, Windows CI, and pytest smoke tests.
 v0.7.0 – B.7: SHACL validation, OWL reasoner smoke checks, Windows CI job, and pytest coverage.

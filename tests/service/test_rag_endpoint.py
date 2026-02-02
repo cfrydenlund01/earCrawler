@@ -7,7 +7,6 @@ from pytest_socket import disable_socket, enable_socket, socket_allow_hosts
 from service.api_server import create_app
 from service.api_server.config import ApiSettings
 from service.api_server.fuseki import StubFusekiClient
-from service.api_server.mistral_support import MistralAgentResult
 from service.api_server.rag_support import RagQueryCache
 
 
@@ -29,27 +28,7 @@ class _StubRetriever:
         ]
 
 
-class _StubMistralService:
-    def __init__(self, enabled: bool, answer: str | None = None, error: str | None = None):
-        self.enabled = enabled
-        self.disabled_reason = error
-        self.model_label = "stub-mistral"
-        self.answer = answer
-        self.error = error
-        self.calls: list[tuple[str, int]] = []
-
-    def generate(self, query: str, *, k: int, documents=None) -> MistralAgentResult:
-        self.calls.append((query, k))
-        contexts = [str(doc.get("text")) for doc in (documents or []) if doc.get("text")]
-        return MistralAgentResult(
-            answer=self.answer,
-            contexts=contexts,
-            documents=list(documents or []),
-            error=self.error,
-        )
-
-
-def _app(stub_retriever: _StubRetriever, mistral_service: _StubMistralService | None = None) -> TestClient:
+def _app(stub_retriever: _StubRetriever) -> TestClient:
     responses = {
         "lineage_by_id": [
             {
@@ -66,7 +45,6 @@ def _app(stub_retriever: _StubRetriever, mistral_service: _StubMistralService | 
         fuseki_client=StubFusekiClient(responses),
         retriever=stub_retriever,
         rag_cache=RagQueryCache(ttl_seconds=60, max_entries=4),
-        mistral_service=mistral_service,
     )
     return TestClient(app)
 
@@ -110,28 +88,36 @@ def test_rag_endpoint_without_lineage():
     assert data["results"][0]["lineage"] is None
 
 
-def test_mistral_endpoint_disabled_returns_stub():
+def test_llm_endpoint_disabled_returns_stub(monkeypatch):
     retriever = _StubRetriever()
-    mistral = _StubMistralService(enabled=False, error="disabled")
-    client = _app(retriever, mistral_service=mistral)
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+
+    def _fail(_messages, *a, **k):
+        raise rag_router.LLMProviderError("disabled")
+
+    monkeypatch.setattr(rag_router, "generate_chat", _fail)
 
     resp = client.post("/v1/rag/answer", json={"query": "export controls"})
     assert resp.status_code == 503
     data = resp.json()
     assert data["rag_enabled"] is True
-    assert data["mistral_enabled"] is False
+    assert data["llm_enabled"] is False
     assert data["disabled_reason"]
 
 
-def test_mistral_endpoint_returns_answer_and_contexts():
+def test_llm_endpoint_returns_answer_and_contexts(monkeypatch):
     retriever = _StubRetriever()
-    mistral = _StubMistralService(enabled=True, answer="stubbed answer")
-    client = _app(retriever, mistral_service=mistral)
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+
+    monkeypatch.setattr(rag_router, "generate_chat", lambda _messages, *a, **k: "stubbed answer")
 
     resp = client.post("/v1/rag/answer", json={"query": "export controls", "top_k": 2})
     assert resp.status_code == 200
     data = resp.json()
     assert data["answer"] == "stubbed answer"
-    assert data["contexts"] == ["Example EAR passage text about exports."]
+    assert data["contexts"] == ["[734.3] Example EAR passage text about exports."]
     assert data["retrieved"][0]["url"] == "https://example.org/doc/1"
-    assert mistral.calls == [("export controls", 2)]

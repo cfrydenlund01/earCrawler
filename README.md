@@ -47,7 +47,7 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
    This path keeps the dependencies and console scripts inside `.venv\Scripts\`. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
    > Tip: Pip may leave a temporary folder (for example `~aml`) behind or warn that script shims such as `uvicorn.exe` are not on `PATH`. The folder can be deleted safely, and you can either add the scripts directory to `PATH` or continue using `python -m earCrawler.cli ...` to invoke commands.
 
-   > **GPU / inference extras:** The torch/transformers stack lives behind an optional extra so Windows operators can skip it entirely. Install it only when you need the RAG or Mistral agents:
+   > **RAG extras:** The retrieval stack (SentenceTransformers/FAISS) is optional; install it only when you need RAG indexing/querying. This project no longer relies on a local Mistral model for generation.
    > ```powershell
    > python -m pip install -e .[gpu]
    > # or use pip install -r requirements-gpu.txt on Linux runners
@@ -130,21 +130,19 @@ Environment variables:
 
 ---
 
-## RAG / Mistral Agent
+## RAG / Remote LLM Answering
 
-The Mistral QLoRA agent can answer questions over retrieved EAR/FR passages. Heavy model downloads are opt-in and guarded by environment variables:
+The API can generate answers using remote OpenAI-compatible providers (Groq or NVIDIA NIM). Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys loaded from your environment, Windows Credential Store, or an optional local-only `config/llm_secrets.env` (copy from `config/llm_secrets.example.env` and do not commit it).
 
 ```powershell
 $env:EARCTL_USER = 'test_operator'
 $env:EARCRAWLER_API_ENABLE_RAG = '1'
-$env:EARCRAWLER_API_ENABLE_MISTRAL = '1'
-# Optional: override defaults
-# $env:EARCRAWLER_MISTRAL_MODEL = 'mistralai/Mistral-7B-Instruct-v0.2'
-# $env:EARCRAWLER_MISTRAL_USE_4BIT = '0'  # disable 4-bit quantization
+$env:EARCRAWLER_ENABLE_REMOTE_LLM = '1'
+# Provide keys via env or Windows Credential Store (recommended), or via config/llm_secrets.env
 py -m earCrawler.cli api start
 ```
 
-Call the agent-backed endpoint:
+Call the generated-answer endpoint:
 
 ```powershell
 Invoke-WebRequest `
@@ -155,7 +153,7 @@ Invoke-WebRequest `
   Select-Object -ExpandProperty Content
 ```
 
-The response includes `question`, `answer`, `contexts` (the passages passed to the agent), `retrieved` (document metadata), `model`, and flags `rag_enabled` / `mistral_enabled` indicating whether the full stack is active.
+The response includes `question`, `answer`, `contexts` (the passages passed to the LLM), `retrieved` (document metadata), `provider`, `model`, and flags `rag_enabled` / `llm_enabled` indicating whether the stack is active.
 
 ---
 
@@ -304,28 +302,26 @@ To add a new dataset:
 
 ### Running evals via CLI
 
-The CLI exposes a convenience command that wraps the evaluation harness:
+The CLI exposes a convenience command that runs the RAG pipeline against datasets using a remote LLM provider:
 
 ```powershell
 $env:EARCTL_USER = 'test_operator'  # if RBAC is enabled
-py -m earCrawler.cli eval-benchmark --dataset-id ear_compliance.v1
+$env:EARCRAWLER_ENABLE_REMOTE_LLM = '1'
+py -m earCrawler.cli eval run-rag --dataset-id ear_compliance.v1 --max-items 5
 ```
 
 By default this:
 
 - Resolves `ear_compliance.v1` from `eval/manifest.json`,
-- Loads the dataset JSONL,
-- Runs the harness with a small baseline model (`sshleifer/tiny-gpt2` by default),
-- Writes metrics + metadata to `dist\eval\ear_compliance.v1.json`,
-- Writes a short Markdown summary to `dist\eval\ear_compliance.v1.md`.
+- Loads the dataset JSONL and runs retrieval + generation,
+- Writes metrics + metadata to `dist\eval\ear_compliance.v1.rag.<provider>.<model>.json`,
+- Writes a short Markdown summary to `dist\eval\ear_compliance.v1.rag.<provider>.<model>.md`.
 
 Other useful options:
 
-- `--model-path` – override the HF model or local directory.
-- `--data-file` – bypass the manifest and point directly at a JSONL file.
-- `--out-json`, `--out-md` – customize output locations under `dist\eval\`.
-- `--explainability-artifacts` – in addition to the normal summary, assert the metrics cover every task in the dataset and write `dist\eval\<stem>.evidence.json` with the aggregated doc spans, KG nodes, and KG paths observed during the run (useful when auditing explainability payloads).
-- `--min-accuracy` / `--min-label-accuracy` – optional thresholds that keep the artefacts but cause the command to exit non-zero if the run regresses below the specified target (handy for release-specific gates).
+- `--top-k` – number of contexts to retrieve before generation.
+- `--max-items` – cap the number of items for a quick smoke run.
+- `--answer-score-mode` – `semantic` (default), `normalized`, or `exact`.
 
 To log the results in `Research/decision_log.md`, run `python scripts/eval/log_eval_summary.py dist/eval/*.json` to emit a markdown-ready set of bullet points for all benchmark outputs in one go. This helper accepts one or many metrics files, making it easy to paste consolidated summaries into the research log.
 
@@ -349,9 +345,9 @@ These outputs are suitable for CI artefacts and for logging Phase E endpoints in
 
 - Create `config/llm_secrets.env` from `config/llm_secrets.example.env` and fill in provider keys/models. The file is git-ignored and only supplements the usual env/Windows Credential Store secrets.
 - Enable remote calls explicitly: `set EARCRAWLER_ENABLE_REMOTE_LLM=1` (default is disabled for CI/offline safety).
-- Choose provider/model per call via CLI (defaults from `config/llm_secrets.env` are typically `GROQ_MODEL=mixtral-8x7b-32768` and `NVIDIA_NIM_MODEL=mistral-7b-instruct-v0.2`):
+- Choose provider/model per call via CLI (defaults come from `earCrawler/config/llm_secrets.py` and can be overridden via environment or `config/llm_secrets.env`):
   - `py -m earCrawler.cli llm ask --llm-provider groq --llm-model mixtral-8x7b-32768 "Can ACME export laptops to France?"`
-  - `py -m earCrawler.cli llm ask --llm-provider nvidia_nim --llm-model mistral-7b-instruct-v0.2 "Are Huawei exports restricted under EAR?"`
+  - `py -m earCrawler.cli llm ask --llm-provider nvidia_nim --llm-model <nim-model-id> "Are Huawei exports restricted under EAR?"`
 - Requests use OpenAI-style `/chat/completions` endpoints with soft call budgets (configure with `LLM_MAX_CALLS` or `LLM_<PROVIDER>_MAX_CALLS`).
 
 Run `py -m earCrawler.cli COMMAND --help` for detailed options.

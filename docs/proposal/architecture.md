@@ -23,7 +23,7 @@ earctl kg-emit ──► RDF/Turtle (data/kg/*.ttl)
         ▼                        │
 earctl bundle export-profiles    │
         │                        │
-        └──► RAG stack (FAISS retriever + Mistral agent)
+        └──► RAG stack (FAISS retriever + remote LLM provider)
 ```
 
 The `scripts/demo-end-to-end.ps1` helper automates the boxed path using
@@ -37,8 +37,8 @@ generate summary analytics.
   `perf/warmers` queries and guarded by SHACL/OWL smoke tests (`tests/test_*`).
 - **FastAPI facade**: Templates curated SPARQL queries, enforces RBAC and rate
   limits, and exposes the contract consumed by downstream applications.
-- **RAG Layer**: FAISS retriever + Mistral QLoRA agent (`earCrawler/rag`,
-  `earCrawler/agent`) providing contextualised answers for EAR QA.
+- **RAG Layer**: FAISS retriever + remote LLM provider (Groq/NVIDIA NIM) providing
+  contextualised answers for EAR QA.
 
 ## Footprint & Performance (Single-node Windows Testbed)
 
@@ -49,7 +49,7 @@ generate summary analytics.
 | `earctl kg-load`            | 2          | 1.5      | 0.5       | TDB2 load via embedded Jena binaries. |
 | `earctl kg-serve`           | 2          | 2.0      | 1.0       | Fuseki idle footprint; add 1 GB for caches. |
 | FastAPI facade (`uvicorn`)  | 1          | 0.3      | <0.1      | Concurrency limit default 32. |
-| RAG inference (Mistral 7B)  | 8 + GPU    | 16       | 15        | Runs with 4-bit adapters; offload to GPU for latency. |
+| RAG inference (remote LLM)  | 2          | 1.0      | <0.1      | Latency dominated by network/provider rate limits. |
 
 Sizing increases linearly with live data volume; bump Fuseki heap (`--java-opts`)
 once KG surpasses 4 GB on disk.

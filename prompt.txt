@@ -1,4 +1,4 @@
-Lets try and complete the project. The end product = ingest PDF or CSL variables -> Mistral parses -> Legal-BERT queries EAR -> Mistral summarizes. You are an expert python engineer and designer; the next steps will complete coding for this end product -- minus GUI, but frame output to be easily redirected to an HTML GUI. Ensure a Windows-first environment, and secrets stay in Windows Credential Store; no hardcoding.
+Lets try and complete the project. The end product = ingest PDF or CSL variables -> retrieval (FAISS/SPARQL over the EAR corpus/KG) -> remote OpenAI-compatible LLM (Groq/NVIDIA NIM) answers with citations. You are an expert python engineer and designer; the next steps will complete coding for this end product -- minus GUI, but frame output to be easily redirected to an HTML GUI. Ensure a Windows-first environment, and secrets stay in Windows Credential Store; no hardcoding.
 
 How each step advances the pipeline
  B.28 Provenance and delta loads:
@@ -16,26 +16,26 @@ How each step advances the pipeline
 	5) CI checks for namespace drift and for accidental introduction of non-canonical IRIs.
  B.30 Entity resolution (dedup):
 	1) Introduce a deterministic dedup phase that merges obvious duplicates from Trade.gov results before graph write.
-	2) Record merge decisions with audit facts so Mistral can display "why this record merged" when summarizing.
+	2) Record merge decisions with audit facts so the LLM can display "why this record merged" when summarizing.
 	3) Keep merges reversible by preserving source nodes and adding equivalence links to the surviving canonical node.
 	4) Tests include synthetic collisions that exercise match rules and ensure no data loss on merge.
 	5) CI flags unmerged duplicates that exceed a strict threshold to prevent silent bloat.
  B.31 FR text ingestion and citation links:
 	1) Expand the Federal Register client usage to pull minimal, high-signal text slices and metadata for EAR topics.
-	2) Store per-document anchors and link them to relevant part: nodes to provide Legal-BERT with authoritative passages.
+	2) Store per-document anchors and link them to relevant part: nodes to provide the retriever/LLM with authoritative passages.
 	3) Maintain lightweight indices that map parts to document anchors for quick prompt assembly.
 	4) Tests validate that each stored part has at least one referenced FR anchor when present in the source set.
 	5) CI asserts that FR ingestion never bypasses the client module and that every anchor is tied to a part IRI.
  B.32 Mention extraction upgrade:
 	1) Replace substring checks with token and pattern logic to detect when entities are mentioned in FR passages or PDFs.
 	2) Introduce false-positive guardrails with stoplists and context windows.
-	3) Emit graded "mention strength" and keep it in the graph so Mistral can pre-rank what Legal-BERT should read first.
+	3) Emit graded "mention strength" and keep it in the graph so the retriever can pre-rank what the LLM should read first.
 	4) Tests cover precision/recall on a labeled sample and guard against regressions.
 	5) CI publishes a small metrics report for mention quality; builds fail if quality drops below a floor.
  B.33 Policy-aware linking rules:
 	1) Encode transparent, testable links between certain EAR parts and screening programs as advisory hints.
 	2) Keep rules data-driven and isolated, so they can be updated without code changes.
-	3) Use these hints to prioritize which parts Legal-BERT queries when entity context is sparse.
+	3) Use these hints to prioritize which parts the retriever surfaces when entity context is sparse.
 	4) Tests assert that rule outputs are deterministic and never override facts derived from APIs.
 	5) CI checks that the rule set is valid, versioned, and documented.
  B.34 Batch jobs and Windows Task Scheduler:
@@ -52,7 +52,7 @@ How each step advances the pipeline
 	5) CI enforces upper bounds on calls during unit tests to prevent accidental network chatter.
  B.36 Observability:
 	1) Standardize logging fields: run id, input hash, step, duration, outcome.
-	2) Capture per-phase timings and counts to a minimal JSON summary artifact that Mistral can read for progress feedback.
+	2) Capture per-phase timings and counts to a minimal JSON summary artifact that the LLM can read for progress feedback.
 	3) Add trace IDs that flow from ingestion to graph write so a PDF's path is reconstructible.
 	4) Tests assert presence and format of logs and summaries.
 	5) CI publishes summaries as artifacts for each run.
@@ -66,7 +66,7 @@ How each step advances the pipeline
  B.38 RDF export profiles:
 	1) Produce multiple export flavors from the same build: compact Turtle for inspection, line-based N-Triples for bulk, gz variants for transport.
 	2) Attach checksums and manifest files so downstream consumers verify integrity.
-	3) Keep filenames and manifests stable so Mistral and Legal-BERT loaders can subscribe to a known pattern.
+	3) Keep filenames and manifests stable so the retriever + LLM pipeline can subscribe to a known pattern.
 	4) Tests confirm round-trip parse for each profile and checksum correctness.
 	5) CI publishes exports as artifacts and verifies manifests.
  B.39 Graph integrity checks:
@@ -109,8 +109,8 @@ Flow alignment to your architecture
 	6) Throughput headroom (B.41).
  Outputs consumed by models:
 	1) Validated TTL/NT exports and SPARQL endpoints keyed by stable IRIs.
-	2) Evidence URIs and citations for Legal-BERT prompts.
-	3) Ranked candidate sets for Mistral to summarize.
+	2) Evidence URIs and citations for LLM prompts.
+	3) Ranked candidate sets for the LLM to summarize.
 
  Pitfalls to watch:
 	1) Keep Trade.gov Data API and Federal Register API calls inside client modules only.

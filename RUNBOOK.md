@@ -19,15 +19,13 @@ Windows notes
 - The installer script writes output to `dist\\` (configured in `installer/earcrawler.iss`).
 - `scripts/make-installer.ps1` exports `EARCRAWLER_VERSION` automatically; no manual env prep needed.
 
-## Deploying LoRA/QLoRA Models
+## Deploying Containers
 1. Tag a release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-2. GitHub Actions builds and pushes `api`, `rag`, and `agent` images to GHCR.
+2. GitHub Actions builds and pushes `api` and `rag` images to GHCR.
 3. On the host, pull images:
    - `docker pull ghcr.io/<org>/earCrawler/api:vX.Y.Z`
    - `docker pull ghcr.io/<org>/earCrawler/rag:vX.Y.Z`
-   - `docker pull ghcr.io/<org>/earCrawler/agent:vX.Y.Z`
-4. Mount adapter weights or model artifacts into the container under `models/`.
-5. Restart services with `docker compose up -d`.
+4. Restart services with `docker compose up -d`.
 
 ## Rollback
 1. Locate previous stable tag.
@@ -84,9 +82,7 @@ Windows notes
 - The evaluation harness expects exactly this shape and treats unknown extra keys as opaque; keep the schema stable when adding new datasets and bump the dataset `id`/`version` when you need to change semantics.
 - CLI helpers:
   - Run `python eval/validate_datasets.py` locally (or watch CI) to catch schema or referential errors early.
-  - `py -m earCrawler.cli eval-benchmark --dataset-id <id>` writes metrics to `dist/eval/<id>.json` and Markdown summaries to `dist/eval/<id>.md`. Optional flags:
-    - `--explainability-artifacts`: asserts per-task coverage and writes aggregated evidence (doc spans, KG nodes, KG paths) to `<stem>.evidence.json` for explainability reviews.
-    - `--min-accuracy` / `--min-label-accuracy`: leave unset for diagnostics; when provided, the command exits non-zero if the run regresses below the threshold (useful for release gates or bespoke workflows).
+  - `py -m earCrawler.cli eval run-rag --dataset-id <id>` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys.
   - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.
 
 ## Toolchain maintenance

@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from ..fuseki import FusekiGateway
-from ..mistral_support import MistralService
+from api_clients.llm_client import LLMProviderError, generate_chat
+from earCrawler.config.llm_secrets import get_llm_config
 from ..schemas import (
     CacheState,
     LineageEdge,
@@ -25,7 +26,6 @@ from .dependencies import (
     get_gateway,
     get_rag_cache,
     get_retriever,
-    get_mistral_service,
     rate_limit,
 )
 
@@ -171,7 +171,6 @@ async def rag_answer(
     request: Request,
     retriever: RetrieverProtocol = Depends(get_retriever),
     cache: RagQueryCache = Depends(get_rag_cache),
-    mistral_service: MistralService | None = Depends(get_mistral_service),
     _: None = Depends(rate_limit("rag")),
 ) -> JSONResponse:
     start = time.perf_counter()
@@ -196,32 +195,61 @@ async def rag_answer(
     answer: str | None = None
     status_code = 200
     model_label = None
-    mistral_enabled = bool(mistral_service and mistral_service.enabled)
+    provider_label = None
+    llm_enabled = False
 
     if not rag_enabled:
         disabled_reason = "RAG retriever disabled; set EARCRAWLER_API_ENABLE_RAG=1"
         status_code = 503
-    elif mistral_service is None:
-        disabled_reason = "Mistral agent unavailable"
-        status_code = 503
-    elif not mistral_service.enabled:
-        disabled_reason = mistral_service.disabled_reason or "Mistral agent disabled"
-        status_code = 503
     else:
         try:
-            result = mistral_service.generate(
-                payload.query, k=payload.top_k, documents=documents
+            cfg = get_llm_config()
+            provider_label = cfg.provider.provider
+            model_label = cfg.provider.model
+            prompt_contexts: list[str] = []
+            for doc in documents:
+                text = str(
+                    doc.get("text")
+                    or doc.get("content")
+                    or doc.get("paragraph")
+                    or doc.get("body")
+                    or doc.get("snippet")
+                    or ""
+                ).strip()
+                if not text:
+                    continue
+                section = str(
+                    doc.get("section")
+                    or doc.get("span_id")
+                    or doc.get("id")
+                    or doc.get("entity_id")
+                    or ""
+                ).strip()
+                prefix = f"[{section}] " if section else ""
+                prompt_contexts.append(prefix + text)
+            contexts = prompt_contexts
+            system = (
+                "You are an expert export compliance assistant focused on the Export Administration Regulations (EAR). "
+                "Answer using ONLY the provided context excerpts. "
+                "When you make a claim, cite the relevant excerpt by referencing its bracketed section id if present."
             )
-            answer = result.answer
-            contexts = result.contexts
-            model_label = mistral_service.model_label
-            if result.error or not answer:
-                disabled_reason = result.error or "Mistral agent did not return an answer"
-                mistral_enabled = False
+            context_block = "\n\n".join(prompt_contexts) if prompt_contexts else "No supporting context provided."
+            user = f"Context:\n{context_block}\n\nQuestion: {payload.query}\nAnswer:"
+            answer = generate_chat(
+                [{"role": "system", "content": system}, {"role": "user", "content": user}]
+            ).strip()
+            llm_enabled = True
+            if not answer:
+                disabled_reason = "LLM did not return an answer"
+                llm_enabled = False
                 status_code = 503
+        except LLMProviderError as exc:
+            disabled_reason = str(exc)
+            llm_enabled = False
+            status_code = 503
         except Exception as exc:  # pragma: no cover - defensive
             disabled_reason = str(exc)
-            mistral_enabled = False
+            llm_enabled = False
             status_code = 503
 
     trace_id = getattr(request.state, "trace_id", "")
@@ -238,8 +266,9 @@ async def rag_answer(
         contexts=contexts,
         retrieved=retrieved,
         model=model_label,
+        provider=provider_label,
         rag_enabled=rag_enabled,
-        mistral_enabled=mistral_enabled,
+        llm_enabled=llm_enabled,
         disabled_reason=disabled_reason,
         cache=cache_state,
     )

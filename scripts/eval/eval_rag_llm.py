@@ -12,7 +12,7 @@ from typing import Any, Dict, Iterable, List
 
 from api_clients.llm_client import LLMProviderError
 from earCrawler.config.llm_secrets import get_llm_config
-from earCrawler.eval.run_eval import _infer_label
+from earCrawler.eval.label_inference import infer_label
 from earCrawler.rag.pipeline import answer_with_rag
 
 _ALLOWED_LABELS = {
@@ -38,7 +38,7 @@ def _normalize_pred_label(
 ) -> tuple[str, str | None]:
     label = (pred_label_raw or "").strip().lower() or "unknown"
     if label not in _ALLOWED_LABELS:
-        inferred = _infer_label(answer)
+        inferred = infer_label(answer)
         if inferred in _ALLOWED_LABELS:
             return inferred, f"fallback_infer_label_from_answer({label})"
         return label, None
@@ -230,7 +230,7 @@ def evaluate_dataset(
             if structured_label:
                 pred_label = structured_label
             else:
-                pred_label = _infer_label(answer)
+                pred_label = infer_label(answer)
             pred_label_raw = pred_label
             pred_label, label_norm = _normalize_pred_label(
                 pred_label_raw,

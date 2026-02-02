@@ -8,7 +8,6 @@ from typing import Iterable, List, Mapping
 from api_clients.llm_client import LLMProviderError, generate_chat
 from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
-from earCrawler.agent.retrieval_adapter import TextContextRetriever
 from pathlib import Path
 import os
 from earCrawler.utils.log_json import JsonLogger

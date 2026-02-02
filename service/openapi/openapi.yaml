@@ -224,7 +224,7 @@ components:
           question,
           cache,
           rag_enabled,
-          mistral_enabled,
+          llm_enabled,
           contexts,
           retrieved,
         ]
@@ -249,9 +249,12 @@ components:
         model:
           type: string
           nullable: true
+        provider:
+          type: string
+          nullable: true
         rag_enabled:
           type: boolean
-        mistral_enabled:
+        llm_enabled:
           type: boolean
         disabled_reason:
           type: string
@@ -439,7 +442,7 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
   /v1/rag/answer:
     post:
-      summary: Generate an answer using the Mistral RAG agent
+      summary: Generate an answer using a remote LLM provider
       requestBody:
         required: true
         content:
@@ -457,7 +460,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/RagGeneratedResponse'
         '503':
-          description: RAG or Mistral disabled
+          description: RAG or remote LLM disabled
           content:
             application/json:
               schema:
