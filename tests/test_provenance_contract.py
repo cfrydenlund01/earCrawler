@@ -20,17 +20,17 @@ if sys.platform != "win32":
     pytest.skip("Windows-only", allow_module_level=True)
 
 if shutil.which("pwsh") is None:
-    pytest.fail(
+    pytest.skip(
         "PowerShell 7 (pwsh) is required to run the provenance contract test. "
         "Install pwsh and ensure it is on the PATH.",
-        pytrace=False,
+        allow_module_level=True,
     )
 
 if not JAVA_VERSION_OK:
-    pytest.fail(
+    pytest.skip(
         "Java 17 or newer is required to run the provenance contract test. "
         "Update the installed Java runtime and try again.",
-        pytrace=False,
+        allow_module_level=True,
     )
 
 from rdflib import ConjunctiveGraph

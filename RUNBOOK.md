@@ -1,5 +1,11 @@
 # Runbook
 
+## Testing
+- Default offline run: `py -m pytest -q` (network marked tests are excluded by default).
+- Finetune/GPU suite (opt-in): `set EARCRAWLER_ENABLE_GPU_TESTS=1` then `py -m pytest -q -m finetune` (requires CUDA).
+- Network-marked tests: `py -m pytest -q -m network` when outbound access is explicitly allowed.
+- Torch and GPU tests skip automatically if PyTorch is missing or fails to load (ImportError/OSError/DLL errors).
+
 ## Release packaging
 1. Bump version in `pyproject.toml` and commit.
 2. Tag `vX.Y.Z` and push.

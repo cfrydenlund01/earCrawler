@@ -60,6 +60,7 @@ def evaluate_groundedness(
                 provider=llm_provider,
                 model=llm_model,
                 top_k=5,
+                strict_retrieval=False,
             )
             used_sections = rag_result.get("used_sections") or []
             grounded = bool(set(ear_sections) & set(used_sections))
@@ -75,6 +76,9 @@ def evaluate_groundedness(
                     "expected_sections": ear_sections,
                     "grounded": grounded,
                     "evidence": item.get("evidence"),
+                    "retrieval_warnings": rag_result.get("retrieval_warnings") or [],
+                    "retrieval_empty": bool(rag_result.get("retrieval_empty")),
+                    "retrieval_empty_reason": rag_result.get("retrieval_empty_reason"),
                 }
             )
         except LLMProviderError as exc:

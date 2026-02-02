@@ -61,8 +61,10 @@ def load_corpus_index(path: Path) -> dict[str, list[Mapping[str, object]]]:
             except json.JSONDecodeError:
                 continue
             section_value = (
-                record.get("section")
+                record.get("section_id")
+                or record.get("section")
                 or record.get("span_id")
+                or record.get("doc_id")
                 or record.get("id")
                 or record.get("entity_id")
             )
