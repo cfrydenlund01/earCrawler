@@ -135,7 +135,7 @@ Project next steps
 
 Stabilize EAR ingestion: fix the Federal Register API path (user agent / unblock issue) or generate a small frozen EAR corpus for parts 744/736 and keep it under kg/source/ear for reproducible runs.
 Produce and adopt a canonical kg/ear.ttl (or kg/ear_triples.ttl), load it into Fuseki (kg-load + kg-serve), and confirm that the API facade (py -m earCrawler.cli api start) can answer basic Part 744 queries.
-Build a minimal end-to-end “answerer” script: given a question (or CSL/PDF-derived variables), run SPARQL over the KG + FR anchors, assemble a prompt (with citations) for Legal-BERT/Mistral, and emit an HTML-ready JSON payload.
+Build a minimal end-to-end “answerer” script: given a question (or CSL/PDF-derived variables), run SPARQL over the KG + FR anchors, assemble a prompt (with citations) for a remote OpenAI-compatible LLM (Groq/NVIDIA NIM), and emit an HTML-ready JSON payload.
 Hook the export bundle you just validated into that script (read from dist/exports/dataset.* and manifest.json instead of live Fuseki), so you have an air-gapped, fully deterministic path for experiments.
 Expand observability for this pipeline: log each run (question, retrieved IRIs, FR docs, model outputs, scores) under run/logs/ so you can later mine it for error analysis and paper figures.
 If you’d like, next I can sketch that minimal “answerer” script wired to your dist/exports bundle and an API/LLM stub so you can start running pilot questions.

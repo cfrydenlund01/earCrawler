@@ -168,6 +168,45 @@ components:
           type: string
           format: date-time
           nullable: true
+    OutputError:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+        raw_preview:
+          type: string
+          nullable: true
+        raw_len:
+          type: integer
+          nullable: true
+    RagCitation:
+      type: object
+      required: [section_id, quote]
+      properties:
+        section_id:
+          type: string
+        quote:
+          type: string
+        span_id:
+          type: string
+          nullable: true
+    EvidenceOkay:
+      type: object
+      required: [ok, reasons]
+      properties:
+        ok:
+          type: boolean
+        reasons:
+          type: array
+          items:
+            type: string
     RagResponse:
       type: object
       required: [trace_id, latency_ms, query, cache, results]
@@ -224,7 +263,7 @@ components:
           question,
           cache,
           rag_enabled,
-          mistral_enabled,
+          llm_enabled,
           contexts,
           retrieved,
         ]
@@ -249,15 +288,43 @@ components:
         model:
           type: string
           nullable: true
+        provider:
+          type: string
+          nullable: true
         rag_enabled:
           type: boolean
-        mistral_enabled:
+        llm_enabled:
           type: boolean
         disabled_reason:
           type: string
           nullable: true
         cache:
           $ref: '#/components/schemas/CacheState'
+        output_ok:
+          type: boolean
+        output_error:
+          $ref: '#/components/schemas/OutputError'
+          nullable: true
+        raw_answer:
+          type: string
+          nullable: true
+        label:
+          type: string
+          nullable: true
+        justification:
+          type: string
+          nullable: true
+        citations:
+          type: array
+          items:
+            $ref: '#/components/schemas/RagCitation'
+        evidence_okay:
+          $ref: '#/components/schemas/EvidenceOkay'
+          nullable: true
+        assumptions:
+          type: array
+          items:
+            type: string
     SparqlProxyRequest:
       type: object
       required: [template]
@@ -439,7 +506,7 @@ paths:
                 $ref: '#/components/schemas/ProblemDetails'
   /v1/rag/answer:
     post:
-      summary: Generate an answer using the Mistral RAG agent
+      summary: Generate an answer using a remote LLM provider
       requestBody:
         required: true
         content:
@@ -456,8 +523,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RagGeneratedResponse'
+        '422':
+          description: LLM output failed schema validation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RagGeneratedResponse'
         '503':
-          description: RAG or Mistral disabled
+          description: RAG or remote LLM disabled
           content:
             application/json:
               schema:

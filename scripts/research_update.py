@@ -27,8 +27,8 @@ if not redlined_src.exists():
     for line in [
         "Phase A — Corpus Curation: loaders, transforms, analytics; deterministic fixtures present.",
         "Phase B — Knowledge Graph: ontology, SHACL, emit/load, Fuseki/Jena bootstrap, integrity gates, CI.",
-        "Phase C — LLM Fine-Tuning: QLoRA scaffolding, sample datasets; config plumbing exists.",
-        "Phase D — RAG Integration: retriever + agent modules; FastAPI facade + OpenAPI.",
+        "Phase C — Remote LLM Integration: provider config + prompt contracts; deterministic offline-safe defaults.",
+        "Phase D — RAG Integration: retriever + remote LLM; FastAPI facade + OpenAPI.",
         "Phase E — Evaluation: seeded harness and perf tests; needs task/metric expansion.",
         "Phase F — Explainability & Release: packaging, installer, SBOM, telemetry, RBAC, audit in place.",
     ]:
@@ -37,7 +37,7 @@ if not redlined_src.exists():
     for line in [
         "Phase A: finalize canonicalization/merge; provenance + redaction enforcement; snapshotting + jobs.",
         "Phase B: freeze v1 ontology/shapes; export profile verification; SPARQL perf budgets in CI.",
-        "Phase C: dataset builders; experiment tracking/configs; model card + compliance checks; HPC templates.",
+        "Phase C: prompt contracts; provider configuration; evaluation baselines; compliance checks.",
         "Phase D: unified retrieval + ranking; caching + tracing; agent tool-use for SPARQL.",
         "Phase E: define tasks/metrics and regression gates; dashboards; red-team and compliance tests.",
         "Phase F: explainability surfaces in API; signed artifacts; SDK + docs; Windows service ops.",
@@ -62,7 +62,7 @@ if not redlined_src.exists():
     for line in [
         "M1: Windows-first end-to-end demo with CI gates.",
         "M2: Complete Phase B with export verification + API docs/SDK.",
-        "M3: Phase C bootstrap with dataset builders and baselines.",
+        "M3: Phase C bootstrap with prompt contracts + eval baselines.",
         "M4: Phase D/E with unified retrieval and continuous evaluation.",
         "M5: Phase F release with explainability and signed packages.",
     ]:
@@ -145,13 +145,13 @@ outline_core = {
     "research_axes": {
         "models": [
             {
-                "type": "Llama 3.1 8B/70B",
-                "finetune": ["LoRA", "QLoRA"],
+                "type": "Remote LLM (e.g., Llama 3.x via Groq/NVIDIA NIM)",
+                "finetune": [],
                 "explainability": ["saliency", "rationale extraction"],
             },
             {
-                "type": "Mistral 7B",
-                "finetune": ["QLoRA"],
+                "type": "Remote LLM (alternative models/providers)",
+                "finetune": [],
                 "explainability": ["attribution", "KG-path grounding"],
             },
             {"type": "Legal-specific BERT/LED", "use": ["reranking", "summarization"]},
@@ -193,7 +193,7 @@ outline_core = {
             "prompt": "Enforce export profiles and SPARQL perf warmers with CI gates.",
         },
         {
-            "name": "RAG & Agent",
+            "name": "RAG & Answering",
             "tasks": ["index builder", "ranking policy", "SPARQL tool-use", "tracing"],
             "prompt": "Expose a RAG endpoint aligned with OpenAPI; include sources, scores, lineage.",
         },
@@ -246,7 +246,7 @@ variant_outlines = [
         "methods": {
             "retrieval": "BM25 + dense (E5-legal) with RRF",
             "grounding": "SPARQL templates for lineage and citations",
-            "generation": "Mistral 7B QLoRA with chain-of-thought (regulated)",
+            "generation": "Remote LLM (Groq/NVIDIA NIM) with a grounded JSON answer contract",
         },
         "datasets": ["EAR corpus", "NSF cases", "synthetic Q/A pairs"],
         "evaluation": {
@@ -282,13 +282,13 @@ variant_outlines = [
         "title": "Instruction-Tuned Legal QA",
         "hypotheses": ["Domain instruction data reduces errors"],
         "methods": {
-            "finetune": "QLoRA on Mistral/Llama",
+            "generation": "Remote LLM (Groq/NVIDIA NIM) with retrieval + grounding",
             "safety": "policy-aware decoding",
         },
         "datasets": ["curated Q/A from EAR/NSF"],
         "gpt5_prompts": [
             "Dataset builder with redaction/licensing checks",
-            "Trainer config + smoke eval",
+            "Expand regression/eval harness + smoke eval",
         ],
     },
 ]

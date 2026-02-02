@@ -177,6 +177,7 @@ def test_fr_coverage_cli_records_ranks(monkeypatch, tmp_path: Path) -> None:
 
     runner = CliRunner()
     out_path = tmp_path / "report.json"
+    summary_path = tmp_path / "summary.json"
     result = runner.invoke(
         cli,
         [
@@ -192,6 +193,8 @@ def test_fr_coverage_cli_records_ranks(monkeypatch, tmp_path: Path) -> None:
             "5",
             "--out",
             str(out_path),
+            "--summary-out",
+            str(summary_path),
             "--no-fail",
         ],
     )
@@ -200,6 +203,170 @@ def test_fr_coverage_cli_records_ranks(monkeypatch, tmp_path: Path) -> None:
     items = report["datasets"][0]["items"]
     ranks = items[0]["retrieval"]["ranks"]
     assert ranks["EAR-740.1"] == 2
+    assert summary_path.exists()
+
+
+def test_fr_coverage_cli_emits_summary_and_filters_v2(monkeypatch, tmp_path: Path) -> None:
+    corpus_path = tmp_path / "corpus.jsonl"
+    _write_jsonl(
+        corpus_path,
+        [
+            {"id": "EAR-740.1", "section": "740.1", "text": "t", "source_url": "http://example/740"},
+            {"id": "EAR-742.4(a)(1)", "section": "742.4(a)(1)", "text": "t", "source_url": "http://example/742"},
+        ],
+    )
+
+    dataset_v1 = tmp_path / "dataset.v1.jsonl"
+    _write_jsonl(
+        dataset_v1,
+        [
+            {
+                "id": "item-v1",
+                "question": "Q",
+                "ear_sections": ["EAR-740.1"],
+                "evidence": {"doc_spans": [{"doc_id": "EAR-740", "span_id": "740.1"}]},
+            }
+        ],
+    )
+    dataset_v2 = tmp_path / "dataset.v2.jsonl"
+    _write_jsonl(
+        dataset_v2,
+        [
+            {
+                "id": "item-v2",
+                "question": "Q",
+                "ear_sections": ["EAR-740.1", "EAR-742.4(a)(1)"],
+                "evidence": {"doc_spans": [{"doc_id": "EAR-742", "span_id": "742.4(a)(1)"}]},
+            }
+        ],
+    )
+
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "datasets": [
+                    {"id": "ds.v1", "file": str(dataset_v1), "version": 1},
+                    {"id": "ds.v2", "file": str(dataset_v2), "version": 2},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    from earCrawler.rag import pipeline as rag_pipeline
+
+    monkeypatch.setattr(rag_pipeline, "_ensure_retriever", lambda *args, **kwargs: object())
+
+    def fake_retrieve(question: str, top_k: int = 5, *, retriever=None, **kwargs):
+        # Hit EAR-740.1 but miss EAR-742.4(a)(1)
+        return [
+            {"section_id": "EAR-740.1", "text": "hit", "score": 0.8, "raw": {}},
+        ][:top_k]
+
+    monkeypatch.setattr(rag_pipeline, "retrieve_regulation_context", fake_retrieve)
+
+    runner = CliRunner()
+    out_path = tmp_path / "report.json"
+    summary_path = tmp_path / "summary.json"
+    result = runner.invoke(
+        cli,
+        [
+            "eval",
+            "fr-coverage",
+            "--manifest",
+            str(manifest_path),
+            "--corpus",
+            str(corpus_path),
+            "--only-v2",
+            "--retrieval-k",
+            "5",
+            "--out",
+            str(out_path),
+            "--summary-out",
+            str(summary_path),
+            "--no-fail",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    assert len(summary["datasets"]) == 1
+    assert summary["datasets"][0]["dataset_id"] == "ds.v2"
+    assert summary["datasets"][0]["num_missing_in_retrieval"] == 1
+    assert summary["datasets"][0]["expected_sections"] == 2
+    assert summary["datasets"][0]["missing_in_retrieval_rate"] == 0.5
+
+
+def test_fr_coverage_cli_strict_gating_writes_artifacts(monkeypatch, tmp_path: Path) -> None:
+    corpus_path = tmp_path / "corpus.jsonl"
+    _write_jsonl(
+        corpus_path,
+        [
+            {"id": "EAR-740.1", "section": "740.1", "text": "t", "source_url": "http://example/740"},
+            {"id": "EAR-742.4(a)(1)", "section": "742.4(a)(1)", "text": "t", "source_url": "http://example/742"},
+        ],
+    )
+    dataset_path = tmp_path / "dataset.v2.jsonl"
+    _write_jsonl(
+        dataset_path,
+        [
+            {
+                "id": "item-1",
+                "question": "Q",
+                "ear_sections": ["EAR-740.1", "EAR-742.4(a)(1)"],
+                "evidence": {},
+            }
+        ],
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({"datasets": [{"id": "ds.v2", "file": str(dataset_path), "version": 2}]}),
+        encoding="utf-8",
+    )
+
+    from earCrawler.rag import pipeline as rag_pipeline
+
+    monkeypatch.setattr(rag_pipeline, "_ensure_retriever", lambda *args, **kwargs: object())
+
+    def fake_retrieve(question: str, top_k: int = 5, *, retriever=None, **kwargs):
+        return [{"section_id": "EAR-740.1", "text": "hit", "score": 0.8, "raw": {}}][:top_k]
+
+    monkeypatch.setattr(rag_pipeline, "retrieve_regulation_context", fake_retrieve)
+
+    runner = CliRunner()
+    out_path = tmp_path / "report.json"
+    summary_path = tmp_path / "summary.json"
+    note_path = tmp_path / "blocker.md"
+    result = runner.invoke(
+        cli,
+        [
+            "eval",
+            "fr-coverage",
+            "--manifest",
+            str(manifest_path),
+            "--corpus",
+            str(corpus_path),
+            "--only-v2",
+            "--retrieval-k",
+            "5",
+            "--out",
+            str(out_path),
+            "--summary-out",
+            str(summary_path),
+            "--write-blocker-note",
+            str(note_path),
+            "--max-missing-rate",
+            "0.10",
+            "--no-fail",
+        ],
+    )
+    assert result.exit_code != 0
+    assert out_path.exists()
+    assert summary_path.exists()
+    assert note_path.exists()
+    note = note_path.read_text(encoding="utf-8")
+    assert "EAR-742.4(a)(1)" in note
 
 
 def test_check_grounding_cli_enforces_thresholds(tmp_path: Path) -> None:

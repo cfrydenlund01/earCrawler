@@ -17,7 +17,6 @@ def _reset_env(monkeypatch):
     # Clear provider-specific budgets to avoid surprises.
     for key in (
         "LLM_MAX_CALLS",
-        "LLM_OPENROUTER_MAX_CALLS",
         "LLM_NVIDIA_NIM_MAX_CALLS",
         "LLM_GROQ_MAX_CALLS",
     ):
@@ -194,3 +193,10 @@ def test_generate_chat_does_not_retry_on_tpd_429(monkeypatch):
     with pytest.raises(LLMProviderError):
         generate_chat([{"role": "user", "content": "ping"}])
     assert calls["count"] == 1
+
+
+def test_generate_chat_rejects_unknown_provider(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "not_a_real_provider")
+    monkeypatch.setenv("GROQ_API_KEY", "dummy")
+    with pytest.raises(LLMProviderError, match="Unsupported LLM_PROVIDER"):
+        generate_chat([{"role": "user", "content": "ping"}])

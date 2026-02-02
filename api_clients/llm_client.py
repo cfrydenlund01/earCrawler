@@ -1,4 +1,4 @@
-"""Multi-provider LLM client (OpenRouter, NVIDIA NIM, Groq) with budget and secrets integration."""
+"""LLM client for supported remote providers (NVIDIA NIM, Groq) with budget and secrets integration."""
 
 from __future__ import annotations
 
@@ -96,6 +96,12 @@ def _chat_request(
         raise LLMProviderError(
             f"{provider} provider selected but {provider.upper()}_API_KEY is not configured. "
             "Set it via the secrets file, environment, or Windows Credential Store."
+        )
+
+    if not model:
+        raise LLMProviderError(
+            f"{provider} provider selected but {provider.upper()}_MODEL is not configured. "
+            "Set it via the secrets file, environment, or CLI override."
         )
 
     base = _choose_base_url(provider, base_url)
@@ -218,7 +224,10 @@ def generate_chat(
 ) -> str:
     """Generate a chat completion using the selected provider."""
 
-    config = get_llm_config(provider_override=provider, model_override=model)
+    try:
+        config = get_llm_config(provider_override=provider, model_override=model)
+    except ValueError as exc:
+        raise LLMProviderError(str(exc)) from exc
     provider_cfg = config.provider
 
     if not config.enable_remote:

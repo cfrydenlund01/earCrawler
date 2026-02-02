@@ -19,13 +19,46 @@ class RetrieverProtocol(Protocol):
 
 
 class NullRetriever:
-    """Fallback retriever returning no results when FAISS/model deps are unavailable."""
+    """Fallback retriever representing a disabled configuration."""
+
+    def __init__(self, *, reason: str | None = None) -> None:
+        self.enabled = False
+        self.ready = False
+        self.failure_type = "retriever_disabled"
+        self.disabled_reason = (
+            reason
+            or "RAG retriever disabled; set EARCRAWLER_API_ENABLE_RAG=1 to enable"
+        )
+        self.index_path: str | None = None
+        self.model_name: str | None = None
 
     def query(
         self, prompt: str, k: int = 5
     ) -> list[dict]:  # pragma: no cover - trivial
         logger.debug("NullRetriever returning empty set for query=%s", prompt)
         return []
+
+
+class BrokenRetriever:
+    """Retriever placeholder that raises a stored initialization failure."""
+
+    def __init__(
+        self,
+        exc: Exception,
+        *,
+        failure_type: str = "retriever_init_failed",
+        index_path: Path | None = None,
+        model_name: str | None = None,
+    ) -> None:
+        self.enabled = True
+        self.ready = False
+        self.failure = exc
+        self.failure_type = failure_type
+        self.index_path = str(index_path) if index_path else None
+        self.model_name = model_name
+
+    def query(self, prompt: str, k: int = 5) -> list[dict]:
+        raise self.failure
 
 
 def load_retriever() -> RetrieverProtocol:
@@ -39,16 +72,22 @@ def load_retriever() -> RetrieverProtocol:
 
     enabled = os.getenv("EARCRAWLER_API_ENABLE_RAG", "0") == "1"
     if not enabled:
-        logger.info("RAG retriever disabled; set EARCRAWLER_API_ENABLE_RAG=1 to enable")
-        return NullRetriever()
+        reason = "RAG retriever disabled; set EARCRAWLER_API_ENABLE_RAG=1"
+        logger.info(reason)
+        return NullRetriever(reason=reason)
 
     try:
         from api_clients.tradegov_client import TradeGovClient
         from api_clients.federalregister_client import FederalRegisterClient
-        from earCrawler.rag.retriever import Retriever
+        from earCrawler.rag.retriever import (
+            IndexBuildRequiredError,
+            IndexMissingError,
+            Retriever,
+            RetrieverError,
+        )
     except Exception as exc:  # pragma: no cover - import errors handled gracefully
         logger.warning("Failed to import retriever dependencies: %s", exc)
-        return NullRetriever()
+        return BrokenRetriever(exc, failure_type="retriever_import_failed")
 
     index_override = os.getenv("EARCRAWLER_FAISS_INDEX")
     model_override = os.getenv("EARCRAWLER_FAISS_MODEL")
@@ -56,15 +95,38 @@ def load_retriever() -> RetrieverProtocol:
     model_name = model_override or "all-MiniLM-L12-v2"
 
     try:
-        return Retriever(
+        retriever = Retriever(
             TradeGovClient(),
             FederalRegisterClient(),
             model_name=model_name,
             index_path=index_path,
         )
+        retriever.ready = True
+        return retriever
+    except (IndexMissingError, IndexBuildRequiredError) as exc:
+        logger.error("Retriever index not ready: %s", exc)
+        return BrokenRetriever(
+            exc,
+            failure_type=getattr(exc, "code", "index_missing"),
+            index_path=index_path,
+            model_name=model_name,
+        )
+    except RetrieverError as exc:  # pragma: no cover - typed retriever failures
+        logger.error("Retriever failed to initialize: %s", exc)
+        return BrokenRetriever(
+            exc,
+            failure_type=getattr(exc, "code", "retriever_error"),
+            index_path=index_path,
+            model_name=model_name,
+        )
     except Exception as exc:  # pragma: no cover - heavy deps may fail at runtime
         logger.error("Unable to initialize retriever; falling back to stub: %s", exc)
-        return NullRetriever()
+        return BrokenRetriever(
+            exc,
+            failure_type="retriever_init_failed",
+            index_path=index_path,
+            model_name=model_name,
+        )
 
 
 @dataclass
@@ -108,4 +170,4 @@ class RagQueryCache:
         return entry.expires_at
 
 
-__all__ = ["RetrieverProtocol", "RagQueryCache", "load_retriever"]
+__all__ = ["RetrieverProtocol", "RagQueryCache", "load_retriever", "NullRetriever", "BrokenRetriever"]

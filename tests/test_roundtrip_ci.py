@@ -27,24 +27,24 @@ if sys.platform != "win32":
     pytest.skip("Windows-only", allow_module_level=True)
 
 if shutil.which("pwsh") is None:
-    pytest.fail(
+    pytest.skip(
         "PowerShell 7 (pwsh) is required to run the KG round-trip tests. "
         "Install pwsh and ensure it is on the PATH.",
-        pytrace=False,
+        allow_module_level=True,
     )
 
 if shutil.which("javac") is None:
-    pytest.fail(
+    pytest.skip(
         "A Java 17+ JDK with the javac compiler is required to run the KG "
         "round-trip tests. Install an appropriate JDK and rerun.",
-        pytrace=False,
+        allow_module_level=True,
     )
 
 if not JAVA_VERSION_OK:
-    pytest.fail(
+    pytest.skip(
         "Java 17 or newer is required to run the KG round-trip tests. Update "
         "the installed Java runtime and try again.",
-        pytrace=False,
+        allow_module_level=True,
     )
 
 

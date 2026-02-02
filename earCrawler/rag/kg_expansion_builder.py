@@ -33,8 +33,10 @@ def _load_corpus_index(corpus_path: Path) -> dict[str, list[dict]]:
     index: dict[str, list[dict]] = {}
     for record in _iter_jsonl(corpus_path):
         section_id = (
-            record.get("section")
+            record.get("section_id")
+            or record.get("section")
             or record.get("span_id")
+            or record.get("doc_id")
             or record.get("id")
             or record.get("entity_id")
         )

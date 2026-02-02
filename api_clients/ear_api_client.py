@@ -102,7 +102,7 @@ class EarCrawlerApiClient:
     def rag_answer(
         self, query: str, *, top_k: int = 3
     ) -> dict[str, Any]:
-        """Call the ``/v1/rag/answer`` endpoint backed by the Mistral agent."""
+        """Call the ``/v1/rag/answer`` endpoint backed by a remote LLM provider."""
         payload = {
             "query": query,
             "top_k": top_k,

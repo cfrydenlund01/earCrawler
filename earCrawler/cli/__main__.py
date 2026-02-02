@@ -36,12 +36,14 @@ from earCrawler.cli.policy_cmd import policy_cmd
 from earCrawler.cli.audit import audit
 from earCrawler.cli import perf
 
-from earCrawler.eval import run_eval as eval_core
 from api_clients.llm_client import LLMProviderError
 from earCrawler.rag.pipeline import answer_with_rag
 from api_clients.federalregister_client import FederalRegisterClient
 from api_clients.tradegov_client import TradeGovClient
-from earCrawler.rag.retriever import Retriever
+from earCrawler.rag.retriever import Retriever, RetrieverError
+from earCrawler.rag.build_corpus import build_retrieval_corpus, write_corpus_jsonl
+from earCrawler.rag.index_builder import build_faiss_index_from_corpus
+from earCrawler.rag.ecfr_api_fetch import fetch_ecfr_snapshot
 
 install_telem()
 
@@ -703,6 +705,18 @@ def eval_run_rag(
     help="Dataset id to check, or 'all' for every entry in the manifest.",
 )
 @click.option(
+    "--only-v2/--no-only-v2",
+    default=False,
+    show_default=True,
+    help="When set, only evaluate v2 datasets (id endswith '.v2' or manifest version>=2).",
+)
+@click.option(
+    "--dataset-id-pattern",
+    type=str,
+    default=None,
+    help="Regex filter applied to dataset ids (example: '.*\\\\.v2$').",
+)
+@click.option(
     "--retrieval-k",
     type=int,
     default=10,
@@ -723,24 +737,60 @@ def eval_run_rag(
     help="Where to write the FR coverage report.",
 )
 @click.option(
-    "--fail/--no-fail",
-    default=True,
+    "--summary-out",
+    type=click.Path(path_type=Path),
+    default=Path("dist") / "eval" / "fr_coverage_summary.json",
     show_default=True,
-    help="Whether to return non-zero when coverage checks fail.",
+    help="Where to write the compact FR coverage summary JSON.",
+)
+@click.option(
+    "--top-missing-sections",
+    type=int,
+    default=10,
+    show_default=True,
+    help="How many missing section ids to include in top-N lists.",
+)
+@click.option(
+    "--max-missing-rate",
+    type=float,
+    default=None,
+    help="Strict gate: fail if any dataset missing_in_retrieval_rate exceeds this threshold (e.g. 0.10).",
+)
+@click.option(
+    "--write-blocker-note",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Optional: write a Markdown note explaining why Phase 1 fails (generated from the report).",
+)
+@click.option(
+    "--fail/--no-fail",
+    default=False,
+    show_default=True,
+    help="Legacy gate: return non-zero when any missing_in_corpus or missing_in_retrieval is non-zero.",
 )
 def eval_fr_coverage(
     manifest: Path,
     corpus: Path,
     dataset_id: str,
+    only_v2: bool,
+    dataset_id_pattern: str | None,
     retrieval_k: int,
     max_items: int | None,
     out: Path,
+    summary_out: Path,
+    top_missing_sections: int,
+    max_missing_rate: float | None,
+    write_blocker_note: Path | None,
     fail: bool,
 ) -> None:
     """Check FR section coverage + retriever ranks for eval datasets."""
 
     try:
-        from earCrawler.eval.coverage_checks import build_fr_coverage_report
+        from earCrawler.eval.coverage_checks import (
+            build_fr_coverage_report,
+            build_fr_coverage_summary,
+            render_fr_coverage_blocker_note,
+        )
     except Exception as exc:  # pragma: no cover - import failures
         raise click.ClickException(str(exc))
 
@@ -749,23 +799,117 @@ def eval_fr_coverage(
             manifest=manifest,
             corpus=corpus,
             dataset_id=dataset_id,
+            only_v2=only_v2,
+            dataset_id_pattern=dataset_id_pattern,
             retrieval_k=retrieval_k,
             max_items=max_items,
+            top_missing_sections=top_missing_sections,
+        )
+        summary_obj = build_fr_coverage_summary(
+            report, top_missing_sections=top_missing_sections
         )
     except Exception as exc:
+        # Still write deterministic artifacts so CI/users can debug quickly.
+        out.parent.mkdir(parents=True, exist_ok=True)
+        summary_out.parent.mkdir(parents=True, exist_ok=True)
+        failure_report = {
+            "manifest_path": str(manifest),
+            "corpus_path": str(corpus),
+            "dataset_selector": {
+                "dataset_id": dataset_id,
+                "only_v2": bool(only_v2),
+                "dataset_id_pattern": dataset_id_pattern,
+            },
+            "retrieval_k": retrieval_k,
+            "error": str(exc),
+        }
+        out.write_text(json.dumps(failure_report, indent=2, sort_keys=True), encoding="utf-8")
+        summary_out.write_text(
+            json.dumps(
+                {
+                    "manifest_path": str(manifest),
+                    "corpus_path": str(corpus),
+                    "dataset_selector": failure_report["dataset_selector"],
+                    "retrieval_k": retrieval_k,
+                    "error": str(exc),
+                    "datasets": [],
+                    "summary": {},
+                },
+                indent=2,
+                sort_keys=True,
+            ),
+            encoding="utf-8",
+        )
+        if write_blocker_note is not None:
+            write_blocker_note.parent.mkdir(parents=True, exist_ok=True)
+            write_blocker_note.write_text(
+                "# Phase 1 retrieval-coverage blocker note\n\n"
+                "## Error\n\n"
+                f"{exc}\n",
+                encoding="utf-8",
+            )
         raise click.ClickException(str(exc))
 
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(report, indent=2, sort_keys=True), encoding="utf-8")
+    summary_out.parent.mkdir(parents=True, exist_ok=True)
+    summary_out.write_text(json.dumps(summary_obj, indent=2, sort_keys=True), encoding="utf-8")
 
-    summary = report.get("summary") or {}
-    missing_in_corpus = int(summary.get("missing_in_corpus") or 0)
-    missing_in_retrieval = int(summary.get("missing_in_retrieval") or 0)
+    if write_blocker_note is not None:
+        write_blocker_note.parent.mkdir(parents=True, exist_ok=True)
+        write_blocker_note.write_text(
+            render_fr_coverage_blocker_note(
+                report,
+                max_missing_rate=max_missing_rate,
+                top_missing_sections=top_missing_sections,
+            ),
+            encoding="utf-8",
+        )
+
+    # Human-readable console summary (worst first).
+    ds_rows = summary_obj.get("datasets") or []
+    click.echo("dataset_id | items | expected | missing_retrieval | missing_rate | missing_corpus")
+    click.echo("-" * 88)
+    for row in ds_rows:
+        ds_id = str(row.get("dataset_id") or "")
+        items = int(row.get("num_items") or 0)
+        expected = int(row.get("expected_sections") or 0)
+        miss_r = int(row.get("num_missing_in_retrieval") or 0)
+        miss_c = int(row.get("num_missing_in_corpus") or 0)
+        try:
+            rate = float(row.get("missing_in_retrieval_rate") or 0.0)
+        except Exception:
+            rate = 0.0
+        click.echo(
+            f"{ds_id} | {items} | {expected} | {miss_r} | {rate:.4f} | {miss_c}"
+        )
+
+    summary = summary_obj.get("summary") or {}
+    missing_in_corpus = int(summary.get("num_missing_in_corpus") or 0)
+    missing_in_retrieval = int(summary.get("num_missing_in_retrieval") or 0)
+    worst_ds = summary.get("worst_dataset_id") or "n/a"
+    try:
+        worst_rate = float(summary.get("worst_missing_in_retrieval_rate") or 0.0)
+    except Exception:
+        worst_rate = 0.0
     click.echo(
-        f"{dataset_id}: missing_in_corpus={missing_in_corpus}, missing_in_retrieval={missing_in_retrieval}"
+        f"overall: missing_in_corpus={missing_in_corpus}, missing_in_retrieval={missing_in_retrieval}, "
+        f"worst_dataset={worst_ds} worst_missing_rate={worst_rate:.4f}"
     )
+    top_missing = summary.get("top_missing_sections") or []
+    if top_missing:
+        click.echo("top_missing_sections:")
+        for row in top_missing[:top_missing_sections]:
+            if isinstance(row, dict):
+                click.echo(f"  - {row.get('section_id')}: {row.get('count')}")
+    click.echo(f"wrote: report={out} summary={summary_out}")
+
+    if max_missing_rate is not None and worst_rate > float(max_missing_rate):
+        raise click.ClickException(
+            f"FR coverage Phase 1 gate failed: worst missing_in_retrieval_rate {worst_rate:.4f} > {float(max_missing_rate):.4f}"
+        )
     if fail and (missing_in_corpus or missing_in_retrieval):
-        raise click.ClickException("FR coverage check failed")
+        raise click.ClickException("FR coverage legacy gate failed (missing counts non-zero)")
 
 
 @eval_group.command(name="check-grounding")
@@ -839,206 +983,6 @@ def eval_check_grounding(
     )
     if fail and not report.get("thresholds_ok"):
         raise click.ClickException("grounding contract check failed")
-
-
-@cli.command(name="eval-benchmark")
-@click.option(
-    "--dataset-id",
-    type=str,
-    help="Dataset ID from eval/manifest.json (e.g., entity_obligations.v1).",
-)
-@click.option(
-    "--data-file",
-    type=click.Path(path_type=Path),
-    default=None,
-    help="Override dataset path (JSONL). If omitted, resolves from manifest.",
-)
-@click.option(
-    "--manifest",
-    type=click.Path(path_type=Path),
-    default=Path("eval") / "manifest.json",
-    show_default=True,
-    help="Path to eval manifest describing datasets and KG state.",
-)
-@click.option(
-    "--model-path",
-    type=str,
-    default="sshleifer/tiny-gpt2",
-    show_default=True,
-    help="Model to evaluate (HF hub path or local directory).",
-)
-@click.option(
-    "--out-json",
-    type=click.Path(path_type=Path),
-    default=Path("dist") / "eval" / "benchmark.json",
-    show_default=True,
-    help="Where to write metrics+metadata JSON.",
-)
-@click.option(
-    "--out-md",
-    type=click.Path(path_type=Path),
-    default=Path("dist") / "eval" / "benchmark.md",
-    show_default=True,
-    help="Where to write a short Markdown summary.",
-)
-@click.option(
-    "--explainability-artifacts",
-    is_flag=True,
-    help="Emit aggregated evidence artifacts and assert by-task coverage.",
-)
-@click.option(
-    "--min-accuracy",
-    type=float,
-    default=None,
-    help="Fail if overall accuracy falls below this threshold.",
-)
-@click.option(
-    "--min-label-accuracy",
-    type=float,
-    default=None,
-    help="Fail if label accuracy falls below this threshold.",
-)
-def eval_benchmark(
-    dataset_id: str | None,
-    data_file: Path | None,
-    manifest: Path,
-    model_path: str,
-    out_json: Path,
-    out_md: Path,
-    explainability_artifacts: bool,
-    min_accuracy: float | None,
-    min_label_accuracy: float | None,
-) -> None:
-    """Run the evaluation harness against a dataset and emit metrics + metadata."""
-
-    # Resolve dataset metadata from manifest if needed.
-    dataset_meta: dict[str, object] | None = None
-    kg_digest: str | None = None
-    if manifest.exists():
-        try:
-            manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
-            kg_digest = (manifest_obj.get("kg_state", {}) or {}).get(
-                "digest"
-            )  # type: ignore[assignment]
-            if dataset_id:
-                ds_entries = manifest_obj.get("datasets", [])
-                for entry in ds_entries:
-                    if entry.get("id") == dataset_id:
-                        dataset_meta = entry
-                        break
-        except Exception as exc:  # pragma: no cover - manifest read errors
-            raise click.ClickException(f"Failed to read manifest: {exc}")
-
-    resolved_data_file = data_file
-    if resolved_data_file is None:
-        if dataset_meta and dataset_meta.get("file"):
-            candidate = Path(str(dataset_meta["file"]))
-            if candidate.is_absolute():
-                resolved_data_file = candidate
-            elif candidate.exists():
-                resolved_data_file = candidate
-            else:
-                resolved_data_file = manifest.parent / candidate
-        else:
-            resolved_data_file = Path("eval") / "pilot_items.jsonl"
-
-    if not resolved_data_file.exists():
-        raise click.ClickException(f"Dataset not found: {resolved_data_file}")
-
-    # Load dataset
-    try:
-        items: list[dict[str, object]] = []
-        with resolved_data_file.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                items.append(json.loads(line))
-    except Exception as exc:
-        raise click.ClickException(f"Failed to load dataset: {exc}")
-
-    # Load model and evaluate
-    try:
-        tokenizer, model = eval_core.load_model(model_path)
-    except RuntimeError as exc:
-        # Surface optional dependency guidance cleanly.
-        raise click.ClickException(str(exc))
-    metrics = eval_core.evaluate(model, tokenizer, items)
-
-    out_json.parent.mkdir(parents=True, exist_ok=True)
-    out_md.parent.mkdir(parents=True, exist_ok=True)
-
-    result = {
-        **metrics,
-        "model_path": model_path,
-        "data_file": str(resolved_data_file),
-        "dataset_id": dataset_id or (dataset_meta.get("id") if dataset_meta else None),
-        "dataset_version": dataset_meta.get("version") if dataset_meta else None,
-        "task": dataset_meta.get("task") if dataset_meta else None,
-        "num_items": len(items),
-        "kg_state_digest": kg_digest,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-
-    out_json.write_text(json.dumps(result, indent=2), encoding="utf-8")
-
-    # Write a minimal markdown summary for quick inspection.
-    markdown_lines = [
-        "| Accuracy | Label Accuracy | Avg Latency (s) | Peak GPU Memory |",
-        "|---------:|---------------:|----------------:|----------------:|",
-        f"| {result['accuracy']:.4f} | {result.get('label_accuracy', 0.0):.4f} | "
-        f"{result['avg_latency']:.4f} | {int(result['peak_gpu_memory'])} |",
-        "",
-        f"- Dataset: {result.get('dataset_id') or 'n/a'} (task={result.get('task') or 'n/a'})",
-        f"- Unanswerable accuracy: {result.get('unanswerable_accuracy', 0.0):.4f}",
-        f"- KG digest: {result.get('kg_state_digest') or 'n/a'}",
-    ]
-    task_breakdown = result.get("by_task") or {}
-    if task_breakdown:
-        markdown_lines.append("")
-        markdown_lines.append("By-task summary:")
-        for task, stats in sorted(task_breakdown.items()):
-            markdown_lines.append(
-                f"- {task}: accuracy={stats['accuracy']:.4f}, "
-                f"label_accuracy={stats['label_accuracy']:.4f}, count={int(stats['count'])}"
-            )
-    out_md.write_text("\n".join(markdown_lines), encoding="utf-8")
-
-    if explainability_artifacts:
-        summary = _collect_evidence_summary(items)
-        dataset_tasks = set(summary["tasks"])
-        by_task = set(result.get("by_task", {}).keys())
-        missing_tasks = dataset_tasks.difference(by_task)
-        if missing_tasks:
-            raise click.ClickException(
-                f"Missing tasks in metrics output: {', '.join(sorted(missing_tasks))}"
-            )
-        evidence_payload = {
-            "dataset_id": result.get("dataset_id") or dataset_id or "n/a",
-            "kg_state_digest": result.get("kg_state_digest"),
-            **summary,
-        }
-        evidence_path = out_json.with_name(f"{out_json.stem}.evidence.json")
-        evidence_path.write_text(
-            json.dumps(evidence_payload, indent=2), encoding="utf-8"
-        )
-        click.echo(f"Wrote {evidence_path}")
-
-    threshold_errors = []
-    if min_accuracy is not None and result["accuracy"] < float(min_accuracy):
-        threshold_errors.append(
-            f"accuracy {result['accuracy']:.4f} < required {float(min_accuracy):.4f}"
-        )
-    if min_label_accuracy is not None and result.get("label_accuracy", 0.0) < float(
-        min_label_accuracy
-    ):
-        threshold_errors.append(
-            f"label_accuracy {result.get('label_accuracy', 0.0):.4f} < required {float(min_label_accuracy):.4f}"
-        )
-
-    click.echo(f"Wrote {out_json} and {out_md}")
-    if threshold_errors:
-        raise click.ClickException("; ".join(threshold_errors))
 
 
 @cli.command(name="kg-emit")
@@ -1124,6 +1068,8 @@ def llm_ask(llm_provider: str | None, llm_model: str | None, top_k: int, questio
             top_k=top_k,
         )
     except LLMProviderError as exc:
+        raise click.ClickException(str(exc))
+    except RetrieverError as exc:
         raise click.ClickException(str(exc))
     click.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
@@ -1249,7 +1195,7 @@ def rag_index() -> None:
     "input_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     required=True,
-    help="JSONL file containing passages with 'text' and 'section'.",
+    help="JSONL file containing retrieval corpus records (see retrieval_corpus_contract.md).",
 )
 @click.option(
     "--index-path",
@@ -1271,51 +1217,114 @@ def rag_index() -> None:
     show_default=True,
     help="Reset existing index/metadata before building.",
 )
-def rag_index_build(input_path: Path, index_path: Path, model_name: str, reset: bool) -> None:
-    """Build a FAISS index from a JSONL corpus."""
+@click.option(
+    "--meta-path",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Destination metadata path (defaults to <index-path>.meta.json).",
+)
+def rag_index_build(input_path: Path, index_path: Path, model_name: str, reset: bool, meta_path: Path | None) -> None:
+    """Build a FAISS index + metadata sidecar from a validated retrieval corpus."""
 
+    meta_path = meta_path or index_path.with_suffix(".meta.json")
     if reset:
         index_path.parent.mkdir(parents=True, exist_ok=True)
-        for path in (index_path, index_path.with_suffix(".pkl")):
+        for path in (index_path, index_path.with_suffix(".pkl"), meta_path):
             if path.exists():
                 path.unlink()
 
-    docs: list[dict] = []
-    with input_path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            stripped = line.strip()
-            if not stripped:
-                continue
-            try:
-                item = json.loads(stripped)
-            except json.JSONDecodeError:
-                continue
-            text = (item.get("text") or item.get("body") or "").strip()
-            if not text:
-                continue
-            docs.append(
-                {
-                    "id": item.get("id") or item.get("section") or item.get("span_id"),
-                    "section": item.get("section"),
-                    "span_id": item.get("span_id"),
-                    "text": text,
-                    "source_url": item.get("source_url"),
-                    "provider": item.get("provider"),
-                    "title": item.get("title"),
-                }
-            )
+    from earCrawler.rag.corpus_contract import load_corpus_jsonl, require_valid_corpus
 
-    if not docs:
-        raise click.ClickException("No documents with text found in input.")
+    try:
+        docs = load_corpus_jsonl(input_path)
+        require_valid_corpus(docs)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
 
-    retriever = Retriever(
-        TradeGovClient(),
-        FederalRegisterClient(),
-        model_name=model_name,
-        index_path=index_path,
-    )
-    retriever.add_documents(docs)
-    click.echo(f"Indexed {len(docs)} documents -> {index_path} (+ metadata {index_path.with_suffix('.pkl')})")
+    try:
+        build_faiss_index_from_corpus(
+            docs,
+            index_path=index_path,
+            meta_path=meta_path,
+            embedding_model=model_name,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Indexed {len(docs)} documents -> {index_path} (meta {meta_path})")
+
+
+@rag_index.command(name="build-corpus")
+@click.option(
+    "--snapshot",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Offline eCFR snapshot JSONL (see retrieval_corpus_contract.md).",
+)
+@click.option(
+    "--out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("data") / "faiss" / "retrieval_corpus.jsonl",
+    show_default=True,
+    help="Destination corpus JSONL path.",
+)
+@click.option(
+    "--source-ref",
+    type=str,
+    default=None,
+    help="Override source_ref for all documents (falls back to snapshot values).",
+)
+@click.option(
+    "--chunk-max-chars",
+    type=int,
+    default=6000,
+    show_default=True,
+    help="Maximum characters per chunk before paragraph splitting.",
+)
+def rag_index_build_corpus(snapshot: Path, out: Path, source_ref: str | None, chunk_max_chars: int) -> None:
+    """Build retrieval corpus from offline snapshot and write JSONL."""
+
+    try:
+        docs = build_retrieval_corpus(
+            snapshot,
+            source_ref=source_ref,
+            chunk_max_chars=chunk_max_chars,
+        )
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    write_corpus_jsonl(out, docs)
+    click.echo(f"Wrote {len(docs)} corpus documents -> {out}")
+
+
+@rag_index.command(name="fetch-ecfr")
+@click.option(
+    "--out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=Path("data") / "ecfr" / "title15.jsonl",
+    show_default=True,
+    help="Snapshot output path (JSONL).",
+)
+@click.option(
+    "--date",
+    type=str,
+    default=None,
+    help="Optional effective date (YYYY-MM-DD) supported by the API.",
+)
+@click.option(
+    "--title",
+    type=str,
+    default="15",
+    show_default=True,
+    help="CFR title to fetch (default: 15).",
+)
+def rag_index_fetch_ecfr(out: Path, date: str | None, title: str) -> None:
+    """Fetch an eCFR snapshot (network gated via EARCRAWLER_ALLOW_NETWORK)."""
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        fetch_ecfr_snapshot(out, title=title, date=date)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Wrote snapshot -> {out}")
 
 
 def main() -> None:  # pragma: no cover - CLI entrypoint

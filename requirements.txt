@@ -1,9 +1,6 @@
-accelerate>=0.32.0; sys_platform != "win32"
 beautifulsoup4==4.12.3
-bitsandbytes==0.43.1; sys_platform != "win32"
 black==25.11.0
 click==8.2.1
-datasets==2.20.0; sys_platform != "win32"
 faiss-cpu==1.8.0; sys_platform != "win32"
 fastapi==0.116.1
 flake8==7.3.0
@@ -12,7 +9,6 @@ httpx==0.28.1
 keyring==24.3.1
 lxml==5.2.2
 numpy==1.26.4
-peft==0.11.1
 pyshacl==0.25.0
 pytest==8.4.1
 pytest-socket==0.7.0

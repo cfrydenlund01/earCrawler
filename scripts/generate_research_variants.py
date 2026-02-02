@@ -12,9 +12,9 @@ risk_variants = [
         "tier": "Low-Risk / Compute-Light",
         "dal_required": False,
         "models": {
-            "generator": "LED/T5-small summarizer",
-            "reranker": "LegalBERT",
-            "option": "Mistral 7B QLoRA (optional, single GPU)",
+            "generator": "Remote LLM (Groq/NVIDIA NIM)",
+            "reranker": "optional (future)",
+            "option": "Remote-only answering (no local fine-tuning)",
         },
         "kg": {
             "ontology": "EAR v1",
@@ -50,9 +50,9 @@ risk_variants = [
         "tier": "Moderate-Risk / Single-GPU",
         "dal_required": False,
         "models": {
-            "generator": "Mistral 7B QLoRA",
+            "generator": "Remote LLM (Groq/NVIDIA NIM)",
             "embeddings": "E5-legal-base",
-            "reranker": "LegalBERT",
+            "reranker": "optional (future)",
         },
         "kg": {
             "ontology": "EAR v1",
@@ -68,7 +68,6 @@ risk_variants = [
         "timeline_weeks": 8,
         "tasks": [
             "Dense index build + hybrid fusion",
-            "QLoRA adapter fine-tune on curated Q/A",
             "SPARQL tool-use for grounding",
             "Evaluation sweeps: retrieval + QA accuracy",
             "Manuscript ablations: dense vs hybrid vs BM25",
@@ -80,14 +79,14 @@ risk_variants = [
         ],
         "gpt5_prompts": [
             "Add dense indexing and fusion policy with tests (earCrawler/rag/retriever.py).",
-            "Wire QLoRA trainer configs and smoke eval (earCrawler/agent/mistral_agent.py).",
+            "Harden remote LLM config + retries (api_clients/llm_client.py).",
         ],
     },
     {
         "tier": "High-Risk / DAL-HPC",
         "dal_required": True,
         "models": {
-            "generator": "Llama 3.1 70B QLoRA/LoRA",
+            "generator": "Remote LLM (Groq/NVIDIA NIM)",
             "embeddings": "E5-large-legal",
         },
         "kg": {
@@ -104,7 +103,6 @@ risk_variants = [
         "timeline_weeks": 12,
         "tasks": [
             "HPC job templates + data staging",
-            "Multi-epoch QLoRA with evaluation checkpoints",
             "Large-scale indexing + canary/perf dashboards",
             "Manuscript large-scale results + error analysis",
         ],
@@ -172,9 +170,9 @@ kdd = {
         "Observability stack with latency/canary SLOs",
     ],
     "methods": {
-        "retrieval": {"hybrid": True, "fusion": "RRF", "reranking": "LegalBERT"},
+        "retrieval": {"hybrid": True, "fusion": "RRF", "reranking": "optional (future)"},
         "generation": {
-            "model": "Mistral/Llama QLoRA",
+            "model": "Remote LLM (Groq/NVIDIA NIM)",
             "guardrails": ["policy-aware decoding"],
         },
         "ops": {"latency_budgets_ms": {"api_p95": 800, "sparql_p95": 1500}},
