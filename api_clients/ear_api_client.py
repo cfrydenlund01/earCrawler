@@ -47,6 +47,7 @@ class EarCrawlerApiClient:
         *,
         params: Optional[Mapping[str, Any]] = None,
         json: Optional[Mapping[str, Any]] = None,
+        allow_statuses: Optional[set[int]] = None,
     ) -> Any:
         url = f"{self.base_url.rstrip('/')}{path}"
         headers = {"Accept": "application/json"}
@@ -55,7 +56,8 @@ class EarCrawlerApiClient:
         resp = self._session.request(
             method, url, params=params, json=json, headers=headers, timeout=self.timeout
         )
-        if resp.status_code >= 400:
+        allowed = allow_statuses or set()
+        if resp.status_code >= 400 and resp.status_code not in allowed:
             raise EarApiError(f"{resp.status_code}: {resp.text}")
         if resp.headers.get("Content-Type", "").startswith("application/json"):
             return resp.json()
@@ -108,7 +110,14 @@ class EarCrawlerApiClient:
             "top_k": top_k,
             "include_lineage": False,
         }
-        return self._request("POST", "/v1/rag/answer", json=payload)
+        # 422 is a structured contract failure (LLM output schema violation) and
+        # returns a normal JSON body with output_error details.
+        return self._request(
+            "POST",
+            "/v1/rag/answer",
+            json=payload,
+            allow_statuses={422},
+        )
 
     # --------------------------------------------------------------#
     # Resource lifecycle
