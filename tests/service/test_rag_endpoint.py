@@ -216,3 +216,30 @@ def test_llm_endpoint_schema_failure_returns_422(monkeypatch):
     assert data["output_ok"] is False
     assert data["output_error"]["code"] == "invalid_json"
     assert data["answer"] is None
+
+
+def test_llm_endpoint_ungrounded_quote_returns_422(monkeypatch):
+    retriever = _StubRetriever()
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+
+    monkeypatch.setattr(
+        rag_router,
+        "generate_chat",
+        lambda _messages, *a, **k: (
+            '{'
+            '"label":"permitted",'
+            '"answer_text":"stubbed answer",'
+            '"citations":[{"section_id":"734.3","quote":"NOT IN CONTEXT","span_id":""}],'
+            '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+            '"assumptions":[]'
+            '}'
+        ),
+    )
+
+    resp = client.post("/v1/rag/answer", json={"query": "export controls"})
+    assert resp.status_code == 422
+    data = resp.json()
+    assert data["output_ok"] is False
+    assert data["output_error"]["code"] == "ungrounded_citation"
