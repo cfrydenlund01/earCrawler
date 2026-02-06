@@ -32,7 +32,12 @@ from .middleware import (
 from .schemas import ProblemDetails
 from .templates import TemplateRegistry
 from .routers import build_router
-from .rag_support import RagQueryCache, load_retriever, RetrieverProtocol
+from .rag_support import (
+    RagQueryCache,
+    RetrieverProtocol,
+    load_retriever,
+    warm_retriever_if_enabled,
+)
 
 _DOCS_PATH = Path(__file__).resolve().parent.parent / "docs" / "index.md"
 _OPENAPI_PATH = Path(__file__).resolve().parent.parent / "openapi" / "openapi.yaml"
@@ -193,6 +198,13 @@ def create_app(
     app.state.request_logger = json_logger
     app.state.rag_cache = rag_cache or RagQueryCache()
     app.state.rag_retriever = retriever or load_retriever()
+
+    async def _warm_retriever_on_startup() -> None:
+        warm_retriever_if_enabled(
+            app.state.rag_retriever, request_logger=app.state.request_logger
+        )
+
+    app.add_event_handler("startup", _warm_retriever_on_startup)
 
     router = build_router()
     app.include_router(router)

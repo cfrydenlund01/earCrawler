@@ -238,6 +238,9 @@ components:
         include_lineage:
           type: boolean
           default: false
+        generate:
+          type: boolean
+          default: true
     RetrievedDocument:
       type: object
       properties:
@@ -516,6 +519,13 @@ paths:
   /v1/rag/answer:
     post:
       summary: Generate an answer using a remote LLM provider
+      parameters:
+        - name: generate
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: When false, returns retrieval-only output without calling an LLM.
       requestBody:
         required: true
         content:

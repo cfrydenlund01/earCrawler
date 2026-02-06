@@ -102,19 +102,22 @@ class EarCrawlerApiClient:
         return self._request("POST", "/v1/rag/query", json=payload)
 
     def rag_answer(
-        self, query: str, *, top_k: int = 3
+        self, query: str, *, top_k: int = 3, generate: bool = True
     ) -> dict[str, Any]:
         """Call the ``/v1/rag/answer`` endpoint backed by a remote LLM provider."""
         payload = {
             "query": query,
             "top_k": top_k,
             "include_lineage": False,
+            "generate": generate,
         }
+        params = {"generate": "1" if generate else "0"}
         # 422 is a structured contract failure (LLM output schema violation) and
         # returns a normal JSON body with output_error details.
         return self._request(
             "POST",
             "/v1/rag/answer",
+            params=params,
             json=payload,
             allow_statuses={422},
         )

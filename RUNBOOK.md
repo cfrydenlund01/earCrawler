@@ -91,6 +91,26 @@ Windows notes
   - `py -m earCrawler.cli eval run-rag --dataset-id <id>` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys.
   - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.
 
+## Phase 2 golden gate (offline)
+- Purpose: `eval/golden_phase2.v1.jsonl` is a deterministic regression gate for retrieval, citation precision, and grounding contract behavior. It runs with stubbed retrieval and stubbed LLM responses only; no provider/network/FAISS access is required.
+- Dataset id: `golden_phase2.v1` (registered in `eval/manifest.json`).
+- Run locally:
+  - `py -m pytest -q tests/golden/test_phase2_golden_gate.py`
+  - `py -m pytest -q`
+- Acceptance thresholds enforced in `tests/golden/test_phase2_golden_gate.py`:
+  - `unanswerable_accuracy >= 0.9`
+  - `grounding_contract_pass_rate >= 0.8`
+  - `citation_precision == 1.0`
+  - `known_bad_citations_count == 0`
+- Fixture files:
+  - Retrieval fixtures: `tests/fixtures/golden_retrieval_map.py`
+  - LLM strict JSON fixtures: `tests/fixtures/golden_llm_outputs.py`
+- Safe update checklist:
+  1. Add/update item in `eval/golden_phase2.v1.jsonl` with stable `id`, `expected.label`, `expected.citations`, and `evidence.doc_spans`.
+  2. Add matching `id` entries in both fixture maps (retrieval docs + strict JSON output).
+  3. Keep outputs deterministic (no timestamps/random ids) and keep citations canonical (`EAR-...`).
+  4. Run `py -m pytest -q tests/golden/test_phase2_golden_gate.py` and `py -m pytest -q` before merging.
+
 ## Toolchain maintenance
 
 ### Rotating Jena/Fuseki versions
@@ -289,6 +309,22 @@ pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
 - Commit updated cassette files after verifying fields.
 - If contract tests drift, compare failing cassettes with live responses and
   adjust normalization logic or update fixtures.
+
+## RAG latency and warm-up
+- Retriever warm-up is opt-in:
+  - `EARCRAWLER_WARM_RETRIEVER=1` enables startup warm-up.
+  - `EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS=5` bounds warm-up runtime.
+- Retrieval-only fast path:
+  - API: `POST /v1/rag/answer?generate=0` (or request body `"generate": false`).
+  - CLI: `python -m earCrawler.cli llm ask --retrieval-only "your question"`.
+- Useful log events for latency debugging:
+  - `rag.query.latency`
+  - `rag.answer.latency`
+  - `rag.pipeline.latency`
+  - `rag.retriever.model_cache_hit` / `rag.retriever.model_cache_miss`
+  - `rag.retriever.index_cache_hit` / `rag.retriever.index_cache_miss`
+  - `rag.warmup.completed` / `rag.warmup.skipped`
+- Stage timing fields (ms): `t_total_ms`, `t_retrieve_ms`, `t_cache_ms`, `t_prompt_ms`, `t_llm_ms`, `t_parse_ms`.
 
 ## Provenance checks
 - `kg/scripts/ci-provenance.ps1` validates `kg/prov/prov.ttl`, loads the domain

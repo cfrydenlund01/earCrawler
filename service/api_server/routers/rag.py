@@ -4,7 +4,7 @@ import logging
 import math
 import time
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 
 from ..fuseki import FusekiGateway
@@ -15,6 +15,12 @@ from earCrawler.rag.output_schema import (
     DEFAULT_ALLOWED_LABELS,
     OutputSchemaError,
     parse_strict_answer_json,
+)
+from earCrawler.security.data_egress import (
+    build_data_egress_decision,
+    redact_contexts,
+    redact_text_for_mode,
+    resolve_redaction_mode,
 )
 from ..schemas import (
     CacheState,
@@ -28,7 +34,7 @@ from ..schemas import (
     RetrievedDocument,
     RagSource,
 )
-from ..rag_support import RagQueryCache, RetrieverProtocol, NullRetriever
+from ..rag_support import RagQueryCache, RetrieverProtocol
 from earCrawler.rag.retriever import RetrieverError
 
 logger = logging.getLogger(__name__)
@@ -50,6 +56,10 @@ def _log_retrieval(request: Request, event: str, trace_id: str, **details) -> No
         logger.info("%s %s", event, details)
 
 
+def _elapsed_ms(start: float) -> float:
+    return round((time.perf_counter() - start) * 1000.0, 3)
+
+
 @router.post(
     "/rag/query",
     response_model=RagResponse,
@@ -63,7 +73,7 @@ async def rag_query(
     cache: RagQueryCache = Depends(get_rag_cache),
     _: None = Depends(rate_limit("rag")),
 ) -> RagResponse:
-    start = time.perf_counter()
+    start_total = time.perf_counter()
     cache_key = payload.cache_key()
     trace_id = getattr(request.state, "trace_id", "")
     rag_enabled = bool(getattr(retriever, "enabled", True))
@@ -71,6 +81,11 @@ async def rag_query(
     failure_type = getattr(retriever, "failure_type", None)
     index_path = getattr(retriever, "index_path", None)
     model_name = getattr(retriever, "model_name", None)
+    t_cache_ms = 0.0
+    t_retrieve_ms = 0.0
+    t_prompt_ms = 0.0
+    t_llm_ms = 0.0
+    t_parse_ms = 0.0
 
     if not rag_enabled:
         disabled_reason = getattr(
@@ -99,26 +114,52 @@ async def rag_query(
             index_path=index_path,
             model_name=model_name,
         )
+        _log_retrieval(
+            request,
+            "rag.query.latency",
+            trace_id,
+            t_total_ms=_elapsed_ms(start_total),
+            t_retrieve_ms=t_retrieve_ms,
+            t_cache_ms=t_cache_ms,
+            t_prompt_ms=t_prompt_ms,
+            t_llm_ms=t_llm_ms,
+            t_parse_ms=t_parse_ms,
+            rag_enabled=rag_enabled,
+            retriever_ready=retriever_ready,
+            retrieved_count=0,
+            retrieval_empty=True,
+            retrieval_empty_reason=failure_type or "retriever_disabled",
+        )
         return JSONResponse(
             status_code=503, content=problem.model_dump(exclude_none=True)
         )
 
+    cache_start = time.perf_counter()
     cached = cache.get(cache_key)
     cache_hit = cached is not None
+    t_cache_ms += _elapsed_ms(cache_start)
     documents: list[dict] = []
     expires_at = None
     retrieval_failure: Exception | None = None
     if cache_hit:
+        cache_start = time.perf_counter()
         documents = cached or []
         expires_at = cache.expires_at(cache_key)
+        t_cache_ms += _elapsed_ms(cache_start)
     else:
+        retrieve_start = time.perf_counter()
         try:
             documents = retriever.query(payload.query, k=payload.top_k)
+            t_retrieve_ms += _elapsed_ms(retrieve_start)
+            cache_start = time.perf_counter()
             expires_at = cache.put(cache_key, documents)
+            t_cache_ms += _elapsed_ms(cache_start)
         except RetrieverError as exc:
+            t_retrieve_ms += _elapsed_ms(retrieve_start)
             retrieval_failure = exc
             failure_type = getattr(exc, "code", "retriever_error")
         except Exception as exc:  # pragma: no cover - defensive
+            t_retrieve_ms += _elapsed_ms(retrieve_start)
             retrieval_failure = exc
             failure_type = failure_type or "retriever_error"
 
@@ -144,6 +185,22 @@ async def rag_query(
             index_path=index_path,
             model_name=model_name,
         )
+        _log_retrieval(
+            request,
+            "rag.query.latency",
+            trace_id,
+            t_total_ms=_elapsed_ms(start_total),
+            t_retrieve_ms=t_retrieve_ms,
+            t_cache_ms=t_cache_ms,
+            t_prompt_ms=t_prompt_ms,
+            t_llm_ms=t_llm_ms,
+            t_parse_ms=t_parse_ms,
+            rag_enabled=rag_enabled,
+            retriever_ready=retriever_ready,
+            retrieved_count=0,
+            retrieval_empty=True,
+            retrieval_empty_reason=failure_type,
+        )
         return JSONResponse(
             status_code=503, content=problem.model_dump(exclude_none=True)
         )
@@ -153,7 +210,7 @@ async def rag_query(
         result = await _build_answer(doc, gateway, payload.include_lineage)
         results.append(result)
 
-    latency_ms = round((time.perf_counter() - start) * 1000, 3)
+    latency_ms = _elapsed_ms(start_total)
     cache_state = CacheState(hit=cache_hit, expires_at=expires_at)
     retrieval_empty = len(documents) == 0
     retrieval_empty_reason = "no_hits" if retrieval_empty else None
@@ -169,6 +226,22 @@ async def rag_query(
         failure_type=failure_type,
         index_path=index_path,
         model_name=model_name,
+    )
+    _log_retrieval(
+        request,
+        "rag.query.latency",
+        trace_id,
+        t_total_ms=latency_ms,
+        t_retrieve_ms=t_retrieve_ms,
+        t_cache_ms=t_cache_ms,
+        t_prompt_ms=t_prompt_ms,
+        t_llm_ms=t_llm_ms,
+        t_parse_ms=t_parse_ms,
+        rag_enabled=rag_enabled,
+        retriever_ready=retriever_ready,
+        retrieved_count=len(documents),
+        retrieval_empty=retrieval_empty,
+        retrieval_empty_reason=retrieval_empty_reason,
     )
     return RagResponse(
         trace_id=trace_id,
@@ -281,17 +354,29 @@ def _to_retrieved_document(doc: dict) -> RetrievedDocument:
 async def rag_answer(
     payload: RagQueryRequest,
     request: Request,
+    generate: bool | None = Query(
+        default=None,
+        description="When false, return retrieval-only output without calling an LLM",
+    ),
     retriever: RetrieverProtocol = Depends(get_retriever),
     cache: RagQueryCache = Depends(get_rag_cache),
     _: None = Depends(rate_limit("rag")),
 ) -> JSONResponse:
-    start = time.perf_counter()
+    start_total = time.perf_counter()
+    trace_id = getattr(request.state, "trace_id", "")
     cache_key = payload.cache_key()
+    generate_enabled = payload.generate if generate is None else bool(generate)
     rag_enabled = bool(getattr(retriever, "enabled", True))
     retriever_ready = bool(getattr(retriever, "ready", True))
     failure_type = getattr(retriever, "failure_type", None)
     index_path = getattr(retriever, "index_path", None)
     model_name = getattr(retriever, "model_name", None)
+    redaction_mode = resolve_redaction_mode()
+    t_cache_ms = 0.0
+    t_retrieve_ms = 0.0
+    t_prompt_ms = 0.0
+    t_llm_ms = 0.0
+    t_parse_ms = 0.0
 
     documents: list[dict] = []
     cache_hit = False
@@ -302,19 +387,29 @@ async def rag_answer(
     retrieval_failure: Exception | None = None
 
     if rag_enabled and retriever_ready:
+        cache_start = time.perf_counter()
         cached = cache.get(cache_key)
         cache_hit = cached is not None
+        t_cache_ms += _elapsed_ms(cache_start)
         if cache_hit:
+            cache_start = time.perf_counter()
             documents = cached or []
             expires_at = cache.expires_at(cache_key)
+            t_cache_ms += _elapsed_ms(cache_start)
         else:
+            retrieve_start = time.perf_counter()
             try:
                 documents = retriever.query(payload.query, k=payload.top_k)
+                t_retrieve_ms += _elapsed_ms(retrieve_start)
+                cache_start = time.perf_counter()
                 expires_at = cache.put(cache_key, documents)
+                t_cache_ms += _elapsed_ms(cache_start)
             except RetrieverError as exc:
+                t_retrieve_ms += _elapsed_ms(retrieve_start)
                 retrieval_failure = exc
                 failure_type = getattr(exc, "code", "retriever_error")
             except Exception as exc:  # pragma: no cover - defensive
+                t_retrieve_ms += _elapsed_ms(retrieve_start)
                 retrieval_failure = exc
                 failure_type = failure_type or "retriever_error"
     elif not rag_enabled:
@@ -345,6 +440,19 @@ async def rag_answer(
     citations: list[dict] = []
     evidence_okay: dict | None = None
     assumptions: list[str] = []
+    remote_attempted = False
+    redacted_question = redact_text_for_mode(payload.query, mode=redaction_mode)
+    egress_decision = build_data_egress_decision(
+        remote_enabled=False,
+        disabled_reason="generation not attempted",
+        provider=None,
+        model=None,
+        redaction_mode=redaction_mode,
+        question=redacted_question,
+        contexts=[],
+        messages=None,
+        trace_id=trace_id,
+    )
 
     if retrieval_failure:
         disabled_reason = str(retrieval_failure)
@@ -356,6 +464,17 @@ async def rag_answer(
             "message": str(retrieval_failure),
             "details": {},
         }
+        egress_decision = build_data_egress_decision(
+            remote_enabled=False,
+            disabled_reason=disabled_reason,
+            provider=None,
+            model=None,
+            redaction_mode=redaction_mode,
+            question=redacted_question,
+            contexts=[],
+            messages=None,
+            trace_id=trace_id,
+        )
     elif not rag_enabled:
         status_code = 503
         output_error = {
@@ -363,80 +482,192 @@ async def rag_answer(
             "message": disabled_reason or "RAG retriever disabled",
             "details": {},
         }
+        egress_decision = build_data_egress_decision(
+            remote_enabled=False,
+            disabled_reason=disabled_reason or "RAG retriever disabled",
+            provider=None,
+            model=None,
+            redaction_mode=redaction_mode,
+            question=redacted_question,
+            contexts=[],
+            messages=None,
+            trace_id=trace_id,
+        )
     else:
         retrieval_empty = len(documents) == 0
         retrieval_empty_reason = (
             retrieval_empty_reason or ("no_hits" if retrieval_empty else None)
         )
-        try:
-            cfg = get_llm_config()
-            provider_label = cfg.provider.provider
-            model_label = cfg.provider.model
-            prompt_contexts: list[str] = []
-            for doc in documents:
-                text = str(
-                    doc.get("text")
-                    or doc.get("content")
-                    or doc.get("paragraph")
-                    or doc.get("body")
-                    or doc.get("snippet")
-                    or ""
-                ).strip()
-                if not text:
-                    continue
-                section = str(
-                    doc.get("section")
-                    or doc.get("span_id")
-                    or doc.get("id")
-                    or doc.get("entity_id")
-                    or ""
-                ).strip()
-                prefix = f"[{section}] " if section else ""
-                prompt_contexts.append(prefix + text)
-            contexts = prompt_contexts
-            prompt = rag_pipeline._build_prompt(payload.query, prompt_contexts, label_schema=None)
-            raw_answer = generate_chat(prompt)
-            llm_enabled = True
-            parsed = parse_strict_answer_json(
-                raw_answer,
-                allowed_labels=DEFAULT_ALLOWED_LABELS,
-                context="\n\n".join(prompt_contexts),
-            )
-            output_ok = True
-            answer = str(parsed["answer_text"])
-            label = str(parsed["label"])
-            citations = list(parsed.get("citations") or [])
-            assumptions = list(parsed.get("assumptions") or [])
-            evidence_okay = dict(parsed.get("evidence_okay") or {})
-            justification = " ".join(
-                f"[{c.get('section_id')}] {c.get('quote')}"
-                for c in citations
-                if c.get("section_id") and c.get("quote")
-            ).strip() or None
-        except LLMProviderError as exc:
-            disabled_reason = str(exc)
-            llm_enabled = False
-            status_code = 503
-            output_error = {"code": "llm_unavailable", "message": str(exc), "details": {}}
-        except OutputSchemaError as exc:
-            output_ok = False
-            output_error = exc.as_dict()
-            failure_type = exc.code
-            status_code = 422
-            answer = None
-            label = None
-            justification = None
-            citations = []
-            assumptions = []
-            evidence_okay = None
-        except Exception as exc:  # pragma: no cover - defensive
-            disabled_reason = str(exc)
-            llm_enabled = False
-            status_code = 503
-            output_error = {"code": "llm_unavailable", "message": str(exc), "details": {}}
+        prompt_contexts: list[str] = []
+        for doc in documents:
+            text = str(
+                doc.get("text")
+                or doc.get("content")
+                or doc.get("paragraph")
+                or doc.get("body")
+                or doc.get("snippet")
+                or ""
+            ).strip()
+            if not text:
+                continue
+            section = str(
+                doc.get("section")
+                or doc.get("span_id")
+                or doc.get("id")
+                or doc.get("entity_id")
+                or ""
+            ).strip()
+            prefix = f"[{section}] " if section else ""
+            prompt_contexts.append(prefix + text)
+        contexts = prompt_contexts
 
-    trace_id = getattr(request.state, "trace_id", "")
-    latency_ms = round((time.perf_counter() - start) * 1000, 3)
+        if not generate_enabled:
+            llm_enabled = False
+            output_ok = True
+            disabled_reason = "generation_disabled_by_request"
+            egress_decision = build_data_egress_decision(
+                remote_enabled=False,
+                disabled_reason=disabled_reason,
+                provider=None,
+                model=None,
+                redaction_mode=redaction_mode,
+                question=redacted_question,
+                contexts=[],
+                messages=None,
+                trace_id=trace_id,
+            )
+        else:
+            llm_start: float | None = None
+            parse_start: float | None = None
+            try:
+                cfg = get_llm_config()
+                provider_label = cfg.provider.provider
+                model_label = cfg.provider.model
+                prompt_start = time.perf_counter()
+                redacted_contexts = redact_contexts(prompt_contexts, mode=redaction_mode)
+                prompt = rag_pipeline._build_prompt(
+                    redacted_question, redacted_contexts, label_schema=None
+                )
+                t_prompt_ms += _elapsed_ms(prompt_start)
+                if not cfg.enable_remote:
+                    disabled_reason = (
+                        cfg.remote_disabled_reason
+                        or "remote LLM policy denied egress"
+                    )
+                    llm_enabled = False
+                    status_code = 503
+                    output_error = {
+                        "code": "llm_disabled",
+                        "message": disabled_reason,
+                        "details": {},
+                    }
+                    egress_decision = build_data_egress_decision(
+                        remote_enabled=False,
+                        disabled_reason=disabled_reason,
+                        provider=provider_label,
+                        model=model_label,
+                        redaction_mode=redaction_mode,
+                        question=redacted_question,
+                        contexts=redacted_contexts,
+                        messages=prompt,
+                        trace_id=trace_id,
+                    )
+                else:
+                    remote_attempted = True
+                    llm_start = time.perf_counter()
+                    raw_answer = generate_chat(
+                        prompt,
+                        provider=provider_label,
+                        model=model_label,
+                    )
+                    t_llm_ms += _elapsed_ms(llm_start)
+                    llm_enabled = True
+                    egress_decision = build_data_egress_decision(
+                        remote_enabled=True,
+                        disabled_reason=None,
+                        provider=provider_label,
+                        model=model_label,
+                        redaction_mode=redaction_mode,
+                        question=redacted_question,
+                        contexts=redacted_contexts,
+                        messages=prompt,
+                        trace_id=trace_id,
+                    )
+                    parse_start = time.perf_counter()
+                    parsed = parse_strict_answer_json(
+                        raw_answer,
+                        allowed_labels=DEFAULT_ALLOWED_LABELS,
+                        context="\n\n".join(redacted_contexts),
+                    )
+                    t_parse_ms += _elapsed_ms(parse_start)
+                    output_ok = True
+                    answer = str(parsed["answer_text"])
+                    label = str(parsed["label"])
+                    citations = list(parsed.get("citations") or [])
+                    assumptions = list(parsed.get("assumptions") or [])
+                    evidence_okay = dict(parsed.get("evidence_okay") or {})
+                    justification = " ".join(
+                        f"[{c.get('section_id')}] {c.get('quote')}"
+                        for c in citations
+                        if c.get("section_id") and c.get("quote")
+                    ).strip() or None
+            except LLMProviderError as exc:
+                if llm_start is not None:
+                    t_llm_ms += _elapsed_ms(llm_start)
+                disabled_reason = str(exc)
+                llm_enabled = False
+                status_code = 503
+                output_error = {
+                    "code": "llm_unavailable",
+                    "message": str(exc),
+                    "details": {},
+                }
+                egress_decision = build_data_egress_decision(
+                    remote_enabled=remote_attempted,
+                    disabled_reason=str(exc),
+                    provider=provider_label,
+                    model=model_label,
+                    redaction_mode=redaction_mode,
+                    question=redacted_question,
+                    contexts=redact_contexts(contexts, mode=redaction_mode),
+                    messages=None,
+                    trace_id=trace_id,
+                )
+            except OutputSchemaError as exc:
+                if parse_start is not None:
+                    t_parse_ms += _elapsed_ms(parse_start)
+                output_ok = False
+                output_error = exc.as_dict()
+                failure_type = exc.code
+                status_code = 422
+                answer = None
+                label = None
+                justification = None
+                citations = []
+                assumptions = []
+                evidence_okay = None
+            except Exception as exc:  # pragma: no cover - defensive
+                disabled_reason = str(exc)
+                llm_enabled = False
+                status_code = 503
+                output_error = {
+                    "code": "llm_unavailable",
+                    "message": str(exc),
+                    "details": {},
+                }
+                egress_decision = build_data_egress_decision(
+                    remote_enabled=remote_attempted,
+                    disabled_reason=str(exc),
+                    provider=provider_label,
+                    model=model_label,
+                    redaction_mode=redaction_mode,
+                    question=redacted_question,
+                    contexts=redact_contexts(contexts, mode=redaction_mode),
+                    messages=None,
+                    trace_id=trace_id,
+                )
+
+    latency_ms = _elapsed_ms(start_total)
     cache_state = CacheState(
         hit=cache_hit if rag_enabled else False, expires_at=expires_at
     )
@@ -454,6 +685,29 @@ async def rag_answer(
         retrieval_empty=retrieval_empty,
         retrieval_empty_reason=retrieval_empty_reason,
     )
+    _log_retrieval(
+        request,
+        "llm.egress_decision",
+        trace_id,
+        **{k: v for k, v in egress_decision.to_dict().items() if k != "trace_id"},
+    )
+    latency_event = {
+        "t_total_ms": latency_ms,
+        "t_retrieve_ms": t_retrieve_ms,
+        "t_cache_ms": t_cache_ms,
+        "t_prompt_ms": t_prompt_ms,
+        "t_llm_ms": t_llm_ms,
+        "t_parse_ms": t_parse_ms,
+        "rag_enabled": rag_enabled,
+        "retriever_ready": retriever_ready and retrieval_failure is None,
+        "retrieved_count": len(documents),
+        "retrieval_empty": retrieval_empty,
+        "retrieval_empty_reason": retrieval_empty_reason,
+    }
+    if remote_attempted:
+        latency_event["provider"] = provider_label
+        latency_event["model"] = model_label
+    _log_retrieval(request, "rag.answer.latency", trace_id, **latency_event)
     response = RagGeneratedResponse(
         trace_id=trace_id,
         latency_ms=latency_ms,
@@ -477,6 +731,7 @@ async def rag_answer(
         citations=citations,
         evidence_okay=evidence_okay,
         assumptions=assumptions,
+        egress=egress_decision.to_dict(),
     )
     return JSONResponse(
         status_code=status_code, content=response.model_dump(mode="json")

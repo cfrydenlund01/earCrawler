@@ -17,6 +17,9 @@ def _stub_expansion(*_args, **_kwargs):
 def _stub_retrieval_and_kg(monkeypatch):
     monkeypatch.setattr(pipeline, "retrieve_regulation_context", _stub_retrieval)
     monkeypatch.setattr(pipeline, "expand_with_kg", _stub_expansion)
+    monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
+    monkeypatch.setenv("EARCRAWLER_SKIP_LLM_SECRETS_FILE", "1")
     yield
 
 

@@ -15,6 +15,7 @@ from .rag import (
     OutputError,
     RagCitation,
     EvidenceOkay,
+    DataEgressRecord,
 )
 
 __all__ = [
@@ -38,4 +39,5 @@ __all__ = [
     "OutputError",
     "RagCitation",
     "EvidenceOkay",
+    "DataEgressRecord",
 ]

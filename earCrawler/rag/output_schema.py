@@ -8,6 +8,7 @@ This module enforces a machine-checkable, grounded contract:
 - enums constrained to allowed labels
 - citations contain verbatim quotes, and at least one quote must be a substring
   of the retrieved context for non-unanswerable labels
+- optional justification strings are accepted to support explainability during eval
 """
 
 import json
@@ -65,9 +66,10 @@ _NEW_REQUIRED_KEYS: Set[str] = {
     "evidence_okay",
     "assumptions",
 }
+_NEW_OPTIONAL_KEYS: Set[str] = {"justification"}
 
 _CITATION_REQUIRED_KEYS: Set[str] = {"section_id", "quote"}
-_CITATION_ALLOWED_KEYS: Set[str] = {"section_id", "quote", "span_id"}
+_CITATION_ALLOWED_KEYS: Set[str] = {"section_id", "quote", "span_id", "source"}
 
 _EVIDENCE_REQUIRED_KEYS: Set[str] = {"ok", "reasons"}
 
@@ -162,7 +164,8 @@ def parse_strict_answer_json(
             details={"expected": "object", "actual": type(parsed).__name__},
         )
 
-    extras = sorted(set(parsed.keys()) - _NEW_REQUIRED_KEYS)
+    allowed_top_level = _NEW_REQUIRED_KEYS | _NEW_OPTIONAL_KEYS
+    extras = sorted(set(parsed.keys()) - allowed_top_level)
     if extras:
         raise OutputSchemaError(
             code="extra_key",
@@ -189,6 +192,10 @@ def parse_strict_answer_json(
             raw_text=raw,
             details={"allowed": sorted(allowed), "label": label_value},
         )
+
+    justification = None
+    if "justification" in parsed:
+        justification = _coerce_str(parsed, "justification", raw=raw)
 
     citations = parsed.get("citations")
     if not isinstance(citations, list):
@@ -338,6 +345,7 @@ def parse_strict_answer_json(
     return {
         "label": label_value,
         "answer_text": answer_text,
+        "justification": justification,
         "citations": parsed_citations,
         "evidence_okay": {"ok": ok, "reasons": list(reasons)},
         "assumptions": list(assumptions),

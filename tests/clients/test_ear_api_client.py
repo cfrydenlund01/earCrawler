@@ -97,7 +97,9 @@ def test_sparql_and_rag_payloads():
         "query": "export controls",
         "top_k": 1,
         "include_lineage": False,
+        "generate": True,
     }
+    assert session.calls[2]["params"] == {"generate": "1"}
 
 
 def test_error_response_raises():
