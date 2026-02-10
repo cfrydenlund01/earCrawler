@@ -1,0 +1,21 @@
+{
+  "manifest_version": "offline-snapshot.v1",
+  "snapshot_id": "ecfr-title15-YYYY-MM-DD",
+  "created_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "source": {
+    "owner": "<team-or-person>",
+    "upstream": "ecfr.gov API export",
+    "approved_by": "<approver>",
+    "approved_at": "YYYY-MM-DDTHH:MM:SSZ"
+  },
+  "scope": {
+    "titles": ["15"],
+    "parts": []
+  },
+  "payload": {
+    "path": "snapshot.jsonl",
+    "size_bytes": 0,
+    "sha256": "<sha256-hex>"
+  }
+}
+

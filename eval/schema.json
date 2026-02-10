@@ -1,22 +1,82 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "EAR Evaluation Item",
-  "type": "object",
+  "additionalProperties": false,
   "properties": {
-    "id": {
-      "type": "string",
-      "minLength": 1
+    "ear_sections": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "type": "array"
     },
-    "task": {
-      "type": "string",
-      "minLength": 1
+    "evidence": {
+      "additionalProperties": false,
+      "properties": {
+        "doc_spans": {
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "doc_id": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "span_id": {
+                "minLength": 1,
+                "type": "string"
+              }
+            },
+            "required": [
+              "doc_id",
+              "span_id"
+            ],
+            "type": "object"
+          },
+          "type": "array"
+        },
+        "kg_nodes": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "kg_paths": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "doc_spans",
+        "kg_nodes"
+      ],
+      "type": "object"
     },
-    "question": {
-      "type": "string",
-      "minLength": 1
+    "expected": {
+      "additionalProperties": false,
+      "properties": {
+        "citations": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "label": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "label",
+        "citations"
+      ],
+      "type": "object"
     },
     "ground_truth": {
-      "type": "object",
+      "additionalProperties": false,
       "properties": {
         "answer_text": {
           "type": "string"
@@ -25,81 +85,32 @@
           "type": "string"
         }
       },
-      "required": ["answer_text", "label"],
-      "additionalProperties": false
+      "required": [
+        "answer_text",
+        "label"
+      ],
+      "type": "object"
     },
-    "expected": {
-      "type": "object",
-      "properties": {
-        "label": {
-          "type": "string",
-          "minLength": 1
-        },
-        "citations": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      },
-      "required": ["label", "citations"],
-      "additionalProperties": false
-    },
-    "ear_sections": {
-      "type": "array",
-      "items": {
-        "type": "string",
-        "minLength": 1
-      }
+    "id": {
+      "minLength": 1,
+      "type": "string"
     },
     "kg_entities": {
-      "type": "array",
       "items": {
-        "type": "string",
-        "minLength": 1
-      }
-    },
-    "evidence": {
-      "type": "object",
-      "properties": {
-        "doc_spans": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "doc_id": {
-                "type": "string",
-                "minLength": 1
-              },
-              "span_id": {
-                "type": "string",
-                "minLength": 1
-              }
-            },
-            "required": ["doc_id", "span_id"],
-            "additionalProperties": false
-          }
-        },
-        "kg_nodes": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        },
-        "kg_paths": {
-          "type": "array",
-          "items": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
+        "minLength": 1,
+        "type": "string"
       },
-      "required": ["doc_spans", "kg_nodes"],
-      "additionalProperties": false
+      "type": "array"
     },
     "notes": {
+      "type": "string"
+    },
+    "question": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "task": {
+      "minLength": 1,
       "type": "string"
     }
   },
@@ -112,5 +123,6 @@
     "kg_entities",
     "evidence"
   ],
-  "additionalProperties": false
+  "title": "EAR Evaluation Item",
+  "type": "object"
 }

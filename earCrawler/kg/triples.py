@@ -4,6 +4,8 @@ from urllib.parse import quote
 from rdflib import RDF, Graph, URIRef, Namespace
 from rdflib.namespace import RDFS
 from .ontology import EAR_NS, DCT, graph_with_prefixes, safe_literal
+from .iri import entity_iri
+from .namespaces import RESOURCE_NS
 from .prov import add_provenance
 
 
@@ -13,7 +15,7 @@ def export_triples(
 ) -> None:
     out_ttl.parent.mkdir(parents=True, exist_ok=True)
     g = graph_with_prefixes()
-    ex_ns = Namespace("http://example.org/ear/")
+    ex_ns = Namespace(f"{RESOURCE_NS}legacy/ear/")
     g.namespace_manager.bind("ex", ex_ns, replace=True)
     for source in ("ear", "nsf"):
         fn = data_dir / f"{source}_corpus.jsonl"
@@ -58,7 +60,7 @@ def emit_tradegov_entities(
     out_path = out_dir / "tradegov.ttl"
     g = graph_with_prefixes()
     for rec in records:
-        ent_iri = EAR_NS[f"entity/{rec['id']}"]
+        ent_iri = URIRef(entity_iri(rec["id"]))
         g.add((ent_iri, RDF.type, EAR_NS.Entity))
         g.add((ent_iri, RDFS.label, safe_literal(rec["name"])))
         country = rec.get("country")

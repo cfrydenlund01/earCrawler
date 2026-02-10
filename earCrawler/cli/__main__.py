@@ -45,6 +45,7 @@ from earCrawler.rag.retriever import Retriever, RetrieverError
 from earCrawler.rag.build_corpus import build_retrieval_corpus, write_corpus_jsonl
 from earCrawler.rag.index_builder import build_faiss_index_from_corpus
 from earCrawler.rag.ecfr_api_fetch import fetch_ecfr_snapshot
+from earCrawler.rag.offline_snapshot_manifest import validate_offline_snapshot
 
 install_telem()
 
@@ -1291,7 +1292,13 @@ def rag_index_build(input_path: Path, index_path: Path, model_name: str, reset: 
     "--snapshot",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     required=True,
-    help="Offline eCFR snapshot JSONL (see retrieval_corpus_contract.md).",
+    help="Offline eCFR snapshot JSONL. Requires a sibling manifest (see docs/offline_snapshot_spec.md).",
+)
+@click.option(
+    "--snapshot-manifest",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional offline snapshot manifest override (offline-snapshot.v1).",
 )
 @click.option(
     "--out",
@@ -1313,19 +1320,63 @@ def rag_index_build(input_path: Path, index_path: Path, model_name: str, reset: 
     show_default=True,
     help="Maximum characters per chunk before paragraph splitting.",
 )
-def rag_index_build_corpus(snapshot: Path, out: Path, source_ref: str | None, chunk_max_chars: int) -> None:
+@click.option(
+    "--preflight/--no-preflight",
+    default=True,
+    show_default=True,
+    help="Run snapshot validation before corpus build.",
+)
+def rag_index_build_corpus(
+    snapshot: Path,
+    snapshot_manifest: Path | None,
+    out: Path,
+    source_ref: str | None,
+    chunk_max_chars: int,
+    preflight: bool,
+) -> None:
     """Build retrieval corpus from offline snapshot and write JSONL."""
 
     try:
         docs = build_retrieval_corpus(
             snapshot,
             source_ref=source_ref,
+            manifest_path=snapshot_manifest,
+            preflight_validate_snapshot=preflight,
             chunk_max_chars=chunk_max_chars,
         )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
     write_corpus_jsonl(out, docs)
     click.echo(f"Wrote {len(docs)} corpus documents -> {out}")
+
+
+@rag_index.command(name="validate-snapshot")
+@click.option(
+    "--snapshot",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Offline eCFR snapshot JSONL to validate.",
+)
+@click.option(
+    "--snapshot-manifest",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional offline snapshot manifest override (offline-snapshot.v1).",
+)
+def rag_index_validate_snapshot(snapshot: Path, snapshot_manifest: Path | None) -> None:
+    """Validate offline snapshot + manifest before any corpus/index work."""
+
+    try:
+        summary = validate_offline_snapshot(snapshot, manifest_path=snapshot_manifest)
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        "Snapshot valid: "
+        f"sections={summary.section_count} "
+        f"titles={summary.title_count} "
+        f"bytes={summary.payload_bytes} "
+        f"manifest={summary.manifest.path}"
+    )
 
 
 @rag_index.command(name="fetch-ecfr")

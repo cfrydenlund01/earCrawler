@@ -80,7 +80,7 @@ Windows notes
     - `answer_text` (string) – canonical short answer.
     - `label` (string) – normalized label (`license_required`, `no_license_required`, `permitted`, `permitted_with_license`, `prohibited`, `unanswerable`, etc.).
   - `ear_sections` (array of strings) – EAR section IDs that determine the answer (for example `["EAR-744.6(b)(3)"]`).
-  - `kg_entities` (array of strings) – IRIs of the main KG entities involved (for example `["https://example.org/ear#entity/acme"]`), or empty when the item is purely statute-level.
+  - `kg_entities` (array of strings) – IRIs of the main KG entities involved (for example `["https://ear.example.org/entity/acme"]`), or empty when the item is purely statute-level.
   - `evidence` (object):
     - `doc_spans` (array) – items of the form `{ "doc_id": "<EAR document ID>", "span_id": "<section/paragraph ID>" }` that should be sufficient to justify the answer.
     - `kg_nodes` (array of strings) – IRIs of policy-graph nodes (obligations, exceptions) that encode the decision logic.
@@ -314,6 +314,19 @@ pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
 - Retriever warm-up is opt-in:
   - `EARCRAWLER_WARM_RETRIEVER=1` enables startup warm-up.
   - `EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS=5` bounds warm-up runtime.
+- KG expansion providers (deterministic/offline-safe testing via stubs):
+  - `EARCRAWLER_ENABLE_KG_EXPANSION=1` enables KG expansion in the RAG pipeline.
+  - `EARCRAWLER_KG_EXPANSION_PROVIDER=fuseki|json_stub` selects provider (default when enabled: `fuseki`).
+  - `EARCRAWLER_KG_EXPANSION_PATH=<path>` selects the temporary JSON stub mapping (explicit fallback mode).
+  - `EARCRAWLER_FUSEKI_URL=http://localhost:3030/ear/sparql` configures Fuseki endpoint for `fuseki` mode.
+  - `EARCRAWLER_KG_EXPANSION_MAX_PATHS_PER_SECTION=4` limits persisted paths per section.
+  - `EARCRAWLER_KG_EXPANSION_MAX_HOPS=2` limits Fuseki traversal depth.
+  - `EARCRAWLER_KG_EXPANSION_FUSEKI_TIMEOUT=5` sets Fuseki query timeout (seconds).
+  - When `fuseki` is selected but endpoint config is missing, expansion fails explicitly.
+- Explainability payload fields in `answer_with_rag` and eval artifacts:
+  - `kg_expansions`: per-section snippets with structured path provenance.
+  - `kg_paths_used`: flattened structured paths used by the answer.
+  - `kg_related_sections`: canonical related EAR section IDs aggregated from KG expansion.
 - Retrieval-only fast path:
   - API: `POST /v1/rag/answer?generate=0` (or request body `"generate": false`).
   - CLI: `python -m earCrawler.cli llm ask --retrieval-only "your question"`.

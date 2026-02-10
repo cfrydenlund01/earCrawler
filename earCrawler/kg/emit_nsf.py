@@ -20,6 +20,7 @@ from .ontology import (
     iri_for_section,
     safe_literal,
 )
+from .iri import resource_iri
 
 
 def _is_url(value: str) -> bool:
@@ -61,7 +62,7 @@ def emit_nsf(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
     out_path = out_dir / "nsf.ttl"
 
     g = graph_with_prefixes()
-    reg_iri = EAR_NS["reg"]
+    reg_iri = URIRef(resource_iri("ear", "reg"))
     g.add((reg_iri, RDF.type, EAR_NS.Reg))
 
     with in_path.open("r", encoding="utf-8") as f:
@@ -97,7 +98,7 @@ def emit_nsf(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
                 g.add((para_iri, PROV.wasDerivedFrom, safe_literal(str(rec_id))))
             for ent in rec.get("entities", []) or []:
                 ent_iri = _iri_for_entity(str(ent))
-                g.add((ent_iri, RDF.type, ENT_NS.Entity))
+                g.add((ent_iri, RDF.type, EAR_NS.Entity))
                 g.add((ent_iri, PROV.wasDerivedFrom, para_iri))
 
     _write_sorted_ttl(g, out_path)

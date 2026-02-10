@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from earCrawler.kg.emit_ear import emit_ear
+from earCrawler.kg.iri import paragraph_iri
 
 
 def _write_records(path: Path, records: list[dict]) -> None:
@@ -40,6 +41,6 @@ def test_emit_ear_deterministic(tmp_path: Path) -> None:
     content2 = path2.read_bytes()
     assert content1 == content2
     text = content1.decode("utf-8")
-    assert "ear:p_" + "a" * 16 in text
+    assert f"<{paragraph_iri('a' * 64)}>" in text
     assert "dct:source" in text
     assert "dct:issued" in text

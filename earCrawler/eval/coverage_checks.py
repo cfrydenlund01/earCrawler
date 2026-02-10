@@ -71,11 +71,15 @@ def _read_index_meta(index_path: str | None) -> dict[str, object] | None:
         return None
     if not isinstance(payload, dict):
         return None
+    snapshot = payload.get("snapshot")
+    if snapshot is not None and not isinstance(snapshot, dict):
+        snapshot = None
     return {
         "meta_path": str(meta_path),
         "schema_version": payload.get("schema_version"),
         "corpus_schema_version": payload.get("corpus_schema_version"),
         "corpus_digest": payload.get("corpus_digest"),
+        "snapshot": snapshot,
     }
 
 

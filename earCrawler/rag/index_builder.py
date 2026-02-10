@@ -69,12 +69,19 @@ def build_faiss_index_from_corpus(
             row["text"] = doc.get("text")
         rows.append(row)
 
+    snapshot_ids = {str(v) for v in (doc.get("snapshot_id") for doc in docs) if isinstance(v, str) and v.strip()}
+    snapshot_sha256s = {str(v) for v in (doc.get("snapshot_sha256") for doc in docs) if isinstance(v, str) and v.strip()}
+    snapshot_obj = None
+    if len(snapshot_ids) == 1 and len(snapshot_sha256s) == 1:
+        snapshot_obj = {"snapshot_id": sorted(snapshot_ids)[0], "snapshot_sha256": sorted(snapshot_sha256s)[0]}
+
     meta = {
         "schema_version": INDEX_META_VERSION,
         "corpus_schema_version": SCHEMA_VERSION,
         "corpus_digest": compute_corpus_digest(docs),
         "doc_count": len(docs),
         "embedding_model": embedding_model,
+        "snapshot": snapshot_obj,
         "rows": rows,
     }
     meta_path = Path(meta_path)

@@ -83,6 +83,8 @@ def _corpus() -> list[dict]:
             "chunk_kind": "section",
             "source": "ecfr_snapshot",
             "source_ref": "snap-1",
+            "snapshot_id": "ecfr-title15-2025-12-31",
+            "snapshot_sha256": "a" * 64,
         },
         {
             "schema_version": SCHEMA_VERSION,
@@ -92,6 +94,8 @@ def _corpus() -> list[dict]:
             "chunk_kind": "subsection",
             "source": "ecfr_snapshot",
             "source_ref": "snap-1",
+            "snapshot_id": "ecfr-title15-2025-12-31",
+            "snapshot_sha256": "a" * 64,
         },
         {
             "schema_version": SCHEMA_VERSION,
@@ -101,6 +105,8 @@ def _corpus() -> list[dict]:
             "chunk_kind": "section",
             "source": "ecfr_snapshot",
             "source_ref": "snap-1",
+            "snapshot_id": "ecfr-title15-2025-12-31",
+            "snapshot_sha256": "a" * 64,
         },
     ]
 
@@ -124,6 +130,7 @@ def test_index_builder_writes_meta(monkeypatch, tmp_path: Path) -> None:
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     assert meta["schema_version"] == INDEX_META_VERSION
     assert meta["doc_count"] == len(corpus_docs)
+    assert meta["snapshot"] == {"snapshot_id": "ecfr-title15-2025-12-31", "snapshot_sha256": "a" * 64}
     rows = meta["rows"]
     doc_ids = [row["doc_id"] for row in rows]
     assert doc_ids == sorted(doc_ids)

@@ -20,6 +20,7 @@ from .ontology import (
     iri_for_section,
     safe_literal,
 )
+from .iri import resource_iri
 from .prov import add_provenance
 
 
@@ -83,7 +84,7 @@ def emit_ear(
     out_path = out_dir / "ear.ttl"
 
     g = graph_with_prefixes()
-    reg_iri = EAR_NS["reg"]
+    reg_iri = URIRef(resource_iri("ear", "reg"))
     g.add((reg_iri, RDF.type, EAR_NS.Reg))
 
     with in_path.open("r", encoding="utf-8") as f:
