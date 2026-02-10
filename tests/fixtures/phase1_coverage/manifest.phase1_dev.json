@@ -1,0 +1,13 @@
+{
+  "datasets": [
+    {
+      "id": "phase1_dev_universe.v2",
+      "version": 2,
+      "task": "fr_coverage_universe",
+      "description": "Tiny dev fixture universe for Phase 1 coverage wiring (built from a committed offline snapshot fixture).",
+      "file": "phase1_dev_universe.v2.jsonl",
+      "num_items": 5
+    }
+  ]
+}
+
