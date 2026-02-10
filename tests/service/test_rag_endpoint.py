@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from fastapi.testclient import TestClient
 import pytest
+from fastapi.testclient import TestClient
 from pytest_socket import disable_socket, enable_socket, socket_allow_hosts
 
 from service.api_server import create_app
@@ -101,7 +101,10 @@ def test_llm_endpoint_disabled_returns_stub(monkeypatch):
 
     import service.api_server.routers.rag as rag_router
 
+    called = {"value": False}
+
     def _fail(_messages, *a, **k):
+        called["value"] = True
         raise rag_router.LLMProviderError("disabled")
 
     monkeypatch.setattr(rag_router, "generate_chat", _fail)
@@ -113,6 +116,11 @@ def test_llm_endpoint_disabled_returns_stub(monkeypatch):
     assert data["llm_enabled"] is False
     assert data["disabled_reason"]
     assert data["output_ok"] is False
+    assert called["value"] is False
+    assert data["egress"]["remote_enabled"] is False
+    assert data["egress"]["disabled_reason"]
+    assert "prompt_hash" in data["egress"]
+    assert "context_hashes" in data["egress"]
 
 
 def test_llm_endpoint_returns_answer_and_contexts(monkeypatch):
@@ -134,6 +142,8 @@ def test_llm_endpoint_returns_answer_and_contexts(monkeypatch):
             '}'
         ),
     )
+    monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
 
     resp = client.post("/v1/rag/answer", json={"query": "export controls", "top_k": 2})
     assert resp.status_code == 200
@@ -150,6 +160,69 @@ def test_llm_endpoint_returns_answer_and_contexts(monkeypatch):
     assert data["contexts"] == ["[734.3] Example EAR passage text about exports."]
     assert data["retrieved"][0]["url"] == "https://example.org/doc/1"
     assert data["retrieval_empty"] is False
+    assert data["egress"]["remote_enabled"] is True
+    assert data["egress"]["provider"] == "groq"
+    assert data["egress"]["model"]
+    assert data["egress"]["redaction_mode"] == "none"
+    assert len(data["egress"]["prompt_hash"]) == 64
+    assert len(data["egress"]["context_hashes"]) == 1
+    assert len(data["egress"]["context_hashes"][0]) == 64
+    assert "export controls" not in str(data["egress"])
+    assert "Example EAR passage text about exports." not in str(data["egress"])
+
+
+def test_llm_endpoint_retrieval_only_skips_generation(monkeypatch):
+    retriever = _StubRetriever()
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+
+    def _fail_if_called(*_args, **_kwargs):
+        raise AssertionError("generate_chat should not be called for retrieval-only path")
+
+    monkeypatch.setattr(rag_router, "generate_chat", _fail_if_called)
+
+    resp = client.post("/v1/rag/answer?generate=0", json={"query": "export controls"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["rag_enabled"] is True
+    assert data["llm_enabled"] is False
+    assert data["disabled_reason"] == "generation_disabled_by_request"
+    assert data["answer"] is None
+    assert data["retrieved"]
+    assert data["contexts"] == ["[734.3] Example EAR passage text about exports."]
+    assert data["egress"]["remote_enabled"] is False
+    assert data["egress"]["disabled_reason"] == "generation_disabled_by_request"
+
+
+def test_warmup_skips_when_retriever_unavailable(monkeypatch):
+    monkeypatch.setenv("EARCRAWLER_WARM_RETRIEVER", "1")
+    monkeypatch.setenv("EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS", "1")
+    broken = BrokenRetriever(
+        RuntimeError("missing sentence-transformers"),
+        failure_type="retriever_unavailable",
+    )
+    responses = {"lineage_by_id": []}
+    settings = ApiSettings(fuseki_url=None)
+    app = create_app(
+        settings,
+        fuseki_client=StubFusekiClient(responses),
+        retriever=broken,
+        rag_cache=RagQueryCache(ttl_seconds=60, max_entries=4),
+    )
+    events: list[str] = []
+    original_info = app.state.request_logger.info
+
+    def _capture(event: str, **fields):
+        events.append(event)
+        return original_info(event, **fields)
+
+    app.state.request_logger.info = _capture  # type: ignore[method-assign]
+    with TestClient(app) as client:
+        health = client.get("/health")
+        assert health.status_code == 200
+
+    assert "rag.warmup.skipped" in events
 
 
 def test_rag_query_returns_503_when_disabled():
@@ -171,6 +244,7 @@ def test_rag_answer_returns_503_when_retriever_broken():
     assert data["retrieval_empty_reason"] == "index_missing"
     assert "index missing" in (data.get("disabled_reason") or "")
     assert data["output_ok"] is False
+    assert data["egress"]["remote_enabled"] is False
 
 
 def test_rag_answer_marks_no_hits(monkeypatch):
@@ -192,6 +266,8 @@ def test_rag_answer_marks_no_hits(monkeypatch):
             '}'
         ),
     )
+    monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
     client = _app(retriever)
     resp = client.post("/v1/rag/answer", json={"query": "export controls"})
     assert resp.status_code == 200
@@ -209,6 +285,8 @@ def test_llm_endpoint_schema_failure_returns_422(monkeypatch):
     monkeypatch.setattr(
         rag_router, "generate_chat", lambda _messages, *a, **k: "freeform answer"
     )
+    monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
 
     resp = client.post("/v1/rag/answer", json={"query": "export controls"})
     assert resp.status_code == 422
@@ -216,3 +294,34 @@ def test_llm_endpoint_schema_failure_returns_422(monkeypatch):
     assert data["output_ok"] is False
     assert data["output_error"]["code"] == "invalid_json"
     assert data["answer"] is None
+    assert data["egress"]["remote_enabled"] is True
+
+
+def test_llm_endpoint_ungrounded_quote_returns_422(monkeypatch):
+    retriever = _StubRetriever()
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+
+    monkeypatch.setattr(
+        rag_router,
+        "generate_chat",
+        lambda _messages, *a, **k: (
+            '{'
+            '"label":"permitted",'
+            '"answer_text":"stubbed answer",'
+            '"citations":[{"section_id":"734.3","quote":"NOT IN CONTEXT","span_id":""}],'
+            '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+            '"assumptions":[]'
+            '}'
+        ),
+    )
+    monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
+
+    resp = client.post("/v1/rag/answer", json={"query": "export controls"})
+    assert resp.status_code == 422
+    data = resp.json()
+    assert data["output_ok"] is False
+    assert data["output_error"]["code"] == "ungrounded_citation"
+    assert data["egress"]["remote_enabled"] is True

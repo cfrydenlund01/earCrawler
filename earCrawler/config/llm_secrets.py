@@ -40,6 +40,9 @@ class ProviderConfig:
 class LLMConfig:
     provider: ProviderConfig
     enable_remote: bool
+    remote_policy: str = "deny"
+    enable_remote_flag: bool = False
+    remote_disabled_reason: str | None = None
 
 
 def _parse_env_file(path: Path) -> Dict[str, str]:
@@ -145,7 +148,24 @@ def get_llm_config(
 
     request_limit = _get_limit(provider)
 
-    enable_remote = os.getenv("EARCRAWLER_ENABLE_REMOTE_LLM", "0") == "1"
+    remote_policy = os.getenv("EARCRAWLER_REMOTE_LLM_POLICY", "deny").strip().lower()
+    if remote_policy not in {"allow", "deny"}:
+        raise ValueError(
+            f"Unsupported EARCRAWLER_REMOTE_LLM_POLICY={remote_policy!r}. "
+            "Supported values: allow, deny."
+        )
+    enable_remote_flag = os.getenv("EARCRAWLER_ENABLE_REMOTE_LLM", "0") == "1"
+    enable_remote = remote_policy == "allow" and enable_remote_flag
+    remote_disabled_reason = None
+    if not enable_remote:
+        if remote_policy != "allow":
+            remote_disabled_reason = (
+                "remote policy is deny; set EARCRAWLER_REMOTE_LLM_POLICY=allow"
+            )
+        elif not enable_remote_flag:
+            remote_disabled_reason = (
+                "remote LLM flag is off; set EARCRAWLER_ENABLE_REMOTE_LLM=1"
+            )
 
     provider_cfg = ProviderConfig(
         provider=provider,
@@ -154,7 +174,13 @@ def get_llm_config(
         base_url=base_url or "",
         request_limit=request_limit,
     )
-    return LLMConfig(provider=provider_cfg, enable_remote=enable_remote)
+    return LLMConfig(
+        provider=provider_cfg,
+        enable_remote=enable_remote,
+        remote_policy=remote_policy,
+        enable_remote_flag=enable_remote_flag,
+        remote_disabled_reason=remote_disabled_reason,
+    )
 
 
 __all__ = ["LLMConfig", "ProviderConfig", "get_llm_config", "load_llm_secrets"]

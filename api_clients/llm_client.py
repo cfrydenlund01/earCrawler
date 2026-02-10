@@ -144,8 +144,16 @@ def _chat_request(
                         )
                         time.sleep(sleep_for)
                     _LAST_REQUEST_AT = time.monotonic()
+                http_start = time.perf_counter()
                 resp = session.post(
                     url, headers=headers, json=payload, timeout=timeout
+                )
+                _logger.info(
+                    "llm.http_timing",
+                    provider=provider,
+                    attempt=attempt,
+                    status=resp.status_code,
+                    t_request_ms=round((time.perf_counter() - http_start) * 1000.0, 3),
                 )
         except budget.BudgetExceededError as exc:
             raise LLMProviderError(str(exc)) from exc
@@ -231,9 +239,13 @@ def generate_chat(
     provider_cfg = config.provider
 
     if not config.enable_remote:
+        reason = config.remote_disabled_reason or (
+            "set EARCRAWLER_REMOTE_LLM_POLICY=allow and EARCRAWLER_ENABLE_REMOTE_LLM=1"
+        )
         raise LLMProviderError(
-            "Remote LLM calls are disabled. Set EARCRAWLER_ENABLE_REMOTE_LLM=1 "
-            "to enable networked providers."
+            f"Remote LLM calls are disabled ({reason}). "
+            "Remote use requires EARCRAWLER_REMOTE_LLM_POLICY=allow and "
+            "EARCRAWLER_ENABLE_REMOTE_LLM=1."
         )
 
     session = requests.Session()

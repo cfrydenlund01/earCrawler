@@ -37,6 +37,14 @@
       "num_items": 100
     },
     {
+      "id": "golden_phase2.v1",
+      "task": "phase2_golden",
+      "file": "eval/golden_phase2.v1.jsonl",
+      "version": 1,
+      "description": "Deterministic offline golden gate for Phase 2 retrieval, citation, and grounding behavior with stubbed LLM fixtures.",
+      "num_items": 12
+    },
+    {
       "id": "unanswerable.v1",
       "task": "unanswerable",
       "file": "eval/unanswerable.v1.jsonl",
@@ -59,7 +67,15 @@
       "EAR-740": ["740.1", "740.9(a)(2)"],
       "EAR-742": ["742.4(a)(1)"],
       "EAR-744": ["744.6(b)(3)"],
-      "EAR-746": ["746.4(a)"]
+      "EAR-746": ["746.4(a)"],
+      "EAR-GOLDEN-PHASE2": [
+        "736.2(b)",
+        "740.1",
+        "740.9(a)(2)",
+        "742.4(a)(1)",
+        "744.6(b)(3)",
+        "746.4(a)"
+      ]
     },
     "kg_nodes": [
       "https://example.org/ear#obligation/license_required_744_6_b_3",

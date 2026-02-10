@@ -8,13 +8,20 @@ import re
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable, List, Mapping, Sequence
+from collections import Counter
 
 from api_clients.llm_client import LLMProviderError
 from earCrawler.config.llm_secrets import get_llm_config
+from earCrawler.eval.citation_metrics import (
+    CitationScore,
+    extract_ground_truth_sections,
+    extract_predicted_sections,
+    score_citations,
+)
 from earCrawler.eval.label_inference import infer_label
 from earCrawler.rag.output_schema import DEFAULT_ALLOWED_LABELS
-from earCrawler.rag.pipeline import answer_with_rag
+from earCrawler.rag.pipeline import _normalize_section_id, answer_with_rag
 
 _ALLOWED_LABELS = DEFAULT_ALLOWED_LABELS
 
@@ -136,6 +143,287 @@ def _answer_is_correct(
     raise ValueError(f"Unknown answer score mode: {mode}")
 
 
+def _flatten_reference_sections(manifest: Mapping[str, object]) -> set[str]:
+    refs = manifest.get("references") or {}
+    sections = refs.get("sections") or {}
+    flattened: set[str] = set()
+    if isinstance(sections, Mapping):
+        for values in sections.values():
+            if isinstance(values, Mapping):
+                iter_values = values.get("sections") or values.get("spans") or values.values()
+            else:
+                iter_values = values
+            if not isinstance(iter_values, Iterable):
+                continue
+            for sec in iter_values:
+                norm = _normalize_section_id(sec)
+                if norm:
+                    flattened.add(norm)
+    return flattened
+
+
+def _parse_reference_sections(
+    manifest: Mapping[str, object],
+) -> tuple[set[str], set[str]]:
+    refs = manifest.get("references") or {}
+    sections = refs.get("sections") or {}
+    allowed: set[str] = set()
+    reserved: set[str] = set()
+    if isinstance(sections, Mapping):
+        for values in sections.values():
+            if isinstance(values, Mapping):
+                iter_values = (
+                    values.get("sections")
+                    or values.get("spans")
+                    or values.get("values")
+                    or values.values()
+                )
+            else:
+                iter_values = values
+            if not isinstance(iter_values, Iterable):
+                continue
+            for sec in iter_values or []:
+                reserved_flag = False
+                raw = sec
+                if isinstance(sec, Mapping):
+                    reserved_flag = bool(sec.get("reserved"))
+                    raw = (
+                        sec.get("id")
+                        or sec.get("section_id")
+                        or sec.get("span_id")
+                        or sec.get("value")
+                        or sec.get("section")
+                    )
+                norm = _normalize_section_id(raw)
+                if not norm:
+                    continue
+                allowed.add(norm)
+                if reserved_flag:
+                    reserved.add(norm)
+    return allowed, reserved
+
+
+def _sanitize_citations(citations: Iterable[Mapping[str, object]] | None) -> list[dict]:
+    cleaned: list[dict] = []
+    for cit in citations or []:
+        if not isinstance(cit, Mapping):
+            continue
+        cleaned.append(
+            {
+                "section_id": cit.get("section_id"),
+                "quote": cit.get("quote"),
+                "span_id": cit.get("span_id"),
+                "source": cit.get("source"),
+            }
+        )
+    return cleaned
+
+
+def _sanitize_retrieved_docs(docs: Iterable[Mapping[str, object]] | None) -> list[dict]:
+    cleaned: list[dict] = []
+    for doc in docs or []:
+        if not isinstance(doc, Mapping):
+            continue
+        cleaned.append(
+            {
+                "id": doc.get("id"),
+                "section": _normalize_section_id(doc.get("section") or doc.get("id")),
+                "url": doc.get("url"),
+                "title": doc.get("title"),
+                "score": doc.get("score"),
+                "source": doc.get("source"),
+            }
+        )
+    return cleaned
+
+
+def _retrieval_id_set(result: Mapping[str, object]) -> set[str]:
+    ids: set[str] = set()
+    for sec in result.get("used_sections") or []:
+        norm = _normalize_section_id(sec)
+        if norm:
+            ids.add(norm)
+    for doc in result.get("retrieved_docs") or []:
+        norm_doc = _normalize_section_id(doc.get("section") or doc.get("id"))
+        if norm_doc:
+            ids.add(norm_doc)
+    return ids
+
+
+def _evaluate_citation_quality(
+    result: Mapping[str, object], reference_sections: set[str] | None
+) -> dict[str, object]:
+    citations = result.get("citations") or []
+    total_citations = len(citations)
+    items_with_citations = 1 if total_citations else 0
+
+    retrieval_ids = _retrieval_id_set(result)
+    errors: list[str] = []
+    valid_citations = 0
+    supported_citations = 0
+    overclaim = False
+
+    if total_citations == 0:
+        errors.append("missing")
+
+    for cit in citations:
+        section_norm = _normalize_section_id(cit.get("section_id"))
+        canonical = bool(section_norm and section_norm.upper().startswith("EAR-"))
+        if not canonical:
+            errors.append("invalid_format")
+        else:
+            if reference_sections is not None and section_norm not in reference_sections:
+                errors.append("not_in_references")
+            else:
+                valid_citations += 1
+        if section_norm in retrieval_ids:
+            supported_citations += 1
+        else:
+            if total_citations:
+                overclaim = True
+            errors.append("not_in_retrieval")
+
+    return {
+        "ok": not errors,
+        "errors": sorted(set(errors)),
+        "counts": {
+            "items": 1,
+            "items_with_citations": items_with_citations,
+            "total_citations": total_citations,
+            "valid_citations": valid_citations,
+            "supported_citations": supported_citations,
+            "items_overclaim": 1 if overclaim else 0,
+        },
+    }
+
+
+def _finalize_citation_metrics(counts: Mapping[str, int], num_items: int) -> dict[str, float]:
+    total_citations = counts.get("total_citations", 0) or 0
+    items_with_citations = counts.get("items_with_citations", 0) or 0
+    supported_citations = counts.get("supported_citations", 0) or 0
+    valid_citations = counts.get("valid_citations", 0) or 0
+    items_overclaim = counts.get("items_overclaim", 0) or 0
+
+    presence_rate = items_with_citations / num_items if num_items else 0.0
+    valid_id_rate = valid_citations / total_citations if total_citations else 0.0
+    supported_rate = supported_citations / total_citations if total_citations else 0.0
+    overclaim_rate = items_overclaim / num_items if num_items else 0.0
+
+    return {
+        "presence_rate": presence_rate,
+        "valid_id_rate": valid_id_rate,
+        "supported_rate": supported_rate,
+        "overclaim_rate": overclaim_rate,
+        "counts": {
+            "items_with_citations": items_with_citations,
+            "total_citations": total_citations,
+            "valid_citations": valid_citations,
+            "supported_citations": supported_citations,
+            "items_overclaim": items_overclaim,
+        },
+    }
+
+
+def _aggregate_citation_scores(scores: Sequence[CitationScore]) -> dict[str, object]:
+    if not scores:
+        return {
+            "macro": {"precision": 0.0, "recall": 0.0, "f1": 0.0},
+            "micro": {"precision": 0.0, "recall": 0.0, "f1": 0.0, "tp": 0, "fp": 0, "fn": 0},
+            "error_counts": {},
+            "items_scored": 0,
+        }
+
+    total_tp = sum(s.tp for s in scores)
+    total_fp = sum(s.fp for s in scores)
+    total_fn = sum(s.fn for s in scores)
+    total_gt = total_tp + total_fn
+
+    def _micro_precision() -> float:
+        if total_tp + total_fp == 0:
+            return 1.0 if total_gt == 0 else 0.0
+        return total_tp / (total_tp + total_fp)
+
+    def _micro_recall() -> float:
+        if total_gt == 0:
+            return 1.0
+        return total_tp / total_gt
+
+    micro_precision = _micro_precision()
+    micro_recall = _micro_recall()
+    denom = micro_precision + micro_recall
+    micro_f1 = (
+        (2 * micro_precision * micro_recall / denom)
+        if denom
+        else (1.0 if (total_tp == 0 and total_fp == 0 and total_fn == 0) else 0.0)
+    )
+
+    macro_precision = sum(s.precision for s in scores) / len(scores)
+    macro_recall = sum(s.recall for s in scores) / len(scores)
+    macro_denom = macro_precision + macro_recall
+    macro_f1 = (
+        (2 * macro_precision * macro_recall / macro_denom)
+        if macro_denom
+        else (1.0 if all((s.tp + s.fp + s.fn) == 0 for s in scores) else 0.0)
+    )
+
+    error_counts: Counter[str] = Counter()
+    for s in scores:
+        for err in s.errors:
+            code = str(err.get("code") or "unknown")
+            error_counts[code] += 1
+
+    return {
+        "macro": {"precision": macro_precision, "recall": macro_recall, "f1": macro_f1},
+        "micro": {
+            "precision": micro_precision,
+            "recall": micro_recall,
+            "f1": micro_f1,
+            "tp": total_tp,
+            "fp": total_fp,
+            "fn": total_fn,
+        },
+        "error_counts": dict(sorted(error_counts.items())),
+        "items_scored": len(scores),
+    }
+
+
+def _write_answer_artifacts(
+    results: Sequence[Mapping[str, object]],
+    *,
+    dataset_id: str,
+    run_id: str,
+    base_dir: Path,
+    provider: str | None,
+    model: str | None,
+    run_meta: Mapping[str, object],
+) -> list[Path]:
+    base = base_dir / run_id / "answers" / dataset_id
+    base.mkdir(parents=True, exist_ok=True)
+    written: list[Path] = []
+    for idx, result in enumerate(results):
+        item_id = result.get("id") or f"item-{idx+1:04d}"
+        safe_item = _safe_name(str(item_id))
+        artifact = {
+            "dataset_id": dataset_id,
+            "item_id": str(item_id),
+            "question": result.get("question"),
+            "label": result.get("pred_label"),
+            "answer": result.get("pred_answer"),
+            "justification": result.get("justification"),
+            "citations": result.get("citations") or [],
+            "retrieved_docs": result.get("retrieved_docs") or [],
+            "trace_id": result.get("trace_id"),
+            "provider": provider,
+            "model": model,
+            "run_id": run_id,
+            "run_meta": dict(run_meta),
+        }
+        out_path = base / f"{safe_item}.answer.json"
+        out_path.write_text(json.dumps(artifact, ensure_ascii=False, indent=2), encoding="utf-8")
+        written.append(out_path)
+    return written
+
+
 def evaluate_dataset(
     dataset_id: str,
     *,
@@ -151,19 +439,39 @@ def evaluate_dataset(
     semantic: bool = False,
 ) -> tuple[Path, Path]:
     manifest = _load_manifest(manifest_path)
+    dataset_refs = manifest.get("references") or {}
     kg_digest = (manifest.get("kg_state", {}) or {}).get("digest")
     dataset_meta, data_path = _resolve_dataset(manifest, dataset_id, manifest_path)
+    reference_sections, reserved_sections = _parse_reference_sections(manifest)
 
     cfg = get_llm_config(provider_override=llm_provider, model_override=llm_model)
     if not cfg.enable_remote:
         raise RuntimeError(
-            "Remote LLMs are disabled. Set EARCRAWLER_ENABLE_REMOTE_LLM=1 and configure provider keys."
+            "Remote LLMs are disabled. Set EARCRAWLER_REMOTE_LLM_POLICY=allow, "
+            "EARCRAWLER_ENABLE_REMOTE_LLM=1, and configure provider keys."
         )
     provider = cfg.provider.provider
     model = cfg.provider.model
+    run_id = _safe_name(out_json.stem)
+    run_meta = {
+        "dataset_version": dataset_meta.get("version"),
+        "kg_state_digest": kg_digest,
+        "manifest_path": str(manifest_path),
+    }
 
     results: List[Dict[str, Any]] = []
     latencies: List[float] = []
+    citation_counts: Dict[str, int] = {
+        "items_with_citations": 0,
+        "total_citations": 0,
+        "valid_citations": 0,
+        "supported_citations": 0,
+        "items_overclaim": 0,
+    }
+    citation_scores: List[CitationScore] = []
+    citation_proxy_items = 0
+    citation_infra_skipped = 0
+    status_counts: Counter[str] = Counter()
 
     correct = 0
     answer_total = 0
@@ -200,6 +508,7 @@ def evaluate_dataset(
         label_norm: str | None = None
         justification: str | None = None
         used_sections: List[str] = []
+        retrieved_docs: List[dict] = []
         error: str | None = None
         retrieval_warnings: list[dict[str, object]] = []
         retrieval_empty = False
@@ -208,10 +517,12 @@ def evaluate_dataset(
         output_error: dict | None = None
         raw_answer: str | None = None
         status = "ok"
+        status_category = "ok"
         citations: list[dict] | None = None
         evidence_okay: dict | None = None
         assumptions: list[str] | None = None
         citation_span_ids: list[str] | None = None
+        trace_id: str | None = None
 
         start = time.perf_counter()
         try:
@@ -233,17 +544,20 @@ def evaluate_dataset(
             output_error = rag_result.get("output_error")
             answer = (rag_result.get("answer") or "").strip() if output_ok else ""
             used_sections = list(rag_result.get("used_sections") or [])
+            retrieved_docs = _sanitize_retrieved_docs(rag_result.get("retrieved_docs"))
             retrieval_warnings = list(rag_result.get("retrieval_warnings") or [])
             retrieval_empty = bool(rag_result.get("retrieval_empty"))
             retrieval_empty_reason = rag_result.get("retrieval_empty_reason")
-            citations = rag_result.get("citations")
+            citations = _sanitize_citations(rag_result.get("citations"))
             evidence_okay = rag_result.get("evidence_okay")
             assumptions = rag_result.get("assumptions")
             citation_span_ids = rag_result.get("citation_span_ids")
+            trace_id = rag_result.get("trace_id")
             # Prefer structured label from the JSON contract when present.
             justification = (rag_result.get("justification") or "").strip() or None
             if not output_ok:
                 status = "failed_output_schema"
+                status_category = "model_output_invalid"
                 output_failures += 1
                 error = (output_error or {}).get("message") if output_error else "invalid_output_schema"
                 pred_label = "invalid_output"
@@ -264,8 +578,14 @@ def evaluate_dataset(
                 )
         except LLMProviderError as exc:
             error = str(exc)
+            status_category = "infra_error"
+            status = "infra_error"
+            output_ok = False
         except Exception as exc:  # pragma: no cover - defensive
             error = f"unexpected_error: {exc}"
+            status_category = "infra_error"
+            status = "infra_error"
+            output_ok = False
         end = time.perf_counter()
         latencies.append(end - start)
 
@@ -279,16 +599,16 @@ def evaluate_dataset(
             mode=mode,
             semantic_threshold=semantic_threshold,
         )
-        if gt_answer:
+        if gt_answer and status_category != "infra_error":
             answer_total += 1
             if answer_correct:
                 correct += 1
 
-        if semantic and gt_answer and answer:
+        if semantic and gt_answer and answer and status_category != "infra_error":
             if _semantic_match_ratio(answer, gt_answer) >= semantic_threshold:
                 semantic_hits += 1
 
-        if gt_label:
+        if gt_label and status_category != "infra_error":
             label_total += 1
             if pred_label == gt_label:
                 label_correct += 1
@@ -298,8 +618,12 @@ def evaluate_dataset(
             unanswerable_total += 1
             if pred_label == "unanswerable":
                 unanswerable_correct += 1
+            elif status_category == "ok":
+                status_category = "refusal_expected_missing"
+        if status_category == "ok" and gt_label and pred_label != gt_label:
+            status_category = "model_answer_wrong"
 
-        if task:
+        if task and status_category != "infra_error":
             stats = by_task_raw.setdefault(
                 task,
                 {
@@ -320,35 +644,120 @@ def evaluate_dataset(
             if grounded:
                 stats["grounded_hits"] += 1
 
-        results.append(
-            {
-                "id": item.get("id"),
-                "question": question,
-                "task": task,
-                "ground_truth_answer": gt_answer,
-                "ground_truth_label": gt_label,
-                "pred_answer": answer,
-                "pred_label_raw": pred_label_raw,
-                "pred_label": pred_label,
-                "pred_label_normalization": label_norm,
-                "grounded": grounded,
-                "expected_sections": ear_sections,
-                "used_sections": used_sections,
-                "evidence": item.get("evidence"),
-                "error": error,
-                "status": status,
-                "output_ok": output_ok,
-                "output_error": output_error,
-                "raw_answer": raw_answer,
-                "citations": citations,
-                "evidence_okay": evidence_okay,
-                "assumptions": assumptions,
-                "citation_span_ids": citation_span_ids,
-                "retrieval_warnings": retrieval_warnings,
-                "retrieval_empty": retrieval_empty,
-                "retrieval_empty_reason": retrieval_empty_reason,
-            }
+        gt_sections = extract_ground_truth_sections(item, dataset_refs)
+        pred_sections = extract_predicted_sections(
+            {"citations": citations, "used_sections": used_sections}
         )
+        proxy_citations_used = bool(not (citations or []) and bool(pred_sections))
+        if proxy_citations_used:
+            citation_proxy_items += 1
+
+        retrieval_ids = _retrieval_id_set(
+            {"used_sections": used_sections, "retrieved_docs": retrieved_docs}
+        )
+        missing_in_retrieval = sorted(gt_sections - retrieval_ids)
+        reserved_hits = sorted(sec for sec in pred_sections if sec in reserved_sections)
+        not_in_refs = sorted(
+            sec for sec in pred_sections if reference_sections and sec not in reference_sections
+        )
+        invalid_ids = [
+            str(cit.get("section_id") or "")
+            for cit in citations or []
+            if not _normalize_section_id(cit.get("section_id"))
+        ]
+        fp_sections = sorted(pred_sections - gt_sections)
+        fn_sections = sorted(gt_sections - pred_sections)
+
+        citation_errors: list[dict[str, object]] = []
+        if proxy_citations_used:
+            citation_errors.append({"code": "proxy_citations_used"})
+        if invalid_ids:
+            citation_errors.append({"code": "invalid_id", "sections": invalid_ids})
+        if reserved_hits:
+            citation_errors.append({"code": "reserved_cited", "sections": reserved_hits})
+        if not_in_refs:
+            citation_errors.append({"code": "not_in_references", "sections": not_in_refs})
+        if fp_sections:
+            citation_errors.append({"code": "not_in_expected", "sections": fp_sections})
+        if fn_sections:
+            citation_errors.append({"code": "missing_expected", "sections": fn_sections})
+        if missing_in_retrieval:
+            citation_errors.append({"code": "missing_in_retrieval", "sections": missing_in_retrieval})
+
+        citation_score = score_citations(pred_sections, gt_sections, errors=citation_errors)
+        citation_not_scored = status_category == "infra_error"
+        if citation_not_scored:
+            citation_infra_skipped += 1
+        else:
+            citation_scores.append(citation_score)
+            for err in citation_errors:
+                code = str(err.get("code") or "unknown")
+                citation_counts[code] = citation_counts.get(code, 0) + 1
+
+        if status_category == "ok" and missing_in_retrieval and gt_sections:
+            status_category = "retrieval_miss_gt_section"
+        if status_category == "ok" and (
+            citation_score.fp or citation_score.fn or reserved_hits or invalid_ids or not_in_refs
+        ):
+            status_category = "citation_wrong"
+
+        if status != "failed_output_schema":
+            status = status_category
+        status_counts[status_category] += 1
+
+        result_entry = {
+            "id": item.get("id"),
+            "question": question,
+            "task": task,
+            "ground_truth_answer": gt_answer,
+            "ground_truth_label": gt_label,
+            "pred_answer": answer,
+            "answer_text": answer,
+            "pred_label_raw": pred_label_raw,
+            "pred_label": pred_label,
+            "pred_label_normalization": label_norm,
+            "grounded": grounded,
+            "expected_sections": ear_sections,
+            "used_sections": used_sections,
+            "retrieved_docs": retrieved_docs,
+            "trace_id": trace_id,
+            "justification": justification,
+            "evidence": item.get("evidence"),
+            "error": error,
+            "status": status,
+            "status_category": status_category,
+            "output_ok": output_ok,
+            "output_error": output_error,
+            "raw_answer": raw_answer,
+            "citations": citations,
+            "evidence_okay": evidence_okay,
+            "assumptions": assumptions,
+            "citation_span_ids": citation_span_ids,
+            "retrieval_warnings": retrieval_warnings,
+            "retrieval_empty": retrieval_empty,
+            "retrieval_empty_reason": retrieval_empty_reason,
+            "citation_precision": citation_score.precision,
+            "citation_recall": citation_score.recall,
+            "citation_f1": citation_score.f1,
+            "citation_tp": citation_score.tp,
+            "citation_fp": citation_score.fp,
+            "citation_fn": citation_score.fn,
+            "citation_predicted_sections": citation_score.predicted,
+            "citation_ground_truth_sections": citation_score.ground_truth,
+            "citation_errors": citation_score.errors,
+            "citation_not_scored_due_to_infra": citation_not_scored,
+            "citation_proxy_used": proxy_citations_used,
+            "missing_ground_truth_in_retrieval": bool(missing_in_retrieval),
+            "missing_ground_truth_sections": missing_in_retrieval,
+        }
+
+        citation_eval = _evaluate_citation_quality(result_entry, reference_sections or None)
+        result_entry["citations_ok"] = citation_eval["ok"]
+        result_entry["citations_errors"] = citation_eval["errors"]
+        for key, val in citation_eval["counts"].items():
+            citation_counts[key] = citation_counts.get(key, 0) + int(val)
+
+        results.append(result_entry)
 
     num_items = len(results)
     accuracy = correct / answer_total if answer_total else 0.0
@@ -379,6 +788,12 @@ def evaluate_dataset(
             "grounded_rate": stats["grounded_hits"] / count,
         }
 
+    citation_metrics = _finalize_citation_metrics(citation_counts, num_items)
+    citation_pr = _aggregate_citation_scores(citation_scores)
+    citation_pr["infra_skipped"] = citation_infra_skipped
+    citation_pr["proxy_items"] = citation_proxy_items
+    status_summary = dict(sorted(status_counts.items()))
+
     payload = {
         "dataset_id": dataset_id,
         "dataset_version": dataset_meta.get("version"),
@@ -386,6 +801,7 @@ def evaluate_dataset(
         "num_items": num_items,
         "provider": provider,
         "model": model,
+        "run_id": run_id,
         "top_k": top_k,
         "kg_state_digest": kg_digest,
         "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -401,8 +817,21 @@ def evaluate_dataset(
         "by_task": by_task,
         "output_failures": output_failures,
         "output_failure_rate": output_failures / num_items if num_items else 0.0,
+        "citation_metrics": citation_metrics,
+        "citation_pr": citation_pr,
+        "status_counts": status_summary,
         "results": results,
     }
+
+    _write_answer_artifacts(
+        results,
+        dataset_id=dataset_id,
+        run_id=run_id,
+        base_dir=out_json.parent,
+        provider=provider,
+        model=model,
+        run_meta=run_meta,
+    )
 
     out_json.parent.mkdir(parents=True, exist_ok=True)
     out_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -419,6 +848,12 @@ def evaluate_dataset(
         f"- Answer scoring: {mode}"
         + (f" (threshold={semantic_threshold:.2f})" if mode == "semantic" else ""),
         f"- KG digest: {kg_digest or 'n/a'}",
+        f"- Citations: presence={citation_metrics['presence_rate']:.4f}, "
+        f"valid_id={citation_metrics['valid_id_rate']:.4f}, "
+        f"supported={citation_metrics['supported_rate']:.4f}, "
+        f"overclaim={citation_metrics['overclaim_rate']:.4f}",
+        f"- Citation micro: precision={citation_pr['micro']['precision']:.4f}, "
+        f"recall={citation_pr['micro']['recall']:.4f}, f1={citation_pr['micro']['f1']:.4f}",
     ]
     if by_task:
         lines.append("")

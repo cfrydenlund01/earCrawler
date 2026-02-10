@@ -10,11 +10,19 @@ from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
 from pathlib import Path
 import os
+import time
+from earCrawler.config.llm_secrets import get_llm_config
 from earCrawler.rag.output_schema import (
     DEFAULT_ALLOWED_LABELS,
     TRUTHINESS_LABELS,
     OutputSchemaError,
     parse_strict_answer_json,
+)
+from earCrawler.security.data_egress import (
+    build_data_egress_decision,
+    redact_contexts,
+    redact_text_for_mode,
+    resolve_redaction_mode,
 )
 from earCrawler.utils.log_json import JsonLogger
 
@@ -121,6 +129,37 @@ def _normalize_section_id(value: object | None) -> str | None:
     if match:
         return f"EAR-{match.group('section')}"
     return raw
+
+
+def _summarize_retrieved_doc(doc: Mapping[str, object], *, source: str = "retrieval") -> dict:
+    """Return a compact, stable view of a retrieved document for artifacts."""
+
+    raw = doc.get("raw") if isinstance(doc.get("raw"), Mapping) else {}
+    raw = raw or {}
+
+    def _first(keys: Iterable[str]) -> str | None:
+        for key in keys:
+            val = raw.get(key) if isinstance(raw, Mapping) else None
+            if val:
+                return str(val)
+        return None
+
+    section = _normalize_section_id(
+        doc.get("section_id")
+        or doc.get("section")
+        or _first(["section", "id", "doc_id", "entity_id"])
+    )
+    url = _first(["source_url", "url"])
+    title = _first(["title", "heading"])
+
+    return {
+        "id": _first(["id", "doc_id"]) or section,
+        "section": section,
+        "url": url,
+        "title": title,
+        "score": doc.get("score"),
+        "source": source,
+    }
 
 
 def retrieve_regulation_context(
@@ -367,6 +406,7 @@ def _build_prompt(
         + allowed_labels
         + '>\",\n'
         '  \"answer_text\": \"<short answer>\",\n'
+        '  \"justification\": \"<1-2 sentences summarizing evidence>\",\n'
         "  \"citations\": [\n"
         "    {\"section_id\": \"EAR-<id>\", \"quote\": \"<verbatim substring from Context>\", \"span_id\": \"<optional>\"}\n"
         "  ],\n"
@@ -401,10 +441,22 @@ def answer_with_rag(
     retriever: object | None = None,
     strict_retrieval: bool = True,
     strict_output: bool = True,
+    generate: bool = True,
+    trace_id: str | None = None,
 ) -> dict:
     """Run retrieval + optional KG expansion + LLM generation."""
 
+    t_total_start = time.perf_counter()
+    t_retrieve_ms = 0.0
+    t_cache_ms = 0.0
+    t_prompt_ms = 0.0
+    t_llm_ms = 0.0
+    t_parse_ms = 0.0
+    rag_enabled = bool(getattr(retriever, "enabled", True)) if retriever is not None else True
+    retriever_ready = bool(getattr(retriever, "ready", True)) if retriever is not None else True
+
     retrieval_warnings: list[dict[str, object]] = []
+    retrieve_start = time.perf_counter()
     docs = retrieve_regulation_context(
         question,
         top_k=top_k,
@@ -412,6 +464,15 @@ def answer_with_rag(
         strict=strict_retrieval,
         warnings=retrieval_warnings,
     )
+    t_retrieve_ms = round((time.perf_counter() - retrieve_start) * 1000.0, 3)
+    if retrieval_warnings:
+        rag_enabled = rag_enabled and retrieval_warnings[-1].get("code") != "retriever_disabled"
+        retriever_ready = retriever_ready and retrieval_warnings[-1].get("code") not in {
+            "retriever_error",
+            "retriever_unavailable",
+            "index_missing",
+            "index_build_required",
+        }
     retrieval_empty = len(docs) == 0
     retrieval_empty_reason = (
         (retrieval_warnings[-1]["code"] if retrieval_warnings else "no_hits")
@@ -420,6 +481,7 @@ def answer_with_rag(
     )
     section_ids = [d["section_id"] for d in docs if d.get("section_id")]
     kg_expansion = expand_with_kg(section_ids)
+    retrieved_docs: list[dict] = [_summarize_retrieved_doc(d, source="retrieval") for d in docs]
     contexts: list[str] = []
     for d in docs:
         text = (d.get("text") or "").strip()
@@ -431,6 +493,8 @@ def answer_with_rag(
         else:
             contexts.append(text)
     for d in kg_expansion:
+        retrieved_docs.append(_summarize_retrieved_doc(d, source="kg"))
+    for d in kg_expansion:
         text = str(d.get("text") or "").strip()
         if not text:
             continue
@@ -440,18 +504,29 @@ def answer_with_rag(
         else:
             contexts.append(text)
 
-    prompt_question = question
-    if task:
-        prompt_question = f"(task={task}) {question}"
-    prompt = _build_prompt(prompt_question, contexts, label_schema=label_schema)
+    prompt_question = question if not task else f"(task={task}) {question}"
+    redaction_mode = resolve_redaction_mode()
+    redacted_question = redact_text_for_mode(prompt_question, mode=redaction_mode)
+    provider_label: str | None = None
+    model_label: str | None = None
+    llm_enabled = False
+    llm_attempted = False
+    raw_answer: str | None = None
+    disabled_reason: str | None = None
+    prompt: list[dict] | None = None
+    redacted_contexts: list[str] = []
+    egress_decision = build_data_egress_decision(
+        remote_enabled=False,
+        disabled_reason="generation not attempted",
+        provider=None,
+        model=None,
+        redaction_mode=redaction_mode,
+        question=redacted_question,
+        contexts=[],
+        messages=None,
+        trace_id=trace_id,
+    )
 
-    try:
-        raw_answer = generate_chat(prompt, provider=provider, model=model)
-    except LLMProviderError as exc:
-        _logger.error("rag.answer.failed", error=str(exc))
-        raise
-
-    raw_answer = str(raw_answer)
     answer_text: str | None = None
     label: str | None = None
     justification: str | None = None  # backward-compat derived from citations
@@ -462,46 +537,155 @@ def answer_with_rag(
     output_ok = True
     output_error: dict | None = None
 
-    try:
-        allowed_labels = (
-            TRUTHINESS_LABELS if label_schema == "truthiness" else DEFAULT_ALLOWED_LABELS
+    if generate:
+        prompt_start = time.perf_counter()
+        redacted_contexts = redact_contexts(contexts, mode=redaction_mode)
+        prompt = _build_prompt(redacted_question, redacted_contexts, label_schema=label_schema)
+        t_prompt_ms = round((time.perf_counter() - prompt_start) * 1000.0, 3)
+        try:
+            config = get_llm_config(provider_override=provider, model_override=model)
+        except ValueError as exc:
+            raise LLMProviderError(str(exc)) from exc
+        provider_label = config.provider.provider
+        model_label = config.provider.model
+
+        if not config.enable_remote:
+            disabled_reason = config.remote_disabled_reason or "remote LLM policy denied egress"
+            egress_decision = build_data_egress_decision(
+                remote_enabled=False,
+                disabled_reason=disabled_reason,
+                provider=provider_label,
+                model=model_label,
+                redaction_mode=redaction_mode,
+                question=redacted_question,
+                contexts=redacted_contexts,
+                messages=prompt,
+                trace_id=trace_id,
+            )
+            _logger.info("llm.egress_decision", **egress_decision.to_dict())
+            raise LLMProviderError(
+                f"Remote LLM calls are disabled ({disabled_reason}). "
+                "Remote use requires EARCRAWLER_REMOTE_LLM_POLICY=allow and "
+                "EARCRAWLER_ENABLE_REMOTE_LLM=1."
+            )
+
+        llm_attempted = True
+        llm_start = time.perf_counter()
+        try:
+            raw_answer = generate_chat(
+                prompt, provider=provider_label, model=model_label
+            )
+            t_llm_ms = round((time.perf_counter() - llm_start) * 1000.0, 3)
+        except LLMProviderError as exc:
+            t_llm_ms = round((time.perf_counter() - llm_start) * 1000.0, 3)
+            egress_decision = build_data_egress_decision(
+                remote_enabled=True,
+                disabled_reason=str(exc),
+                provider=provider_label,
+                model=model_label,
+                redaction_mode=redaction_mode,
+                question=redacted_question,
+                contexts=redacted_contexts,
+                messages=prompt,
+                trace_id=trace_id,
+            )
+            _logger.info("llm.egress_decision", **egress_decision.to_dict())
+            _logger.error("rag.answer.failed", error=str(exc))
+            raise
+
+        llm_enabled = True
+        egress_decision = build_data_egress_decision(
+            remote_enabled=True,
+            disabled_reason=None,
+            provider=provider_label,
+            model=model_label,
+            redaction_mode=redaction_mode,
+            question=redacted_question,
+            contexts=redacted_contexts,
+            messages=prompt,
+            trace_id=trace_id,
         )
-        parsed = parse_strict_answer_json(
-            raw_answer,
-            allowed_labels=allowed_labels,
-            context="\n\n".join(contexts),
+        _logger.info("llm.egress_decision", **egress_decision.to_dict())
+
+        raw_answer = str(raw_answer)
+        parse_start = time.perf_counter()
+        try:
+            allowed_labels = (
+                TRUTHINESS_LABELS if label_schema == "truthiness" else DEFAULT_ALLOWED_LABELS
+            )
+            parsed = parse_strict_answer_json(
+                raw_answer,
+                allowed_labels=allowed_labels,
+                context="\n\n".join(redacted_contexts),
+            )
+            t_parse_ms = round((time.perf_counter() - parse_start) * 1000.0, 3)
+            answer_text = str(parsed["answer_text"])
+            label = str(parsed["label"])
+            citations = list(parsed.get("citations") or [])
+            assumptions = list(parsed.get("assumptions") or [])
+            evidence_okay = dict(parsed.get("evidence_okay") or {})
+            justification = parsed.get("justification")
+            if justification:
+                justification = justification.strip() or None
+            # Derived: compact human-readable trace for older callers when justification is absent.
+            if not justification:
+                justification = " ".join(
+                    f"[{c.get('section_id')}] {c.get('quote')}"
+                    for c in (citations or [])
+                    if c.get("section_id") and c.get("quote")
+                ).strip() or None
+            citation_span_ids = sorted(
+                {
+                    str(c.get("span_id")).strip()
+                    for c in (citations or [])
+                    if isinstance(c.get("span_id"), str) and str(c.get("span_id")).strip()
+                }
+            )
+        except OutputSchemaError as exc:
+            t_parse_ms = round((time.perf_counter() - parse_start) * 1000.0, 3)
+            output_ok = False
+            output_error = exc.as_dict()
+            if not strict_output:
+                answer_text = raw_answer
+            else:
+                answer_text = None
+                label = None
+                justification = None
+                citations = None
+                assumptions = None
+                evidence_okay = None
+                citation_span_ids = None
+    else:
+        disabled_reason = "generation_disabled_by_request"
+        egress_decision = build_data_egress_decision(
+            remote_enabled=False,
+            disabled_reason=disabled_reason,
+            provider=None,
+            model=None,
+            redaction_mode=redaction_mode,
+            question=redacted_question,
+            contexts=[],
+            messages=None,
+            trace_id=trace_id,
         )
-        answer_text = str(parsed["answer_text"])
-        label = str(parsed["label"])
-        citations = list(parsed.get("citations") or [])
-        assumptions = list(parsed.get("assumptions") or [])
-        evidence_okay = dict(parsed.get("evidence_okay") or {})
-        # Derived: compact human-readable trace for older callers.
-        justification = " ".join(
-            f"[{c.get('section_id')}] {c.get('quote')}"
-            for c in (citations or [])
-            if c.get("section_id") and c.get("quote")
-        ).strip() or None
-        citation_span_ids = sorted(
-            {
-                str(c.get("span_id")).strip()
-                for c in (citations or [])
-                if isinstance(c.get("span_id"), str) and str(c.get("span_id")).strip()
-            }
-        )
-    except OutputSchemaError as exc:
-        output_ok = False
-        output_error = exc.as_dict()
-        if not strict_output:
-            answer_text = raw_answer
-        else:
-            answer_text = None
-            label = None
-            justification = None
-            citations = None
-            assumptions = None
-            evidence_okay = None
-            citation_span_ids = None
+
+    t_total_ms = round((time.perf_counter() - t_total_start) * 1000.0, 3)
+    latency_fields: dict[str, object] = {
+        "trace_id": trace_id,
+        "t_total_ms": t_total_ms,
+        "t_retrieve_ms": t_retrieve_ms,
+        "t_cache_ms": t_cache_ms,
+        "t_prompt_ms": t_prompt_ms,
+        "t_llm_ms": t_llm_ms,
+        "t_parse_ms": t_parse_ms,
+        "rag_enabled": rag_enabled,
+        "retriever_ready": retriever_ready,
+        "retrieved_count": len(docs),
+    }
+    if llm_attempted:
+        latency_fields["provider"] = provider_label
+        latency_fields["model"] = model_label
+    _logger.info("rag.pipeline.latency", **latency_fields)
 
     return {
         "question": question,
@@ -509,10 +693,18 @@ def answer_with_rag(
         "label": label,
         "justification": justification,
         "citations": citations,
+        "retrieved_docs": retrieved_docs,
+        "trace_id": None,
         "evidence_okay": evidence_okay,
         "assumptions": assumptions,
         "citation_span_ids": citation_span_ids,
         "used_sections": section_ids,
+        "contexts": contexts,
+        "prompt_contexts": contexts,
+        "rag_enabled": rag_enabled,
+        "retriever_ready": retriever_ready,
+        "llm_enabled": llm_enabled,
+        "disabled_reason": disabled_reason,
         "raw_context": "\n\n".join(contexts),
         "raw_answer": raw_answer,
         "retrieval_warnings": retrieval_warnings,
@@ -520,6 +712,15 @@ def answer_with_rag(
         "retrieval_empty_reason": retrieval_empty_reason,
         "output_ok": output_ok,
         "output_error": output_error,
+        "timings": {
+            "t_total_ms": t_total_ms,
+            "t_retrieve_ms": t_retrieve_ms,
+            "t_cache_ms": t_cache_ms,
+            "t_prompt_ms": t_prompt_ms,
+            "t_llm_ms": t_llm_ms,
+            "t_parse_ms": t_parse_ms,
+        },
+        "egress_decision": egress_decision.to_dict() if egress_decision else None,
     }
 
 

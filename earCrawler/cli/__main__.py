@@ -37,6 +37,7 @@ from earCrawler.cli.audit import audit
 from earCrawler.cli import perf
 
 from api_clients.llm_client import LLMProviderError
+from earCrawler.config.llm_secrets import get_llm_config
 from earCrawler.rag.pipeline import answer_with_rag
 from api_clients.federalregister_client import FederalRegisterClient
 from api_clients.tradegov_client import TradeGovClient
@@ -61,15 +62,24 @@ def diagnose() -> None:
     """Print deterministic diagnostic information."""
     from earCrawler.telemetry import config as tconfig
 
-    cfg = tconfig.load_config()
+    telemetry_cfg = tconfig.load_config()
+    llm_cfg = get_llm_config()
     info = {
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "earCrawler": __version__,
         "telemetry": {
-            "enabled": cfg.enabled,
-            "spool_dir": cfg.spool_dir,
-            "files": len(list(Path(cfg.spool_dir).glob("*"))) if cfg.enabled else 0,
+            "enabled": telemetry_cfg.enabled,
+            "spool_dir": telemetry_cfg.spool_dir,
+            "files": len(list(Path(telemetry_cfg.spool_dir).glob("*"))) if telemetry_cfg.enabled else 0,
+        },
+        "llm": {
+            "remote_policy": llm_cfg.remote_policy,
+            "enable_remote_flag": llm_cfg.enable_remote_flag,
+            "remote_enabled": llm_cfg.enable_remote,
+            "remote_disabled_reason": llm_cfg.remote_disabled_reason,
+            "provider": llm_cfg.provider.provider,
+            "model": llm_cfg.provider.model,
         },
     }
     click.echo(json.dumps(info, sort_keys=True, indent=2))
@@ -1056,8 +1066,20 @@ def llm() -> None:
     show_default=True,
     help="Number of retrieved contexts to pass to the LLM.",
 )
+@click.option(
+    "--retrieval-only",
+    is_flag=True,
+    default=False,
+    help="Skip generation and return only retrieved contexts/documents.",
+)
 @click.argument("question", type=str)
-def llm_ask(llm_provider: str | None, llm_model: str | None, top_k: int, question: str) -> None:
+def llm_ask(
+    llm_provider: str | None,
+    llm_model: str | None,
+    top_k: int,
+    retrieval_only: bool,
+    question: str,
+) -> None:
     """Answer a question using the RAG pipeline and selected provider/model."""
 
     try:
@@ -1066,11 +1088,22 @@ def llm_ask(llm_provider: str | None, llm_model: str | None, top_k: int, questio
             provider=llm_provider,
             model=llm_model,
             top_k=top_k,
+            generate=not retrieval_only,
         )
     except LLMProviderError as exc:
         raise click.ClickException(str(exc))
     except RetrieverError as exc:
         raise click.ClickException(str(exc))
+    egress = result.get("egress_decision") or {}
+    click.echo(
+        "remote_enabled={remote} provider={provider} model={model} redaction={redaction} prompt_hash={prompt_hash}".format(
+            remote=egress.get("remote_enabled"),
+            provider=egress.get("provider"),
+            model=egress.get("model"),
+            redaction=egress.get("redaction_mode"),
+            prompt_hash=egress.get("prompt_hash"),
+        )
+    )
     click.echo(json.dumps(result, ensure_ascii=False, indent=2))
 
 

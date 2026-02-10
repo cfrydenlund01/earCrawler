@@ -97,7 +97,9 @@ def test_sparql_and_rag_payloads():
         "query": "export controls",
         "top_k": 1,
         "include_lineage": False,
+        "generate": True,
     }
+    assert session.calls[2]["params"] == {"generate": "1"}
 
 
 def test_error_response_raises():
@@ -106,3 +108,13 @@ def test_error_response_raises():
 
     with pytest.raises(EarApiError):
         client.get_entity("urn:missing")
+
+
+def test_rag_answer_allows_422_schema_violation() -> None:
+    payload = {"trace_id": "t", "output_ok": False, "output_error": {"code": "invalid_json", "message": "bad"}}
+    session = _StubSession([_StubResponse(payload=payload, status_code=422)])
+    client = EarCrawlerApiClient("http://localhost:9001", session=session)
+
+    resp = client.rag_answer("export controls", top_k=1)
+    assert resp["output_ok"] is False
+    assert resp["output_error"]["code"] == "invalid_json"

@@ -11,6 +11,7 @@ from api_clients.llm_client import LLMProviderError, generate_chat
 @pytest.fixture(autouse=True)
 def _reset_env(monkeypatch):
     # Ensure remote LLM calls are allowed for these isolated tests.
+    monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
     monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
     # Keep unit tests deterministic even when a developer has a local secrets file.
     monkeypatch.setenv("EARCRAWLER_SKIP_LLM_SECRETS_FILE", "1")

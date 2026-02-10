@@ -28,6 +28,24 @@
       "required": ["answer_text", "label"],
       "additionalProperties": false
     },
+    "expected": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "citations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "required": ["label", "citations"],
+      "additionalProperties": false
+    },
     "ear_sections": {
       "type": "array",
       "items": {
@@ -80,6 +98,9 @@
       },
       "required": ["doc_spans", "kg_nodes"],
       "additionalProperties": false
+    },
+    "notes": {
+      "type": "string"
     }
   },
   "required": [

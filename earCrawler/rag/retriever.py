@@ -7,12 +7,17 @@ import pickle
 import json
 import time
 from pathlib import Path
+from threading import RLock
 from typing import List, Mapping, MutableMapping, Optional
 
 from earCrawler.utils.import_guard import import_optional
 
 SentenceTransformer = None  # type: ignore[assignment]
 faiss = None  # type: ignore[assignment]
+_MODEL_CACHE: dict[str, object] = {}
+_INDEX_CACHE: dict[str, tuple[int, int, object]] = {}
+_META_CACHE: dict[str, tuple[int, int, list[dict]]] = {}
+_CACHE_LOCK = RLock()
 
 from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
@@ -125,17 +130,17 @@ class Retriever:
                     str(exc), metadata={"packages": ["sentence-transformers"]}
                 ) from exc
             SentenceTransformer = sentence_transformers.SentenceTransformer
+        self.index_path = Path(index_path)
+        self.meta_path = self.index_path.with_suffix(".meta.json")
+        self.legacy_meta_path = self.index_path.with_suffix(".pkl")
+        self.logger = logging.getLogger(__name__)
         try:
-            self.model = SentenceTransformer(model_name)  # type: ignore[misc]
+            self.model = self._load_model(model_name)
         except Exception as exc:
             raise RetrieverMisconfiguredError(
                 f"Failed to load SentenceTransformer model '{model_name}'",
                 metadata={"model_name": model_name},
             ) from exc
-        self.index_path = Path(index_path)
-        self.meta_path = self.index_path.with_suffix(".meta.json")
-        self.legacy_meta_path = self.index_path.with_suffix(".pkl")
-        self.logger = logging.getLogger(__name__)
         global faiss
         if faiss is None:
             try:
@@ -155,6 +160,27 @@ class Retriever:
         self.enabled = True
         self.ready = True
         self.failure_type: str | None = None
+
+    # ------------------------------------------------------------------
+    def _load_model(self, model_name: str):
+        with _CACHE_LOCK:
+            cached = _MODEL_CACHE.get(model_name)
+        if cached is not None:
+            self.logger.info(
+                "rag.retriever.model_cache_hit model_name=%s", model_name
+            )
+            return cached
+
+        self.logger.info("rag.retriever.model_cache_miss model_name=%s", model_name)
+        model_obj = SentenceTransformer(model_name)  # type: ignore[misc]
+        with _CACHE_LOCK:
+            _MODEL_CACHE[model_name] = model_obj
+        return model_obj
+
+    # ------------------------------------------------------------------
+    def _cache_token(self, path: Path) -> tuple[int, int]:
+        stat = path.stat()
+        return int(stat.st_mtime_ns), int(stat.st_size)
 
     # ------------------------------------------------------------------
     def _retry(self, func, *args, **kwargs):
@@ -202,6 +228,14 @@ class Retriever:
     def _load_index(self, dim: int, *, allow_create: bool = False):
         faiss_mod = self._faiss
         if self.index_path.exists():
+            key = str(self.index_path)
+            token = self._cache_token(self.index_path)
+            with _CACHE_LOCK:
+                cached = _INDEX_CACHE.get(key)
+            if cached is not None and cached[:2] == token:
+                self.logger.info("rag.retriever.index_cache_hit index_path=%s", key)
+                return cached[2]
+            self.logger.info("rag.retriever.index_cache_miss index_path=%s", key)
             try:
                 index = faiss_mod.read_index(str(self.index_path))
             except Exception as exc:
@@ -211,6 +245,8 @@ class Retriever:
             IndexIDMap = getattr(faiss_mod, "IndexIDMap", None)
             if isinstance(IndexIDMap, type) and not isinstance(index, IndexIDMap):  # pragma: no cover
                 index = IndexIDMap(index)
+            with _CACHE_LOCK:
+                _INDEX_CACHE[key] = (token[0], token[1], index)
             return index
         if not allow_create:
             raise IndexMissingError(self.index_path)
@@ -219,27 +255,49 @@ class Retriever:
     # ------------------------------------------------------------------
     def _load_metadata(self, *, allow_create: bool = False) -> List[dict]:
         if self.meta_path.exists():
+            key = str(self.meta_path)
+            token = self._cache_token(self.meta_path)
+            with _CACHE_LOCK:
+                cached = _META_CACHE.get(key)
+            if cached is not None and cached[:2] == token:
+                return list(cached[2])
             try:
                 meta_obj = json.loads(self.meta_path.read_text(encoding="utf-8"))
             except Exception as exc:
                 raise IndexBuildRequiredError(
                     self.index_path, reason=f"failed to read metadata: {exc}"
                 ) from exc
+            rows: list[dict]
             if isinstance(meta_obj, dict) and isinstance(meta_obj.get("rows"), list):
-                return list(meta_obj["rows"])
+                rows = list(meta_obj["rows"])
+                with _CACHE_LOCK:
+                    _META_CACHE[key] = (token[0], token[1], list(rows))
+                return rows
             if isinstance(meta_obj, list):
-                return list(meta_obj)
+                rows = list(meta_obj)
+                with _CACHE_LOCK:
+                    _META_CACHE[key] = (token[0], token[1], list(rows))
+                return rows
             raise IndexBuildRequiredError(
                 self.index_path, reason="metadata rows missing or invalid"
             )
         if self.legacy_meta_path.exists():
+            key = str(self.legacy_meta_path)
+            token = self._cache_token(self.legacy_meta_path)
+            with _CACHE_LOCK:
+                cached = _META_CACHE.get(key)
+            if cached is not None and cached[:2] == token:
+                return list(cached[2])
             try:
                 with self.legacy_meta_path.open("rb") as fh:
-                    return pickle.load(fh)
+                    rows = pickle.load(fh)
             except Exception as exc:
                 raise IndexBuildRequiredError(
                     self.index_path, reason=f"failed to read metadata: {exc}"
                 ) from exc
+            with _CACHE_LOCK:
+                _META_CACHE[key] = (token[0], token[1], list(rows))
+            return list(rows)
         if allow_create:
             return []
         raise IndexBuildRequiredError(
@@ -276,6 +334,19 @@ class Retriever:
         # Legacy pickle for backward compatibility with older tooling.
         with self.legacy_meta_path.open("wb") as fh:
             pickle.dump(metadata, fh)
+        with _CACHE_LOCK:
+            _INDEX_CACHE[str(self.index_path)] = (
+                *self._cache_token(self.index_path),
+                index,
+            )
+            _META_CACHE[str(self.meta_path)] = (
+                *self._cache_token(self.meta_path),
+                list(metadata),
+            )
+            _META_CACHE[str(self.legacy_meta_path)] = (
+                *self._cache_token(self.legacy_meta_path),
+                list(metadata),
+            )
 
     # ------------------------------------------------------------------
     def add_documents(self, docs: List[dict]) -> None:
@@ -370,6 +441,23 @@ class Retriever:
                         doc["score"] = 0.0
                 results.append(doc)
         return results
+
+    # ------------------------------------------------------------------
+    def warm(self) -> None:
+        """Pre-load embeddings and index metadata for faster first query."""
+
+        np_mod = self._np
+        embedding = self._retry(
+            self.model.encode,
+            ["earcrawler warmup"],
+            show_progress_bar=False,
+        )
+        vector = np_mod.asarray(embedding).astype("float32")
+        dim = vector.shape[1]
+        if self.index_path.exists():
+            self._load_index(dim)
+        if self.meta_path.exists() or self.legacy_meta_path.exists():
+            self._load_metadata(allow_create=True)
 
 
 def describe_retriever_config(obj: object) -> dict[str, object]:

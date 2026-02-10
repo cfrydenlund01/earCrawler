@@ -224,3 +224,48 @@ def test_missing_optional_dependency_raises(monkeypatch, tmp_path):
             SimpleNamespace(),
             index_path=tmp_path / "x.faiss",
         )
+
+
+def test_model_instance_cached_across_retrievers(monkeypatch, tmp_path):
+    index = StubIndex()
+    faiss_mod = StubFaiss(index)
+    monkeypatch.setitem(sys.modules, "faiss", faiss_mod)
+    calls = {"count": 0}
+
+    def _model_ctor(name: str):
+        calls["count"] += 1
+        return DummyModel(name)
+
+    st_mod = SimpleNamespace(SentenceTransformer=_model_ctor)
+    monkeypatch.setitem(sys.modules, "sentence_transformers", st_mod)
+    tg_mod = SimpleNamespace(TradeGovClient=object)
+    fr_mod = SimpleNamespace(FederalRegisterClient=object)
+    pkg_mod = SimpleNamespace(
+        TradeGovClient=object,
+        TradeGovError=Exception,
+        FederalRegisterClient=object,
+        FederalRegisterError=Exception,
+    )
+    monkeypatch.setitem(sys.modules, "api_clients.tradegov_client", tg_mod)
+    monkeypatch.setitem(sys.modules, "api_clients.federalregister_client", fr_mod)
+    monkeypatch.setitem(sys.modules, "api_clients", pkg_mod)
+    import earCrawler.rag.retriever as retriever_mod
+
+    importlib.reload(retriever_mod)
+    with retriever_mod._CACHE_LOCK:
+        retriever_mod._MODEL_CACHE.clear()
+    monkeypatch.setattr(retriever_mod, "SentenceTransformer", _model_ctor)
+    monkeypatch.setattr(retriever_mod, "faiss", faiss_mod)
+    retriever_mod.Retriever(
+        SimpleNamespace(),
+        SimpleNamespace(),
+        model_name="all-MiniLM-L12-v2",
+        index_path=Path(tmp_path / "idx1.faiss"),
+    )
+    retriever_mod.Retriever(
+        SimpleNamespace(),
+        SimpleNamespace(),
+        model_name="all-MiniLM-L12-v2",
+        index_path=Path(tmp_path / "idx2.faiss"),
+    )
+    assert calls["count"] == 1

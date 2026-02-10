@@ -238,6 +238,9 @@ components:
         include_lineage:
           type: boolean
           default: false
+        generate:
+          type: boolean
+          default: true
     RetrievedDocument:
       type: object
       properties:
@@ -266,6 +269,10 @@ components:
           llm_enabled,
           contexts,
           retrieved,
+          retrieval_empty,
+          output_ok,
+          citations,
+          assumptions,
         ]
       properties:
         trace_id:
@@ -300,6 +307,11 @@ components:
           nullable: true
         cache:
           $ref: '#/components/schemas/CacheState'
+        retrieval_empty:
+          type: boolean
+        retrieval_empty_reason:
+          type: string
+          nullable: true
         output_ok:
           type: boolean
         output_error:
@@ -507,6 +519,13 @@ paths:
   /v1/rag/answer:
     post:
       summary: Generate an answer using a remote LLM provider
+      parameters:
+        - name: generate
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: When false, returns retrieval-only output without calling an LLM.
       requestBody:
         required: true
         content:

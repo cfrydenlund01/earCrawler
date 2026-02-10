@@ -4,12 +4,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
 import logging
 import os
 from pathlib import Path
 from typing import Protocol
+import time
+
+from earCrawler.utils.log_json import JsonLogger
 
 logger = logging.getLogger(__name__)
+_warm_logger = JsonLogger("rag-support")
 
 
 class RetrieverProtocol(Protocol):
@@ -59,6 +64,13 @@ class BrokenRetriever:
 
     def query(self, prompt: str, k: int = 5) -> list[dict]:
         raise self.failure
+
+
+def _warm_reason(value: object) -> str:
+    reason = str(value or "").strip() or "unknown"
+    if len(reason) > 18:
+        return reason[:18]
+    return reason
 
 
 def load_retriever() -> RetrieverProtocol:
@@ -129,6 +141,57 @@ def load_retriever() -> RetrieverProtocol:
         )
 
 
+def warm_retriever_if_enabled(
+    retriever: RetrieverProtocol, *, request_logger: JsonLogger | None = None
+) -> None:
+    """Warm heavy retriever components when explicitly enabled."""
+
+    if os.getenv("EARCRAWLER_WARM_RETRIEVER", "0") != "1":
+        return
+    log = request_logger or _warm_logger
+    timeout_seconds = float(
+        os.getenv("EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS", "5")
+    )
+    if not bool(getattr(retriever, "enabled", True)):
+        log.info("rag.warmup.skipped", reason="retriever_disabled")
+        return
+    if not bool(getattr(retriever, "ready", True)):
+        reason = _warm_reason(
+            getattr(retriever, "failure_type", None) or "retriever_not_ready"
+        )
+        log.info("rag.warmup.skipped", reason=reason)
+        return
+    warm_callable = getattr(retriever, "warm", None)
+    if not callable(warm_callable):
+        log.info("rag.warmup.skipped", reason="warm_not_supported")
+        return
+
+    start = time.perf_counter()
+    try:
+        if timeout_seconds > 0:
+            with ThreadPoolExecutor(max_workers=1) as pool:
+                fut = pool.submit(warm_callable)
+                fut.result(timeout=timeout_seconds)
+        else:
+            warm_callable()
+    except FutureTimeoutError:
+        log.warning(
+            "rag.warmup.skipped",
+            reason="timeout",
+            timeout_seconds=timeout_seconds,
+        )
+        return
+    except Exception as exc:  # pragma: no cover - defensive runtime guard
+        log.warning("rag.warmup.skipped", reason=_warm_reason(exc))
+        return
+
+    log.info(
+        "rag.warmup.completed",
+        timeout_seconds=timeout_seconds,
+        t_total_ms=round((time.perf_counter() - start) * 1000.0, 3),
+    )
+
+
 @dataclass
 class RagCacheEntry:
     expires_at: datetime
@@ -170,4 +233,11 @@ class RagQueryCache:
         return entry.expires_at
 
 
-__all__ = ["RetrieverProtocol", "RagQueryCache", "load_retriever", "NullRetriever", "BrokenRetriever"]
+__all__ = [
+    "RetrieverProtocol",
+    "RagQueryCache",
+    "load_retriever",
+    "warm_retriever_if_enabled",
+    "NullRetriever",
+    "BrokenRetriever",
+]

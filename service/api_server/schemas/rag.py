@@ -16,6 +16,10 @@ class RagQueryRequest(BaseModel):
     include_lineage: bool = Field(
         False, description="Return KG lineage data when available"
     )
+    generate: bool = Field(
+        True,
+        description="When false, run retrieval only and skip any remote LLM generation",
+    )
 
     def cache_key(self) -> str:
         lineage_flag = "1" if self.include_lineage else "0"
@@ -81,6 +85,36 @@ class RagCitation(BaseModel):
 class EvidenceOkay(BaseModel):
     ok: bool = Field(..., description="True when the response is grounded and follows the contract")
     reasons: List[str] = Field(default_factory=list, description="Machine-readable reasons for ok/failed checks")
+
+
+class DataEgressRecord(BaseModel):
+    remote_enabled: bool = Field(..., description="True when remote LLM egress was allowed")
+    disabled_reason: Optional[str] = Field(
+        default=None,
+        description="Reason egress was blocked or failed",
+    )
+    provider: Optional[str] = Field(default=None, description="Resolved LLM provider")
+    model: Optional[str] = Field(default=None, description="Resolved model identifier")
+    redaction_mode: str = Field(..., description="Redaction policy applied to outbound payloads")
+    prompt_hash: Optional[str] = Field(
+        default=None, description="SHA-256 hash of the outbound message payload"
+    )
+    context_hashes: List[str] = Field(
+        default_factory=list,
+        description="SHA-256 hashes of each outbound context chunk",
+    )
+    question_hash: Optional[str] = Field(
+        default=None, description="SHA-256 hash of the outbound question"
+    )
+    context_count: int = Field(
+        default=0, description="Number of context chunks sent to the LLM"
+    )
+    trace_id: Optional[str] = Field(
+        default=None, description="Trace identifier for correlating logs"
+    )
+    policy_version: str = Field(
+        default="data-egress.v1", description="Version of the egress decision policy"
+    )
 
 
 class RagResponse(BaseModel):
@@ -173,4 +207,8 @@ class RagGeneratedResponse(BaseModel):
     assumptions: List[str] = Field(
         default_factory=list,
         description="Explicit assumptions; non-empty assumptions generally require label=unanswerable unless supported",
+    )
+    egress: DataEgressRecord = Field(
+        ...,
+        description="Per-answer egress decision record with only hashed payload details",
     )

@@ -17,6 +17,9 @@ def _stub_expansion(*_args, **_kwargs):
 def _stub_retrieval_and_kg(monkeypatch):
     monkeypatch.setattr(pipeline, "retrieve_regulation_context", _stub_retrieval)
     monkeypatch.setattr(pipeline, "expand_with_kg", _stub_expansion)
+    monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
+    monkeypatch.setenv("EARCRAWLER_SKIP_LLM_SECRETS_FILE", "1")
     yield
 
 
@@ -93,3 +96,34 @@ def test_pipeline_accepts_valid_json(monkeypatch):
     assert result["answer"] == "Yes"
     assert result["label"] == "permitted"
     assert result["citations"][0]["quote"] == "License Exceptions intro"
+
+
+def test_pipeline_rejects_ungrounded_quote(monkeypatch):
+    monkeypatch.setattr(
+        pipeline,
+        "retrieve_regulation_context",
+        lambda *a, **k: [{"section_id": "EAR-740.1", "text": "License Exceptions intro", "score": 1.0, "raw": {}}],
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "generate_chat",
+        lambda *a, **k: (
+            '{'
+            '"label":"permitted",'
+            '"answer_text":"Yes",'
+            '"citations":[{"section_id":"EAR-740.1","quote":"NOT IN CONTEXT","span_id":""}],'
+            '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+            '"assumptions":[]'
+            '}'
+        ),
+    )
+
+    result = pipeline.answer_with_rag(
+        "Question?",
+        strict_retrieval=False,
+        strict_output=True,
+    )
+
+    assert result["output_ok"] is False
+    assert result["output_error"]["code"] == "ungrounded_citation"
+    assert result["answer"] is None
