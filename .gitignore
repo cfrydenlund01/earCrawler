@@ -35,6 +35,7 @@ kg/snapshots/sample.srj
 db/
 fuseki_db/
 run/
+runs/
 Research/
 *.egg-info/
 dir-tree*.txt
