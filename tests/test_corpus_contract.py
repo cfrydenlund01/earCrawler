@@ -60,6 +60,15 @@ def test_doc_id_suffix_allowed() -> None:
     assert validate_corpus_documents(docs) == []
 
 
+def test_part_metadata_when_present_must_match_section() -> None:
+    docs = [_doc(part="736")]
+    assert validate_corpus_documents(docs) == []
+
+    bad = [_doc(part="740")]
+    issues = validate_corpus_documents(bad)
+    assert any(issue.code == "part_section_mismatch" for issue in issues)
+
+
 def test_invalid_ids_fail_validation() -> None:
     docs = [_doc(doc_id="736.2", section_id="736.2")]
     issues = validate_corpus_documents(docs)

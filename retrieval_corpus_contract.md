@@ -28,7 +28,7 @@
 - `source_ref`: non-empty string describing the specific snapshot/version/hash.
 
 ## Optional fields (MAY be present)
-- `title`, `url`, `parent_id`, `ordinal`, `tokens_estimate`, `hash`, `snapshot_id`, `snapshot_sha256`.
+- `title`, `part`, `url`, `parent_id`, `ordinal`, `tokens_estimate`, `hash`, `snapshot_id`, `snapshot_sha256`.
 
 ## Identifier rules
 - Canonical prefix: `EAR-`.

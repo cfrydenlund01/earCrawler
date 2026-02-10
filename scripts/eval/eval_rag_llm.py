@@ -3,7 +3,9 @@ from __future__ import annotations
 """Dataset-driven evaluation using the RAG pipeline + remote LLM providers."""
 
 import argparse
+import hashlib
 import json
+import os
 import re
 import time
 from datetime import datetime, timezone
@@ -315,6 +317,86 @@ def _sanitize_kg_expansions(expansions: Iterable[Mapping[str, object]] | None) -
     return sorted(cleaned, key=lambda item: str(item.get("section_id") or ""))
 
 
+def _sha256_file(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _load_index_meta(path: Path) -> dict[str, Any] | None:
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _sanitize_trace_run_provenance(provenance: Mapping[str, object]) -> dict[str, str]:
+    fields: tuple[str, ...] = (
+        "snapshot_id",
+        "snapshot_sha256",
+        "corpus_digest",
+        "index_path",
+        "index_sha256",
+        "index_meta_path",
+        "index_meta_sha256",
+        "index_meta_schema_version",
+        "index_build_timestamp_utc",
+        "embedding_model",
+        "llm_provider",
+        "llm_model",
+    )
+    sanitized: dict[str, str] = {}
+    for field in fields:
+        value = str(provenance.get(field) or "").strip()
+        if value:
+            sanitized[field] = value
+    return sanitized
+
+
+def _collect_trace_run_provenance(*, llm_provider: str, llm_model: str) -> dict[str, str]:
+    index_override = str(os.getenv("EARCRAWLER_FAISS_INDEX") or "").strip()
+    index_path = Path(index_override) if index_override else Path("data") / "faiss" / "index.faiss"
+    model_override = str(os.getenv("EARCRAWLER_FAISS_MODEL") or "").strip() or "all-MiniLM-L12-v2"
+    meta_path = index_path.with_suffix(".meta.json")
+    meta = _load_index_meta(meta_path) or {}
+    snapshot = meta.get("snapshot") if isinstance(meta.get("snapshot"), Mapping) else {}
+
+    provenance: dict[str, object] = {
+        "snapshot_id": str(snapshot.get("snapshot_id") or "unknown").strip() or "unknown",
+        "snapshot_sha256": str(snapshot.get("snapshot_sha256") or "unknown").strip() or "unknown",
+        "corpus_digest": str(meta.get("corpus_digest") or "unknown").strip() or "unknown",
+        "index_path": str(index_path.resolve()),
+        "embedding_model": str(meta.get("embedding_model") or model_override or "unknown").strip() or "unknown",
+        "llm_provider": str(llm_provider or "unknown").strip() or "unknown",
+        "llm_model": str(llm_model or "unknown").strip() or "unknown",
+    }
+    index_sha = _sha256_file(index_path)
+    if index_sha:
+        provenance["index_sha256"] = index_sha
+    if meta_path.exists():
+        provenance["index_meta_path"] = str(meta_path.resolve())
+        meta_sha = _sha256_file(meta_path)
+        if meta_sha:
+            provenance["index_meta_sha256"] = meta_sha
+    schema_version = str(meta.get("schema_version") or "").strip()
+    if schema_version:
+        provenance["index_meta_schema_version"] = schema_version
+    build_ts = str(meta.get("build_timestamp_utc") or "").strip()
+    if build_ts:
+        provenance["index_build_timestamp_utc"] = build_ts
+
+    return _sanitize_trace_run_provenance(provenance)
+
+
 def _retrieval_id_set(result: Mapping[str, object]) -> set[str]:
     ids: set[str] = set()
     for sec in result.get("used_sections") or []:
@@ -519,6 +601,7 @@ def _build_trace_pack(
     citations: Sequence[Mapping[str, object]] | None,
     retrieved_docs: Sequence[Mapping[str, object]] | None,
     kg_paths_used: Sequence[Mapping[str, object]] | None,
+    run_provenance: Mapping[str, object] | None,
 ) -> dict[str, object]:
     doc_by_section: dict[str, Mapping[str, object]] = {}
     for doc in retrieved_docs or []:
@@ -555,6 +638,7 @@ def _build_trace_pack(
         "kg_paths": _sanitize_kg_paths(kg_paths_used),
         "citations": _sanitize_citations(citations),
         "retrieval_metadata": _sanitize_retrieved_docs(retrieved_docs),
+        "run_provenance": _sanitize_trace_run_provenance(run_provenance or {}),
     }
     trace_pack["provenance_hash"] = trace_provenance_hash(trace_pack)
     return normalize_trace_pack(trace_pack)
@@ -687,6 +771,10 @@ def evaluate_dataset(
         )
     provider = cfg.provider.provider
     model = cfg.provider.model
+    trace_run_provenance = _collect_trace_run_provenance(
+        llm_provider=provider,
+        llm_model=model,
+    )
     run_id = _safe_name(out_json.stem)
     ablation_mode = (ablation or "").strip().lower() or None
     if ablation_mode and ablation_mode not in _ABLATION_MODES:
@@ -703,6 +791,7 @@ def evaluate_dataset(
         "ablation": ablation_mode,
         "kg_expansion": kg_expansion_enabled,
         "multihop_only": bool(multihop_only),
+        "trace_run_provenance": trace_run_provenance,
     }
 
     results: List[Dict[str, Any]] = []
@@ -1049,9 +1138,14 @@ def evaluate_dataset(
             citations=citations,
             retrieved_docs=retrieved_docs,
             kg_paths_used=kg_paths_used,
+            run_provenance=trace_run_provenance,
         )
         trace_require_kg = bool(trace_pack_require_kg_paths and item_multihop)
-        trace_issues = validate_trace_pack(trace_pack, require_kg_paths=trace_require_kg)
+        trace_issues = validate_trace_pack(
+            trace_pack,
+            require_kg_paths=trace_require_kg,
+            require_run_provenance=True,
+        )
         result_entry["provenance_hash"] = trace_pack.get("provenance_hash")
         result_entry["trace_pack_pass"] = len(trace_issues) == 0
         result_entry["trace_pack_issues"] = [issue.to_dict() for issue in trace_issues]

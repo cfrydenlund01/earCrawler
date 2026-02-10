@@ -31,6 +31,7 @@ class TracePack:
     provenance_hash: str
     citations: list[dict[str, object]]
     retrieval_metadata: list[dict[str, object]]
+    run_provenance: dict[str, object]
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -43,6 +44,7 @@ class TracePack:
             "provenance_hash": self.provenance_hash,
             "citations": list(self.citations),
             "retrieval_metadata": list(self.retrieval_metadata),
+            "run_provenance": dict(self.run_provenance),
         }
 
 
@@ -182,6 +184,34 @@ def _normalize_retrieval_metadata(
     )
 
 
+def _normalize_run_provenance(
+    run_provenance: Mapping[str, object] | None,
+) -> dict[str, object]:
+    if not isinstance(run_provenance, Mapping):
+        return {}
+
+    scalar_fields: tuple[str, ...] = (
+        "snapshot_id",
+        "snapshot_sha256",
+        "corpus_digest",
+        "index_path",
+        "index_sha256",
+        "index_meta_path",
+        "index_meta_sha256",
+        "index_meta_schema_version",
+        "index_build_timestamp_utc",
+        "embedding_model",
+        "llm_provider",
+        "llm_model",
+    )
+    normalized: dict[str, object] = {}
+    for key in scalar_fields:
+        value = _as_str(run_provenance.get(key))
+        if value:
+            normalized[key] = value
+    return normalized
+
+
 def canonical_provenance_payload(pack: Mapping[str, object]) -> dict[str, object]:
     """Return canonical evidence payload used to compute provenance_hash."""
 
@@ -191,6 +221,9 @@ def canonical_provenance_payload(pack: Mapping[str, object]) -> dict[str, object
         "citations": _normalize_citations(pack.get("citations")),  # type: ignore[arg-type]
         "retrieval_metadata": _normalize_retrieval_metadata(
             pack.get("retrieval_metadata")  # type: ignore[arg-type]
+        ),
+        "run_provenance": _normalize_run_provenance(
+            pack.get("run_provenance")  # type: ignore[arg-type]
         ),
     }
 
@@ -208,6 +241,9 @@ def normalize_trace_pack(pack: Mapping[str, object]) -> dict[str, object]:
     retrieval_metadata = _normalize_retrieval_metadata(
         pack.get("retrieval_metadata")  # type: ignore[arg-type]
     )
+    run_provenance = _normalize_run_provenance(
+        pack.get("run_provenance")  # type: ignore[arg-type]
+    )
     normalized: dict[str, object] = {
         "trace_id": _as_str(pack.get("trace_id")),
         "question_hash": _as_str(pack.get("question_hash")),
@@ -217,6 +253,7 @@ def normalize_trace_pack(pack: Mapping[str, object]) -> dict[str, object]:
         "kg_paths": kg_paths,
         "citations": citations,
         "retrieval_metadata": retrieval_metadata,
+        "run_provenance": run_provenance,
     }
     normalized["provenance_hash"] = _as_str(pack.get("provenance_hash")) or provenance_hash(
         normalized
@@ -228,6 +265,7 @@ def validate_trace_pack(
     pack: Mapping[str, object],
     *,
     require_kg_paths: bool = False,
+    require_run_provenance: bool = False,
 ) -> list[TraceIssue]:
     normalized = normalize_trace_pack(pack)
     issues: list[TraceIssue] = []
@@ -261,6 +299,26 @@ def validate_trace_pack(
             )
         )
 
+    run_provenance = normalized["run_provenance"]
+    if require_run_provenance:
+        required_provenance_fields = (
+            "snapshot_id",
+            "snapshot_sha256",
+            "corpus_digest",
+            "index_path",
+            "embedding_model",
+        )
+        for field in required_provenance_fields:
+            value = _as_str(run_provenance.get(field)) if isinstance(run_provenance, Mapping) else ""
+            if not value:
+                issues.append(
+                    TraceIssue(
+                        "missing",
+                        f"run_provenance.{field}",
+                        f"run_provenance.{field} is required",
+                    )
+                )
+
     provided_hash = _as_str(pack.get("provenance_hash"))
     expected_hash = provenance_hash(normalized)
     if not provided_hash:
@@ -287,4 +345,3 @@ __all__ = [
     "provenance_hash",
     "validate_trace_pack",
 ]
-

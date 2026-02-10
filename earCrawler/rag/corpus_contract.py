@@ -19,6 +19,7 @@ _SECTION_RE = re.compile(
 )
 
 _DOC_ID_SUFFIX_RE = re.compile(r"^[a-z0-9][a-z0-9:._-]{0,200}$")
+_PART_RE = re.compile(r"^\d{3}$")
 
 REQUIRED_FIELDS: tuple[str, ...] = (
     "schema_version",
@@ -32,6 +33,7 @@ REQUIRED_FIELDS: tuple[str, ...] = (
 
 OPTIONAL_FIELDS: tuple[str, ...] = (
     "title",
+    "part",
     "url",
     "parent_id",
     "ordinal",
@@ -181,6 +183,7 @@ def validate_corpus_documents(docs: Sequence[Mapping[str, object]]) -> list[Issu
 
         section_id_raw = doc.get("section_id")
         section_id_norm = normalize_ear_section_id(section_id_raw)
+        expected_part: str | None = None
         if section_id_raw is None or not _is_non_empty_string(section_id_raw):
             issues.append(
                 Issue(
@@ -208,6 +211,8 @@ def validate_corpus_documents(docs: Sequence[Mapping[str, object]]) -> list[Issu
                     str(doc.get("doc_id") or ""),
                 )
             )
+        else:
+            expected_part = section_id_norm[len("EAR-") :].split(".", 1)[0]
 
         if doc_id_norm and section_id_norm:
             doc_id_section = doc_id_norm.split("#", 1)[0]
@@ -220,6 +225,38 @@ def validate_corpus_documents(docs: Sequence[Mapping[str, object]]) -> list[Issu
                         doc_id_norm,
                     )
                 )
+
+        part = doc.get("part")
+        if part is not None:
+            if not _is_non_empty_string(part):
+                issues.append(
+                    Issue(
+                        "invalid_part",
+                        "part must be a non-empty string when provided",
+                        idx,
+                        str(doc.get("doc_id") or ""),
+                    )
+                )
+            else:
+                part_str = str(part)
+                if not _PART_RE.fullmatch(part_str):
+                    issues.append(
+                        Issue(
+                            "invalid_part",
+                            "part must be exactly three digits when provided",
+                            idx,
+                            str(doc.get("doc_id") or ""),
+                        )
+                    )
+                elif expected_part and part_str != expected_part:
+                    issues.append(
+                        Issue(
+                            "part_section_mismatch",
+                            f"part '{part_str}' does not match section_id part '{expected_part}'",
+                            idx,
+                            str(doc.get("doc_id") or ""),
+                        )
+                    )
 
         text = doc.get("text")
         if text is None or not isinstance(text, str):

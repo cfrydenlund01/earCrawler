@@ -46,6 +46,8 @@ from earCrawler.rag.build_corpus import build_retrieval_corpus, write_corpus_jso
 from earCrawler.rag.index_builder import build_faiss_index_from_corpus
 from earCrawler.rag.ecfr_api_fetch import fetch_ecfr_snapshot
 from earCrawler.rag.offline_snapshot_manifest import validate_offline_snapshot
+from earCrawler.rag.snapshot_corpus import build_snapshot_corpus_bundle
+from earCrawler.rag.snapshot_index import build_snapshot_index_bundle
 
 install_telem()
 
@@ -1348,6 +1350,210 @@ def rag_index_build_corpus(
         raise click.ClickException(str(exc)) from exc
     write_corpus_jsonl(out, docs)
     click.echo(f"Wrote {len(docs)} corpus documents -> {out}")
+
+
+@rag_index.command(name="rebuild-corpus")
+@click.option(
+    "--snapshot",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Offline eCFR snapshot JSONL to rebuild from.",
+)
+@click.option(
+    "--snapshot-manifest",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional offline snapshot manifest override (offline-snapshot.v1).",
+)
+@click.option(
+    "--out-base",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("dist") / "corpus",
+    show_default=True,
+    help="Base output directory; artifacts are written to <out-base>/<snapshot_id>/.",
+)
+@click.option(
+    "--source-ref",
+    type=str,
+    default=None,
+    help="Override source_ref for all documents (falls back to snapshot values).",
+)
+@click.option(
+    "--chunk-max-chars",
+    type=int,
+    default=6000,
+    show_default=True,
+    help="Maximum characters per chunk before paragraph splitting.",
+)
+@click.option(
+    "--preflight/--no-preflight",
+    default=True,
+    show_default=True,
+    help="Run snapshot validation before corpus build.",
+)
+@click.option(
+    "--check-expected-sections/--no-check-expected-sections",
+    default=True,
+    show_default=True,
+    help="Run smoke check against section IDs referenced in eval datasets.",
+)
+@click.option(
+    "--dataset-manifest",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    default=Path("eval") / "manifest.json",
+    show_default=True,
+    help="Eval manifest used to collect expected section IDs.",
+)
+@click.option(
+    "--dataset-id",
+    "dataset_ids",
+    multiple=True,
+    help="Dataset ID(s) to check; defaults to all *.v2 datasets when omitted.",
+)
+@click.option(
+    "--v2-only/--all-datasets",
+    default=True,
+    show_default=True,
+    help="When --dataset-id is omitted, check only *.v2 datasets or all datasets.",
+)
+def rag_index_rebuild_corpus(
+    snapshot: Path,
+    snapshot_manifest: Path | None,
+    out_base: Path,
+    source_ref: str | None,
+    chunk_max_chars: int,
+    preflight: bool,
+    check_expected_sections: bool,
+    dataset_manifest: Path,
+    dataset_ids: tuple[str, ...],
+    v2_only: bool,
+) -> None:
+    """Deterministically rebuild corpus artifacts under dist/corpus/<snapshot_id>."""
+
+    try:
+        bundle = build_snapshot_corpus_bundle(
+            snapshot=snapshot,
+            snapshot_manifest=snapshot_manifest,
+            out_base=out_base,
+            source_ref=source_ref,
+            chunk_max_chars=chunk_max_chars,
+            preflight=preflight,
+            check_expected_sections=check_expected_sections,
+            dataset_manifest=dataset_manifest,
+            dataset_ids=list(dataset_ids) or None,
+            include_v2_only=v2_only,
+        )
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Wrote corpus: {bundle.corpus_path}")
+    click.echo(f"Wrote build log: {bundle.build_log_path}")
+    click.echo(
+        "Smoke check passed: "
+        f"doc_count={bundle.doc_count} "
+        f"unique_sections={bundle.unique_section_count} "
+        f"expected_sections={bundle.expected_section_count} "
+        f"missing={len(bundle.missing_expected_sections)}"
+    )
+    click.echo(
+        f"Provenance: snapshot_id={bundle.snapshot_id} "
+        f"corpus_digest={bundle.corpus_digest} "
+        f"corpus_sha256={bundle.corpus_sha256}"
+    )
+
+
+@rag_index.command(name="rebuild-index")
+@click.option(
+    "--corpus",
+    "corpus_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Canonical retrieval corpus JSONL (typically dist/corpus/<snapshot_id>/retrieval_corpus.jsonl).",
+)
+@click.option(
+    "--out-base",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("dist") / "index",
+    show_default=True,
+    help="Base output directory; artifacts are written to <out-base>/<snapshot_id>/.",
+)
+@click.option(
+    "--model-name",
+    type=str,
+    default="all-MiniLM-L12-v2",
+    show_default=True,
+    help="SentenceTransformer model used for embedding/index build.",
+)
+@click.option(
+    "--verify-env/--no-verify-env",
+    default=True,
+    show_default=True,
+    help="Set EARCRAWLER_FAISS_INDEX/EARCRAWLER_FAISS_MODEL and verify pipeline retriever wiring.",
+)
+@click.option(
+    "--smoke-query",
+    type=str,
+    default=None,
+    help="Optional retrieval smoke query to run against the built index.",
+)
+@click.option(
+    "--smoke-top-k",
+    type=int,
+    default=5,
+    show_default=True,
+    help="Top-k for retrieval smoke query.",
+)
+@click.option(
+    "--expect-section",
+    "expected_sections",
+    multiple=True,
+    help="Expected section ID(s) that should appear in smoke-query results (repeatable).",
+)
+def rag_index_rebuild_index(
+    corpus_path: Path,
+    out_base: Path,
+    model_name: str,
+    verify_env: bool,
+    smoke_query: str | None,
+    smoke_top_k: int,
+    expected_sections: tuple[str, ...],
+) -> None:
+    """Build snapshot-scoped FAISS index + sidecar and verify runtime wiring."""
+
+    try:
+        bundle = build_snapshot_index_bundle(
+            corpus_path=corpus_path,
+            out_base=out_base,
+            model_name=model_name,
+            verify_pipeline_env=verify_env,
+            smoke_query=smoke_query,
+            smoke_top_k=smoke_top_k,
+            expected_sections=list(expected_sections) or None,
+        )
+    except ValueError as exc:
+        raise click.ClickException(str(exc)) from exc
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    click.echo(f"Wrote index: {bundle.index_path}")
+    click.echo(f"Wrote metadata: {bundle.meta_path}")
+    click.echo(f"Wrote index build log: {bundle.build_log_path}")
+    click.echo(f"Wrote runtime env: {bundle.env_file_path}")
+    click.echo(f"Wrote runtime env ps1: {bundle.env_ps1_path}")
+    click.echo(
+        "Index metadata verified: "
+        f"embedding_model={bundle.embedding_model} "
+        f"corpus_digest={bundle.corpus_digest} "
+        f"doc_count={bundle.doc_count} "
+        f"build_timestamp_utc={bundle.build_timestamp_utc}"
+    )
+    if smoke_query:
+        click.echo(
+            "Retrieval smoke passed: "
+            f"query='{smoke_query}' "
+            f"results={bundle.smoke_result_count} "
+            f"expected_hits={bundle.smoke_expected_hits}"
+        )
 
 
 @rag_index.command(name="validate-snapshot")

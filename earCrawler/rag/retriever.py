@@ -6,6 +6,7 @@ import logging
 import pickle
 import json
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
 from typing import List, Mapping, MutableMapping, Optional
@@ -23,6 +24,10 @@ from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
 from earCrawler.rag.build_corpus import compute_corpus_digest
 from earCrawler.rag.index_builder import INDEX_META_VERSION
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class RetrieverError(RuntimeError):
@@ -316,6 +321,7 @@ class Retriever:
 
         meta_payload = {
             "schema_version": INDEX_META_VERSION,
+            "build_timestamp_utc": _utc_now_iso(),
             "corpus_schema_version": None,
             "corpus_digest": corpus_digest,
             "doc_count": len(metadata),

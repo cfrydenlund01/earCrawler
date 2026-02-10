@@ -32,6 +32,15 @@ def _base_pack() -> dict[str, object]:
         "retrieval_metadata": [
             {"id": "EAR-740.1", "section": "EAR-740.1", "score": 0.8, "source": "retrieval", "url": "https://example/740", "title": "s"},
         ],
+        "run_provenance": {
+            "snapshot_id": "snap-1",
+            "snapshot_sha256": "a" * 64,
+            "corpus_digest": "b" * 64,
+            "index_path": "dist/index/snap-1/index.faiss",
+            "embedding_model": "all-MiniLM-L12-v2",
+            "llm_provider": "groq",
+            "llm_model": "llama-3.1-8b",
+        },
     }
 
 
@@ -69,3 +78,10 @@ def test_validate_trace_pack_requires_kg_paths_when_requested() -> None:
     issues = validate_trace_pack(pack, require_kg_paths=True)
     assert any(issue.field == "kg_paths" for issue in issues)
 
+
+def test_validate_trace_pack_requires_run_provenance_when_requested() -> None:
+    pack = _base_pack()
+    pack["run_provenance"] = {}
+    pack["provenance_hash"] = provenance_hash(pack)
+    issues = validate_trace_pack(pack, require_run_provenance=True)
+    assert any(issue.field.startswith("run_provenance.") for issue in issues)
