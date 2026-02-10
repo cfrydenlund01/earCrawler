@@ -6,10 +6,15 @@ from datetime import date, datetime
 from typing import Optional
 
 import rdflib
-from rdflib import Graph, Literal, Namespace
+from rdflib import Graph, Literal, Namespace, URIRef
 
-EAR_NS = Namespace("https://example.org/ear#")
-ENT_NS = Namespace("https://example.org/entity#")
+from .iri import paragraph_iri, section_iri
+from .namespaces import ENTITY_NS, RESOURCE_NS, SCHEMA_NS
+
+# Backward-compatible namespace objects.
+EAR_NS = Namespace(SCHEMA_NS)
+ENT_NS = Namespace(ENTITY_NS)
+RES_NS = Namespace(RESOURCE_NS)
 DCT = Namespace("http://purl.org/dc/terms/")
 PROV = Namespace("http://www.w3.org/ns/prov#")
 XSD = Namespace("http://www.w3.org/2001/XMLSchema#")
@@ -31,6 +36,7 @@ def graph_with_prefixes(*, identifier: rdflib.term.Identifier | None = None) -> 
     g = Graph(identifier=identifier)
     g.bind("ear", EAR_NS)
     g.bind("ent", ENT_NS)
+    g.bind("res", RES_NS)
     g.bind("dct", DCT)
     g.bind("prov", PROV)
     g.bind("xsd", XSD)
@@ -40,14 +46,13 @@ def graph_with_prefixes(*, identifier: rdflib.term.Identifier | None = None) -> 
 def iri_for_paragraph(hash_hex: str) -> rdflib.term.Identifier:
     """Return deterministic paragraph IRI based on a SHA256 hex digest."""
 
-    return EAR_NS[f"p_{hash_hex[:16]}"]
+    return URIRef(paragraph_iri(hash_hex))
 
 
 def iri_for_section(sec_id: str) -> rdflib.term.Identifier:
-    """Normalise a section identifier like ``734.3`` to ``ear:s_734_3``."""
+    """Return canonical section IRI for a section identifier."""
 
-    norm = sec_id.strip().replace(".", "_")
-    return EAR_NS[f"s_{norm}"]
+    return URIRef(section_iri(sec_id))
 
 
 def safe_literal(
@@ -72,6 +77,7 @@ def safe_literal(
 __all__ = [
     "EAR_NS",
     "ENT_NS",
+    "RES_NS",
     "graph_with_prefixes",
     "iri_for_paragraph",
     "iri_for_section",

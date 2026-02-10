@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import click
 
+from earCrawler.audit.hitl_events import ingest_hitl_directory
 from earCrawler.audit import ledger, verify
 from earCrawler.security import policy
 
@@ -39,3 +40,16 @@ def tail_cmd(n: int) -> None:
     entries = list(ledger.tail(n))
     for e in entries:
         click.echo(json.dumps(e))
+
+
+@audit.command(name="ingest-hitl")
+@click.argument("directory", type=click.Path(path_type=Path, exists=True, file_okay=False))
+@policy.enforce
+def ingest_hitl_cmd(directory: Path) -> None:
+    """Ingest filled HITL decision templates into the audit ledger."""
+
+    try:
+        summary = ingest_hitl_directory(directory)
+    except Exception as exc:
+        raise click.ClickException(str(exc))
+    click.echo(json.dumps(summary))

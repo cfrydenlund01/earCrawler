@@ -10,9 +10,11 @@ from typing import Dict, Optional
 from rdflib import Graph, Literal, URIRef
 from rdflib.namespace import RDF, FOAF
 
+from .iri import resource_iri
+from .namespaces import GRAPH_NS
 from .ontology import EAR_NS, DCT, PROV, XSD, graph_with_prefixes, safe_literal
 
-PROV_GRAPH_IRI = URIRef("urn:graph:prov")
+PROV_GRAPH_IRI = URIRef(f"{GRAPH_NS}prov")
 
 
 def _hash(text: str) -> str:
@@ -29,7 +31,7 @@ def new_prov_graph() -> Graph:
 def mint_agent(domain: str) -> URIRef:
     norm = domain.replace("http://", "").replace("https://", "").strip("/")
     norm = norm.replace(".", "_")
-    return EAR_NS[f"agent/{norm}"]
+    return URIRef(resource_iri("ear", "agent", norm))
 
 
 def mint_activity(request_url: str, params: Optional[Dict[str, str]] = None) -> URIRef:
@@ -38,7 +40,7 @@ def mint_activity(request_url: str, params: Optional[Dict[str, str]] = None) -> 
         parts = [f"{k}={v}" for k, v in sorted(params.items())]
         key += "?" + "&".join(parts)
     digest = _hash(key)[:16]
-    return EAR_NS[f"activity/{digest}"]
+    return URIRef(resource_iri("ear", "activity", digest))
 
 
 def mint_request(request_url: str, params: Optional[Dict[str, str]] = None) -> URIRef:
@@ -47,7 +49,7 @@ def mint_request(request_url: str, params: Optional[Dict[str, str]] = None) -> U
         parts = [f"{k}={v}" for k, v in sorted(params.items())]
         key += "?" + "&".join(parts)
     digest = _hash("req:" + key)[:16]
-    return EAR_NS[f"request/{digest}"]
+    return URIRef(resource_iri("ear", "request", digest))
 
 
 def add_provenance(

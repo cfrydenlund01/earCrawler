@@ -55,7 +55,7 @@ def test_validate_orphan_entity(tmp_path: Path) -> None:
     _copy("bad_nsf_orphan_entity.jsonl", in_dir / "nsf_corpus.jsonl")
     emit_nsf(in_dir, out_dir)
     ttl = out_dir / "nsf.ttl"
-    lines = [ln for ln in ttl.read_text().splitlines() if "ent:Entity" not in ln]
+    lines = [ln for ln in ttl.read_text().splitlines() if "ear:Entity" not in ln]
     ttl.write_text("\n".join(lines) + "\n")
     res = _run(["--ttl", str(ttl)])
     assert res.returncode == 1

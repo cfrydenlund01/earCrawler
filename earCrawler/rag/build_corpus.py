@@ -12,6 +12,10 @@ from earCrawler.rag.corpus_contract import (
 )
 from earCrawler.rag.ecfr_snapshot_loader import load_ecfr_snapshot, CorpusDocument
 from earCrawler.rag.chunking import chunk_section_text
+from earCrawler.rag.offline_snapshot_manifest import (
+    require_offline_snapshot_manifest,
+    validate_offline_snapshot,
+)
 from earCrawler.utils.log_json import JsonLogger
 
 _logger = JsonLogger("rag-corpus")
@@ -36,17 +40,33 @@ def build_retrieval_corpus(
     snapshot_path: Path,
     *,
     source_ref: str | None = None,
+    manifest_path: Path | None = None,
+    preflight_validate_snapshot: bool = True,
     chunk_max_chars: int = 6000,
 ) -> List[CorpusDocument]:
     """Load snapshot, chunk deterministically, and validate corpus documents."""
 
+    validation_sections = None
+    validation_titles = None
+    validation_bytes = None
+    if preflight_validate_snapshot:
+        validation = validate_offline_snapshot(snapshot_path, manifest_path=manifest_path)
+        manifest = validation.manifest
+        validation_sections = validation.section_count
+        validation_titles = validation.title_count
+        validation_bytes = validation.payload_bytes
+    else:
+        manifest = require_offline_snapshot_manifest(snapshot_path, manifest_path=manifest_path)
     sections = load_ecfr_snapshot(snapshot_path)
     if chunk_max_chars <= 0:
         raise ValueError("chunk_max_chars must be positive")
 
+    manifest_source_ref = str(manifest.data.get("source_ref") or "").strip()
+    snapshot_id = str(manifest.data.get("snapshot_id") or "").strip()
+    snapshot_sha256 = str(manifest.data.get("payload", {}).get("sha256") or "").strip()
     docs: List[CorpusDocument] = []
     for section in sections:
-        resolved_source_ref = source_ref or section.get("source_ref") or ""
+        resolved_source_ref = source_ref or manifest_source_ref or section.get("source_ref") or ""
         if not resolved_source_ref:
             raise ValueError(
                 f"source_ref missing for section {section.get('section_id')}; "
@@ -67,6 +87,8 @@ def build_retrieval_corpus(
                 "schema_version": SCHEMA_VERSION,
                 "source": section.get("source") or "ecfr_snapshot",
                 "source_ref": resolved_source_ref,
+                "snapshot_id": snapshot_id,
+                "snapshot_sha256": snapshot_sha256,
             }
             if heading and "title" not in doc:
                 doc["title"] = heading
@@ -83,8 +105,14 @@ def build_retrieval_corpus(
         details={
             "doc_count": len(docs),
             "unique_sections": unique_sections,
-            "source_ref": source_ref or sections[0].get("source_ref"),
+            "source_ref": source_ref or manifest_source_ref or sections[0].get("source_ref"),
             "digest": digest,
+            "snapshot_manifest": str(manifest.path),
+            "snapshot_id": snapshot_id,
+            "snapshot_sha256": str(manifest.data.get("payload", {}).get("sha256") or ""),
+            "snapshot_sections": validation_sections,
+            "snapshot_titles": validation_titles,
+            "snapshot_bytes": validation_bytes,
         },
     )
     return docs

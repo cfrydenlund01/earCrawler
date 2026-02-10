@@ -1,90 +1,93 @@
 {
-  "kg_state": {
-    "manifest_path": "kg/.kgstate/manifest.json",
-    "digest": "e5e98b355356537bca1482634b722d908b3e0f8ed1ef943253f7e61dbc685f7a"
-  },
   "datasets": [
     {
-      "id": "entity_obligations.v1",
-      "task": "entity_obligation",
-      "file": "eval/entity_obligations.v1.jsonl",
-      "version": 1,
       "description": "Entity-level obligation questions for a fixed ACME universe, with links to EAR sections and KG policy nodes/paths.",
-      "num_items": 3
-    },
-    {
-      "id": "entity_obligations.v2",
+      "file": "eval/entity_obligations.v1.jsonl",
+      "id": "entity_obligations.v1",
+      "num_items": 3,
       "task": "entity_obligation",
-      "file": "eval/entity_obligations.v2.jsonl",
-      "version": 2,
+      "version": 1
+    },
+    {
       "description": "Expanded entity-level obligation QA (true/false) anchored to Parts 736, 740, 742, and 744.",
-      "num_items": 100
+      "file": "eval/entity_obligations.v2.jsonl",
+      "id": "entity_obligations.v2",
+      "num_items": 100,
+      "task": "entity_obligation",
+      "version": 2
     },
     {
-      "id": "ear_compliance.v1",
-      "task": "ear_compliance",
-      "file": "eval/ear_compliance.v1.jsonl",
-      "version": 1,
       "description": "Statute-level EAR compliance questions anchored to specific sections.",
-      "num_items": 3
-    },
-    {
-      "id": "ear_compliance.v2",
+      "file": "eval/ear_compliance.v1.jsonl",
+      "id": "ear_compliance.v1",
+      "num_items": 3,
       "task": "ear_compliance",
-      "file": "eval/ear_compliance.v2.jsonl",
-      "version": 2,
+      "version": 1
+    },
+    {
       "description": "Expanded statute-level EAR compliance QA (true/false) anchored to Parts 736, 740, 742, and 744.",
-      "num_items": 100
+      "file": "eval/ear_compliance.v2.jsonl",
+      "id": "ear_compliance.v2",
+      "num_items": 100,
+      "task": "ear_compliance",
+      "version": 2
     },
     {
-      "id": "golden_phase2.v1",
-      "task": "phase2_golden",
-      "file": "eval/golden_phase2.v1.jsonl",
-      "version": 1,
       "description": "Deterministic offline golden gate for Phase 2 retrieval, citation, and grounding behavior with stubbed LLM fixtures.",
-      "num_items": 12
+      "file": "eval/golden_phase2.v1.jsonl",
+      "id": "golden_phase2.v1",
+      "num_items": 12,
+      "task": "phase2_golden",
+      "version": 1
     },
     {
-      "id": "unanswerable.v1",
-      "task": "unanswerable",
-      "file": "eval/unanswerable.v1.jsonl",
+      "description": "Derived multi-hop slice for Phase 3 ablations. Each item requires evidence across at least two distinct EAR sections, with linked KG paths for entity context.",
+      "file": "eval/multihop_slice.v1.jsonl",
+      "id": "multihop_slice.v1",
+      "num_items": 12,
+      "task": "multihop",
       "version": 1,
-      "description": "Questions that must be declined because they fall outside the modeled EAR scope or lack sufficient evidence.",
-      "num_items": 2
+      "slice": {
+        "derived_from": [
+          "entity_obligations.v2",
+          "golden_phase2.v1"
+        ],
+        "criteria": [
+          ">=2 distinct expected sections via ear_sections/evidence.doc_spans",
+          "entity-linked evidence.kg_paths present for explainability traces"
+        ]
+      }
     },
     {
-      "id": "unanswerable.v2",
+      "description": "Questions that must be declined because they fall outside the modeled EAR scope or lack sufficient evidence.",
+      "file": "eval/unanswerable.v1.jsonl",
+      "id": "unanswerable.v1",
+      "num_items": 2,
       "task": "unanswerable",
-      "file": "eval/unanswerable.v2.jsonl",
-      "version": 2,
+      "version": 1
+    },
+    {
       "description": "Expanded unanswerable set (out-of-scope or insufficient evidence) to harden refusal behavior.",
-      "num_items": 20
+      "file": "eval/unanswerable.v2.jsonl",
+      "id": "unanswerable.v2",
+      "num_items": 20,
+      "task": "unanswerable",
+      "version": 2
     }
   ],
+  "kg_state": {
+    "digest": "e5e98b355356537bca1482634b722d908b3e0f8ed1ef943253f7e61dbc685f7a",
+    "manifest_path": "kg/.kgstate/manifest.json"
+  },
   "references": {
-    "sections": {
-      "EAR-736": ["736.2(b)"],
-      "EAR-740": ["740.1", "740.9(a)(2)"],
-      "EAR-742": ["742.4(a)(1)"],
-      "EAR-744": ["744.6(b)(3)"],
-      "EAR-746": ["746.4(a)"],
-      "EAR-GOLDEN-PHASE2": [
-        "736.2(b)",
-        "740.1",
-        "740.9(a)(2)",
-        "742.4(a)(1)",
-        "744.6(b)(3)",
-        "746.4(a)"
-      ]
-    },
     "kg_nodes": [
-      "https://example.org/ear#obligation/license_required_744_6_b_3",
-      "https://example.org/ear#obligation/license_required_746_4_a",
-      "https://example.org/ear#obligation/license_required_742_4_a_1",
-      "https://example.org/ear#exception/740_9_a_2",
-      "https://example.org/ear#exception/740_1",
-      "https://example.org/ear#exception/tmp_740_9_a_2_reserved",
-      "https://example.org/ear#policy/ns_column_1_742_4_a_1"
+      "https://ear.example.org/resource/ear/obligation/license_required_744_6_b_3",
+      "https://ear.example.org/resource/ear/obligation/license_required_746_4_a",
+      "https://ear.example.org/resource/ear/obligation/license_required_742_4_a_1",
+      "https://ear.example.org/resource/ear/exception/740_9_a_2",
+      "https://ear.example.org/resource/ear/exception/740_1",
+      "https://ear.example.org/resource/ear/exception/tmp_740_9_a_2_reserved",
+      "https://ear.example.org/resource/ear/policy/ns_column_1_742_4_a_1"
     ],
     "kg_paths": [
       "path:acme_all_to_NK_v1",
@@ -120,6 +123,32 @@
       "path:entity/zenith_742_4a1_T_v2",
       "path:entity/zenith_744_6b3_F_v2",
       "path:entity/zenith_744_6b3_T_v2"
-    ]
+    ],
+    "sections": {
+      "EAR-736": [
+        "736.2(b)"
+      ],
+      "EAR-740": [
+        "740.1",
+        "740.9(a)(2)"
+      ],
+      "EAR-742": [
+        "742.4(a)(1)"
+      ],
+      "EAR-744": [
+        "744.6(b)(3)"
+      ],
+      "EAR-746": [
+        "746.4(a)"
+      ],
+      "EAR-GOLDEN-PHASE2": [
+        "736.2(b)",
+        "740.1",
+        "740.9(a)(2)",
+        "742.4(a)(1)",
+        "744.6(b)(3)",
+        "746.4(a)"
+      ]
+    }
   }
 }

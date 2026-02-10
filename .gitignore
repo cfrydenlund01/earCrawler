@@ -7,8 +7,15 @@ kg/reports/
 kg/shapes.ttl
 perf/synth/out/
 .cache/
+.pytest_cache/
+.pytest_tmp/
 dist/
 build/
+data/ecfr/
+data/ecfr/**
+# Offline snapshot payloads are large and must not be committed.
+snapshots/offline/**/snapshot*.jsonl
+snapshots/offline/**/payload*.jsonl
 kg/.kgstate/
 kg/canonical/*
 !kg/canonical/aliases.json
@@ -34,6 +41,8 @@ dir-tree*.txt
 EAR_AI_Training_Proposal.docx
 docs/*Code_Improvement_Plan*.docx
 docs/*Work_Timeline*.xlsx
+docs/Archive/*.docx
+docs/Archive/*.xlsx
 
 # Local LLM secrets
 config/llm_secrets.env

@@ -1,0 +1,20 @@
+PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+PREFIX dcterms: <http://purl.org/dc/terms/>
+
+SELECT ?graph ?source ?predicate ?target ?section_label ?section_comment ?target_label ?target_comment ?related_section
+WHERE {
+  GRAPH ?graph {
+    VALUES ?source { {{section_iri}} }
+    ?source ?predicate ?target .
+    FILTER(isIRI(?target))
+    FILTER(?predicate != rdf:type)
+
+    OPTIONAL { ?source rdfs:label ?section_label }
+    OPTIONAL { ?source dcterms:description ?section_comment }
+    OPTIONAL { ?target rdfs:label ?target_label }
+    OPTIONAL { ?target dcterms:description ?target_comment }
+    OPTIONAL { ?target dcterms:identifier ?related_section }
+  }
+}
+ORDER BY ?graph ?source ?predicate ?target

@@ -9,12 +9,19 @@ import hashlib
 import hmac as hmaclib
 import subprocess
 import sys
-from typing import Any, Dict, Iterable
+from typing import Any, Dict, Iterable, Mapping
 
 from earCrawler.telemetry import redaction
 from earCrawler.security import cred_store
 
-__all__ = ["append_event", "verify_chain", "rotate", "tail", "current_log_path"]
+__all__ = [
+    "append_event",
+    "append_fact",
+    "verify_chain",
+    "rotate",
+    "tail",
+    "current_log_path",
+]
 
 
 def _base_dir() -> Path:
@@ -58,33 +65,14 @@ def _commit_hash() -> str:
         return "unknown"
 
 
-def append_event(
-    event: str,
-    user: str,
-    roles: Iterable[str],
-    command: str,
-    args_sanitized: str,
-    exit_code: int,
-    duration_ms: int,
-) -> None:
+def _append_entry(entry: Mapping[str, Any], *, redact_args: bool) -> None:
     path = current_log_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    entry: Dict[str, Any] = {
-        "ts": datetime.now(timezone.utc).isoformat(),
-        "event": event,
-        "user": user,
-        "roles": list(roles),
-        "command": command,
-        "args_sanitized": args_sanitized,
-        "exit_code": exit_code,
-        "duration_ms": duration_ms,
-        "host": platform.node(),
-        "commit": _commit_hash(),
-    }
     prev = _prev_hash(path)
-    entry["chain_prev"] = prev
     sanitized = dict(entry)
-    sanitized["args_sanitized"] = redaction.redact(entry.get("args_sanitized", ""))
+    if redact_args:
+        sanitized["args_sanitized"] = redaction.redact(str(entry.get("args_sanitized", "")))
+    sanitized["chain_prev"] = prev
     base = {
         k: sanitized[k]
         for k in sanitized
@@ -104,6 +92,43 @@ def append_event(
             fh.write(json.dumps(sanitized, ensure_ascii=False) + "\n")
     except Exception:
         print("audit log write failed", file=sys.stderr)
+
+
+def append_event(
+    event: str,
+    user: str,
+    roles: Iterable[str],
+    command: str,
+    args_sanitized: str,
+    exit_code: int,
+    duration_ms: int,
+) -> None:
+    entry: Dict[str, Any] = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": event,
+        "user": user,
+        "roles": list(roles),
+        "command": command,
+        "args_sanitized": args_sanitized,
+        "exit_code": exit_code,
+        "duration_ms": duration_ms,
+        "host": platform.node(),
+        "commit": _commit_hash(),
+    }
+    _append_entry(entry, redact_args=True)
+
+
+def append_fact(event: str, payload: Mapping[str, Any]) -> None:
+    """Append a structured non-command fact to the audit ledger."""
+
+    entry: Dict[str, Any] = {
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "event": event,
+        "host": platform.node(),
+        "commit": _commit_hash(),
+        "payload": dict(payload),
+    }
+    _append_entry(entry, redact_args=False)
 
 
 def rotate() -> Path:

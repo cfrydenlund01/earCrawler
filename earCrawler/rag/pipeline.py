@@ -3,7 +3,7 @@ from __future__ import annotations
 """Thin RAG pipeline wrapper that reuses the existing FAISS retriever and LLM client."""
 
 import re
-from typing import Iterable, List, Mapping
+from typing import Iterable, List, Literal, Mapping
 
 from api_clients.llm_client import LLMProviderError, generate_chat
 from api_clients.tradegov_client import TradeGovClient
@@ -12,6 +12,12 @@ from pathlib import Path
 import os
 import time
 from earCrawler.config.llm_secrets import get_llm_config
+from earCrawler.kg.paths import KGExpansionSnippet, KGPath
+from earCrawler.rag.kg_expansion_fuseki import (
+    FusekiGatewayLike,
+    SPARQLTemplateGateway,
+    expand_sections_via_fuseki,
+)
 from earCrawler.rag.output_schema import (
     DEFAULT_ALLOWED_LABELS,
     TRUTHINESS_LABELS,
@@ -237,23 +243,35 @@ def retrieve_regulation_context(
     return results
 
 
-def expand_with_kg(section_ids: Iterable[str]) -> list[dict]:
-    """Optionally expand results with KG snippets.
+def _env_truthy(name: str, *, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
-    This remains a lightweight hook: it reads from a JSON mapping when provided
-    via EARCRAWLER_KG_EXPANSION_PATH. If the mapping is absent or cannot be
-    parsed, the function returns an empty list (safe fallback).
 
-    TODO: Replace JSON KG expansion with Fuseki queries. Swap the file read
-    below with calls to the Fuseki gateway (see service/api_server/fuseki.py,
-    service/api_server/templates.py, and earCrawler/sparql/*.sparql) that return
-    the same {section_id, text, source, related_sections} structure so callers
-    do not need to change.
-    """
+def _env_int(name: str, *, default: int, min_value: int = 1) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        return default
+    return max(min_value, value)
 
-    mapping_path = os.getenv("EARCRAWLER_KG_EXPANSION_PATH")
-    if not mapping_path:
-        return []
+
+def _create_fuseki_gateway() -> FusekiGatewayLike:
+    endpoint = str(os.getenv("EARCRAWLER_FUSEKI_URL") or "").strip()
+    if not endpoint:
+        raise RuntimeError(
+            "KG expansion provider=fuseki selected but EARCRAWLER_FUSEKI_URL is not configured."
+        )
+    timeout = _env_int("EARCRAWLER_KG_EXPANSION_FUSEKI_TIMEOUT", default=5, min_value=1)
+    return SPARQLTemplateGateway(endpoint=endpoint, timeout=timeout)
+
+
+def _expand_with_json_stub(section_ids: list[str], mapping_path: str) -> list[KGExpansionSnippet]:
     try:
         import json
 
@@ -262,36 +280,101 @@ def expand_with_kg(section_ids: Iterable[str]) -> list[dict]:
         _logger.warning("rag.kg.expansion_failed", error=str(exc))
         return []
 
-    normalized = {}
+    normalized: dict[str, str] = {}
     for raw_key in data.keys():
         norm = _normalize_section_id(raw_key)
         if norm:
-            normalized.setdefault(norm, raw_key)
-    expansions: list[dict] = []
-    for sec in section_ids:
+            normalized.setdefault(norm, str(raw_key))
+
+    expansions: list[KGExpansionSnippet] = []
+    for sec in sorted(set(section_ids)):
         key = _normalize_section_id(sec)
-        if key in normalized:
-            raw_key = normalized[key]
-            entry = data.get(raw_key) or {}
-            text = str(entry.get("text") or entry.get("comment") or "").strip()
-            if not text:
-                continue
-            related_sections = []
-            for related in entry.get("related_sections") or []:
-                norm_related = _normalize_section_id(related)
-                if norm_related:
-                    related_sections.append(norm_related)
-            expansions.append(
-                {
-                    "section_id": key or raw_key,
-                    "text": text,
-                    "source": entry.get("source"),
-                    "title": entry.get("title"),
-                    "related_sections": sorted(set(related_sections)),
-                    "label_hints": sorted(entry.get("label_hints") or []),
-                }
+        if not key or key not in normalized:
+            continue
+        raw_key = normalized[key]
+        entry = data.get(raw_key) or {}
+        text = str(entry.get("text") or entry.get("comment") or "").strip()
+        if not text:
+            continue
+        related_sections: list[str] = []
+        for related in entry.get("related_sections") or []:
+            norm_related = _normalize_section_id(related)
+            if norm_related:
+                related_sections.append(norm_related)
+        expansions.append(
+            KGExpansionSnippet(
+                section_id=key,
+                text=text,
+                source=str(entry.get("source") or "json_stub"),
+                paths=[],
+                related_sections=sorted(set(related_sections) - {key}),
             )
+        )
     return expansions
+
+
+def expand_with_kg(
+    section_ids: Iterable[str],
+    *,
+    provider: Literal["fuseki", "json_stub"] = "fuseki",
+    gateway: FusekiGatewayLike | None = None,
+) -> list[KGExpansionSnippet]:
+    """Expand retrieved sections with KG snippets and structured path provenance.
+
+    Provider selection:
+    - explicit: ``EARCRAWLER_KG_EXPANSION_PROVIDER`` (``fuseki`` or ``json_stub``)
+    - explicit stub fallback: ``EARCRAWLER_KG_EXPANSION_PATH``
+    - default when enabled: ``fuseki`` via ``EARCRAWLER_ENABLE_KG_EXPANSION=1``
+
+    When ``fuseki`` is selected, missing gateway configuration is a hard error.
+    """
+
+    sections = [norm for norm in (_normalize_section_id(value) for value in section_ids) if norm]
+    if not sections:
+        return []
+
+    configured_provider = str(os.getenv("EARCRAWLER_KG_EXPANSION_PROVIDER") or "").strip().lower()
+    mapping_path = str(os.getenv("EARCRAWLER_KG_EXPANSION_PATH") or "").strip()
+    enabled = _env_truthy("EARCRAWLER_ENABLE_KG_EXPANSION", default=False)
+
+    selected_provider: Literal["fuseki", "json_stub"] | None = None
+    if configured_provider:
+        if configured_provider not in {"fuseki", "json_stub"}:
+            raise ValueError(
+                "EARCRAWLER_KG_EXPANSION_PROVIDER must be one of: fuseki, json_stub"
+            )
+        selected_provider = configured_provider  # type: ignore[assignment]
+    elif mapping_path:
+        selected_provider = "json_stub"
+    elif enabled or gateway is not None:
+        selected_provider = provider
+    else:
+        return []
+
+    _logger.info("rag.kg_expansion.provider", provider=selected_provider)
+
+    if selected_provider == "json_stub":
+        if not mapping_path:
+            _logger.warning(
+                "rag.kg.expansion_failed",
+                error="json_stub provider selected but EARCRAWLER_KG_EXPANSION_PATH is not configured",
+            )
+            return []
+        return _expand_with_json_stub(sections, mapping_path)
+
+    max_paths = _env_int(
+        "EARCRAWLER_KG_EXPANSION_MAX_PATHS_PER_SECTION",
+        default=4,
+        min_value=1,
+    )
+    max_hops = _env_int("EARCRAWLER_KG_EXPANSION_MAX_HOPS", default=2, min_value=1)
+    provider_gateway = gateway or _create_fuseki_gateway()
+    return expand_sections_via_fuseki(
+        sections,
+        provider_gateway,
+        max_paths_per_section=max_paths,
+        max_hops=max_hops,
+    )
 
 
 def _build_prompt(
@@ -439,6 +522,7 @@ def answer_with_rag(
     model: str | None = None,
     top_k: int = 5,
     retriever: object | None = None,
+    kg_expansion: bool | None = None,
     strict_retrieval: bool = True,
     strict_output: bool = True,
     generate: bool = True,
@@ -480,7 +564,15 @@ def answer_with_rag(
         else None
     )
     section_ids = [d["section_id"] for d in docs if d.get("section_id")]
-    kg_expansion = expand_with_kg(section_ids)
+    kg_expansion_enabled = True if kg_expansion is None else bool(kg_expansion)
+    kg_expansion = expand_with_kg(section_ids) if kg_expansion_enabled else []
+    kg_paths_by_id: dict[str, KGPath] = {}
+    for snippet in kg_expansion:
+        for path in snippet.paths:
+            kg_paths_by_id.setdefault(path.path_id, path)
+    kg_paths_used = [kg_paths_by_id[key] for key in sorted(kg_paths_by_id)]
+    kg_expansions_payload = [snippet.to_dict() for snippet in kg_expansion]
+    kg_paths_payload = [path.to_dict() for path in kg_paths_used]
     retrieved_docs: list[dict] = [_summarize_retrieved_doc(d, source="retrieval") for d in docs]
     contexts: list[str] = []
     for d in docs:
@@ -492,13 +584,18 @@ def answer_with_rag(
             contexts.append(f"[{section_id}] {text}")
         else:
             contexts.append(text)
-    for d in kg_expansion:
-        retrieved_docs.append(_summarize_retrieved_doc(d, source="kg"))
-    for d in kg_expansion:
-        text = str(d.get("text") or "").strip()
+    for snippet in kg_expansion:
+        kg_doc = {
+            "section_id": snippet.section_id,
+            "text": snippet.text,
+            "source": snippet.source,
+        }
+        retrieved_docs.append(_summarize_retrieved_doc(kg_doc, source="kg"))
+    for snippet in kg_expansion:
+        text = str(snippet.text or "").strip()
         if not text:
             continue
-        section_id = _normalize_section_id(d.get("section_id"))
+        section_id = _normalize_section_id(snippet.section_id)
         if section_id:
             contexts.append(f"[{section_id}] {text}")
         else:
@@ -694,7 +791,9 @@ def answer_with_rag(
         "justification": justification,
         "citations": citations,
         "retrieved_docs": retrieved_docs,
-        "trace_id": None,
+        "kg_expansions": kg_expansions_payload,
+        "kg_paths_used": kg_paths_payload,
+        "trace_id": trace_id,
         "evidence_okay": evidence_okay,
         "assumptions": assumptions,
         "citation_span_ids": citation_span_ids,

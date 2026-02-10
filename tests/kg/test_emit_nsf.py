@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from earCrawler.kg.emit_nsf import emit_nsf
+from earCrawler.kg.iri import paragraph_iri
 
 
 def _write_records(path: Path, records: list[dict]) -> None:
@@ -34,5 +35,5 @@ def test_emit_nsf_deterministic(tmp_path: Path) -> None:
     content2 = path2.read_bytes()
     assert content1 == content2
     text = content1.decode("utf-8")
-    assert "ear:p_" + "c" * 16 in text
+    assert f"<{paragraph_iri('c' * 64)}>" in text
     assert "prov:wasDerivedFrom" in text

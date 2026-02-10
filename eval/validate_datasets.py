@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, Iterator, Sequence, Set, Tuple, Any
 
 from jsonschema import Draft7Validator
+
+from earCrawler.kg.namespaces import ENTITY_NS, LEGACY_NS_LIST, RESOURCE_NS
 
 
 @dataclass(frozen=True)
@@ -115,9 +118,27 @@ def _validate_kg_refs(
     kg_nodes: Set[str],
     kg_paths: Set[str],
 ) -> Iterator[ValidationIssue]:
+    allow_legacy = os.getenv("EARCRAWLER_ALLOW_LEGACY_IRIS") == "1"
     if kg_nodes:
         for node in evidence.get("kg_nodes", []):
             node_str = str(node or "")
+            if node_str.startswith(("http://", "https://")) and not allow_legacy:
+                if any(node_str.startswith(legacy) for legacy in LEGACY_NS_LIST):
+                    yield ValidationIssue(
+                        dataset_id=dataset_id,
+                        file=file_path,
+                        line=line_no,
+                        message=f"legacy kg_node IRI not allowed: '{node_str}'",
+                        instance_path="evidence/kg_nodes",
+                    )
+                elif not node_str.startswith(RESOURCE_NS):
+                    yield ValidationIssue(
+                        dataset_id=dataset_id,
+                        file=file_path,
+                        line=line_no,
+                        message=f"non-canonical kg_node IRI namespace: '{node_str}'",
+                        instance_path="evidence/kg_nodes",
+                    )
             if node_str and node_str not in kg_nodes:
                 yield ValidationIssue(
                     dataset_id=dataset_id,
@@ -150,8 +171,23 @@ def validate_datasets(
     manifest = _load_json(manifest_path)
     validator = _load_schema(schema_path)
     section_map, kg_nodes, kg_paths = _load_references(manifest)
+    allow_legacy = os.getenv("EARCRAWLER_ALLOW_LEGACY_IRIS") == "1"
 
     issues: list[ValidationIssue] = []
+    if not allow_legacy:
+        for node in sorted(kg_nodes):
+            if node.startswith(("http://", "https://")) and any(
+                node.startswith(legacy) for legacy in LEGACY_NS_LIST
+            ):
+                issues.append(
+                    ValidationIssue(
+                        dataset_id="<manifest>",
+                        file=manifest_path,
+                        line=0,
+                        message=f"legacy kg_node IRI not allowed in references: '{node}'",
+                        instance_path="references/kg_nodes",
+                    )
+                )
     for dataset_id, file_path in _iter_dataset_entries(
         manifest, manifest_path, dataset_ids
     ):
@@ -177,6 +213,33 @@ def validate_datasets(
                         instance_path="/".join(str(p) for p in error.path),
                     )
                 )
+            if not allow_legacy:
+                for ent in item.get("kg_entities") or []:
+                    ent_str = str(ent or "")
+                    if ent_str.startswith(("http://", "https://")) and any(
+                        ent_str.startswith(legacy) for legacy in LEGACY_NS_LIST
+                    ):
+                        issues.append(
+                            ValidationIssue(
+                                dataset_id=dataset_id,
+                                file=file_path,
+                                line=line_no,
+                                message=f"legacy kg_entity IRI not allowed: '{ent_str}'",
+                                instance_path="kg_entities",
+                            )
+                        )
+                    elif ent_str.startswith(("http://", "https://")) and not ent_str.startswith(
+                        ENTITY_NS
+                    ):
+                        issues.append(
+                            ValidationIssue(
+                                dataset_id=dataset_id,
+                                file=file_path,
+                                line=line_no,
+                                message=f"non-canonical kg_entity IRI namespace: '{ent_str}'",
+                                instance_path="kg_entities",
+                            )
+                        )
             evidence: dict[str, Any] = item.get("evidence", {}) or {}
             issues.extend(
                 _validate_doc_spans(
