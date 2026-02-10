@@ -9,8 +9,64 @@ from earCrawler.rag.corpus_contract import normalize_ear_section_id
 
 CorpusDocument = Dict[str, Any]
 
-_SUBSECTION_RE = re.compile(r"(?m)^\s*\(([a-z0-9]+)\)\s")
+_LETTER_MARKER_RE = re.compile(r"(?m)^\s*\(\s*([a-z])\s*\)\s")
+_DIGIT_MARKER_RE = re.compile(r"(?m)^\s*\(\s*(\d+)\s*\)\s")
 _PARAGRAPH_SPLIT_RE = re.compile(r"\n\s*\n")
+_NEWLINE_SPLIT_RE = re.compile(r"\n+")
+
+
+def _split_by_whitespace(text: str, *, max_chars: int) -> list[str]:
+    """Deterministically split a long block into <=max_chars segments on whitespace.
+
+    Used as a fallback when upstream text contains long unbroken paragraphs.
+    """
+
+    words = text.split()
+    if not words:
+        return []
+
+    chunks: list[str] = []
+    current: list[str] = []
+    current_len = 0
+
+    def _flush() -> None:
+        nonlocal current, current_len
+        if current:
+            chunks.append(" ".join(current))
+            current = []
+            current_len = 0
+
+    for word in words:
+        if not current:
+            if len(word) <= max_chars:
+                current = [word]
+                current_len = len(word)
+                continue
+            # Extremely long "word" fallback: hard-slice deterministically.
+            start = 0
+            while start < len(word):
+                chunks.append(word[start : start + max_chars])
+                start += max_chars
+            continue
+
+        needed = 1 + len(word)
+        if current_len + needed <= max_chars:
+            current.append(word)
+            current_len += needed
+            continue
+
+        _flush()
+        if len(word) <= max_chars:
+            current = [word]
+            current_len = len(word)
+            continue
+        start = 0
+        while start < len(word):
+            chunks.append(word[start : start + max_chars])
+            start += max_chars
+
+    _flush()
+    return chunks
 
 
 def _paragraph_chunks(container: CorpusDocument, max_chars: int) -> List[CorpusDocument]:
@@ -23,11 +79,20 @@ def _paragraph_chunks(container: CorpusDocument, max_chars: int) -> List[CorpusD
     text = str(container.get("text") or "").strip()
     paragraphs = [p.strip() for p in _PARAGRAPH_SPLIT_RE.split(text) if p.strip()]
     if len(paragraphs) <= 1:
-        raise ValueError(
-            f"Chunk for {container.get('doc_id')} exceeds max_chars={max_chars} and cannot be split on paragraph boundaries."
-        )
+        # Some upstream sources don't preserve blank lines; fall back to single-newline
+        # or whitespace splitting to keep builds robust and deterministic.
+        paragraphs = [p.strip() for p in _NEWLINE_SPLIT_RE.split(text) if p.strip()]
+        if len(paragraphs) <= 1:
+            paragraphs = _split_by_whitespace(text, max_chars=max_chars)
+        if len(paragraphs) <= 1:
+            raise ValueError(
+                f"Chunk for {container.get('doc_id')} exceeds max_chars={max_chars} and cannot be split deterministically."
+            )
+
+    # Enforce size constraints after selecting a split strategy.
     for para in paragraphs:
         if len(para) > max_chars:
+            # whitespace splitter should prevent this, but keep defensive.
             raise ValueError(
                 f"Paragraph for {container.get('doc_id')} exceeds max_chars={max_chars} (len={len(para)})."
             )
@@ -108,10 +173,10 @@ def chunk_section_text(
     heading_val = (heading or "").strip()
     raw_text = text
 
-    matches = list(_SUBSECTION_RE.finditer(raw_text))
+    letter_matches = list(_LETTER_MARKER_RE.finditer(raw_text))
     chunks: List[CorpusDocument] = []
 
-    if not matches:
+    if not letter_matches:
         section_doc: CorpusDocument = {
             "doc_id": norm_section,
             "section_id": norm_section,
@@ -123,36 +188,100 @@ def chunk_section_text(
             section_doc["title"] = heading_val
         return _emit_chunk(section_doc, max_chars)
 
-    lead_text = raw_text[: matches[0].start()].strip()
-    if lead_text:
-        section_doc = {
-            "doc_id": norm_section,
-            "section_id": norm_section,
-            "text": lead_text,
-            "chunk_kind": "section",
-            "ordinal": 0,
-        }
-        if heading_val:
-            section_doc["title"] = heading_val
-        chunks.extend(_emit_chunk(section_doc, max_chars))
+    # Always emit a base section container so child chunks have a valid parent_id.
+    section_doc = {
+        "doc_id": norm_section,
+        "section_id": norm_section,
+        "text": raw_text.strip(),
+        "chunk_kind": "section",
+        "ordinal": 0,
+    }
+    if heading_val:
+        section_doc["title"] = heading_val
+    chunks.extend(_emit_chunk(section_doc, max_chars))
 
-    for idx, match in enumerate(matches):
-        label = match.group(1).lower()
+    filtered_matches = []
+    for match in letter_matches:
+        letter = match.group(1).lower()
+        # Avoid treating common roman numeral markers as top-level subsection labels.
+        if letter in {"i", "v", "x"}:
+            continue
+        filtered_matches.append(match)
+
+    if filtered_matches:
+        labels = [m.group(1).lower() for m in filtered_matches]
+        # If top-level labels repeat within a section, they are almost certainly
+        # from nested enumerations or formatting artifacts. In that case, skip
+        # subsection splitting and rely on the base section chunk.
+        if len(set(labels)) != len(labels):
+            filtered_matches = []
+
+    for idx, match in enumerate(filtered_matches):
+        letter = match.group(1).lower()
         start = match.start()
-        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(raw_text)
-        subsection_text = raw_text[start:end].strip()
-        subsection_id = f"{norm_section}({label})"
-        subsection_doc: CorpusDocument = {
-            "doc_id": subsection_id,
-            "section_id": subsection_id,
-            "text": subsection_text,
-            "chunk_kind": "subsection",
-            "parent_id": norm_section,
-            "ordinal": idx + 1,
-        }
-        if heading_val:
-            subsection_doc["title"] = heading_val
-        chunks.extend(_emit_chunk(subsection_doc, max_chars))
+        end = (
+            filtered_matches[idx + 1].start()
+            if idx + 1 < len(filtered_matches)
+            else len(raw_text)
+        )
+        letter_block = raw_text[start:end].strip()
+        letter_id = f"{norm_section}({letter})"
+
+        digit_matches = list(_DIGIT_MARKER_RE.finditer(letter_block))
+        if digit_matches:
+            digit_labels = [m.group(1) for m in digit_matches]
+            # If numeric markers repeat within a subsection, they are almost certainly nested
+            # under deeper enumerations (A)/(i)/... and cannot be represented uniquely at the
+            # (letter)(number) level. In that case, keep the full letter block as a single chunk.
+            if len(set(digit_labels)) != len(digit_labels):
+                digit_matches = []
+
+        if not digit_matches:
+            subsection_doc: CorpusDocument = {
+                "doc_id": letter_id,
+                "section_id": letter_id,
+                "text": letter_block,
+                "chunk_kind": "subsection",
+                "parent_id": norm_section,
+                "ordinal": idx + 1,
+            }
+            if heading_val:
+                subsection_doc["title"] = heading_val
+            chunks.extend(_emit_chunk(subsection_doc, max_chars))
+            continue
+
+        # Emit the letter container for any lead-in text before the first numeric marker.
+        letter_lead = letter_block[: digit_matches[0].start()].strip()
+        if letter_lead:
+            subsection_doc = {
+                "doc_id": letter_id,
+                "section_id": letter_id,
+                "text": letter_lead,
+                "chunk_kind": "subsection",
+                "parent_id": norm_section,
+                "ordinal": idx + 1,
+            }
+            if heading_val:
+                subsection_doc["title"] = heading_val
+            chunks.extend(_emit_chunk(subsection_doc, max_chars))
+
+        for jdx, dmatch in enumerate(digit_matches):
+            num = dmatch.group(1)
+            dstart = dmatch.start()
+            dend = digit_matches[jdx + 1].start() if jdx + 1 < len(digit_matches) else len(letter_block)
+            digit_block = letter_block[dstart:dend].strip()
+            digit_id = f"{letter_id}({num})"
+            digit_doc: CorpusDocument = {
+                "doc_id": digit_id,
+                "section_id": digit_id,
+                "text": digit_block,
+                "chunk_kind": "subsection",
+                "parent_id": letter_id,
+                "ordinal": jdx + 1,
+            }
+            if heading_val:
+                digit_doc["title"] = heading_val
+            chunks.extend(_emit_chunk(digit_doc, max_chars))
 
     return chunks
 

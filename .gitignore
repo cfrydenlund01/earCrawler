@@ -16,6 +16,10 @@ data/ecfr/**
 # Offline snapshot payloads are large and must not be committed.
 snapshots/offline/**/snapshot*.jsonl
 snapshots/offline/**/payload*.jsonl
+# Offline snapshot provenance manifests are local-only; capture provenance in `runs/` instead.
+snapshots/offline/**/manifest.json
+# Derived RAG artifacts (regenerated via CLI).
+data/faiss/retrieval_corpus.jsonl
 kg/.kgstate/
 kg/canonical/*
 !kg/canonical/aliases.json

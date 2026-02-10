@@ -1594,6 +1594,13 @@ def rag_index_validate_snapshot(snapshot: Path, snapshot_manifest: Path | None) 
     help="Snapshot output path (JSONL).",
 )
 @click.option(
+    "--part",
+    "parts",
+    multiple=True,
+    type=str,
+    help="Optional CFR part(s) to fetch (repeatable). If omitted, fetches the entire title.",
+)
+@click.option(
     "--date",
     type=str,
     default=None,
@@ -1606,15 +1613,58 @@ def rag_index_validate_snapshot(snapshot: Path, snapshot_manifest: Path | None) 
     show_default=True,
     help="CFR title to fetch (default: 15).",
 )
-def rag_index_fetch_ecfr(out: Path, date: str | None, title: str) -> None:
+@click.option(
+    "--snapshot-id",
+    type=str,
+    default=None,
+    help="Snapshot id to write into the offline manifest (defaults to out parent directory name).",
+)
+@click.option(
+    "--manifest-out",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Optional manifest output path (offline-snapshot.v1). Defaults to <out_dir>/manifest.json.",
+)
+@click.option(
+    "--owner",
+    type=str,
+    default=None,
+    help="Manifest source.owner (defaults to current OS user).",
+)
+@click.option(
+    "--approved-by",
+    type=str,
+    default=None,
+    help="Manifest source.approved_by (defaults to owner).",
+)
+def rag_index_fetch_ecfr(
+    out: Path,
+    parts: tuple[str, ...],
+    date: str | None,
+    title: str,
+    snapshot_id: str | None,
+    manifest_out: Path | None,
+    owner: str | None,
+    approved_by: str | None,
+) -> None:
     """Fetch an eCFR snapshot (network gated via EARCRAWLER_ALLOW_NETWORK)."""
 
     out.parent.mkdir(parents=True, exist_ok=True)
     try:
-        fetch_ecfr_snapshot(out, title=title, date=date)
+        payload_path, manifest_path = fetch_ecfr_snapshot(
+            out,
+            title=title,
+            date=date,
+            parts=list(parts),
+            snapshot_id=snapshot_id,
+            manifest_path=manifest_out,
+            owner=owner,
+            approved_by=approved_by,
+        )
     except Exception as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(f"Wrote snapshot -> {out}")
+    click.echo(f"Wrote snapshot -> {payload_path}")
+    click.echo(f"Wrote manifest -> {manifest_path}")
 
 
 def main() -> None:  # pragma: no cover - CLI entrypoint

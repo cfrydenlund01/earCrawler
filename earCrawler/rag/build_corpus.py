@@ -94,6 +94,20 @@ def build_retrieval_corpus(
         )
         for chunk in chunks:
             part = extract_ear_part(chunk.get("section_id"))
+            # Improve retrieval for citation-style queries by ensuring the embedding
+            # text includes a stable CFR identifier alongside the natural-language body.
+            chunk_section_id = str(chunk.get("section_id") or "").strip()
+            citation = (
+                chunk_section_id[len("EAR-") :] if chunk_section_id.startswith("EAR-") else chunk_section_id
+            )
+            prefix_lines: list[str] = []
+            if citation:
+                prefix_lines.append(f"15 CFR {citation}")
+            if heading:
+                prefix_lines.append(str(heading).strip())
+            prefix = "\n".join([line for line in prefix_lines if line]).strip()
+            chunk_text = str(chunk.get("text") or "").strip()
+            embedded_text = (prefix + "\n\n" + chunk_text).strip() if prefix else chunk_text
             doc: CorpusDocument = {
                 **chunk,
                 "schema_version": SCHEMA_VERSION,
@@ -101,6 +115,7 @@ def build_retrieval_corpus(
                 "source_ref": resolved_source_ref,
                 "snapshot_id": snapshot_id,
                 "snapshot_sha256": snapshot_sha256,
+                "text": embedded_text,
             }
             if part:
                 doc["part"] = part

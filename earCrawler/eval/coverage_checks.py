@@ -10,6 +10,17 @@ from earCrawler.eval.evidence_resolver import load_corpus_index
 from earCrawler.rag.pipeline import _normalize_section_id
 
 
+def _base_section_id(value: str) -> str:
+    """Return the base section id without subsection suffixes.
+
+    Example:
+    - EAR-740.9(a)(2) -> EAR-740.9
+    - EAR-736.2#p0001 -> EAR-736.2  (caller should normalize '#' first)
+    """
+
+    return str(value).split("(", 1)[0].strip()
+
+
 def _iter_jsonl(path: Path) -> Iterable[dict]:
     with path.open("r", encoding="utf-8") as handle:
         for line in handle:
@@ -363,9 +374,20 @@ def build_fr_coverage_report(
                     retrieved_sections.append(norm)
 
             ranks: dict[str, int | None] = {sec: None for sec in expected_sections}
+            base_ranks: dict[str, int] = {}
             for rank, sec in enumerate(retrieved_sections, start=1):
+                base_ranks.setdefault(_base_section_id(sec), rank)
                 if sec in ranks and ranks[sec] is None:
                     ranks[sec] = rank
+
+            # When the expected universe is section-level (EAR-740.9), count hits on any
+            # subsection (EAR-740.9(a), EAR-740.9(a)(2), ...) as coverage.
+            for expected in expected_sections:
+                if ranks[expected] is not None:
+                    continue
+                if "(" in expected:
+                    continue
+                ranks[expected] = base_ranks.get(expected)
 
             missing_in_retrieval = [sec for sec, rank in ranks.items() if rank is None]
             rank_values = [rank for rank in ranks.values() if isinstance(rank, int)]
