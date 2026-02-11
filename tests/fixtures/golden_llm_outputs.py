@@ -142,7 +142,7 @@ GOLDEN_LLM_OUTPUTS: dict[str, str] = {
             "citations": [
                 {
                     "section_id": "EAR-746.4(a)",
-                    "quote": "a license is required for this activity.",
+                    "quote": "Part 746 imposes licensing requirements for embargoed destinations.",
                     "span_id": "746.4(a)",
                 }
             ],
@@ -187,6 +187,132 @@ GOLDEN_LLM_OUTPUTS: dict[str, str] = {
                     "section_id": "EAR-744.6(b)(3)",
                     "quote": "A BIS license is required for covered biological-weapons support activities.",
                     "span_id": "744.6(b)(3)",
+                },
+            ],
+            "evidence_okay": {
+                "ok": True,
+                "reasons": ["citation_quote_is_substring_of_context"],
+            },
+            "assumptions": [],
+        }
+    ),
+    "gph2-ua-006": _render(
+        {
+            "label": "unanswerable",
+            "answer_text": "Insufficient information to determine. Need the ECCN, destination controls, and the specific EAR excerpt governing exports to Russia.",
+            "justification": "The retrieved text is too general to confirm ECCN 3A001 licensing for Russia.",
+            "citations": [],
+            "evidence_okay": {"ok": True, "reasons": ["no_grounded_quote_for_key_claim"]},
+            "assumptions": [],
+        }
+    ),
+    "gph2-ua-007": _render(
+        {
+            "label": "unanswerable",
+            "answer_text": "Insufficient information to determine. Need ENC eligibility conditions for 5D002 and the relevant destination controls.",
+            "justification": "No retrieved excerpt states ENC applicability for this scenario.",
+            "citations": [],
+            "evidence_okay": {"ok": True, "reasons": ["no_grounded_quote_for_key_claim"]},
+            "assumptions": [],
+        }
+    ),
+    "gph2-ua-008": _render(
+        {
+            "label": "unanswerable",
+            "answer_text": "Insufficient information to determine. Need the ECCN, destination, and the STA eligibility conditions from the relevant EAR section.",
+            "justification": "The provided excerpts do not specify STA availability criteria for the scenario.",
+            "citations": [],
+            "evidence_okay": {"ok": True, "reasons": ["no_grounded_quote_for_key_claim"]},
+            "assumptions": [],
+        }
+    ),
+    "gph2-ans-008": _render(
+        {
+            "label": "false",
+            "answer_text": "False. The excerpt says NS Column 1 exports to China require a license unless an exception applies.",
+            "justification": "The cited NS-control excerpt explicitly states a license requirement for China.",
+            "citations": [
+                {
+                    "section_id": "EAR-742.4(a)(1)",
+                    "quote": "A license is required for NS Column 1 exports to China unless an exception applies.",
+                    "span_id": "742.4(a)(1)",
+                }
+            ],
+            "evidence_okay": {
+                "ok": True,
+                "reasons": ["citation_quote_is_substring_of_context"],
+            },
+            "assumptions": [],
+        }
+    ),
+    "gph2-ans-009": _render(
+        {
+            "label": "false",
+            "answer_text": "False. EAR-744.6(b)(3) concerns U.S. person support related to biological weapons activities, not Part 746 embargo controls.",
+            "justification": "The cited excerpt describes a BIS license requirement tied to biological weapons support activities.",
+            "citations": [
+                {
+                    "section_id": "EAR-744.6(b)(3)",
+                    "quote": "A BIS license is required for certain U.S. person support related to biological weapons activities.",
+                    "span_id": "744.6(b)(3)",
+                }
+            ],
+            "evidence_okay": {
+                "ok": True,
+                "reasons": ["citation_quote_is_substring_of_context"],
+            },
+            "assumptions": [],
+        }
+    ),
+    "gph2-ua-009": _render(
+        {
+            "label": "unanswerable",
+            "answer_text": "Insufficient information to determine. The retrieved context does not provide substantive requirements for that section.",
+            "justification": "The excerpt is insufficient to answer what requirements apply under the referenced section.",
+            "citations": [],
+            "evidence_okay": {"ok": True, "reasons": ["no_grounded_quote_for_key_claim"]},
+            "assumptions": [],
+        }
+    ),
+    "gph2-ans-010": _render(
+        {
+            "label": "true",
+            "answer_text": "Yes. One excerpt states a license is required for NS Column 1 exports to China unless an exception applies, and another describes License Exceptions authorizing exports without a license when conditions are met.",
+            "justification": "Both the license requirement and the license-exception rule are needed to support the claim.",
+            "citations": [
+                {
+                    "section_id": "EAR-742.4(a)(1)",
+                    "quote": "A license is required for NS Column 1 exports to China unless an exception applies.",
+                    "span_id": "742.4(a)(1)",
+                },
+                {
+                    "section_id": "EAR-740.1",
+                    "quote": "License Exceptions authorize exports without a license when all stated conditions are met.",
+                    "span_id": "740.1",
+                },
+            ],
+            "evidence_okay": {
+                "ok": True,
+                "reasons": ["citation_quote_is_substring_of_context"],
+            },
+            "assumptions": [],
+        }
+    ),
+    "gph2-ans-011": _render(
+        {
+            "label": "true",
+            "answer_text": "Yes. The embargo excerpt indicates licensing requirements for embargoed destinations, and the general-prohibitions excerpt requires authorization before proceeding.",
+            "justification": "Both the embargo licensing requirement and the general authorization rule support the conclusion.",
+            "citations": [
+                {
+                    "section_id": "EAR-746.4(a)",
+                    "quote": "Part 746 imposes licensing requirements for embargoed destinations.",
+                    "span_id": "746.4(a)",
+                },
+                {
+                    "section_id": "EAR-736.2(b)",
+                    "quote": "you may not proceed unless a BIS license or License Exception applies.",
+                    "span_id": "736.2(b)",
                 },
             ],
             "evidence_okay": {

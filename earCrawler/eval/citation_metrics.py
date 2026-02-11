@@ -100,21 +100,13 @@ def extract_ground_truth_sections(
 def extract_predicted_sections(result_item: Mapping[str, object]) -> set[str]:
     """Canonicalize predicted citation ids.
 
-    Prefer explicit citations[]. If absent, fall back to used_sections as a
-    temporary proxy so legacy outputs remain comparable.
+    Use explicit citations[] only. Missing citations must remain missing so
+    eval outputs do not silently convert retrieval hits into citation passes.
     """
 
     sections: set[str] = set()
     for cit in result_item.get("citations") or []:
         norm = _normalize_section_id(cit.get("section_id"))
-        if norm:
-            sections.add(norm)
-
-    if sections:
-        return sections
-
-    for sec in result_item.get("used_sections") or []:
-        norm = _normalize_section_id(sec)
         if norm:
             sections.add(norm)
     return sections

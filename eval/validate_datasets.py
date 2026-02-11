@@ -21,6 +21,26 @@ class ValidationIssue:
     instance_path: str
 
 
+def format_issue(issue: ValidationIssue) -> str:
+    return (
+        f"- {issue.dataset_id} @ {issue.file} line {issue.line}: "
+        f"{issue.message} (path={issue.instance_path or '/'})"
+    )
+
+
+def summarize_issues(issues: Sequence[ValidationIssue], *, max_lines: int = 20) -> str:
+    if not issues:
+        return "All evaluation datasets validated successfully."
+
+    lines = [f"Validation failed for {len(issues)} issue(s):"]
+    for issue in list(issues)[:max_lines]:
+        lines.append(format_issue(issue))
+    remaining = len(issues) - max_lines
+    if remaining > 0:
+        lines.append(f"- ... and {remaining} more issue(s)")
+    return "\n".join(lines)
+
+
 def _load_json(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -263,6 +283,18 @@ def validate_datasets(
     return issues
 
 
+def ensure_valid_datasets(
+    manifest_path: Path | None = None,
+    schema_path: Path | None = None,
+    dataset_ids: Sequence[str] | None = None,
+    *,
+    max_issue_lines: int = 20,
+) -> None:
+    issues = validate_datasets(manifest_path, schema_path, dataset_ids)
+    if issues:
+        raise ValueError(summarize_issues(issues, max_lines=max_issue_lines))
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Validate evaluation datasets against schema."
@@ -288,16 +320,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     issues = validate_datasets(args.manifest, args.schema, args.dataset_ids or None)
-    if issues:
-        print(f"Validation failed for {len(issues)} issue(s):")
-        for issue in issues:
-            print(
-                f"- {issue.dataset_id} @ {issue.file} line {issue.line}: "
-                f"{issue.message} (path={issue.instance_path or '/'})"
-            )
-        return 1
-    print("All evaluation datasets validated successfully.")
-    return 0
+    print(summarize_issues(issues, max_lines=len(issues) if issues else 20))
+    return 1 if issues else 0
 
 
 if __name__ == "__main__":  # pragma: no cover

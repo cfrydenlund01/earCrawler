@@ -4,6 +4,8 @@ set -euo pipefail
 MODEL_PATH=${MODEL_PATH:-sshleifer/tiny-gpt2}
 TMP_JSON=$(mktemp)
 
+python -m eval.validate_datasets
+
 python -m earCrawler.eval.run_eval \
   --model-path "$MODEL_PATH" \
   --data-file eval/pilot_items.jsonl \

@@ -56,3 +56,51 @@ def test_validate_datasets_flags_missing_references(tmp_path: Path) -> None:
         dataset_ids=None,
     )
     assert len(issues) == 3
+
+
+def test_validate_datasets_reports_schema_error_with_record_context(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    dataset_path = tmp_path / "invalid_schema.jsonl"
+    schema_path = Path("eval") / "schema.json"
+    manifest = {
+        "kg_state": {"manifest_path": "kg/.kgstate/manifest.json", "digest": "abc"},
+        "datasets": [
+            {
+                "id": "schema_fail.v1",
+                "task": "test_task",
+                "file": str(dataset_path),
+                "version": 1,
+                "description": "",
+                "num_items": 1,
+            }
+        ],
+        "references": {
+            "sections": {},
+            "kg_nodes": [],
+            "kg_paths": [],
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    dataset_item = {
+        "id": "item1",
+        "task": "test_task",
+        "question": "Q?",
+        "ear_sections": [],
+        "kg_entities": [],
+        "evidence": {"doc_spans": [], "kg_nodes": []},
+    }
+    dataset_path.write_text(json.dumps(dataset_item) + "\n", encoding="utf-8")
+
+    issues = validate_datasets(
+        manifest_path=manifest_path,
+        schema_path=schema_path,
+        dataset_ids=None,
+    )
+
+    assert len(issues) == 1
+    issue = issues[0]
+    assert issue.dataset_id == "schema_fail.v1"
+    assert issue.file == dataset_path
+    assert issue.line == 1
+    assert issue.instance_path == ""
+    assert "'ground_truth' is a required property" in issue.message

@@ -21,6 +21,7 @@ except Exception:  # pragma: no cover - pytest_socket optional fallback
 DATASET_ID = "golden_phase2.v1"
 DATASET_PATH = Path("eval") / f"{DATASET_ID}.jsonl"
 RESERVED_OR_INVALID_SECTION_IDS = {"EAR-740.9(a)(2)"}
+MULTI_CITATION_REQUIRED_IDS = {"gph2-ans-007", "gph2-ans-010", "gph2-ans-011"}
 
 
 def _iter_jsonl(path: Path) -> list[dict]:
@@ -66,6 +67,20 @@ def _extract_predicted(result: Mapping[str, object]) -> set[str]:
     return sections
 
 
+def _fixture_quote_supported(*, item_id: str, section_id: str, quote: str) -> bool:
+    quote = str(quote or "")
+    if not quote.strip():
+        return False
+    for doc in GOLDEN_RETRIEVAL_MAP.get(item_id) or []:
+        doc_section = pipeline._normalize_section_id(doc.get("section"))
+        if doc_section != section_id:
+            continue
+        text = str(doc.get("text") or "")
+        if quote in text:
+            return True
+    return False
+
+
 def _render_rows(title: str, rows: list[dict]) -> str:
     if not rows:
         return f"{title}: none"
@@ -106,6 +121,9 @@ def test_phase2_golden_gate(monkeypatch) -> None:
     monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
     monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
     monkeypatch.setenv("EARCRAWLER_SKIP_LLM_SECRETS_FILE", "1")
+    # Refusals should be triggered by thin evidence (deterministic), not model variance.
+    monkeypatch.setenv("EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL", "1")
+    monkeypatch.setenv("EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE", "0.5")
 
     ids = {str(item["id"]) for item in items}
     assert ids == set(GOLDEN_RETRIEVAL_MAP), "Retrieval fixture keys must match golden item ids"
@@ -180,6 +198,21 @@ def test_phase2_golden_gate(monkeypatch) -> None:
         retrieved_sections = _normalize_set(result.get("used_sections") or [])
         schema_valid = bool(result.get("output_ok"))
 
+        quote_conditions: list[str] = []
+        for citation in result.get("citations") or []:
+            if not isinstance(citation, Mapping):
+                continue
+            cited_sec = pipeline._normalize_section_id(citation.get("section_id"))
+            if not cited_sec:
+                quote_conditions.append("quote:invalid_section_id")
+                continue
+            quote = str(citation.get("quote") or "")
+            if not quote.strip():
+                quote_conditions.append("quote:missing")
+                continue
+            if not _fixture_quote_supported(item_id=item_id, section_id=cited_sec, quote=quote):
+                quote_conditions.append("quote:not_substring_of_fixture_text")
+
         if expected_label == "unanswerable":
             unanswerable_total += 1
             if predicted_label == "unanswerable":
@@ -193,6 +226,13 @@ def test_phase2_golden_gate(monkeypatch) -> None:
             grounding_conditions.append("grounding:no_citations_for_answerable")
         if not predicted_citations.issubset(retrieved_sections):
             grounding_conditions.append("grounding:citation_not_in_retrieval")
+        grounding_conditions.extend(quote_conditions)
+
+        if item_id in MULTI_CITATION_REQUIRED_IDS:
+            if len(expected_citations) < 2:
+                grounding_conditions.append("multi:expected_lt2")
+            if predicted_citations != expected_citations:
+                grounding_conditions.append("multi:predicted_not_exact_expected")
 
         grounding_item_pass = len(grounding_conditions) == 0
         if grounding_item_pass:

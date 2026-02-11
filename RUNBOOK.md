@@ -87,14 +87,16 @@ Windows notes
     - `kg_paths` (optional array of strings) – identifiers for precomputed reasoning paths used in explainability/graph-walk evaluations.
 - The evaluation harness expects exactly this shape and treats unknown extra keys as opaque; keep the schema stable when adding new datasets and bump the dataset `id`/`version` when you need to change semantics.
 - CLI helpers:
-  - Run `python eval/validate_datasets.py` locally (or watch CI) to catch schema or referential errors early.
-  - `py -m earCrawler.cli eval run-rag --dataset-id <id>` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys.
+  - Required before every eval run: `py -m eval.validate_datasets` (or `python eval/validate_datasets.py`).
+  - `py -m earCrawler.cli eval run-rag --dataset-id <id> --fallback-max-uses 0` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys.
+  - Eval artifacts include strictness counters under `eval_strictness` (`fallbacks_used`, `fallback_counts`, `fallback_items`, threshold/breach flags). Runs fail when fallback count exceeds `fallback_max_uses`.
   - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.
 
 ## Phase 2 golden gate (offline)
 - Purpose: `eval/golden_phase2.v1.jsonl` is a deterministic regression gate for retrieval, citation precision, and grounding contract behavior. It runs with stubbed retrieval and stubbed LLM responses only; no provider/network/FAISS access is required.
 - Dataset id: `golden_phase2.v1` (registered in `eval/manifest.json`).
 - Run locally:
+  - `py -m eval.validate_datasets`
   - `py -m pytest -q tests/golden/test_phase2_golden_gate.py`
   - `py -m pytest -q`
 - Acceptance thresholds enforced in `tests/golden/test_phase2_golden_gate.py`:

@@ -12,6 +12,27 @@ def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
 
 
+def _valid_eval_item(
+    *,
+    item_id: str,
+    question: str,
+    task: str = "ear_compliance",
+    answer_text: str = "A",
+    label: str = "permitted",
+    ear_sections: list[str] | None = None,
+    evidence: dict | None = None,
+) -> dict:
+    return {
+        "id": item_id,
+        "task": task,
+        "question": question,
+        "ground_truth": {"answer_text": answer_text, "label": label},
+        "ear_sections": ear_sections or [],
+        "kg_entities": [],
+        "evidence": evidence or {"doc_spans": [], "kg_nodes": []},
+    }
+
+
 def test_verify_evidence_cli_success(tmp_path: Path) -> None:
     corpus_path = tmp_path / "corpus.jsonl"
     _write_jsonl(
@@ -59,7 +80,15 @@ def test_verify_evidence_cli_success(tmp_path: Path) -> None:
 
 def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
     dataset_path = tmp_path / "dataset.jsonl"
-    _write_jsonl(dataset_path, [{"id": "q1", "question": "?", "ground_truth": {}, "ear_sections": [], "evidence": {}}])
+    _write_jsonl(
+        dataset_path,
+        [
+            _valid_eval_item(
+                item_id="q1",
+                question="?",
+            )
+        ],
+    )
     manifest_path = tmp_path / "manifest.json"
     manifest_path.write_text(
         json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}), encoding="utf-8"
@@ -81,6 +110,7 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
         answer_score_mode,
         semantic_threshold,
         semantic,
+        fallback_max_uses,
     ):
         out_json.parent.mkdir(parents=True, exist_ok=True)
         out_json.write_text("{}", encoding="utf-8")
@@ -96,6 +126,7 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
                 "answer_score_mode": answer_score_mode,
                 "semantic_threshold": semantic_threshold,
                 "manifest": Path(manifest_path),
+                "fallback_max_uses": fallback_max_uses,
             }
         )
         return out_json, out_md
@@ -130,7 +161,47 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
     assert calls[0]["answer_score_mode"] == "semantic"
     assert calls[0]["semantic_threshold"] == 0.6
     assert calls[0]["manifest"] == manifest_path
+    assert calls[0]["fallback_max_uses"] == 0
     assert (out_dir / "ds1.rag.groq.llama-3.3-70b-versatile.json").exists()
+
+
+def test_run_rag_cli_fails_on_dataset_schema_error(tmp_path: Path) -> None:
+    dataset_path = tmp_path / "dataset.invalid.jsonl"
+    _write_jsonl(
+        dataset_path,
+        [
+            {
+                "id": "q1",
+                "task": "ear_compliance",
+                "question": "Q?",
+                "ear_sections": [],
+                "kg_entities": [],
+                "evidence": {"doc_spans": [], "kg_nodes": []},
+            }
+        ],
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}), encoding="utf-8"
+    )
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli,
+        [
+            "eval",
+            "run-rag",
+            "--manifest",
+            str(manifest_path),
+            "--dataset-id",
+            "ds1",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Validation failed for 1 issue(s):" in result.output
+    assert "line 1" in result.output
+    assert "'ground_truth' is a required property" in result.output
 
 
 def test_fr_coverage_cli_records_ranks(monkeypatch, tmp_path: Path) -> None:
@@ -150,12 +221,11 @@ def test_fr_coverage_cli_records_ranks(monkeypatch, tmp_path: Path) -> None:
     _write_jsonl(
         dataset_path,
         [
-            {
-                "id": "item-1",
-                "question": "Can I export without a license if a license exception applies?",
-                "ear_sections": ["EAR-740.1"],
-                "evidence": {"doc_spans": [{"doc_id": "EAR-740", "span_id": "740.1"}]},
-            }
+            _valid_eval_item(
+                item_id="item-1",
+                question="Can I export without a license if a license exception applies?",
+                ear_sections=["EAR-740.1"],
+            )
         ],
     )
     manifest_path = tmp_path / "manifest.json"
@@ -220,24 +290,22 @@ def test_fr_coverage_cli_emits_summary_and_filters_v2(monkeypatch, tmp_path: Pat
     _write_jsonl(
         dataset_v1,
         [
-            {
-                "id": "item-v1",
-                "question": "Q",
-                "ear_sections": ["EAR-740.1"],
-                "evidence": {"doc_spans": [{"doc_id": "EAR-740", "span_id": "740.1"}]},
-            }
+            _valid_eval_item(
+                item_id="item-v1",
+                question="Q",
+                ear_sections=["EAR-740.1"],
+            )
         ],
     )
     dataset_v2 = tmp_path / "dataset.v2.jsonl"
     _write_jsonl(
         dataset_v2,
         [
-            {
-                "id": "item-v2",
-                "question": "Q",
-                "ear_sections": ["EAR-740.1", "EAR-742.4(a)(1)"],
-                "evidence": {"doc_spans": [{"doc_id": "EAR-742", "span_id": "742.4(a)(1)"}]},
-            }
+            _valid_eval_item(
+                item_id="item-v2",
+                question="Q",
+                ear_sections=["EAR-740.1", "EAR-742.4(a)(1)"],
+            )
         ],
     )
 
@@ -311,12 +379,11 @@ def test_fr_coverage_cli_strict_gating_writes_artifacts(monkeypatch, tmp_path: P
     _write_jsonl(
         dataset_path,
         [
-            {
-                "id": "item-1",
-                "question": "Q",
-                "ear_sections": ["EAR-740.1", "EAR-742.4(a)(1)"],
-                "evidence": {},
-            }
+            _valid_eval_item(
+                item_id="item-1",
+                question="Q",
+                ear_sections=["EAR-740.1", "EAR-742.4(a)(1)"],
+            )
         ],
     )
     manifest_path = tmp_path / "manifest.json"

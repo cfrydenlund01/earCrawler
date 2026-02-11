@@ -636,6 +636,13 @@ def build_kg_expansion(manifest: Path, corpus: Path, out: Path) -> None:
     help="Whether to include semantic accuracy in the metrics.",
 )
 @click.option(
+    "--fallback-max-uses",
+    type=int,
+    default=0,
+    show_default=True,
+    help="Fail the run when fallback normalization/inference count exceeds this threshold (-1 disables).",
+)
+@click.option(
     "--out-dir",
     type=click.Path(path_type=Path),
     default=Path("dist") / "eval",
@@ -652,9 +659,16 @@ def eval_run_rag(
     answer_score_mode: str,
     semantic_threshold: float,
     semantic: bool,
+    fallback_max_uses: int,
     out_dir: Path,
 ) -> None:
     """Run RAG-based evals for each dataset in the manifest."""
+    fallback_threshold = None if fallback_max_uses < 0 else fallback_max_uses
+
+    try:
+        from eval.validate_datasets import ensure_valid_datasets
+    except Exception as exc:  # pragma: no cover - import failures
+        raise click.ClickException(str(exc))
 
     try:
         manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
@@ -666,6 +680,18 @@ def eval_run_rag(
         dataset_entries = [entry for entry in dataset_entries if entry.get("id") == dataset_id]
         if not dataset_entries:
             raise click.ClickException(f"Dataset not found: {dataset_id}")
+        dataset_ids: list[str] | None = [dataset_id]
+    else:
+        dataset_ids = None
+
+    try:
+        ensure_valid_datasets(
+            manifest_path=manifest,
+            schema_path=Path("eval") / "schema.json",
+            dataset_ids=dataset_ids,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc))
 
     try:
         from scripts.eval import eval_rag_llm
@@ -690,6 +716,7 @@ def eval_run_rag(
                 answer_score_mode=answer_score_mode,
                 semantic_threshold=semantic_threshold,
                 semantic=semantic,
+                fallback_max_uses=fallback_threshold,
             )
         except Exception as exc:  # pragma: no cover - bubbled to CLI
             raise click.ClickException(str(exc))
@@ -797,6 +824,23 @@ def eval_fr_coverage(
     fail: bool,
 ) -> None:
     """Check FR section coverage + retriever ranks for eval datasets."""
+
+    try:
+        from eval.validate_datasets import ensure_valid_datasets
+    except Exception as exc:  # pragma: no cover - import failures
+        raise click.ClickException(str(exc))
+
+    selected_dataset_ids: list[str] | None = None
+    if dataset_id and dataset_id != "all":
+        selected_dataset_ids = [dataset_id]
+    try:
+        ensure_valid_datasets(
+            manifest_path=manifest,
+            schema_path=Path("eval") / "schema.json",
+            dataset_ids=selected_dataset_ids,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc))
 
     try:
         from earCrawler.eval.coverage_checks import (
