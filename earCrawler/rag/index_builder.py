@@ -3,6 +3,7 @@ from __future__ import annotations
 """Deterministic FAISS index builder for the retrieval corpus."""
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, List, Dict, Any
 
@@ -11,6 +12,10 @@ from earCrawler.rag.corpus_contract import SCHEMA_VERSION, require_valid_corpus
 from earCrawler.utils.import_guard import import_optional
 
 INDEX_META_VERSION = "faiss-index-meta.v1"
+
+
+def _utc_now_iso() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 def _load_sentence_transformer(model_name: str):
@@ -77,6 +82,7 @@ def build_faiss_index_from_corpus(
 
     meta = {
         "schema_version": INDEX_META_VERSION,
+        "build_timestamp_utc": _utc_now_iso(),
         "corpus_schema_version": SCHEMA_VERSION,
         "corpus_digest": compute_corpus_digest(docs),
         "doc_count": len(docs),

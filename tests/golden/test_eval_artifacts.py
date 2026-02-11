@@ -255,6 +255,7 @@ def test_eval_writes_answer_artifacts_and_citation_metrics(monkeypatch, tmp_path
     assert "citation_precision" in results[0]
     assert any(r["citations_errors"] for r in results if r["id"] == "item-2")
     assert any(r["citations_ok"] is True for r in results)
+    assert all(r.get("trace_pack_path") for r in results)
 
     artifact_dir = tmp_path / "metrics" / "answers" / dataset_id
     artifacts = sorted(artifact_dir.glob("*.answer.json"))
@@ -281,3 +282,14 @@ def test_eval_writes_answer_artifacts_and_citation_metrics(monkeypatch, tmp_path
     assert sample["citations"]
     assert sample["citations"][0]["section_id"] == "EAR-736.2(b)"
     assert sample["retrieved_docs"]
+
+    trace_sample_path = Path(str(results[0]["trace_pack_path"]))
+    trace_sample = json.loads(trace_sample_path.read_text(encoding="utf-8"))
+    run_provenance = trace_sample.get("run_provenance") or {}
+    assert run_provenance.get("snapshot_id")
+    assert run_provenance.get("snapshot_sha256")
+    assert run_provenance.get("corpus_digest")
+    assert run_provenance.get("index_path")
+    assert run_provenance.get("embedding_model")
+    assert "api_key" not in run_provenance
+    assert len(str(trace_sample.get("provenance_hash") or "")) == 64

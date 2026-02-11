@@ -1,0 +1,62 @@
+name: Phase1 Coverage (Dev Snapshot)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  phase1-dev:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      HF_HUB_DISABLE_PROGRESS_BARS: "1"
+      PYTHONUTF8: "1"
+      SOURCE_DATE_EPOCH: "946684800"
+      EARCTL_USER: test_operator
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Cache pip
+        uses: actions/cache@v3
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-3.11-${{ hashFiles('**/requirements*.txt') }}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade --retries 5 -r requirements.txt -r requirements-win.txt
+      - name: Validate dev snapshot fixture
+        shell: pwsh
+        run: |
+          python -m earCrawler.cli rag-index validate-snapshot --snapshot tests/fixtures/offline_snapshots/ecfr_dev_title15_parts_736_740_742_744_746/snapshot.jsonl
+      - name: Build corpus + index (dev)
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist/phase1_dev | Out-Null
+          python -m earCrawler.cli rag-index build-corpus --snapshot tests/fixtures/offline_snapshots/ecfr_dev_title15_parts_736_740_742_744_746/snapshot.jsonl --out dist/phase1_dev/retrieval_corpus.jsonl
+          python -m earCrawler.cli rag-index build --input dist/phase1_dev/retrieval_corpus.jsonl --index-path dist/phase1_dev/index.faiss --model-name all-MiniLM-L12-v2 --reset
+      - name: Run Phase 1 coverage gate (dev)
+        shell: pwsh
+        env:
+          EARCRAWLER_FAISS_INDEX: dist/phase1_dev/index.faiss
+          EARCRAWLER_FAISS_MODEL: all-MiniLM-L12-v2
+        run: |
+          pwsh scripts/run_phase1_coverage.ps1 `
+            -Manifest tests/fixtures/phase1_coverage/manifest.phase1_dev.json `
+            -Corpus dist/phase1_dev/retrieval_corpus.jsonl `
+            -DatasetId phase1_dev_universe.v2 `
+            -MaxMissingRate 0.0 `
+            -RetrievalK 10
+      - name: Upload coverage artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase1-coverage-dev
+          path: dist/eval/coverage_runs
+          if-no-files-found: ignore
+

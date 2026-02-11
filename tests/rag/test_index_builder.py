@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -129,6 +130,8 @@ def test_index_builder_writes_meta(monkeypatch, tmp_path: Path) -> None:
     assert meta_path.exists()
     meta = json.loads(meta_path.read_text(encoding="utf-8"))
     assert meta["schema_version"] == INDEX_META_VERSION
+    assert isinstance(meta["build_timestamp_utc"], str)
+    datetime.fromisoformat(meta["build_timestamp_utc"].replace("Z", "+00:00"))
     assert meta["doc_count"] == len(corpus_docs)
     assert meta["snapshot"] == {"snapshot_id": "ecfr-title15-2025-12-31", "snapshot_sha256": "a" * 64}
     rows = meta["rows"]
@@ -171,3 +174,32 @@ def test_retriever_reads_index_and_meta(monkeypatch, tmp_path: Path) -> None:
     assert [res["doc_id"] for res in results] == ["EAR-736.2(a)", "EAR-736.2"]
     assert all("section_id" in res for res in results)
     assert all(res["score"] >= 0 for res in results)
+
+
+def test_index_builder_meta_changes_when_model_changes(monkeypatch, tmp_path: Path) -> None:
+    _install_stubs(monkeypatch)
+    corpus_docs = _corpus()
+
+    index_a = tmp_path / "a.faiss"
+    meta_a = tmp_path / "a.meta.json"
+    build_faiss_index_from_corpus(
+        corpus_docs,
+        index_path=index_a,
+        meta_path=meta_a,
+        embedding_model="stub-model-a",
+    )
+    payload_a = json.loads(meta_a.read_text(encoding="utf-8"))
+
+    index_b = tmp_path / "b.faiss"
+    meta_b = tmp_path / "b.meta.json"
+    build_faiss_index_from_corpus(
+        corpus_docs,
+        index_path=index_b,
+        meta_path=meta_b,
+        embedding_model="stub-model-b",
+    )
+    payload_b = json.loads(meta_b.read_text(encoding="utf-8"))
+
+    assert payload_a["embedding_model"] == "stub-model-a"
+    assert payload_b["embedding_model"] == "stub-model-b"
+    assert payload_a["embedding_model"] != payload_b["embedding_model"]

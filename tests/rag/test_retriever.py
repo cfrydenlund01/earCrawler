@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 import json
 import sys
+from datetime import datetime
 
 root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root))
@@ -146,6 +147,8 @@ def test_add_documents_creates_index(monkeypatch, tmp_path):
     assert len(index.added[0]) == 2
     assert faiss_mod.write_args[1] == str(r.index_path)
     meta = json.loads(r.meta_path.read_text(encoding="utf-8"))
+    assert isinstance(meta["build_timestamp_utc"], str)
+    datetime.fromisoformat(meta["build_timestamp_utc"].replace("Z", "+00:00"))
     assert meta["doc_count"] == 2
     assert [row["doc_id"] for row in meta["rows"]] == ["EAR-736.2", "EAR-736.3"]
 

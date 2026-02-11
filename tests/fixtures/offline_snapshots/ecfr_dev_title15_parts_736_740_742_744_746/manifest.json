@@ -1,0 +1,28 @@
+{
+  "manifest_version": "offline-snapshot.v1",
+  "snapshot_id": "ecfr_dev_title15_parts_736_740_742_744_746",
+  "created_at": "2026-02-10T00:00:00Z",
+  "source": {
+    "owner": "earCrawler-dev-fixture",
+    "upstream": "fixture",
+    "approved_by": "earCrawler-dev-fixture",
+    "approved_at": "2026-02-10T00:00:00Z"
+  },
+  "scope": {
+    "titles": [
+      "15"
+    ],
+    "parts": [
+      "736",
+      "740",
+      "742",
+      "744",
+      "746"
+    ]
+  },
+  "payload": {
+    "path": "snapshot.jsonl",
+    "sha256": "a162771666fe7f679a93c811db8d789834680f69d543f293d8ea150cc5f7ab4a",
+    "size_bytes": 1457
+  }
+}
