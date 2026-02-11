@@ -11,7 +11,8 @@ PREFIX = "http://example.org/"
 
 def json_to_ttl(delta_json: Path, ttl_out: Path, prov_out: Path) -> None:
     """Convert ``delta_json`` records to simple TTL and PROV files."""
-    data = json.load(delta_json.open("r", encoding="utf-8"))
+    with delta_json.open("r", encoding="utf-8") as handle:
+        data = json.load(handle)
     ttl_lines: List[str] = []
     prov_lines: List[str] = ["@prefix prov: <http://www.w3.org/ns/prov#> ."]
     for item_id, payload in data.items():

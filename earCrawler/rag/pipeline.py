@@ -679,14 +679,16 @@ def answer_with_rag(
         min_top_score = _env_float("EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE", default=0.0, min_value=0.0)
         min_total_chars = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS", default=0, min_value=0)
 
-        thin_retrieval = retrieval_empty
-        if not thin_retrieval and refuse_on_thin:
-            if len(docs) < min_docs:
-                thin_retrieval = True
-            elif _max_retrieval_score(docs) < min_top_score:
-                thin_retrieval = True
-            elif _total_context_chars(redacted_contexts) < min_total_chars:
-                thin_retrieval = True
+        thin_retrieval = False
+        if refuse_on_thin:
+            thin_retrieval = retrieval_empty
+            if not thin_retrieval:
+                if len(docs) < min_docs:
+                    thin_retrieval = True
+                elif _max_retrieval_score(docs) < min_top_score:
+                    thin_retrieval = True
+                elif _total_context_chars(redacted_contexts) < min_total_chars:
+                    thin_retrieval = True
 
         if thin_retrieval:
             disabled_reason = "insufficient_evidence"

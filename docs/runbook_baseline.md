@@ -26,6 +26,18 @@ Required:
 Optional (only when overriding defaults):
 - `EARCRAWLER_FAISS_INDEX` (custom FAISS index path)
 - `EARCRAWLER_FAISS_MODEL` (custom embedding model for retriever metadata)
+- `EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL` (`0` or `1`; set explicitly for eval reproducibility)
+- `EARCRAWLER_THIN_RETRIEVAL_MIN_DOCS` (default `1`, used when refusal mode is on)
+- `EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE` (default `0.0`, used when refusal mode is on)
+- `EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS` (default `0`, used when refusal mode is on)
+
+Recommended explicit profile for baseline bundles:
+```powershell
+$env:EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL = "1"
+$env:EARCRAWLER_THIN_RETRIEVAL_MIN_DOCS = "1"
+$env:EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE = "0.5"
+$env:EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS = "0"
+```
 
 ## Canonical Commands
 0. Snapshot provenance (fail fast + record the authoritative manifest/hash):

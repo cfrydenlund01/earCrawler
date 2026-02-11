@@ -10,7 +10,8 @@ def test_idmap_and_collisions():
     rules = reconcile.load_rules(Path("kg/reconcile/rules.yml"))
     corpus = reconcile.load_corpus(Path("tests/fixtures/reconcile/corpus.json"))
     reconcile.reconcile(corpus, rules, Path("kg/reconcile"))
-    rows = list(csv.DictReader(open("kg/reconcile/idmap.csv", encoding="utf-8")))
+    with open("kg/reconcile/idmap.csv", encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle))
     canon_s1 = [r["canonical_id"] for r in rows if r["source_id"] == "s1"][0]
     canon_s2 = [r["canonical_id"] for r in rows if r["source_id"] == "s2"][0]
     assert canon_s1 == canon_s2

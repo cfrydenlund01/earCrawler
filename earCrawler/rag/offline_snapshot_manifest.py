@@ -150,8 +150,9 @@ def _validate_payload_encoding(snapshot_path: Path) -> None:
 
     # Ensure it actually decodes as UTF-8.
     try:
-        for _ in Path(snapshot_path).open("r", encoding="utf-8", newline="\n"):
-            break
+        with Path(snapshot_path).open("r", encoding="utf-8", newline="\n") as handle:
+            for _ in handle:
+                break
     except UnicodeDecodeError as exc:
         raise ValueError(f"{snapshot_path}: must be valid UTF-8: {exc}") from exc
 

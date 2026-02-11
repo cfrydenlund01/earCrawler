@@ -1,11 +1,30 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "earSectionId": {
+      "description": "Canonical EAR section citation id (see docs/identifier_policy.md). Example: EAR-736.2(b)",
+      "minLength": 1,
+      "pattern": "^EAR-\\d{3}(?:\\.\\d+[a-z0-9]*)+(?:\\([a-z0-9]+\\))*$",
+      "type": "string"
+    },
+    "earDocId": {
+      "description": "EAR identifier used as an evidence doc_id. Allows part-only ids (EAR-736), canonical section ids, and optional stable suffixes (e.g. #p0001).",
+      "minLength": 1,
+      "pattern": "^EAR-\\d{3}(?:\\.\\d+[a-z0-9]*)*(?:\\([a-z0-9]+\\))*(?:#[a-z0-9][a-z0-9:._-]{0,200})?$",
+      "type": "string"
+    },
+    "earSpanId": {
+      "description": "Evidence span locator. Accepts either a canonical EAR section id or a section-local id without the EAR- prefix (e.g. 736.2(b)).",
+      "minLength": 1,
+      "pattern": "^(?:EAR-)?\\d{3}(?:\\.\\d+[a-z0-9]*)+(?:\\([a-z0-9]+\\))*$",
+      "type": "string"
+    }
+  },
   "additionalProperties": false,
   "properties": {
     "ear_sections": {
       "items": {
-        "minLength": 1,
-        "type": "string"
+        "$ref": "#/definitions/earSectionId"
       },
       "type": "array"
     },
@@ -17,12 +36,10 @@
             "additionalProperties": false,
             "properties": {
               "doc_id": {
-                "minLength": 1,
-                "type": "string"
+                "$ref": "#/definitions/earDocId"
               },
               "span_id": {
-                "minLength": 1,
-                "type": "string"
+                "$ref": "#/definitions/earSpanId"
               }
             },
             "required": [
@@ -59,8 +76,7 @@
       "properties": {
         "citations": {
           "items": {
-            "minLength": 1,
-            "type": "string"
+            "$ref": "#/definitions/earSectionId"
           },
           "type": "array"
         },

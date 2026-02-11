@@ -115,14 +115,16 @@ def load_rules(path: Path) -> dict:
     data = yaml.safe_load(path.read_text(encoding="utf-8"))
     wl_path = path.parent / "whitelist.csv"
     bl_path = path.parent / "blacklist.csv"
-    data["whitelist"] = {
-        (row["left_id"], row["right_id"]): row["reason"]
-        for row in csv.DictReader(wl_path.open("r", encoding="utf-8"))
-    }
-    data["blacklist"] = {
-        (row["left_id"], row["right_id"]): row["reason"]
-        for row in csv.DictReader(bl_path.open("r", encoding="utf-8"))
-    }
+    with wl_path.open("r", encoding="utf-8") as whitelist_handle:
+        data["whitelist"] = {
+            (row["left_id"], row["right_id"]): row["reason"]
+            for row in csv.DictReader(whitelist_handle)
+        }
+    with bl_path.open("r", encoding="utf-8") as blacklist_handle:
+        data["blacklist"] = {
+            (row["left_id"], row["right_id"]): row["reason"]
+            for row in csv.DictReader(blacklist_handle)
+        }
     return data
 
 
