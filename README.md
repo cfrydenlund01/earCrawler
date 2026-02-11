@@ -168,12 +168,14 @@ $env:EARCRAWLER_ENABLE_REMOTE_LLM = '1'
 # Override model if needed (Groq example)
 # $env:GROQ_MODEL = 'llama-3.1-8b-instant'
 
+py -m eval.validate_datasets
 python scripts/eval/eval_rag_llm.py --dataset-id ear_compliance.v1 --llm-provider groq --llm-model llama-3.1-8b-instant
 python scripts/eval/eval_rag_llm.py --dataset-id entity_obligations.v1 --llm-provider nvidia_nim
 python scripts/eval/eval_rag_llm.py --dataset-id unanswerable.v1 --llm-provider groq --max-items 2
 ```
 
 Outputs land under `dist/eval/` with filenames like `<dataset>.rag.<provider>.<model>.json`/`.md`. Metrics include accuracy, label accuracy, unanswerable accuracy, grounded_rate (section overlap), by-task breakdowns, provider/model metadata, and per-item records (with any LLM errors captured without stopping the run).
+Artifacts also include an `eval_strictness` section with fallback counters and threshold status (`fallbacks_used`, `fallback_counts`, `fallback_items`, `fallback_max_uses`, `fallback_threshold_breached`).
 
 ---
 
@@ -307,7 +309,8 @@ The CLI exposes a convenience command that runs the RAG pipeline against dataset
 ```powershell
 $env:EARCTL_USER = 'test_operator'  # if RBAC is enabled
 $env:EARCRAWLER_ENABLE_REMOTE_LLM = '1'
-py -m earCrawler.cli eval run-rag --dataset-id ear_compliance.v1 --max-items 5
+py -m eval.validate_datasets
+py -m earCrawler.cli eval run-rag --dataset-id ear_compliance.v1 --max-items 5 --fallback-max-uses 0
 ```
 
 By default this:

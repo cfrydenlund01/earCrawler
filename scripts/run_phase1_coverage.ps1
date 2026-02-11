@@ -89,6 +89,21 @@ try {
 & $py -V 2>&1 | Out-File -Encoding ascii (Join-Path $outDir "python_version.txt")
 & $py -m pip freeze 2>&1 | Out-File -Encoding utf8 $envFreeze
 
+$validateArgs = @(
+  "-m", "eval.validate_datasets",
+  "--manifest", $Manifest
+)
+"command=$py $($validateArgs -join ' ')" | Out-File -Append -Encoding ascii $cmdHistory
+$validateExit = 0
+& $py @validateArgs 2>&1 | Tee-Object -FilePath $logPath
+$validateExit = $LASTEXITCODE
+if ($validateExit -ne 0) {
+  Write-Host ""
+  Write-Host "Dataset schema validation FAILED (exit $validateExit)."
+  Write-Host "Artifacts: $outDir"
+  exit $validateExit
+}
+
 $oldIndex = $env:EARCRAWLER_FAISS_INDEX
 $oldModel = $env:EARCRAWLER_FAISS_MODEL
 if ($IndexPath -and $IndexPath.Trim()) {
@@ -114,7 +129,7 @@ $args = @(
 
 $exitCode = 0
 try {
-  & $py @args 2>&1 | Tee-Object -FilePath $logPath
+  & $py @args 2>&1 | Tee-Object -FilePath $logPath -Append
   $exitCode = $LASTEXITCODE
 } finally {
   $env:EARCRAWLER_FAISS_INDEX = $oldIndex
@@ -133,4 +148,3 @@ Write-Host ""
 Write-Host "Phase 1 coverage gate PASSED."
 Write-Host "Artifacts: $outDir"
 exit 0
-

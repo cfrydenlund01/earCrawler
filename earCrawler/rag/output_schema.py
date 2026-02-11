@@ -353,9 +353,84 @@ def parse_strict_answer_json(
     }
 
 
+def validate_and_extract_strict_answer(
+    raw: str,
+    *,
+    allowed_labels: Iterable[str],
+    context: str | None = None,
+) -> Dict[str, object]:
+    """Single strict-contract validation path for answer-producing entrypoints."""
+
+    parsed = parse_strict_answer_json(
+        raw,
+        allowed_labels=allowed_labels,
+        context=context,
+    )
+
+    citations = list(parsed.get("citations") or [])
+    justification = parsed.get("justification")
+    if isinstance(justification, str):
+        justification = justification.strip() or None
+    else:
+        justification = None
+
+    # Keep a compact human-readable trace for callers that need backward compatibility.
+    if not justification:
+        justification = (
+            " ".join(
+                f"[{c.get('section_id')}] {c.get('quote')}"
+                for c in citations
+                if c.get("section_id") and c.get("quote")
+            ).strip()
+            or None
+        )
+
+    citation_span_ids = sorted(
+        {
+            str(c.get("span_id")).strip()
+            for c in citations
+            if isinstance(c.get("span_id"), str) and str(c.get("span_id")).strip()
+        }
+    )
+
+    return {
+        "label": str(parsed["label"]),
+        "answer_text": str(parsed["answer_text"]),
+        "justification": justification,
+        "citations": citations,
+        "evidence_okay": dict(parsed.get("evidence_okay") or {}),
+        "assumptions": list(parsed.get("assumptions") or []),
+        "citation_span_ids": citation_span_ids,
+    }
+
+
+def make_unanswerable_payload(
+    *,
+    hint: str,
+    justification: str | None = None,
+    evidence_reasons: Iterable[str] | None = None,
+) -> Dict[str, object]:
+    """Build a contract-shaped refusal payload for thin/empty evidence cases."""
+
+    answer_text = f"Insufficient information to determine. Need {hint.strip().rstrip('.')}."
+    return {
+        "label": "unanswerable",
+        "answer_text": answer_text,
+        "justification": (justification or "").strip() or None,
+        "citations": [],
+        "evidence_okay": {
+            "ok": True,
+            "reasons": list(evidence_reasons or ["no_grounded_quote_for_key_claim"]),
+        },
+        "assumptions": [],
+    }
+
+
 __all__ = [
     "DEFAULT_ALLOWED_LABELS",
     "TRUTHINESS_LABELS",
     "OutputSchemaError",
     "parse_strict_answer_json",
+    "validate_and_extract_strict_answer",
+    "make_unanswerable_payload",
 ]

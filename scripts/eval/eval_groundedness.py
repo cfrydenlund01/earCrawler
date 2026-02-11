@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List
 
 from api_clients.llm_client import LLMProviderError
+from eval.validate_datasets import ensure_valid_datasets
 from earCrawler.rag.pipeline import answer_with_rag
 
 
@@ -144,6 +145,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Output directory for groundedness metrics.",
     )
     args = parser.parse_args(argv)
+
+    try:
+        ensure_valid_datasets(
+            manifest_path=args.manifest,
+            schema_path=Path("eval") / "schema.json",
+            dataset_ids=[args.dataset_id],
+        )
+    except Exception as exc:  # pragma: no cover - surfaced as CLI failure
+        print(f"Failed: {exc}")
+        return 1
 
     try:
         out_path = evaluate_groundedness(

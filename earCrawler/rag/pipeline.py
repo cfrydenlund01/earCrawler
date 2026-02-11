@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Thin RAG pipeline wrapper that reuses the existing FAISS retriever and LLM client."""
 
+import json
 import re
 from typing import Iterable, List, Literal, Mapping
 
@@ -22,7 +23,8 @@ from earCrawler.rag.output_schema import (
     DEFAULT_ALLOWED_LABELS,
     TRUTHINESS_LABELS,
     OutputSchemaError,
-    parse_strict_answer_json,
+    make_unanswerable_payload,
+    validate_and_extract_strict_answer,
 )
 from earCrawler.security.data_egress import (
     build_data_egress_decision,
@@ -259,6 +261,35 @@ def _env_int(name: str, *, default: int, min_value: int = 1) -> int:
     except ValueError:
         return default
     return max(min_value, value)
+
+
+def _env_float(name: str, *, default: float, min_value: float = 0.0) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = float(str(raw).strip())
+    except ValueError:
+        return default
+    return max(min_value, value)
+
+
+def _max_retrieval_score(docs: list[dict]) -> float:
+    best = 0.0
+    for doc in docs or []:
+        score = doc.get("score")
+        if isinstance(score, (int, float)):
+            best = max(best, float(score))
+        elif isinstance(score, str):
+            try:
+                best = max(best, float(score))
+            except ValueError:
+                continue
+    return best
+
+
+def _total_context_chars(contexts: list[str]) -> int:
+    return sum(len(str(c or "")) for c in (contexts or []))
 
 
 def _create_fuseki_gateway() -> FusekiGatewayLike:
@@ -639,20 +670,32 @@ def answer_with_rag(
         redacted_contexts = redact_contexts(contexts, mode=redaction_mode)
         prompt = _build_prompt(redacted_question, redacted_contexts, label_schema=label_schema)
         t_prompt_ms = round((time.perf_counter() - prompt_start) * 1000.0, 3)
-        try:
-            config = get_llm_config(provider_override=provider, model_override=model)
-        except ValueError as exc:
-            raise LLMProviderError(str(exc)) from exc
-        provider_label = config.provider.provider
-        model_label = config.provider.model
 
-        if not config.enable_remote:
-            disabled_reason = config.remote_disabled_reason or "remote LLM policy denied egress"
+        allowed_labels = (
+            TRUTHINESS_LABELS if label_schema == "truthiness" else DEFAULT_ALLOWED_LABELS
+        )
+        refuse_on_thin = _env_truthy("EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL", default=False)
+        min_docs = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_DOCS", default=1, min_value=1)
+        min_top_score = _env_float("EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE", default=0.0, min_value=0.0)
+        min_total_chars = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS", default=0, min_value=0)
+
+        thin_retrieval = retrieval_empty
+        if not thin_retrieval and refuse_on_thin:
+            if len(docs) < min_docs:
+                thin_retrieval = True
+            elif _max_retrieval_score(docs) < min_top_score:
+                thin_retrieval = True
+            elif _total_context_chars(redacted_contexts) < min_total_chars:
+                thin_retrieval = True
+
+        if thin_retrieval:
+            disabled_reason = "insufficient_evidence"
+            llm_enabled = False
             egress_decision = build_data_egress_decision(
                 remote_enabled=False,
                 disabled_reason=disabled_reason,
-                provider=provider_label,
-                model=model_label,
+                provider=None,
+                model=None,
                 redaction_mode=redaction_mode,
                 question=redacted_question,
                 contexts=redacted_contexts,
@@ -660,98 +703,121 @@ def answer_with_rag(
                 trace_id=trace_id,
             )
             _logger.info("llm.egress_decision", **egress_decision.to_dict())
-            raise LLMProviderError(
-                f"Remote LLM calls are disabled ({disabled_reason}). "
-                "Remote use requires EARCRAWLER_REMOTE_LLM_POLICY=allow and "
-                "EARCRAWLER_ENABLE_REMOTE_LLM=1."
-            )
 
-        llm_attempted = True
-        llm_start = time.perf_counter()
-        try:
-            raw_answer = generate_chat(
-                prompt, provider=provider_label, model=model_label
+            refusal = make_unanswerable_payload(
+                hint="the relevant EAR section excerpt(s) for this scenario (for example: ECCN, destination, end user/end use)",
+                justification="Retrieval evidence was empty or too thin to ground a compliant answer.",
+                evidence_reasons=["thin_or_empty_retrieval"],
             )
-            t_llm_ms = round((time.perf_counter() - llm_start) * 1000.0, 3)
-        except LLMProviderError as exc:
-            t_llm_ms = round((time.perf_counter() - llm_start) * 1000.0, 3)
-            egress_decision = build_data_egress_decision(
-                remote_enabled=True,
-                disabled_reason=str(exc),
-                provider=provider_label,
-                model=model_label,
-                redaction_mode=redaction_mode,
-                question=redacted_question,
-                contexts=redacted_contexts,
-                messages=prompt,
-                trace_id=trace_id,
-            )
-            _logger.info("llm.egress_decision", **egress_decision.to_dict())
-            _logger.error("rag.answer.failed", error=str(exc))
-            raise
-
-        llm_enabled = True
-        egress_decision = build_data_egress_decision(
-            remote_enabled=True,
-            disabled_reason=None,
-            provider=provider_label,
-            model=model_label,
-            redaction_mode=redaction_mode,
-            question=redacted_question,
-            contexts=redacted_contexts,
-            messages=prompt,
-            trace_id=trace_id,
-        )
-        _logger.info("llm.egress_decision", **egress_decision.to_dict())
-
-        raw_answer = str(raw_answer)
-        parse_start = time.perf_counter()
-        try:
-            allowed_labels = (
-                TRUTHINESS_LABELS if label_schema == "truthiness" else DEFAULT_ALLOWED_LABELS
-            )
-            parsed = parse_strict_answer_json(
-                raw_answer,
+            rendered = json.dumps(refusal, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+            validated = validate_and_extract_strict_answer(
+                rendered,
                 allowed_labels=allowed_labels,
                 context="\n\n".join(redacted_contexts),
             )
-            t_parse_ms = round((time.perf_counter() - parse_start) * 1000.0, 3)
-            answer_text = str(parsed["answer_text"])
-            label = str(parsed["label"])
-            citations = list(parsed.get("citations") or [])
-            assumptions = list(parsed.get("assumptions") or [])
-            evidence_okay = dict(parsed.get("evidence_okay") or {})
-            justification = parsed.get("justification")
-            if justification:
-                justification = justification.strip() or None
-            # Derived: compact human-readable trace for older callers when justification is absent.
-            if not justification:
-                justification = " ".join(
-                    f"[{c.get('section_id')}] {c.get('quote')}"
-                    for c in (citations or [])
-                    if c.get("section_id") and c.get("quote")
-                ).strip() or None
-            citation_span_ids = sorted(
-                {
-                    str(c.get("span_id")).strip()
-                    for c in (citations or [])
-                    if isinstance(c.get("span_id"), str) and str(c.get("span_id")).strip()
-                }
+            answer_text = str(validated["answer_text"])
+            label = str(validated["label"])
+            citations = list(validated.get("citations") or [])
+            assumptions = list(validated.get("assumptions") or [])
+            evidence_okay = dict(validated.get("evidence_okay") or {})
+            justification = validated.get("justification")
+            citation_span_ids = list(validated.get("citation_span_ids") or [])
+        else:
+            try:
+                config = get_llm_config(provider_override=provider, model_override=model)
+            except ValueError as exc:
+                raise LLMProviderError(str(exc)) from exc
+            provider_label = config.provider.provider
+            model_label = config.provider.model
+
+            if not config.enable_remote:
+                disabled_reason = config.remote_disabled_reason or "remote LLM policy denied egress"
+                egress_decision = build_data_egress_decision(
+                    remote_enabled=False,
+                    disabled_reason=disabled_reason,
+                    provider=provider_label,
+                    model=model_label,
+                    redaction_mode=redaction_mode,
+                    question=redacted_question,
+                    contexts=redacted_contexts,
+                    messages=prompt,
+                    trace_id=trace_id,
+                )
+                _logger.info("llm.egress_decision", **egress_decision.to_dict())
+                raise LLMProviderError(
+                    f"Remote LLM calls are disabled ({disabled_reason}). "
+                    "Remote use requires EARCRAWLER_REMOTE_LLM_POLICY=allow and "
+                    "EARCRAWLER_ENABLE_REMOTE_LLM=1."
+                )
+
+            llm_attempted = True
+            llm_start = time.perf_counter()
+            try:
+                raw_answer = generate_chat(
+                    prompt, provider=provider_label, model=model_label
+                )
+                t_llm_ms = round((time.perf_counter() - llm_start) * 1000.0, 3)
+            except LLMProviderError as exc:
+                t_llm_ms = round((time.perf_counter() - llm_start) * 1000.0, 3)
+                egress_decision = build_data_egress_decision(
+                    remote_enabled=True,
+                    disabled_reason=str(exc),
+                    provider=provider_label,
+                    model=model_label,
+                    redaction_mode=redaction_mode,
+                    question=redacted_question,
+                    contexts=redacted_contexts,
+                    messages=prompt,
+                    trace_id=trace_id,
+                )
+                _logger.info("llm.egress_decision", **egress_decision.to_dict())
+                _logger.error("rag.answer.failed", error=str(exc))
+                raise
+
+            llm_enabled = True
+            egress_decision = build_data_egress_decision(
+                remote_enabled=True,
+                disabled_reason=None,
+                provider=provider_label,
+                model=model_label,
+                redaction_mode=redaction_mode,
+                question=redacted_question,
+                contexts=redacted_contexts,
+                messages=prompt,
+                trace_id=trace_id,
             )
-        except OutputSchemaError as exc:
-            t_parse_ms = round((time.perf_counter() - parse_start) * 1000.0, 3)
-            output_ok = False
-            output_error = exc.as_dict()
-            if not strict_output:
-                answer_text = raw_answer
-            else:
-                answer_text = None
-                label = None
-                justification = None
-                citations = None
-                assumptions = None
-                evidence_okay = None
-                citation_span_ids = None
+            _logger.info("llm.egress_decision", **egress_decision.to_dict())
+
+            raw_answer = str(raw_answer)
+            parse_start = time.perf_counter()
+            try:
+                validated = validate_and_extract_strict_answer(
+                    raw_answer,
+                    allowed_labels=allowed_labels,
+                    context="\n\n".join(redacted_contexts),
+                )
+                t_parse_ms = round((time.perf_counter() - parse_start) * 1000.0, 3)
+                answer_text = str(validated["answer_text"])
+                label = str(validated["label"])
+                citations = list(validated.get("citations") or [])
+                assumptions = list(validated.get("assumptions") or [])
+                evidence_okay = dict(validated.get("evidence_okay") or {})
+                justification = validated.get("justification")
+                citation_span_ids = list(validated.get("citation_span_ids") or [])
+            except OutputSchemaError as exc:
+                t_parse_ms = round((time.perf_counter() - parse_start) * 1000.0, 3)
+                output_ok = False
+                output_error = exc.as_dict()
+                if not strict_output:
+                    answer_text = raw_answer
+                else:
+                    answer_text = None
+                    label = None
+                    justification = None
+                    citations = None
+                    assumptions = None
+                    evidence_okay = None
+                    citation_span_ids = None
     else:
         disabled_reason = "generation_disabled_by_request"
         egress_decision = build_data_egress_decision(

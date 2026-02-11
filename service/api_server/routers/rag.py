@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
 import math
 import time
+import os
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
@@ -14,7 +16,8 @@ from earCrawler.rag import pipeline as rag_pipeline
 from earCrawler.rag.output_schema import (
     DEFAULT_ALLOWED_LABELS,
     OutputSchemaError,
-    parse_strict_answer_json,
+    make_unanswerable_payload,
+    validate_and_extract_strict_answer,
 )
 from earCrawler.security.data_egress import (
     build_data_egress_decision,
@@ -46,6 +49,48 @@ from .dependencies import (
 )
 
 router = APIRouter(prefix="/v1", tags=["rag"])
+
+def _env_truthy(name: str, *, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, *, default: int, min_value: int = 0) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        return default
+    return max(min_value, value)
+
+
+def _env_float(name: str, *, default: float, min_value: float = 0.0) -> float:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = float(str(raw).strip())
+    except ValueError:
+        return default
+    return max(min_value, value)
+
+
+def _max_score(documents: list[dict]) -> float:
+    best = 0.0
+    for doc in documents or []:
+        score = doc.get("score")
+        if isinstance(score, (int, float)):
+            best = max(best, float(score))
+        elif isinstance(score, str):
+            try:
+                best = max(best, float(score))
+            except ValueError:
+                continue
+    return best
 
 
 def _log_retrieval(request: Request, event: str, trace_id: str, **details) -> None:
@@ -537,135 +582,188 @@ async def rag_answer(
                 trace_id=trace_id,
             )
         else:
-            llm_start: float | None = None
-            parse_start: float | None = None
-            try:
-                cfg = get_llm_config()
-                provider_label = cfg.provider.provider
-                model_label = cfg.provider.model
+            refuse_on_thin = _env_truthy("EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL", default=False)
+            min_docs = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_DOCS", default=1, min_value=1)
+            min_top_score = _env_float("EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE", default=0.0, min_value=0.0)
+            min_total_chars = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS", default=0, min_value=0)
+
+            thin_retrieval = retrieval_empty
+            if not thin_retrieval and refuse_on_thin:
+                if len(documents) < min_docs:
+                    thin_retrieval = True
+                elif _max_score(documents) < min_top_score:
+                    thin_retrieval = True
+                else:
+                    total_chars = sum(len(str(c or "")) for c in prompt_contexts)
+                    if total_chars < min_total_chars:
+                        thin_retrieval = True
+
+            if thin_retrieval:
+                disabled_reason = "insufficient_evidence"
+                llm_enabled = False
+                output_ok = True
+
                 prompt_start = time.perf_counter()
                 redacted_contexts = redact_contexts(prompt_contexts, mode=redaction_mode)
                 prompt = rag_pipeline._build_prompt(
                     redacted_question, redacted_contexts, label_schema=None
                 )
                 t_prompt_ms += _elapsed_ms(prompt_start)
-                if not cfg.enable_remote:
-                    disabled_reason = (
-                        cfg.remote_disabled_reason
-                        or "remote LLM policy denied egress"
+                egress_decision = build_data_egress_decision(
+                    remote_enabled=False,
+                    disabled_reason=disabled_reason,
+                    provider=None,
+                    model=None,
+                    redaction_mode=redaction_mode,
+                    question=redacted_question,
+                    contexts=redacted_contexts,
+                    messages=prompt,
+                    trace_id=trace_id,
+                )
+
+                refusal = make_unanswerable_payload(
+                    hint="the relevant EAR excerpt(s) for this scenario (for example: ECCN, destination, end user/end use)",
+                    justification="Retrieval evidence was empty or too thin to ground a compliant answer.",
+                    evidence_reasons=["thin_or_empty_retrieval"],
+                )
+                rendered = json.dumps(refusal, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
+                validated = validate_and_extract_strict_answer(
+                    rendered,
+                    allowed_labels=DEFAULT_ALLOWED_LABELS,
+                    context="\n\n".join(redacted_contexts),
+                )
+                answer = str(validated["answer_text"])
+                label = str(validated["label"])
+                citations = list(validated.get("citations") or [])
+                assumptions = list(validated.get("assumptions") or [])
+                evidence_okay = dict(validated.get("evidence_okay") or {})
+                justification = validated.get("justification")
+            else:
+                llm_start: float | None = None
+                parse_start: float | None = None
+                try:
+                    cfg = get_llm_config()
+                    provider_label = cfg.provider.provider
+                    model_label = cfg.provider.model
+                    prompt_start = time.perf_counter()
+                    redacted_contexts = redact_contexts(prompt_contexts, mode=redaction_mode)
+                    prompt = rag_pipeline._build_prompt(
+                        redacted_question, redacted_contexts, label_schema=None
                     )
-                    llm_enabled = False
-                    status_code = 503
-                    output_error = {
-                        "code": "llm_disabled",
-                        "message": disabled_reason,
-                        "details": {},
-                    }
-                    egress_decision = build_data_egress_decision(
-                        remote_enabled=False,
-                        disabled_reason=disabled_reason,
-                        provider=provider_label,
-                        model=model_label,
-                        redaction_mode=redaction_mode,
-                        question=redacted_question,
-                        contexts=redacted_contexts,
-                        messages=prompt,
-                        trace_id=trace_id,
-                    )
-                else:
-                    remote_attempted = True
-                    llm_start = time.perf_counter()
-                    raw_answer = generate_chat(
-                        prompt,
-                        provider=provider_label,
-                        model=model_label,
-                    )
-                    t_llm_ms += _elapsed_ms(llm_start)
-                    llm_enabled = True
-                    egress_decision = build_data_egress_decision(
-                        remote_enabled=True,
-                        disabled_reason=None,
-                        provider=provider_label,
-                        model=model_label,
-                        redaction_mode=redaction_mode,
-                        question=redacted_question,
-                        contexts=redacted_contexts,
-                        messages=prompt,
-                        trace_id=trace_id,
-                    )
-                    parse_start = time.perf_counter()
-                    parsed = parse_strict_answer_json(
-                        raw_answer,
+                    t_prompt_ms += _elapsed_ms(prompt_start)
+                    if not cfg.enable_remote:
+                        disabled_reason = (
+                            cfg.remote_disabled_reason
+                            or "remote LLM policy denied egress"
+                        )
+                        llm_enabled = False
+                        status_code = 503
+                        output_error = {
+                            "code": "llm_disabled",
+                            "message": disabled_reason,
+                            "details": {},
+                        }
+                        egress_decision = build_data_egress_decision(
+                            remote_enabled=False,
+                            disabled_reason=disabled_reason,
+                            provider=provider_label,
+                            model=model_label,
+                            redaction_mode=redaction_mode,
+                            question=redacted_question,
+                            contexts=redacted_contexts,
+                            messages=prompt,
+                            trace_id=trace_id,
+                        )
+                    else:
+                        remote_attempted = True
+                        llm_start = time.perf_counter()
+                        raw_answer = generate_chat(
+                            prompt,
+                            provider=provider_label,
+                            model=model_label,
+                        )
+                        t_llm_ms += _elapsed_ms(llm_start)
+                        llm_enabled = True
+                        egress_decision = build_data_egress_decision(
+                            remote_enabled=True,
+                            disabled_reason=None,
+                            provider=provider_label,
+                            model=model_label,
+                            redaction_mode=redaction_mode,
+                            question=redacted_question,
+                            contexts=redacted_contexts,
+                            messages=prompt,
+                            trace_id=trace_id,
+                        )
+                        parse_start = time.perf_counter()
+                        validated = validate_and_extract_strict_answer(
+                            raw_answer,
                         allowed_labels=DEFAULT_ALLOWED_LABELS,
                         context="\n\n".join(redacted_contexts),
                     )
                     t_parse_ms += _elapsed_ms(parse_start)
                     output_ok = True
-                    answer = str(parsed["answer_text"])
-                    label = str(parsed["label"])
-                    citations = list(parsed.get("citations") or [])
-                    assumptions = list(parsed.get("assumptions") or [])
-                    evidence_okay = dict(parsed.get("evidence_okay") or {})
-                    justification = " ".join(
-                        f"[{c.get('section_id')}] {c.get('quote')}"
-                        for c in citations
-                        if c.get("section_id") and c.get("quote")
-                    ).strip() or None
-            except LLMProviderError as exc:
-                if llm_start is not None:
-                    t_llm_ms += _elapsed_ms(llm_start)
-                disabled_reason = str(exc)
-                llm_enabled = False
-                status_code = 503
-                output_error = {
-                    "code": "llm_unavailable",
-                    "message": str(exc),
-                    "details": {},
-                }
-                egress_decision = build_data_egress_decision(
-                    remote_enabled=remote_attempted,
-                    disabled_reason=str(exc),
-                    provider=provider_label,
-                    model=model_label,
-                    redaction_mode=redaction_mode,
-                    question=redacted_question,
-                    contexts=redact_contexts(contexts, mode=redaction_mode),
-                    messages=None,
-                    trace_id=trace_id,
-                )
-            except OutputSchemaError as exc:
-                if parse_start is not None:
-                    t_parse_ms += _elapsed_ms(parse_start)
-                output_ok = False
-                output_error = exc.as_dict()
-                failure_type = exc.code
-                status_code = 422
-                answer = None
-                label = None
-                justification = None
-                citations = []
-                assumptions = []
-                evidence_okay = None
-            except Exception as exc:  # pragma: no cover - defensive
-                disabled_reason = str(exc)
-                llm_enabled = False
-                status_code = 503
-                output_error = {
-                    "code": "llm_unavailable",
-                    "message": str(exc),
-                    "details": {},
-                }
-                egress_decision = build_data_egress_decision(
-                    remote_enabled=remote_attempted,
-                    disabled_reason=str(exc),
-                    provider=provider_label,
-                    model=model_label,
-                    redaction_mode=redaction_mode,
-                    question=redacted_question,
-                    contexts=redact_contexts(contexts, mode=redaction_mode),
-                    messages=None,
-                    trace_id=trace_id,
-                )
+                    answer = str(validated["answer_text"])
+                    label = str(validated["label"])
+                    citations = list(validated.get("citations") or [])
+                    assumptions = list(validated.get("assumptions") or [])
+                    evidence_okay = dict(validated.get("evidence_okay") or {})
+                    justification = validated.get("justification")
+                except LLMProviderError as exc:
+                    if llm_start is not None:
+                        t_llm_ms += _elapsed_ms(llm_start)
+                    disabled_reason = str(exc)
+                    llm_enabled = False
+                    status_code = 503
+                    output_error = {
+                        "code": "llm_unavailable",
+                        "message": str(exc),
+                        "details": {},
+                    }
+                    egress_decision = build_data_egress_decision(
+                        remote_enabled=remote_attempted,
+                        disabled_reason=str(exc),
+                        provider=provider_label,
+                        model=model_label,
+                        redaction_mode=redaction_mode,
+                        question=redacted_question,
+                        contexts=redact_contexts(contexts, mode=redaction_mode),
+                        messages=None,
+                        trace_id=trace_id,
+                    )
+                except OutputSchemaError as exc:
+                    if parse_start is not None:
+                        t_parse_ms += _elapsed_ms(parse_start)
+                    output_ok = False
+                    output_error = exc.as_dict()
+                    failure_type = exc.code
+                    status_code = 422
+                    answer = None
+                    label = None
+                    justification = None
+                    citations = []
+                    assumptions = []
+                    evidence_okay = None
+                except Exception as exc:  # pragma: no cover - defensive
+                    disabled_reason = str(exc)
+                    llm_enabled = False
+                    status_code = 503
+                    output_error = {
+                        "code": "llm_unavailable",
+                        "message": str(exc),
+                        "details": {},
+                    }
+                    egress_decision = build_data_egress_decision(
+                        remote_enabled=remote_attempted,
+                        disabled_reason=str(exc),
+                        provider=provider_label,
+                        model=model_label,
+                        redaction_mode=redaction_mode,
+                        question=redacted_question,
+                        contexts=redact_contexts(contexts, mode=redaction_mode),
+                        messages=None,
+                        trace_id=trace_id,
+                    )
 
     latency_ms = _elapsed_ms(start_total)
     cache_state = CacheState(

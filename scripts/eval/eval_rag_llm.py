@@ -14,6 +14,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Sequence
 from collections import Counter
 
 from api_clients.llm_client import LLMProviderError
+from eval.validate_datasets import ensure_valid_datasets
 from earCrawler.audit.hitl_events import decision_template
 from earCrawler.config.llm_secrets import get_llm_config
 from earCrawler.eval.citation_metrics import (
@@ -113,6 +114,59 @@ def _safe_name(value: str) -> str:
 
 _ANSWER_SCORE_MODES = ("semantic", "normalized", "exact")
 _ABLATION_MODES = ("faiss_only", "faiss_plus_kg")
+_DEFAULT_FALLBACK_MAX_USES = 0
+
+
+def _fallback_code(reason: str | None) -> str | None:
+    value = (reason or "").strip()
+    if not value:
+        return None
+    if value.startswith("fallback_infer_label_from_answer("):
+        return "infer_label_from_answer"
+    if value == "normalized_by_license_exception_signal(entity_obligation)":
+        return "normalized_by_license_exception_signal_entity_obligation"
+    if value == "normalized_by_license_exception_signal":
+        return "normalized_by_license_exception_signal"
+    if value == "normalized_license_required_to_permitted_with_license":
+        return "normalized_license_required_to_permitted_with_license"
+    if value == "normalized_prohibited_to_license_required":
+        return "normalized_prohibited_to_license_required"
+    return f"unknown_normalization:{value}"
+
+
+def _fallback_policy() -> list[dict[str, str]]:
+    return [
+        {
+            "fallback": "infer_label_from_answer",
+            "decision": "keep_with_counter",
+            "reason": "Legacy model outputs may emit unknown labels; keep inference but surface usage.",
+        },
+        {
+            "fallback": "normalized_by_license_exception_signal_entity_obligation",
+            "decision": "keep_with_counter",
+            "reason": "Task-specific label normalization remains for backward compatibility.",
+        },
+        {
+            "fallback": "normalized_by_license_exception_signal",
+            "decision": "keep_with_counter",
+            "reason": "License-exception heuristic remains enabled but is now explicit in strictness metrics.",
+        },
+        {
+            "fallback": "normalized_license_required_to_permitted_with_license",
+            "decision": "keep_with_counter",
+            "reason": "Question-form normalization remains enabled but counted.",
+        },
+        {
+            "fallback": "normalized_prohibited_to_license_required",
+            "decision": "keep_with_counter",
+            "reason": "EAR-compliance label normalization remains enabled but counted.",
+        },
+        {
+            "fallback": "proxy_citations_from_used_sections",
+            "decision": "removed",
+            "reason": "Citation scoring no longer infers citations from retrieval sections.",
+        },
+    ]
 
 
 def _normalize_answer_text(text: str) -> str:
@@ -756,6 +810,7 @@ def evaluate_dataset(
     emit_hitl_template: Path | None = None,
     trace_pack_require_kg_paths: bool = False,
     trace_pack_required_threshold: float | None = None,
+    fallback_max_uses: int | None = _DEFAULT_FALLBACK_MAX_USES,
 ) -> tuple[Path, Path]:
     manifest = _load_manifest(manifest_path)
     dataset_refs = manifest.get("references") or {}
@@ -807,6 +862,8 @@ def evaluate_dataset(
     citation_proxy_items = 0
     citation_infra_skipped = 0
     status_counts: Counter[str] = Counter()
+    fallback_counts: Counter[str] = Counter()
+    fallback_items: list[dict[str, object]] = []
 
     correct = 0
     answer_total = 0
@@ -834,6 +891,8 @@ def evaluate_dataset(
         raise ValueError(f"Unsupported --answer-score-mode: {mode}")
     if semantic_threshold <= 0 or semantic_threshold > 1:
         raise ValueError("semantic_threshold must be in (0, 1]")
+    if fallback_max_uses is not None and fallback_max_uses < 0:
+        raise ValueError("fallback_max_uses must be >= 0")
 
     emitted = 0
     for idx, item in enumerate(_iter_items(data_path)):
@@ -867,6 +926,7 @@ def evaluate_dataset(
         raw_answer: str | None = None
         status = "ok"
         status_category = "ok"
+        item_fallbacks: list[dict[str, str]] = []
         citations: list[dict] | None = None
         evidence_okay: dict | None = None
         assumptions: list[str] | None = None
@@ -940,6 +1000,15 @@ def evaluate_dataset(
                     answer=answer,
                     justification=justification,
                 )
+                fallback_code = _fallback_code(label_norm)
+                if fallback_code:
+                    fallback_counts[fallback_code] += 1
+                    item_fallbacks.append(
+                        {
+                            "code": fallback_code,
+                            "detail": str(label_norm),
+                        }
+                    )
         except LLMProviderError as exc:
             error = str(exc)
             status_category = "infra_error"
@@ -1009,12 +1078,8 @@ def evaluate_dataset(
                 stats["grounded_hits"] += 1
 
         gt_sections = extract_ground_truth_sections(item, dataset_refs)
-        pred_sections = extract_predicted_sections(
-            {"citations": citations, "used_sections": used_sections}
-        )
-        proxy_citations_used = bool(not (citations or []) and bool(pred_sections))
-        if proxy_citations_used:
-            citation_proxy_items += 1
+        pred_sections = extract_predicted_sections({"citations": citations})
+        proxy_citations_used = False
 
         retrieval_ids = _retrieval_id_set(
             {"used_sections": used_sections, "retrieved_docs": retrieved_docs}
@@ -1033,8 +1098,6 @@ def evaluate_dataset(
         fn_sections = sorted(gt_sections - pred_sections)
 
         citation_errors: list[dict[str, object]] = []
-        if proxy_citations_used:
-            citation_errors.append({"code": "proxy_citations_used"})
         if invalid_ids:
             citation_errors.append({"code": "invalid_id", "sections": invalid_ids})
         if reserved_hits:
@@ -1090,6 +1153,8 @@ def evaluate_dataset(
             "pred_label_raw": pred_label_raw,
             "pred_label": pred_label,
             "pred_label_normalization": label_norm,
+            "fallbacks": item_fallbacks,
+            "fallbacks_used": len(item_fallbacks),
             "grounded": grounded,
             "expected_sections": ear_sections,
             "used_sections": used_sections,
@@ -1159,6 +1224,13 @@ def evaluate_dataset(
             citation_counts[key] = citation_counts.get(key, 0) + int(val)
 
         results.append(result_entry)
+        if item_fallbacks:
+            fallback_items.append(
+                {
+                    "id": item_id,
+                    "fallbacks": item_fallbacks,
+                }
+            )
 
     num_items = len(results)
     accuracy = correct / answer_total if answer_total else 0.0
@@ -1217,6 +1289,20 @@ def evaluate_dataset(
     multihop_trace_pass_rate = (
         multihop_trace_pass_count / multihop_items if multihop_items else 0.0
     )
+    fallback_counts_dict = dict(sorted(fallback_counts.items()))
+    fallbacks_used = int(sum(fallback_counts.values()))
+    fallback_threshold_breached = bool(
+        fallback_max_uses is not None and fallbacks_used > int(fallback_max_uses)
+    )
+    eval_strictness = {
+        "schema_validation_required": True,
+        "fallback_policy": _fallback_policy(),
+        "fallbacks_used": fallbacks_used,
+        "fallback_counts": fallback_counts_dict,
+        "fallback_items": fallback_items,
+        "fallback_max_uses": fallback_max_uses,
+        "fallback_threshold_breached": fallback_threshold_breached,
+    }
 
     payload = {
         "dataset_id": dataset_id,
@@ -1263,6 +1349,11 @@ def evaluate_dataset(
             "required_threshold": trace_pack_required_threshold,
             "issues_by_item": trace_pack_issues_by_item,
         },
+        "fallbacks_used": fallbacks_used,
+        "fallback_counts": fallback_counts_dict,
+        "fallback_items": fallback_items,
+        "fallback_max_uses": fallback_max_uses,
+        "eval_strictness": eval_strictness,
         "status_counts": status_summary,
         "results": results,
     }
@@ -1320,7 +1411,15 @@ def evaluate_dataset(
         f"overclaim={citation_metrics['overclaim_rate']:.4f}",
         f"- Citation micro: precision={citation_pr['micro']['precision']:.4f}, "
         f"recall={citation_pr['micro']['recall']:.4f}, f1={citation_pr['micro']['f1']:.4f}",
+        f"- Eval strictness: fallbacks_used={fallbacks_used}, "
+        f"fallback_max_uses={fallback_max_uses if fallback_max_uses is not None else 'disabled'}, "
+        f"threshold_breached={fallback_threshold_breached}",
     ]
+    if fallback_counts_dict:
+        lines.append(
+            "- Fallback counts: "
+            + ", ".join(f"{k}={v}" for k, v in sorted(fallback_counts_dict.items()))
+        )
     if by_task:
         lines.append("")
         lines.append("By-task summary:")
@@ -1349,6 +1448,12 @@ def evaluate_dataset(
             "Trace-pack validation failed: multihop trace_pack_pass_rate "
             f"{multihop_trace_pass_rate:.4f} < required threshold {trace_pack_required_threshold:.4f}"
         )
+    if fallback_threshold_breached:
+        raise RuntimeError(
+            "Eval strictness failed: fallbacks_used "
+            f"{fallbacks_used} > fallback_max_uses {fallback_max_uses}. "
+            f"Counts: {fallback_counts_dict}"
+        )
     return out_json, out_md
 
 
@@ -1370,6 +1475,7 @@ def _ablation_metrics(payload: Mapping[str, object]) -> dict[str, float]:
         ),
         "kg_path_usage_rate": float(multihop.get("kg_path_usage_rate") or 0.0),
         "trace_pack_pass_rate": float(multihop.get("trace_pack_pass_rate") or 0.0),
+        "fallbacks_used": float(payload.get("fallbacks_used") or 0.0),
     }
 
 
@@ -1530,6 +1636,15 @@ def main(argv: list[str] | None = None) -> int:
         help="Required minimum trace_pack_pass_rate on multihop items (used for faiss_plus_kg).",
     )
     parser.add_argument(
+        "--fallback-max-uses",
+        type=int,
+        default=_DEFAULT_FALLBACK_MAX_USES,
+        help=(
+            "Maximum allowed fallback normalizations/inference events before failing the run. "
+            "Use -1 to disable."
+        ),
+    )
+    parser.add_argument(
         "--out-json",
         type=Path,
         default=None,
@@ -1542,6 +1657,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Where to write markdown summary (defaults to dist/eval/<dataset>.rag.<provider>.md).",
     )
     args = parser.parse_args(argv)
+    fallback_max_uses = None if args.fallback_max_uses < 0 else args.fallback_max_uses
+
+    try:
+        ensure_valid_datasets(
+            manifest_path=args.manifest,
+            schema_path=Path("eval") / "schema.json",
+            dataset_ids=[args.dataset_id],
+        )
+    except Exception as exc:
+        print(f"Failed: {exc}")
+        return 1
 
     cfg = get_llm_config(
         provider_override=args.llm_provider, model_override=args.llm_model
@@ -1597,6 +1723,7 @@ def main(argv: list[str] | None = None) -> int:
                     emit_hitl_template=args.emit_hitl_template,
                     trace_pack_require_kg_paths=(cond == "faiss_plus_kg"),
                     trace_pack_required_threshold=cond_threshold,
+                    fallback_max_uses=fallback_max_uses,
                 )
                 payload = _load_eval_payload(j)
                 payload["artifact_json"] = str(j)
@@ -1647,6 +1774,7 @@ def main(argv: list[str] | None = None) -> int:
             emit_hitl_template=args.emit_hitl_template,
             trace_pack_require_kg_paths=args.ablation == "faiss_plus_kg",
             trace_pack_required_threshold=trace_threshold,
+            fallback_max_uses=fallback_max_uses,
         )
     except Exception as exc:  # pragma: no cover - surfaced as CLI failure
         print(f"Failed: {exc}")
