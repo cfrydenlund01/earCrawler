@@ -112,6 +112,7 @@ def test_health_success(tmp_path):
         )
     finally:
         server.shutdown()
+        server.server_close()
 
 
 def test_health_failure(tmp_path):

@@ -92,6 +92,29 @@ Windows notes
   - Eval artifacts include strictness counters under `eval_strictness` (`fallbacks_used`, `fallback_counts`, `fallback_items`, threshold/breach flags). Runs fail when fallback count exceeds `fallback_max_uses`.
   - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.
 
+### Eval/retrieval switches (set explicitly for reproducible agent runs)
+- `EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL=1` forces deterministic unanswerable payloads when retrieval is empty/thin.
+- `EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL=0` keeps normal generation/strict JSON validation flow even when retrieval is empty.
+- Thin-retrieval thresholds (used only when refusal mode is on):
+  - `EARCRAWLER_THIN_RETRIEVAL_MIN_DOCS` (default `1`)
+  - `EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE` (default `0.0`)
+  - `EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS` (default `0`)
+
+PowerShell examples:
+```powershell
+# Generation + strict-output debugging profile (default for parser/schema tests)
+$env:EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL = "0"
+Remove-Item Env:EARCRAWLER_THIN_RETRIEVAL_MIN_DOCS -ErrorAction SilentlyContinue
+Remove-Item Env:EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE -ErrorAction SilentlyContinue
+Remove-Item Env:EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS -ErrorAction SilentlyContinue
+
+# Deterministic refusal profile (default for conservative offline gating)
+$env:EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL = "1"
+$env:EARCRAWLER_THIN_RETRIEVAL_MIN_DOCS = "1"
+$env:EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE = "0.5"
+$env:EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS = "0"
+```
+
 ## Phase 2 golden gate (offline)
 - Purpose: `eval/golden_phase2.v1.jsonl` is a deterministic regression gate for retrieval, citation precision, and grounding contract behavior. It runs with stubbed retrieval and stubbed LLM responses only; no provider/network/FAISS access is required.
 - Dataset id: `golden_phase2.v1` (registered in `eval/manifest.json`).

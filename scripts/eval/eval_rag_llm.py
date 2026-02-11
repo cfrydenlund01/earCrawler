@@ -87,6 +87,21 @@ def _load_manifest(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _resolve_schema_path(manifest_path: Path) -> Path:
+    """Resolve schema path independent of current working directory."""
+
+    candidates = [
+        manifest_path.parent / "schema.json",
+        Path(__file__).resolve().parents[2] / "eval" / "schema.json",
+        Path("eval") / "schema.json",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    # Keep deterministic fallback error messages from ensure_valid_datasets.
+    return candidates[1]
+
+
 def _resolve_dataset(manifest: dict, dataset_id: str, manifest_path: Path) -> tuple[dict, Path]:
     for entry in manifest.get("datasets", []):
         if entry.get("id") == dataset_id:
@@ -1662,7 +1677,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         ensure_valid_datasets(
             manifest_path=args.manifest,
-            schema_path=Path("eval") / "schema.json",
+            schema_path=_resolve_schema_path(args.manifest),
             dataset_ids=[args.dataset_id],
         )
     except Exception as exc:
