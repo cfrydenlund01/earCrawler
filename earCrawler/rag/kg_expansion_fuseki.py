@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from typing import Any, Mapping, Protocol, Sequence
 from urllib.parse import unquote
 
@@ -41,11 +42,15 @@ class SPARQLTemplateGateway:
         *,
         template_path: Path | None = None,
         timeout: int = 5,
+        query_retries: int = 0,
+        retry_backoff_ms: int = 0,
         client: SPARQLClient | None = None,
     ) -> None:
         self._template_path = template_path or _TEMPLATE_PATH
         self._template = self._template_path.read_text(encoding="utf-8")
         self._client = client or SPARQLClient(endpoint=endpoint, timeout=timeout)
+        self._query_retries = max(0, int(query_retries))
+        self._retry_backoff_ms = max(0, int(retry_backoff_ms))
 
     def select(self, query_id: str, params: Mapping[str, object]) -> list[dict[str, object]]:
         if query_id != "kg_expand_by_section_id":
@@ -54,8 +59,23 @@ class SPARQLTemplateGateway:
         if not section:
             raise ValueError("section_iri is required")
         query = self._template.replace("{{section_iri}}", f"<{section}>")
-        payload = self._client.select(query)
-        return _coerce_bindings(payload)
+
+        attempts = self._query_retries + 1
+        last_exc: Exception | None = None
+        for attempt in range(1, attempts + 1):
+            try:
+                payload = self._client.select(query)
+                return _coerce_bindings(payload)
+            except Exception as exc:
+                last_exc = exc
+                if attempt >= attempts:
+                    raise
+                if self._retry_backoff_ms > 0:
+                    time.sleep(self._retry_backoff_ms / 1000.0)
+
+        if last_exc is not None:
+            raise last_exc
+        return []
 
 
 def expand_sections_via_fuseki(

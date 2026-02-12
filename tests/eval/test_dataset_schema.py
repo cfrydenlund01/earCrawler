@@ -55,7 +55,22 @@ def test_validate_datasets_flags_missing_references(tmp_path: Path) -> None:
         schema_path=schema_path,
         dataset_ids=None,
     )
-    assert len(issues) == 3
+    assert len(issues) >= 3
+
+    def _has_issue(instance_path: str, contains: str) -> bool:
+        return any(
+            (issue.instance_path == instance_path and contains in issue.message)
+            for issue in issues
+        )
+
+    # Missing reference checks
+    assert _has_issue("evidence/doc_spans", "not registered in manifest references")
+    assert _has_issue("evidence/kg_nodes", "not registered in manifest references")
+    assert _has_issue("evidence/kg_paths", "not registered in manifest references")
+
+    # Schema-level format checks (should also be flagged).
+    assert any(issue.instance_path == "evidence/doc_spans/0/doc_id" for issue in issues)
+    assert any(issue.instance_path == "evidence/doc_spans/0/span_id" for issue in issues)
 
 
 def test_validate_datasets_reports_schema_error_with_record_context(tmp_path: Path) -> None:

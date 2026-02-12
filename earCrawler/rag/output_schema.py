@@ -74,10 +74,13 @@ _CITATION_ALLOWED_KEYS: Set[str] = {"section_id", "quote", "span_id", "source"}
 _EVIDENCE_REQUIRED_KEYS: Set[str] = {"ok", "reasons"}
 
 _REFUSAL_KEYWORDS = re.compile(
-    r"\b(insufficient|not enough|cannot determine|unable to determine|unanswerable)\b",
+    r"\b(insufficient|not enough|cannot determine|unable to determine|cannot answer|unanswerable|does not mention|not mentioned|not present|not provided|does not contain)\b",
     flags=re.IGNORECASE,
 )
-_HINT_KEYWORDS = re.compile(r"\b(need|missing|provide)\b", flags=re.IGNORECASE)
+_HINT_KEYWORDS = re.compile(
+    r"\b(need|needs|missing|provide|provided|providing|additional|more|to determine|to answer)\b",
+    flags=re.IGNORECASE,
+)
 
 
 def _coerce_str(parsed: dict, key: str, *, raw: str) -> str:

@@ -235,10 +235,18 @@ def generate_snapshot_universe_dataset(
         heading = re.sub(rf"^(?:§\\s*)?{re.escape(section)}\\s*", "", heading).strip()
         heading = heading or "Untitled"
         question = f"15 CFR {section} § {section} {heading}."
+        ear_id = f"EAR-{section}"
         items_by_section[section] = {
-            "ear_sections": [section],
             "id": f"snap:{section}",
+            "task": "fr_coverage_universe",
             "question": question,
+            "ground_truth": {
+                "answer_text": "Snapshot-universe coverage item.",
+                "label": "unanswerable",
+            },
+            "ear_sections": [ear_id],
+            "kg_entities": [],
+            "evidence": {"doc_spans": [], "kg_nodes": [], "kg_paths": []},
         }
 
     items = [items_by_section[k] for k in sorted(items_by_section.keys(), key=_sort_key_section)]

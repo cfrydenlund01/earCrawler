@@ -20,9 +20,9 @@ def audit() -> None:
 @policy.enforce
 def verify_cmd(path: Path | None) -> None:
     path = path or ledger.current_log_path()
-    ok = verify.verify(path)
-    click.echo(json.dumps({"path": str(path), "ok": ok}))
-    if not ok:
+    report = verify.verify_report(path)
+    click.echo(json.dumps(report))
+    if not bool(report.get("ok")):
         raise click.ClickException("audit verification failed")
 
 

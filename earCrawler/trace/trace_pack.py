@@ -280,7 +280,9 @@ def validate_trace_pack(
         issues.append(TraceIssue("missing", "label", "label is required"))
 
     section_quotes = normalized["section_quotes"]
-    if not isinstance(section_quotes, list) or not section_quotes:
+    label = str(normalized.get("label") or "").strip().lower()
+    require_quotes = label != "unanswerable"
+    if require_quotes and (not isinstance(section_quotes, list) or not section_quotes):
         issues.append(
             TraceIssue(
                 "missing",

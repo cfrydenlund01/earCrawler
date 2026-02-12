@@ -71,3 +71,28 @@ def test_start_fuseki_no_wait_returns_popen(tmp_path, monkeypatch):
 
     proc = fuseki.start_fuseki(tmp_path / "db", wait=False)
     assert proc is sentinel
+
+
+def test_start_fuseki_uses_jena_lib_cwd_for_bat_wrapper(tmp_path, monkeypatch):
+    jena_home = tmp_path / "tools" / "jena"
+    bat_dir = jena_home / "bat"
+    lib_dir = jena_home / "lib"
+    bat_dir.mkdir(parents=True)
+    lib_dir.mkdir(parents=True)
+    server = bat_dir / "fuseki-server.bat"
+    server.write_text("")
+    (lib_dir / "fuseki-server.jar").write_text("")
+
+    monkeypatch.setattr(fuseki, "_port_in_use", lambda _port: False)
+    monkeypatch.setattr(fuseki, "fuseki_server_path", lambda: server)
+
+    captured: dict[str, Path] = {}
+
+    def fake_popen(*_args, **kwargs):
+        captured["cwd"] = Path(kwargs["cwd"])
+        return DummyProc()
+
+    monkeypatch.setattr(fuseki.subprocess, "Popen", fake_popen)
+
+    fuseki.start_fuseki(tmp_path / "db", wait=False)
+    assert captured["cwd"].resolve() == lib_dir.resolve()

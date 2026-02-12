@@ -341,12 +341,22 @@ pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
   - `EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS=5` bounds warm-up runtime.
 - KG expansion providers (deterministic/offline-safe testing via stubs):
   - `EARCRAWLER_ENABLE_KG_EXPANSION=1` enables KG expansion in the RAG pipeline.
+  - `EARCRAWLER_KG_EXPANSION_MODE=always_on|multihop_only|off` controls when expansion is applied when callers do not pass an explicit override.
+    - Recommended production default: `multihop_only` (limits latency/cost to multi-hop workloads).
+    - `always_on` applies KG expansion to all tasks.
+    - `off` disables KG expansion globally.
   - `EARCRAWLER_KG_EXPANSION_PROVIDER=fuseki|json_stub` selects provider (default when enabled: `fuseki`).
   - `EARCRAWLER_KG_EXPANSION_PATH=<path>` selects the temporary JSON stub mapping (explicit fallback mode).
   - `EARCRAWLER_FUSEKI_URL=http://localhost:3030/ear/sparql` configures Fuseki endpoint for `fuseki` mode.
+  - `EARCRAWLER_KG_EXPANSION_FAILURE_POLICY=error|disable` controls Fuseki failure handling.
+    - `error` fails loudly (default, strict mode).
+    - `disable` degrades gracefully to retrieval-only when Fuseki is unavailable.
+  - `EARCRAWLER_KG_EXPANSION_FUSEKI_HEALTHCHECK=1` enables pre-query Fuseki health checks (`/$/ping` + SPARQL `ASK` probe).
   - `EARCRAWLER_KG_EXPANSION_MAX_PATHS_PER_SECTION=4` limits persisted paths per section.
   - `EARCRAWLER_KG_EXPANSION_MAX_HOPS=2` limits Fuseki traversal depth.
   - `EARCRAWLER_KG_EXPANSION_FUSEKI_TIMEOUT=5` sets Fuseki query timeout (seconds).
+  - `EARCRAWLER_KG_EXPANSION_FUSEKI_RETRIES=1` sets retry count for health/query attempts.
+  - `EARCRAWLER_KG_EXPANSION_FUSEKI_RETRY_BACKOFF_MS=200` sets retry backoff in milliseconds.
   - When `fuseki` is selected but endpoint config is missing, expansion fails explicitly.
 - Explainability payload fields in `answer_with_rag` and eval artifacts:
   - `kg_expansions`: per-section snippets with structured path provenance.
