@@ -9,6 +9,7 @@ import time
 import contextlib
 import socket
 from typing import Optional
+import shutil
 
 import requests
 
@@ -126,7 +127,40 @@ def start_fuseki(
         env["FUSEKI_JAVA_OPTS"] = java_opts
 
     server_path = Path(cmd[0])
-    proc = subprocess.Popen(cmd, env=env, shell=False, cwd=server_path.parent)
+    cwd = server_path.parent
+
+    # On Windows, launching a `.bat` script spawns `cmd.exe` which then spawns `java.exe`.
+    # Terminating the parent process does not reliably terminate the child Java process.
+    # When possible, invoke the Fuseki main class directly so we can reliably stop it.
+    if os.name == "nt" and server_path.suffix.lower() == ".bat":
+        lib_dir = server_path.parent.parent / "lib"
+        jar = lib_dir / "fuseki-server.jar"
+        if jar.is_file():
+            java_home = os.getenv("JAVA_HOME")
+            java_exe = None
+            if java_home:
+                candidate = Path(java_home) / "bin" / "java.exe"
+                if candidate.is_file():
+                    java_exe = str(candidate)
+            java_exe = java_exe or shutil.which("java") or "java"
+            cmd = [
+                java_exe,
+                "-Xmx4G",
+                "-cp",
+                str(jar),
+                "org.apache.jena.fuseki.main.cmds.FusekiServerCmd",
+                *cmd[1:],
+            ]
+            cwd = lib_dir
+
+    # Jena's bat wrapper references `fuseki-server.jar` via a relative classpath.
+    # If the script lives in `<jena>/bat`, execute it from `<jena>/lib` so the jar resolves.
+    if server_path.parent.name.lower() == "bat":
+        lib_dir = server_path.parent.parent / "lib"
+        if (lib_dir / "fuseki-server.jar").is_file():
+            cwd = lib_dir
+
+    proc = subprocess.Popen(cmd, env=env, shell=False, cwd=cwd)
 
     if not wait:
         return proc
@@ -182,4 +216,8 @@ def running_fuseki(
             try:
                 proc.wait(timeout=5)
             except Exception:
-                pass
+                try:
+                    proc.kill()
+                    proc.wait(timeout=5)
+                except Exception:
+                    pass

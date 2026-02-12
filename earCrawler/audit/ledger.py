@@ -18,6 +18,7 @@ __all__ = [
     "append_event",
     "append_fact",
     "verify_chain",
+    "verify_chain_report",
     "rotate",
     "tail",
     "current_log_path",
@@ -32,7 +33,17 @@ def _base_dir() -> Path:
     return Path(prog) / "EarCrawler" / "audit"
 
 
-def current_log_path() -> Path:
+def _safe_run_id(value: str) -> str:
+    safe = "".join(ch if ch.isalnum() or ch in {"-", "_", "."} else "-" for ch in value)
+    return safe.strip("-.")
+
+
+def current_log_path(run_id: str | None = None) -> Path:
+    run_ref = str(run_id or os.getenv("EARCTL_AUDIT_RUN_ID") or "").strip()
+    if run_ref:
+        safe_run = _safe_run_id(run_ref)
+        if safe_run:
+            return _base_dir() / "runs" / f"{safe_run}.jsonl"
     day = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     return _base_dir() / f"{day}.jsonl"
 
@@ -65,8 +76,8 @@ def _commit_hash() -> str:
         return "unknown"
 
 
-def _append_entry(entry: Mapping[str, Any], *, redact_args: bool) -> None:
-    path = current_log_path()
+def _append_entry(entry: Mapping[str, Any], *, redact_args: bool, run_id: str | None = None) -> None:
+    path = current_log_path(run_id=run_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     prev = _prev_hash(path)
     sanitized = dict(entry)
@@ -102,6 +113,7 @@ def append_event(
     args_sanitized: str,
     exit_code: int,
     duration_ms: int,
+    run_id: str | None = None,
 ) -> None:
     entry: Dict[str, Any] = {
         "ts": datetime.now(timezone.utc).isoformat(),
@@ -115,10 +127,10 @@ def append_event(
         "host": platform.node(),
         "commit": _commit_hash(),
     }
-    _append_entry(entry, redact_args=True)
+    _append_entry(entry, redact_args=True, run_id=run_id)
 
 
-def append_fact(event: str, payload: Mapping[str, Any]) -> None:
+def append_fact(event: str, payload: Mapping[str, Any], run_id: str | None = None) -> None:
     """Append a structured non-command fact to the audit ledger."""
 
     entry: Dict[str, Any] = {
@@ -128,7 +140,7 @@ def append_fact(event: str, payload: Mapping[str, Any]) -> None:
         "commit": _commit_hash(),
         "payload": dict(payload),
     }
-    _append_entry(entry, redact_args=False)
+    _append_entry(entry, redact_args=False, run_id=run_id)
 
 
 def rotate() -> Path:
@@ -141,8 +153,8 @@ def rotate() -> Path:
     return path
 
 
-def tail(n: int = 50) -> Iterable[dict]:
-    path = current_log_path()
+def tail(n: int = 50, run_id: str | None = None) -> Iterable[dict]:
+    path = current_log_path(run_id=run_id)
     if not path.exists():
         return []
     with path.open("r", encoding="utf-8") as fh:
@@ -150,11 +162,32 @@ def tail(n: int = 50) -> Iterable[dict]:
     return [json.loads(line) for line in lines]
 
 
-def verify_chain(path: Path) -> bool:
+def verify_chain_report(path: Path) -> dict[str, Any]:
+    if not path.exists():
+        return {
+            "ok": False,
+            "path": str(path),
+            "checked_entries": 0,
+            "line": 0,
+            "reason": "missing_file",
+        }
+
     prev = "0" * 64
+    checked_entries = 0
+    hmac_key = cred_store.get_secret("EARCTL_AUDIT_HMAC_KEY")
     with path.open("r", encoding="utf-8") as fh:
-        for line in fh:
-            entry = json.loads(line)
+        for line_no, line in enumerate(fh, start=1):
+            checked_entries = line_no
+            try:
+                entry = json.loads(line)
+            except Exception:
+                return {
+                    "ok": False,
+                    "path": str(path),
+                    "checked_entries": line_no - 1,
+                    "line": line_no,
+                    "reason": "invalid_json",
+                }
             canonical = json.dumps(
                 {
                     k: entry[k]
@@ -165,16 +198,50 @@ def verify_chain(path: Path) -> bool:
                 separators=(",", ":"),
             )
             expected = hashlib.sha256((prev + canonical).encode("utf-8")).hexdigest()
-            if entry.get("chain_prev") != prev or entry.get("chain_hash") != expected:
-                return False
-            hmac_key = cred_store.get_secret("EARCTL_AUDIT_HMAC_KEY")
-            if (
-                hmac_key
-                and entry.get("hmac")
-                != hmaclib.new(
+            if entry.get("chain_prev") != prev:
+                return {
+                    "ok": False,
+                    "path": str(path),
+                    "checked_entries": line_no - 1,
+                    "line": line_no,
+                    "reason": "chain_prev_mismatch",
+                    "expected_chain_prev": prev,
+                    "actual_chain_prev": entry.get("chain_prev"),
+                    "event": entry.get("event"),
+                }
+            if entry.get("chain_hash") != expected:
+                return {
+                    "ok": False,
+                    "path": str(path),
+                    "checked_entries": line_no - 1,
+                    "line": line_no,
+                    "reason": "chain_hash_mismatch",
+                    "expected_chain_hash": expected,
+                    "actual_chain_hash": entry.get("chain_hash"),
+                    "event": entry.get("event"),
+                }
+            if hmac_key:
+                expected_hmac = hmaclib.new(
                     hmac_key.encode("utf-8"), canonical.encode("utf-8"), hashlib.sha256
                 ).hexdigest()
-            ):
-                return False
+                if entry.get("hmac") != expected_hmac:
+                    return {
+                        "ok": False,
+                        "path": str(path),
+                        "checked_entries": line_no - 1,
+                        "line": line_no,
+                        "reason": "hmac_mismatch",
+                        "event": entry.get("event"),
+                    }
             prev = entry["chain_hash"]
-    return True
+    return {
+        "ok": True,
+        "path": str(path),
+        "checked_entries": checked_entries,
+        "line": None,
+        "reason": None,
+    }
+
+
+def verify_chain(path: Path) -> bool:
+    return bool(verify_chain_report(path).get("ok"))

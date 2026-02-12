@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from earCrawler.kg.iri import section_iri
-from earCrawler.rag.kg_expansion_fuseki import expand_sections_via_fuseki
+from earCrawler.rag.kg_expansion_fuseki import (
+    SPARQLTemplateGateway,
+    expand_sections_via_fuseki,
+)
 
 
 class _FakeGateway:
@@ -96,3 +101,38 @@ def test_expand_sections_via_fuseki_enforces_hop_and_path_limits() -> None:
     assert len(snippet.paths) == 1
     assert len(snippet.paths[0].edges) == 1
     assert snippet.paths[0].edges[0].predicate.endswith("relA")
+
+
+def test_sparql_template_gateway_retries_query_failures(tmp_path: Path) -> None:
+    query_template = tmp_path / "kg_expand.rq"
+    query_template.write_text(
+        "SELECT * WHERE { BIND({{section_iri}} AS ?source) }",
+        encoding="utf-8",
+    )
+
+    class _FlakyClient:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def select(self, _query: str) -> dict[str, object]:
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("temporary timeout")
+            return {"results": {"bindings": []}}
+
+    client = _FlakyClient()
+    gateway = SPARQLTemplateGateway(
+        endpoint="http://localhost:3030/ear/sparql",
+        template_path=query_template,
+        query_retries=1,
+        retry_backoff_ms=0,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    rows = gateway.select(
+        "kg_expand_by_section_id",
+        {"section_iri": section_iri("EAR-736.2(b)")},
+    )
+
+    assert rows == []
+    assert client.calls == 2

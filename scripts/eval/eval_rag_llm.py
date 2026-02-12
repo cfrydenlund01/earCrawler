@@ -7,15 +7,22 @@ import hashlib
 import json
 import os
 import re
+import sys
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
 from collections import Counter
 
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from api_clients.llm_client import LLMProviderError
 from eval.validate_datasets import ensure_valid_datasets
 from earCrawler.audit.hitl_events import decision_template
+from earCrawler.audit import ledger as audit_ledger
+from earCrawler.audit import required_events as audit_required_events
 from earCrawler.config.llm_secrets import get_llm_config
 from earCrawler.eval.citation_metrics import (
     CitationScore,
@@ -466,6 +473,19 @@ def _collect_trace_run_provenance(*, llm_provider: str, llm_model: str) -> dict[
     return _sanitize_trace_run_provenance(provenance)
 
 
+def _audit_scope() -> str:
+    return str(os.getenv("EARCRAWLER_AUDIT_EVENT_SCOPE", "ci_eval")).strip().lower()
+
+
+def _audit_required_enforced() -> bool:
+    return str(os.getenv("EARCRAWLER_AUDIT_REQUIRE_EVENTS", "0")).strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def _retrieval_id_set(result: Mapping[str, object]) -> set[str]:
     ids: set[str] = set()
     for sec in result.get("used_sections") or []:
@@ -846,6 +866,11 @@ def evaluate_dataset(
         llm_model=model,
     )
     run_id = _safe_name(out_json.stem)
+    os.environ["EARCTL_AUDIT_RUN_ID"] = run_id
+    if not str(os.getenv("EARCTL_AUDIT_DIR") or "").strip():
+        default_audit_dir = (out_json.parent / run_id / "audit").resolve()
+        os.environ["EARCTL_AUDIT_DIR"] = str(default_audit_dir)
+    audit_ledger_path = audit_ledger.current_log_path(run_id=run_id)
     ablation_mode = (ablation or "").strip().lower() or None
     if ablation_mode and ablation_mode not in _ABLATION_MODES:
         raise ValueError(f"Unsupported --ablation: {ablation_mode}")
@@ -863,6 +888,34 @@ def evaluate_dataset(
         "multihop_only": bool(multihop_only),
         "trace_run_provenance": trace_run_provenance,
     }
+    audit_required_events.emit_run_started(
+        run_id=run_id,
+        run_kind="ci_eval",
+        dataset_id=dataset_id,
+        metadata={
+            "manifest_path": str(manifest_path),
+            "provider": provider,
+            "model": model,
+            "top_k": top_k,
+            "ablation": ablation_mode,
+            "kg_expansion": kg_expansion_enabled,
+            "multihop_only": bool(multihop_only),
+        },
+    )
+    audit_required_events.emit_snapshot_selected(
+        run_id=run_id,
+        snapshot_id=trace_run_provenance.get("snapshot_id"),
+        snapshot_sha256=trace_run_provenance.get("snapshot_sha256"),
+        corpus_digest=trace_run_provenance.get("corpus_digest"),
+    )
+    audit_required_events.emit_index_selected(
+        run_id=run_id,
+        index_path=str(trace_run_provenance.get("index_path") or ""),
+        index_sha256=trace_run_provenance.get("index_sha256"),
+        index_meta_path=trace_run_provenance.get("index_meta_path"),
+        index_meta_sha256=trace_run_provenance.get("index_meta_sha256"),
+        embedding_model=trace_run_provenance.get("embedding_model"),
+    )
 
     results: List[Dict[str, Any]] = []
     latencies: List[float] = []
@@ -967,6 +1020,7 @@ def evaluate_dataset(
                 strict_retrieval=False,
                 strict_output=True,
                 trace_id=trace_id,
+                run_id=run_id,
             )
             raw_answer = rag_result.get("raw_answer")
             output_ok = bool(rag_result.get("output_ok", True))
@@ -1372,6 +1426,18 @@ def evaluate_dataset(
         "status_counts": status_summary,
         "results": results,
     }
+    audit_scope = _audit_scope()
+    audit_required_report = audit_required_events.verify_required_events(
+        audit_ledger_path,
+        scope=audit_scope,
+        run_id=run_id,
+    )
+    audit_chain_report = audit_ledger.verify_chain_report(audit_ledger_path)
+    payload["audit"] = {
+        "ledger_path": str(audit_ledger_path),
+        "required_events": audit_required_report,
+        "chain_integrity": audit_chain_report,
+    }
 
     _write_answer_artifacts(
         results,
@@ -1469,6 +1535,11 @@ def evaluate_dataset(
             f"{fallbacks_used} > fallback_max_uses {fallback_max_uses}. "
             f"Counts: {fallback_counts_dict}"
         )
+    if _audit_required_enforced() and not bool(audit_required_report.get("ok")):
+        raise RuntimeError(
+            "Audit required-event policy failed: missing "
+            + ", ".join(audit_required_report.get("missing") or [])
+        )
     return out_json, out_md
 
 
@@ -1478,12 +1549,25 @@ def _load_eval_payload(path: Path) -> dict[str, object]:
 
 def _ablation_metrics(payload: Mapping[str, object]) -> dict[str, float]:
     citation_metrics = payload.get("citation_metrics") or {}
+    citation_pr = payload.get("citation_pr") or {}
+    citation_micro = citation_pr.get("micro") if isinstance(citation_pr, Mapping) else {}
+    citation_macro = citation_pr.get("macro") if isinstance(citation_pr, Mapping) else {}
     multihop = payload.get("multihop_metrics") or {}
     return {
         "accuracy": float(payload.get("accuracy") or 0.0),
         "label_accuracy": float(payload.get("label_accuracy") or 0.0),
         "grounded_rate": float(payload.get("grounded_rate") or 0.0),
         "citation_supported_rate": float(citation_metrics.get("supported_rate") or 0.0),
+        "citation_micro_precision": float(
+            (citation_micro or {}).get("precision") or 0.0
+        ),
+        "citation_micro_recall": float((citation_micro or {}).get("recall") or 0.0),
+        "citation_micro_f1": float((citation_micro or {}).get("f1") or 0.0),
+        "citation_macro_precision": float(
+            (citation_macro or {}).get("precision") or 0.0
+        ),
+        "citation_macro_recall": float((citation_macro or {}).get("recall") or 0.0),
+        "citation_macro_f1": float((citation_macro or {}).get("f1") or 0.0),
         "evidence_coverage_recall": float(payload.get("evidence_coverage_recall") or 0.0),
         "multihop_evidence_coverage_recall": float(
             multihop.get("evidence_coverage_recall") or 0.0

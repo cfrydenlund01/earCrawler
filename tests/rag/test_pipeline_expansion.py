@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import pytest
 
 from earCrawler.rag.pipeline import expand_with_kg
 
@@ -63,3 +64,34 @@ def test_expand_with_kg_logs_selected_stub_provider(monkeypatch, tmp_path: Path)
     expansions = pipeline.expand_with_kg(["EAR-740.1"])
     assert len(expansions) == 1
     assert ("rag.kg_expansion.provider", {"provider": "json_stub"}) in fake_logger.events
+
+
+def test_expand_with_kg_disable_policy_on_fuseki_error(monkeypatch) -> None:
+    import earCrawler.rag.pipeline as pipeline
+
+    monkeypatch.setenv("EARCRAWLER_KG_EXPANSION_PROVIDER", "fuseki")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_KG_EXPANSION", "1")
+    monkeypatch.setenv("EARCRAWLER_KG_EXPANSION_FAILURE_POLICY", "disable")
+    monkeypatch.setattr(
+        pipeline,
+        "_create_fuseki_gateway",
+        lambda: (_ for _ in ()).throw(RuntimeError("fuseki down")),
+    )
+
+    assert pipeline.expand_with_kg(["EAR-740.1"]) == []
+
+
+def test_expand_with_kg_error_policy_raises_on_fuseki_error(monkeypatch) -> None:
+    import earCrawler.rag.pipeline as pipeline
+
+    monkeypatch.setenv("EARCRAWLER_KG_EXPANSION_PROVIDER", "fuseki")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_KG_EXPANSION", "1")
+    monkeypatch.setenv("EARCRAWLER_KG_EXPANSION_FAILURE_POLICY", "error")
+    monkeypatch.setattr(
+        pipeline,
+        "_create_fuseki_gateway",
+        lambda: (_ for _ in ()).throw(RuntimeError("fuseki down")),
+    )
+
+    with pytest.raises(RuntimeError, match="fuseki down"):
+        pipeline.expand_with_kg(["EAR-740.1"])

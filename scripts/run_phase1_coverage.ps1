@@ -15,6 +15,9 @@ Param(
   [double]$MaxMissingRate = 0.10,
 
   [Parameter(Mandatory = $false)]
+  [switch]$IncludeLegacy,
+
+  [Parameter(Mandatory = $false)]
   [string]$OutBase = "dist/eval/coverage_runs",
 
   [Parameter(Mandatory = $false)]
@@ -72,6 +75,7 @@ $envFreeze = Join-Path $outDir "env_freeze.txt"
   "dataset_id=$DatasetId"
   "retrieval_k=$RetrievalK"
   "max_missing_rate=$MaxMissingRate"
+  "include_legacy=$IncludeLegacy"
   "EARCRAWLER_FAISS_INDEX=$IndexPath"
   "EARCRAWLER_FAISS_MODEL=$ModelName"
 ) | Out-File -Encoding ascii $cmdHistory
@@ -119,6 +123,7 @@ $args = @(
   "--manifest", $Manifest,
   "--corpus", $Corpus,
   "--dataset-id", $DatasetId,
+  ($IncludeLegacy ? "--no-only-v2" : "--only-v2"),
   "--retrieval-k", "$RetrievalK",
   "--max-missing-rate", "$MaxMissingRate",
   "--out", $reportPath,

@@ -5,15 +5,18 @@ from __future__ import annotations
 import json
 import re
 from typing import Iterable, List, Literal, Mapping
+from urllib.parse import urlsplit, urlunsplit
 
 from api_clients.llm_client import LLMProviderError, generate_chat
 from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
 from pathlib import Path
 import os
+import requests
 import time
 from earCrawler.config.llm_secrets import get_llm_config
-from earCrawler.kg.paths import KGExpansionSnippet, KGPath
+from earCrawler.kg.paths import KGExpansionSnippet, KGPath, KGPathEdge
+from earCrawler.audit import required_events as audit_required_events
 from earCrawler.rag.kg_expansion_fuseki import (
     FusekiGatewayLike,
     SPARQLTemplateGateway,
@@ -118,7 +121,7 @@ def _extract_text(doc: Mapping[str, object]) -> str:
 
 
 _EAR_SECTION_RE = re.compile(
-    r"^(?:15\s*CFR\s*)?(?P<section>\d{3}(?:\.\S+)?)$",
+    r"^(?:15\s*CFR\s*)?(?:§+\s*)?(?P<section>\d{3}(?:\.\S+)?)$",
     re.IGNORECASE,
 )
 
@@ -133,7 +136,11 @@ def _normalize_section_id(value: object | None) -> str | None:
         if "#" in raw:
             raw = raw.split("#", 1)[0].strip()
         return raw
-    match = _EAR_SECTION_RE.match(raw)
+    # Normalize common CFR section prefixes like "§ 736.1" to the canonical
+    # "EAR-736.1" form used across datasets, citations, and KG identifiers.
+    cleaned = raw.strip().rstrip(".,;:")
+    cleaned = re.sub(r"^§+\\s*", "", cleaned).strip()
+    match = _EAR_SECTION_RE.match(cleaned)
     if match:
         return f"EAR-{match.group('section')}"
     return raw
@@ -292,6 +299,103 @@ def _total_context_chars(contexts: list[str]) -> int:
     return sum(len(str(c or "")) for c in (contexts or []))
 
 
+def _kg_failure_policy() -> Literal["error", "disable"]:
+    raw = str(os.getenv("EARCRAWLER_KG_EXPANSION_FAILURE_POLICY") or "error").strip().lower()
+    aliases = {
+        "error": "error",
+        "fail": "error",
+        "disable": "disable",
+    }
+    resolved = aliases.get(raw)
+    if resolved is None:
+        raise ValueError(
+            "EARCRAWLER_KG_EXPANSION_FAILURE_POLICY must be one of: error, disable"
+        )
+    return resolved
+
+
+def _kg_expansion_mode() -> Literal["always_on", "multihop_only", "off"]:
+    raw = str(os.getenv("EARCRAWLER_KG_EXPANSION_MODE") or "always_on").strip().lower()
+    aliases = {
+        "always_on": "always_on",
+        "always": "always_on",
+        "multihop_only": "multihop_only",
+        "multihop": "multihop_only",
+        "off": "off",
+    }
+    resolved = aliases.get(raw)
+    if resolved is None:
+        raise ValueError(
+            "EARCRAWLER_KG_EXPANSION_MODE must be one of: always_on, multihop_only, off"
+        )
+    return resolved
+
+
+def _task_is_multihop(task: str | None) -> bool:
+    value = str(task or "").strip().lower()
+    return "multihop" in value or "multi-hop" in value
+
+
+def _should_run_kg_expansion(*, task: str | None, explicit: bool | None) -> bool:
+    # Explicit caller choice (for example eval ablation modes) takes precedence.
+    if explicit is not None:
+        return bool(explicit)
+
+    mode = _kg_expansion_mode()
+    if mode == "off":
+        return False
+    if mode == "multihop_only":
+        return _task_is_multihop(task)
+    return True
+
+
+def _fuseki_ping_url(endpoint: str) -> str:
+    parsed = urlsplit(endpoint)
+    if not parsed.scheme or not parsed.netloc:
+        raise RuntimeError(f"Invalid EARCRAWLER_FUSEKI_URL: {endpoint!r}")
+    return urlunsplit((parsed.scheme, parsed.netloc, "/$/ping", "", ""))
+
+
+def _probe_fuseki_endpoint(
+    endpoint: str,
+    *,
+    timeout: int,
+    retries: int,
+    retry_backoff_ms: int,
+) -> None:
+    ping_url = _fuseki_ping_url(endpoint)
+    ask_query = "ASK { ?s ?p ?o }"
+
+    attempts = max(1, retries + 1)
+    last_exc: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            ping_response = requests.get(ping_url, timeout=timeout)
+            if ping_response.status_code != 200:
+                raise RuntimeError(f"ping status={ping_response.status_code}")
+
+            ask_response = requests.get(
+                endpoint,
+                params={"query": ask_query},
+                headers={"Accept": "application/sparql-results+json"},
+                timeout=timeout,
+            )
+            if ask_response.status_code != 200:
+                raise RuntimeError(f"ask status={ask_response.status_code}")
+            payload = ask_response.json()
+            if not isinstance(payload, Mapping) or "boolean" not in payload:
+                raise RuntimeError("ask probe returned invalid JSON payload")
+            return
+        except Exception as exc:
+            last_exc = exc
+            if attempt >= attempts:
+                break
+            if retry_backoff_ms > 0:
+                time.sleep(retry_backoff_ms / 1000.0)
+
+    raise RuntimeError(f"Fuseki health check failed for {endpoint}: {last_exc}")
+
+
 def _create_fuseki_gateway() -> FusekiGatewayLike:
     endpoint = str(os.getenv("EARCRAWLER_FUSEKI_URL") or "").strip()
     if not endpoint:
@@ -299,7 +403,31 @@ def _create_fuseki_gateway() -> FusekiGatewayLike:
             "KG expansion provider=fuseki selected but EARCRAWLER_FUSEKI_URL is not configured."
         )
     timeout = _env_int("EARCRAWLER_KG_EXPANSION_FUSEKI_TIMEOUT", default=5, min_value=1)
-    return SPARQLTemplateGateway(endpoint=endpoint, timeout=timeout)
+    retries = _env_int("EARCRAWLER_KG_EXPANSION_FUSEKI_RETRIES", default=1, min_value=0)
+    retry_backoff_ms = _env_int(
+        "EARCRAWLER_KG_EXPANSION_FUSEKI_RETRY_BACKOFF_MS",
+        default=200,
+        min_value=0,
+    )
+    healthcheck_enabled = _env_truthy(
+        "EARCRAWLER_KG_EXPANSION_FUSEKI_HEALTHCHECK",
+        default=True,
+    )
+
+    if healthcheck_enabled:
+        _probe_fuseki_endpoint(
+            endpoint,
+            timeout=timeout,
+            retries=retries,
+            retry_backoff_ms=retry_backoff_ms,
+        )
+
+    return SPARQLTemplateGateway(
+        endpoint=endpoint,
+        timeout=timeout,
+        query_retries=retries,
+        retry_backoff_ms=retry_backoff_ms,
+    )
 
 
 def _expand_with_json_stub(section_ids: list[str], mapping_path: str) -> list[KGExpansionSnippet]:
@@ -317,6 +445,11 @@ def _expand_with_json_stub(section_ids: list[str], mapping_path: str) -> list[KG
         if norm:
             normalized.setdefault(norm, str(raw_key))
 
+    max_paths = _env_int(
+        "EARCRAWLER_KG_EXPANSION_MAX_PATHS_PER_SECTION",
+        default=4,
+        min_value=1,
+    )
     expansions: list[KGExpansionSnippet] = []
     for sec in sorted(set(section_ids)):
         key = _normalize_section_id(sec)
@@ -327,6 +460,32 @@ def _expand_with_json_stub(section_ids: list[str], mapping_path: str) -> list[KG
         text = str(entry.get("text") or entry.get("comment") or "").strip()
         if not text:
             continue
+
+        paths: list[KGPath] = []
+        raw_hints = entry.get("label_hints") or []
+        if isinstance(raw_hints, list):
+            for hint in raw_hints:
+                value = str(hint or "").strip()
+                if not value.startswith("path:"):
+                    continue
+                paths.append(
+                    KGPath(
+                        path_id=value,
+                        start_section_id=key,
+                        edges=[
+                            KGPathEdge(
+                                source=f"stub:section/{key}",
+                                predicate="stub:hint_path",
+                                target=value,
+                            )
+                        ],
+                        graph_iri="stub://kg_expansion.json",
+                        confidence=None,
+                    )
+                )
+                if len(paths) >= max_paths:
+                    break
+
         related_sections: list[str] = []
         for related in entry.get("related_sections") or []:
             norm_related = _normalize_section_id(related)
@@ -337,7 +496,7 @@ def _expand_with_json_stub(section_ids: list[str], mapping_path: str) -> list[KG
                 section_id=key,
                 text=text,
                 source=str(entry.get("source") or "json_stub"),
-                paths=[],
+                paths=paths,
                 related_sections=sorted(set(related_sections) - {key}),
             )
         )
@@ -399,13 +558,24 @@ def expand_with_kg(
         min_value=1,
     )
     max_hops = _env_int("EARCRAWLER_KG_EXPANSION_MAX_HOPS", default=2, min_value=1)
-    provider_gateway = gateway or _create_fuseki_gateway()
-    return expand_sections_via_fuseki(
-        sections,
-        provider_gateway,
-        max_paths_per_section=max_paths,
-        max_hops=max_hops,
-    )
+    failure_policy = _kg_failure_policy()
+    try:
+        provider_gateway = gateway or _create_fuseki_gateway()
+        return expand_sections_via_fuseki(
+            sections,
+            provider_gateway,
+            max_paths_per_section=max_paths,
+            max_hops=max_hops,
+        )
+    except Exception as exc:
+        if failure_policy == "disable":
+            _logger.warning(
+                "rag.kg.expansion_failed",
+                error=str(exc),
+                failure_policy=failure_policy,
+            )
+            return []
+        raise
 
 
 def _build_prompt(
@@ -558,10 +728,12 @@ def answer_with_rag(
     strict_output: bool = True,
     generate: bool = True,
     trace_id: str | None = None,
+    run_id: str | None = None,
 ) -> dict:
     """Run retrieval + optional KG expansion + LLM generation."""
 
     t_total_start = time.perf_counter()
+    audit_run_id = str(run_id or os.getenv("EARCTL_AUDIT_RUN_ID") or "").strip() or None
     t_retrieve_ms = 0.0
     t_cache_ms = 0.0
     t_prompt_ms = 0.0
@@ -595,7 +767,15 @@ def answer_with_rag(
         else None
     )
     section_ids = [d["section_id"] for d in docs if d.get("section_id")]
-    kg_expansion_enabled = True if kg_expansion is None else bool(kg_expansion)
+    kg_mode = _kg_expansion_mode()
+    kg_expansion_enabled = _should_run_kg_expansion(task=task, explicit=kg_expansion)
+    _logger.info(
+        "rag.kg_expansion.mode",
+        mode=kg_mode,
+        enabled=kg_expansion_enabled,
+        task=str(task or ""),
+        explicit=kg_expansion,
+    )
     kg_expansion = expand_with_kg(section_ids) if kg_expansion_enabled else []
     kg_paths_by_id: dict[str, KGPath] = {}
     for snippet in kg_expansion:
@@ -851,6 +1031,31 @@ def answer_with_rag(
         latency_fields["provider"] = provider_label
         latency_fields["model"] = model_label
     _logger.info("rag.pipeline.latency", **latency_fields)
+
+    try:
+        audit_required_events.emit_remote_llm_policy_decision(
+            trace_id=trace_id,
+            run_id=audit_run_id,
+            egress_decision=egress_decision.to_dict() if egress_decision else {},
+        )
+        output_error_code: str | None = None
+        if isinstance(output_error, Mapping):
+            raw_code = output_error.get("code")
+            if raw_code is not None:
+                output_error_code = str(raw_code)
+        audit_required_events.emit_query_outcome(
+            trace_id=trace_id,
+            run_id=audit_run_id,
+            label=label,
+            answer_text=answer_text,
+            output_ok=bool(output_ok),
+            retrieval_empty=bool(retrieval_empty),
+            retrieval_empty_reason=str(retrieval_empty_reason or "") or None,
+            disabled_reason=str(disabled_reason or "") or None,
+            output_error_code=output_error_code,
+        )
+    except Exception as exc:  # pragma: no cover - audit logging must never break answers
+        _logger.warning("audit.event.emit_failed", error=str(exc), trace_id=trace_id)
 
     return {
         "question": question,
