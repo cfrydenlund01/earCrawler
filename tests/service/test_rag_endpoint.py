@@ -136,7 +136,7 @@ def test_llm_endpoint_returns_answer_and_contexts(monkeypatch):
             '{'
             '"label":"permitted",'
             '"answer_text":"stubbed answer",'
-            '"citations":[{"section_id":"734.3","quote":"Example EAR passage text about exports.","span_id":""}],'
+            '"citations":[{"section_id":"EAR-734.3","quote":"Example EAR passage text about exports.","span_id":""}],'
             '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
             '"assumptions":[]'
             '}'
@@ -153,7 +153,7 @@ def test_llm_endpoint_returns_answer_and_contexts(monkeypatch):
     assert "Example EAR passage text about exports." in (data.get("justification") or "")
     assert data["output_ok"] is True
     assert data["output_error"] is None
-    assert data["citations"][0]["section_id"] == "734.3"
+    assert data["citations"][0]["section_id"] == "EAR-734.3"
     assert data["citations"][0]["quote"] == "Example EAR passage text about exports."
     assert data["evidence_okay"]["ok"] is True
     assert data["assumptions"] == []
@@ -310,7 +310,7 @@ def test_llm_endpoint_ungrounded_quote_returns_422(monkeypatch):
             '{'
             '"label":"permitted",'
             '"answer_text":"stubbed answer",'
-            '"citations":[{"section_id":"734.3","quote":"NOT IN CONTEXT","span_id":""}],'
+            '"citations":[{"section_id":"EAR-734.3","quote":"NOT IN CONTEXT","span_id":""}],'
             '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
             '"assumptions":[]'
             '}'

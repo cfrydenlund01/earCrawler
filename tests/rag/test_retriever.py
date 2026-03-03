@@ -29,6 +29,23 @@ class DummyModel:
         return np.ones((len(texts), 3), dtype="float32")
 
 
+class KeywordModel:
+    def __init__(self, _name: str) -> None:
+        self.calls: list[list[str]] = []
+
+    def _encode_one(self, text: str):
+        lowered = str(text or "").lower()
+        if "license" in lowered:
+            return np.array([1.0, 0.0, 0.0], dtype="float32")
+        if "prohibition" in lowered:
+            return np.array([0.0, 1.0, 0.0], dtype="float32")
+        return np.array([0.0, 0.0, 1.0], dtype="float32")
+
+    def encode(self, texts, show_progress_bar=False):
+        self.calls.append(list(texts))
+        return np.asarray([self._encode_one(text) for text in texts], dtype="float32")
+
+
 class StubIndex:
     def __init__(self) -> None:
         self.added = []
@@ -66,6 +83,7 @@ class StubFaiss(SimpleNamespace):
         super().__init__()
         self.index = index
         self.write_args = None
+        self.threads = None
 
     def IndexFlatL2(self, dim):  # noqa: N802 - mimics faiss API
         self.dim = dim
@@ -79,6 +97,9 @@ class StubFaiss(SimpleNamespace):
     def write_index(self, index, path):  # noqa: N802
         self.write_args = (index, path)
         Path(path).touch()
+
+    def omp_set_num_threads(self, value):  # noqa: N802
+        self.threads = value
 
 
 def _doc(doc_id: str, text: str, *, chunk_kind: str = "section") -> dict:
@@ -94,7 +115,7 @@ def _doc(doc_id: str, text: str, *, chunk_kind: str = "section") -> dict:
     }
 
 
-def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
+def _load_retriever(monkeypatch, tmp_path, fail_encode=False, *, backend="faiss"):
     index = StubIndex()
     faiss_mod = StubFaiss(index)
     monkeypatch.setitem(sys.modules, "faiss", faiss_mod)
@@ -136,6 +157,7 @@ def _load_retriever(monkeypatch, tmp_path, fail_encode=False):
         SimpleNamespace(),
         SimpleNamespace(),
         index_path=Path(tmp_path / "idx.faiss"),
+        backend=backend,
     )
     return r, model, index, faiss_mod, retriever
 
@@ -272,3 +294,73 @@ def test_model_instance_cached_across_retrievers(monkeypatch, tmp_path):
         index_path=Path(tmp_path / "idx2.faiss"),
     )
     assert calls["count"] == 1
+
+
+def test_windows_default_backend_uses_bruteforce_without_faiss(monkeypatch, tmp_path):
+    tg_mod = SimpleNamespace(TradeGovClient=object)
+    fr_mod = SimpleNamespace(FederalRegisterClient=object)
+    pkg_mod = SimpleNamespace(
+        TradeGovClient=object,
+        TradeGovError=Exception,
+        FederalRegisterClient=object,
+        FederalRegisterError=Exception,
+    )
+    monkeypatch.setitem(sys.modules, "api_clients.tradegov_client", tg_mod)
+    monkeypatch.setitem(sys.modules, "api_clients.federalregister_client", fr_mod)
+    monkeypatch.setitem(sys.modules, "api_clients", pkg_mod)
+    monkeypatch.delenv("EARCRAWLER_RETRIEVAL_BACKEND", raising=False)
+
+    import earCrawler.rag.retriever as retriever_mod
+
+    importlib.reload(retriever_mod)
+    monkeypatch.setattr(retriever_mod, "SentenceTransformer", lambda name: KeywordModel(name))
+    monkeypatch.setattr(retriever_mod, "faiss", None)
+    monkeypatch.setattr(retriever_mod.sys, "platform", "win32", raising=False)
+
+    rows = [
+        _doc("EAR-740.9", "License exception STA eligibility."),
+        _doc("EAR-740.1", "License exception overview."),
+        _doc("EAR-736.2", "General prohibition one."),
+    ]
+    meta_path = tmp_path / "windows.meta.json"
+    meta_path.write_text(
+        json.dumps({"rows": rows}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    retriever = retriever_mod.Retriever(
+        SimpleNamespace(),
+        SimpleNamespace(),
+        model_name="stub-model",
+        index_path=tmp_path / "windows.faiss",
+    )
+
+    first = retriever.query("license exception", k=2)
+    second = retriever.query("license exception", k=2)
+
+    assert retriever.backend == "bruteforce"
+    assert [row["doc_id"] for row in first] == ["EAR-740.1", "EAR-740.9"]
+    assert [row["doc_id"] for row in second] == ["EAR-740.1", "EAR-740.9"]
+    assert any(row["section_id"] == "EAR-740.1" for row in first)
+
+
+def test_faiss_backend_breaks_ties_deterministically_on_windows(monkeypatch, tmp_path):
+    r, _model, index, faiss_mod, retriever_mod = _load_retriever(
+        monkeypatch,
+        tmp_path,
+        backend="faiss",
+    )
+    monkeypatch.setattr(retriever_mod.sys, "platform", "win32", raising=False)
+    docs = [_doc("EAR-736.3", "b"), _doc("EAR-736.2", "a")]
+    r.add_documents(docs)
+    index.returns = (
+        np.zeros((1, 2), dtype="float32"),
+        np.array([[1, 0]], dtype="int64"),
+    )
+
+    first = r.query("hi", k=2)
+    second = r.query("hi", k=2)
+
+    assert faiss_mod.threads == 1
+    assert [row["doc_id"] for row in first] == ["EAR-736.2", "EAR-736.3"]
+    assert [row["doc_id"] for row in second] == ["EAR-736.2", "EAR-736.3"]

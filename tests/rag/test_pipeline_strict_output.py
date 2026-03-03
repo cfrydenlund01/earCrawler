@@ -127,3 +127,47 @@ def test_pipeline_rejects_ungrounded_quote(monkeypatch):
     assert result["output_ok"] is False
     assert result["output_error"]["code"] == "ungrounded_citation"
     assert result["answer"] is None
+
+
+def test_pipeline_rejects_quote_from_different_section_context(monkeypatch):
+    monkeypatch.setattr(
+        pipeline,
+        "retrieve_regulation_context",
+        lambda *a, **k: [
+            {
+                "section_id": "EAR-736.2",
+                "text": "General Prohibition Four example stub text.",
+                "score": 1.0,
+                "raw": {},
+            },
+            {
+                "section_id": "EAR-740.1",
+                "text": "License Exceptions intro",
+                "score": 0.9,
+                "raw": {},
+            },
+        ],
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "generate_chat",
+        lambda *a, **k: (
+            '{'
+            '"label":"permitted",'
+            '"answer_text":"Yes",'
+            '"citations":[{"section_id":"EAR-740.1","quote":"General Prohibition Four example stub text.","span_id":""}],'
+            '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+            '"assumptions":[]'
+            '}'
+        ),
+    )
+
+    result = pipeline.answer_with_rag(
+        "Question?",
+        strict_retrieval=False,
+        strict_output=True,
+    )
+
+    assert result["output_ok"] is False
+    assert result["output_error"]["code"] == "ungrounded_citation"
+    assert result["answer"] is None

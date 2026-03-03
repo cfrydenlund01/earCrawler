@@ -52,6 +52,23 @@ def test_extra_key_rejected() -> None:
     assert excinfo.value.as_dict()["details"]["unexpected"] == "extra"
 
 
+def test_canon_005_extra_json_keys_fail() -> None:
+    raw = (
+        '{'
+        '"label":"permitted",'
+        '"answer_text":"Yes",'
+        '"citations":[],' 
+        '"evidence_okay":{"ok":true,"reasons":[]},'
+        '"assumptions":[],' 
+        '"unexpected_debug":"1"'
+        '}'
+    )
+    with pytest.raises(OutputSchemaError) as excinfo:
+        parse_strict_answer_json(raw, allowed_labels=DEFAULT_ALLOWED_LABELS)
+    assert excinfo.value.code == "extra_key"
+    assert excinfo.value.as_dict()["details"]["unexpected"] == "unexpected_debug"
+
+
 def test_missing_key_rejected() -> None:
     raw = '{"label":"permitted","answer_text":"Yes","citations":[],"assumptions":[]}'
     with pytest.raises(OutputSchemaError) as excinfo:
@@ -90,6 +107,65 @@ def test_invalid_enum_rejected() -> None:
         parse_strict_answer_json(raw, allowed_labels=DEFAULT_ALLOWED_LABELS)
     assert excinfo.value.code == "invalid_enum"
     assert "maybe" in excinfo.value.as_dict()["details"]["label"]
+
+
+def test_canon_004_unknown_label_fails() -> None:
+    raw = (
+        '{'
+        '"label":"maybe",'
+        '"answer_text":"Yes",'
+        '"citations":[],' 
+        '"evidence_okay":{"ok":true,"reasons":[]},'
+        '"assumptions":[]'
+        '}'
+    )
+    with pytest.raises(OutputSchemaError) as excinfo:
+        parse_strict_answer_json(raw, allowed_labels=DEFAULT_ALLOWED_LABELS)
+    assert excinfo.value.code == "invalid_enum"
+    assert excinfo.value.as_dict()["details"]["label"] == "maybe"
+
+
+def test_canon_002_trailing_period_in_section_id_fails() -> None:
+    raw = (
+        '{'
+        '"label":"permitted",'
+        '"answer_text":"Yes",'
+        '"citations":[{"section_id":"EAR-740.1.","quote":"License Exceptions intro","span_id":""}],'
+        '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+        '"assumptions":[]'
+        '}'
+    )
+    with pytest.raises(OutputSchemaError) as excinfo:
+        parse_strict_answer_json(
+            raw,
+            allowed_labels=DEFAULT_ALLOWED_LABELS,
+            contexts=["[EAR-740.1] License Exceptions intro"],
+        )
+    assert excinfo.value.code == "invalid_section_id"
+    assert excinfo.value.as_dict()["details"]["expected"] == "EAR-740.1"
+
+
+def test_canon_003_quote_must_match_cited_section_context() -> None:
+    raw = (
+        '{'
+        '"label":"permitted",'
+        '"answer_text":"Yes",'
+        '"citations":[{"section_id":"EAR-740.1","quote":"General Prohibition Four example stub text.","span_id":""}],'
+        '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+        '"assumptions":[]'
+        '}'
+    )
+    with pytest.raises(OutputSchemaError) as excinfo:
+        parse_strict_answer_json(
+            raw,
+            allowed_labels=DEFAULT_ALLOWED_LABELS,
+            contexts=[
+                "[EAR-736.2] General Prohibition Four example stub text.",
+                "[EAR-740.1] License Exceptions intro",
+            ],
+        )
+    assert excinfo.value.code == "ungrounded_citation"
+    assert excinfo.value.as_dict()["details"]["section_id"] == "EAR-740.1"
 
 
 def test_ungrounded_citation_requires_unanswerable() -> None:

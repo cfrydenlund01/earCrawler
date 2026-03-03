@@ -896,6 +896,7 @@ def answer_with_rag(
                 rendered,
                 allowed_labels=allowed_labels,
                 context="\n\n".join(redacted_contexts),
+                contexts=redacted_contexts,
             )
             answer_text = str(validated["answer_text"])
             label = str(validated["label"])
@@ -977,6 +978,7 @@ def answer_with_rag(
                     raw_answer,
                     allowed_labels=allowed_labels,
                     context="\n\n".join(redacted_contexts),
+                    contexts=redacted_contexts,
                 )
                 t_parse_ms = round((time.perf_counter() - parse_start) * 1000.0, 3)
                 answer_text = str(validated["answer_text"])
