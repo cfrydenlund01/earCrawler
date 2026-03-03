@@ -255,6 +255,93 @@ GOLDEN_RETRIEVAL_MAP: dict[str, list[dict[str, object]]] = {
             "source_url": "https://example.test/ear/736.2b",
         }
     ],
+    "ambiguity-001": [
+        {
+            "section": "EAR-740.1",
+            "text": "License Exceptions authorize exports without a license when all stated conditions are met.",
+            "score": 0.91,
+            "title": "License Exceptions",
+            "source_url": "https://example.test/ear/740.1",
+        }
+    ],
+    "ambiguity-002": [
+        {
+            "section": "EAR-742.4(a)(1)",
+            "text": "A license is required for NS Column 1 exports to China unless an exception applies.",
+            "score": 0.93,
+            "title": "NS Controls",
+            "source_url": "https://example.test/ear/742.4a1",
+        }
+    ],
+    "ambiguity-003": [
+        {
+            "section": "EAR-744.6(b)(3)",
+            "text": "A BIS license is required for certain U.S. person support related to biological weapons activities.",
+            "score": 0.92,
+            "title": "U.S. Person Activities",
+            "source_url": "https://example.test/ear/744.6b3",
+        }
+    ],
+    "adv-cite-001": [
+        {
+            "section": "EAR-736.2(b)",
+            "text": "General Prohibition One: you may not proceed unless a BIS license or License Exception applies.",
+            "score": 0.97,
+            "title": "General Prohibitions",
+            "source_url": "https://example.test/ear/736.2b",
+        }
+    ],
+    "adv-cite-002": [
+        {
+            "section": "EAR-736.2(b)",
+            "text": "General Prohibition One: you may not proceed unless a BIS license or License Exception applies.",
+            "score": 0.97,
+            "title": "General Prohibitions",
+            "source_url": "https://example.test/ear/736.2b",
+        }
+    ],
+    "adv-cite-003": [
+        {
+            "section": "EAR-736.2(b)",
+            "text": "General Prohibition One: you may not proceed unless a BIS license or License Exception applies.",
+            "score": 0.95,
+            "title": "General Prohibitions",
+            "source_url": "https://example.test/ear/736.2b",
+        },
+        {
+            "section": "EAR-740.1",
+            "text": "License Exceptions authorize exports without a license when all stated conditions are met.",
+            "score": 0.94,
+            "title": "License Exceptions",
+            "source_url": "https://example.test/ear/740.1",
+        },
+    ],
+    "adv-cite-004": [
+        {
+            "section": "EAR-740.1",
+            "text": "License Exceptions authorize exports without a license when all stated conditions are met.",
+            "score": 0.96,
+            "title": "License Exceptions",
+            "source_url": "https://example.test/ear/740.1",
+        },
+        {
+            "section": "EAR-736.2(b)",
+            "text": "General Prohibition One: you may not proceed unless a BIS license or License Exception applies.",
+            "score": 0.71,
+            "title": "General Prohibitions",
+            "source_url": "https://example.test/ear/736.2b",
+        },
+    ],
+    "thin-001": [],
+    "thin-002": [
+        {
+            "section": "EAR-736.2(b)",
+            "text": "General prohibitions apply to covered exports unless authorized.",
+            "score": 0.31,
+            "title": "General Prohibitions",
+            "source_url": "https://example.test/ear/736.2b",
+        }
+    ],
 }
 
 __all__ = ["GOLDEN_RETRIEVAL_MAP"]

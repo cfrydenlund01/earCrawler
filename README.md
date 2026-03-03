@@ -47,7 +47,7 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
    This path keeps the dependencies and console scripts inside `.venv\Scripts\`. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
    > Tip: Pip may leave a temporary folder (for example `~aml`) behind or warn that script shims such as `uvicorn.exe` are not on `PATH`. The folder can be deleted safely, and you can either add the scripts directory to `PATH` or continue using `python -m earCrawler.cli ...` to invoke commands.
 
-   > **RAG extras:** The retrieval stack (SentenceTransformers/FAISS) is optional; install it only when you need RAG indexing/querying. This project no longer relies on a local Mistral model for generation.
+   > **RAG extras:** The retrieval stack (SentenceTransformers/FAISS) is optional; install it only when you need RAG indexing/querying. This project no longer relies on a specific local model for generation.
    > ```powershell
    > python -m pip install -e .[gpu]
    > # or use pip install -r requirements-gpu.txt on Linux runners
@@ -172,7 +172,7 @@ Windows retrieval smoke:
 
 ## RAG + Remote LLM Evaluation
 
-You can score the existing eval datasets (`eval/*.jsonl`) through the RAG pipeline using remote providers (Groq or NVIDIA NIM). Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys in `config/llm_secrets.env` or your environment. The defaults come from `earCrawler/config/llm_secrets.py`, but you can override them if a model is decommissioned (e.g., Groq `mixtral-8x7b-32768`).
+You can score the existing eval datasets (`eval/*.jsonl`) through the RAG pipeline using remote providers (Groq or NVIDIA NIM). Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys in `config/llm_secrets.env` or your environment. The defaults come from `earCrawler/config/llm_secrets.py` and remain provider-agnostic/configurable via environment overrides if a default remote model changes.
 
 Examples:
 
@@ -362,7 +362,7 @@ These outputs are suitable for CI artefacts and for logging Phase E endpoints in
 - Create `config/llm_secrets.env` from `config/llm_secrets.example.env` and fill in provider keys/models. The file is git-ignored and only supplements the usual env/Windows Credential Store secrets.
 - Enable remote calls explicitly: `set EARCRAWLER_ENABLE_REMOTE_LLM=1` (default is disabled for CI/offline safety).
 - Choose provider/model per call via CLI (defaults come from `earCrawler/config/llm_secrets.py` and can be overridden via environment or `config/llm_secrets.env`):
-  - `py -m earCrawler.cli llm ask --llm-provider groq --llm-model mixtral-8x7b-32768 "Can ACME export laptops to France?"`
+  - `py -m earCrawler.cli llm ask --llm-provider groq --llm-model <provider-model-id> "Can ACME export laptops to France?"`
   - `py -m earCrawler.cli llm ask --llm-provider nvidia_nim --llm-model <nim-model-id> "Are Huawei exports restricted under EAR?"`
 - Requests use OpenAI-style `/chat/completions` endpoints with soft call budgets (configure with `LLM_MAX_CALLS` or `LLM_<PROVIDER>_MAX_CALLS`).
 

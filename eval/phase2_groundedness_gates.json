@@ -1,0 +1,11 @@
+{
+  "golden_phase2": {
+    "unanswerable_accuracy_min": 0.9,
+    "grounding_contract_pass_rate_min": 0.8,
+    "citation_precision_eq": 1.0,
+    "known_bad_citations_count_eq": 0,
+    "valid_citation_rate_eq": 1.0,
+    "supported_rate_eq": 1.0,
+    "overclaim_rate_eq": 0.0
+  }
+}
