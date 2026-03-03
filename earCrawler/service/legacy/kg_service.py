@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-"""FastAPI Knowledge Graph service for querying and inserting triples.
+"""Legacy / future-work KG service.
 
-This module exposes a minimal API in front of a SPARQL endpoint. It supports
-safe read-only ``SELECT`` queries and SHACL-validated inserts of Turtle
-triples.
+This module is quarantined on purpose. The only supported runtime service
+surface for this repository is ``service/api_server``. To run this legacy
+module for isolated future-project work, set
+``EARCRAWLER_ENABLE_LEGACY_KG_SERVICE=1`` explicitly before importing it.
 """
 
 import logging
@@ -21,7 +22,12 @@ from SPARQLWrapper.SPARQLExceptions import QueryBadFormed
 from pyshacl import validate
 from urllib.error import HTTPError, URLError
 
-from .utils import get_secret
+from ..utils import get_secret
+
+if os.getenv("EARCRAWLER_ENABLE_LEGACY_KG_SERVICE") != "1":
+    raise RuntimeError(
+        "Legacy kg_service is quarantined. Use service.api_server instead."
+    )
 
 # Load SPARQL_ENDPOINT_URL & SHAPES_FILE_PATH from env or
 # Windows Credential Store.

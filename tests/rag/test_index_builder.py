@@ -169,9 +169,10 @@ def test_retriever_reads_index_and_meta(monkeypatch, tmp_path: Path) -> None:
         SimpleNamespace(),
         model_name="stub-model",
         index_path=index_path,
+        backend="faiss",
     )
     results = r.query("hi", k=2)
-    assert [res["doc_id"] for res in results] == ["EAR-736.2(a)", "EAR-736.2"]
+    assert [res["doc_id"] for res in results] == ["EAR-736.2", "EAR-736.2(a)"]
     assert all("section_id" in res for res in results)
     assert all(res["score"] >= 0 for res in results)
 

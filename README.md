@@ -122,6 +122,8 @@ py -m earCrawler.cli api stop
 
 PID files are written to `kg/reports/api.pid`. If the stop command warns that it cannot find the process, the server has already exited; remove the stale PID file before the next start.
 
+Legacy / Future work: `kg_service` is deferred to a future project and is not a supported entrypoint in this repo. Use `service/api_server/` and the `earctl api ...` commands as the only runtime service surface.
+
 Environment variables:
 
 - `EARCRAWLER_API_HOST` and `EARCRAWLER_API_PORT` control bind address and port.
@@ -154,6 +156,17 @@ Invoke-WebRequest `
 ```
 
 The response includes `question`, `answer`, `contexts` (the passages passed to the LLM), `retrieved` (document metadata), `provider`, `model`, and flags `rag_enabled` / `llm_enabled` indicating whether the stack is active.
+
+Retrieval backend selection is controlled by `EARCRAWLER_RETRIEVAL_BACKEND`:
+
+- `bruteforce`: deterministic cosine search over the metadata corpus embeddings; this is the default on Windows because the project does not package `faiss-cpu` on `win32`.
+- `faiss`: uses the existing FAISS index; on Windows the retriever forces FAISS to one thread and applies a stable tie-break on equal-score hits.
+
+Windows retrieval smoke:
+
+```powershell
+.\scripts\retrieval_smoke.ps1
+```
 
 ---
 
@@ -356,6 +369,18 @@ These outputs are suitable for CI artefacts and for logging Phase E endpoints in
 Run `py -m earCrawler.cli COMMAND --help` for detailed options.
 
 ---
+
+## Baseline run (Phase 0)
+
+Run the replayable baseline helper from the repo root:
+
+```powershell
+pwsh .\scripts\baseline.ps1
+```
+
+It creates a new timestamped artifact directory at `runs\<YYYYMMDD_HHMMSS>\` and writes `pytest.txt`, `python_version.txt`, and `env_freeze.txt` there. The script also creates a matching baseline branch (`baseline/<timestamp>`) and tag (`baseline-<timestamp>`) for the exact `HEAD` commit used by the run, adding a suffix such as `_01` if the branch/tag name already exists. To find the recorded commit later, run `git rev-list -n 1 baseline-<timestamp>` or inspect the tag with `git show baseline-<timestamp>`.
+
+- Run `pwsh .\scripts\env_snapshot.ps1` to capture a replay-friendly environment snapshot in the latest `runs\<timestamp>\env_snapshot.json`; it reuses existing `python_version.txt` / `env_freeze.txt` when present and redacts secret-like environment variables.
 
 ## Troubleshooting
 

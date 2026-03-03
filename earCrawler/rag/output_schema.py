@@ -14,8 +14,9 @@ This module enforces a machine-checkable, grounded contract:
 import json
 import re
 from dataclasses import dataclass
-from typing import Dict, Iterable, List, Set
+from typing import Dict, Iterable, List, Sequence, Set
 
+from earCrawler.rag.corpus_contract import normalize_ear_section_id
 DEFAULT_ALLOWED_LABELS: Set[str] = {
     "license_required",
     "no_license_required",
@@ -81,6 +82,8 @@ _HINT_KEYWORDS = re.compile(
     r"\b(need|needs|missing|provide|provided|providing|additional|more|to determine|to answer)\b",
     flags=re.IGNORECASE,
 )
+_CONTEXT_PREFIX_RE = re.compile(r"^\[(?P<section>[^\]]+)\]\s*(?P<text>.*)$", flags=re.DOTALL)
+_CONTEXT_BLOCK_RE = re.compile(r"(?:\A|\n\n)\[(?P<section>[^\]]+)\]\s*", flags=re.DOTALL)
 
 
 def _coerce_str(parsed: dict, key: str, *, raw: str) -> str:
@@ -115,11 +118,87 @@ def _substring_in_context(quote: str, context: str) -> bool:
     return q in c
 
 
+def _parse_context_entry(entry: object) -> tuple[str | None, str]:
+    raw = str(entry or "").strip()
+    if not raw:
+        return None, ""
+    match = _CONTEXT_PREFIX_RE.match(raw)
+    if not match:
+        return None, raw
+    section_id = normalize_ear_section_id(match.group("section"))
+    return section_id, match.group("text").strip()
+
+
+def _expand_context_string(context: str) -> list[str]:
+    if not context:
+        return []
+    matches = list(_CONTEXT_BLOCK_RE.finditer(context))
+    if not matches:
+        return [context]
+
+    entries: list[str] = []
+    for idx, match in enumerate(matches):
+        start = match.start()
+        if start > 0:
+            leading = context[:start].strip()
+            if leading:
+                entries.append(leading)
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(context)
+        block = context[match.start():end].strip()
+        if block:
+            entries.append(block)
+    return entries
+
+
+def _build_context_index(
+    *,
+    context: str | None,
+    contexts: Sequence[str] | None,
+) -> tuple[dict[str, list[str]], str]:
+    index: dict[str, list[str]] = {}
+    raw_entries = list(contexts or [])
+    if context:
+        raw_entries.extend(_expand_context_string(context))
+
+    full_context_parts: list[str] = []
+    for entry in raw_entries:
+        section_id, text = _parse_context_entry(entry)
+        full_context_parts.append(str(entry or ""))
+        if section_id and text:
+            index.setdefault(section_id, []).append(text)
+    return index, "\n\n".join(full_context_parts)
+
+
+def _canonical_citation_section_id(section_id: str, *, raw: str, index: int) -> str:
+    canonical = normalize_ear_section_id(section_id)
+    if canonical is None:
+        raise OutputSchemaError(
+            code="invalid_section_id",
+            message=f"citation.section_id '{section_id}' is not a valid EAR identifier",
+            raw_text=raw,
+            details={"key": "citations", "index": index, "section_id": section_id},
+        )
+    if canonical != section_id:
+        raise OutputSchemaError(
+            code="invalid_section_id",
+            message=f"citation.section_id must be canonical (expected '{canonical}')",
+            raw_text=raw,
+            details={
+                "key": "citations",
+                "index": index,
+                "section_id": section_id,
+                "expected": canonical,
+            },
+        )
+    return canonical
+
+
 def parse_strict_answer_json(
     raw: str,
     *,
     allowed_labels: Iterable[str],
     context: str | None = None,
+    contexts: Sequence[str] | None = None,
 ) -> Dict[str, object]:
     """Parse and validate strict JSON RAG answer payloads.
 
@@ -210,7 +289,8 @@ def parse_strict_answer_json(
         )
 
     parsed_citations: List[dict] = []
-    matched_any_quote = False
+    context_index, full_context = _build_context_index(context=context, contexts=contexts)
+    has_structured_context = bool(context_index)
     for idx, item in enumerate(citations):
         if not isinstance(item, dict):
             raise OutputSchemaError(
@@ -235,7 +315,11 @@ def parse_strict_answer_json(
                 raw_text=raw,
                 details={"key": "citations", "index": idx, "missing": item_missing},
             )
-        section_id = _coerce_str(item, "section_id", raw=raw)
+        section_id = _canonical_citation_section_id(
+            _coerce_str(item, "section_id", raw=raw),
+            raw=raw,
+            index=idx,
+        )
         quote = _coerce_str(item, "quote", raw=raw)
         span_id = item.get("span_id")
         if span_id is not None and not isinstance(span_id, str):
@@ -245,8 +329,21 @@ def parse_strict_answer_json(
                 raw_text=raw,
                 details={"key": "citations", "index": idx, "field": "span_id", "expected": "string"},
             )
-        if context is not None and _substring_in_context(quote, context):
-            matched_any_quote = True
+        matched_quote = False
+        if has_structured_context:
+            matched_quote = any(
+                _substring_in_context(quote, section_context)
+                for section_context in context_index.get(section_id, [])
+            )
+        elif full_context:
+            matched_quote = _substring_in_context(quote, full_context)
+        if (has_structured_context or full_context) and not matched_quote:
+            raise OutputSchemaError(
+                code="ungrounded_citation",
+                message="Citation quote must come from the cited section context",
+                raw_text=raw,
+                details={"key": "citations", "index": idx, "section_id": section_id},
+            )
         parsed_citations.append(
             {"section_id": section_id, "quote": quote, "span_id": span_id}
         )
@@ -309,8 +406,8 @@ def parse_strict_answer_json(
             details={"key": "assumptions"},
         )
 
-    if context is not None and assumptions:
-        unsupported = [a for a in assumptions if not _substring_in_context(a, context)]
+    if full_context and assumptions:
+        unsupported = [a for a in assumptions if not _substring_in_context(a, full_context)]
         if unsupported and label_value != "unanswerable":
             raise OutputSchemaError(
                 code="assumption_unsupported",
@@ -319,7 +416,7 @@ def parse_strict_answer_json(
                 details={"unsupported": unsupported},
             )
 
-    if context is not None and (label_value != "unanswerable") and not matched_any_quote:
+    if (has_structured_context or full_context) and (label_value != "unanswerable") and not parsed_citations:
         raise OutputSchemaError(
             code="ungrounded_citation",
             message="No citation quote is a substring of retrieved context; must label unanswerable",
@@ -352,7 +449,7 @@ def parse_strict_answer_json(
         "citations": parsed_citations,
         "evidence_okay": {"ok": ok, "reasons": list(reasons)},
         "assumptions": list(assumptions),
-        "matched_any_quote": matched_any_quote,
+        "matched_any_quote": bool(parsed_citations),
     }
 
 
@@ -361,6 +458,7 @@ def validate_and_extract_strict_answer(
     *,
     allowed_labels: Iterable[str],
     context: str | None = None,
+    contexts: Sequence[str] | None = None,
 ) -> Dict[str, object]:
     """Single strict-contract validation path for answer-producing entrypoints."""
 
@@ -368,6 +466,7 @@ def validate_and_extract_strict_answer(
         raw,
         allowed_labels=allowed_labels,
         context=context,
+        contexts=contexts,
     )
 
     citations = list(parsed.get("citations") or [])
