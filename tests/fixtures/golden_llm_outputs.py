@@ -137,7 +137,7 @@ GOLDEN_LLM_OUTPUTS: dict[str, str] = {
     "gph2-ans-005": _render(
         {
             "label": "true",
-            "answer_text": "Yes. The scenario requires a license under the cited embargo control.",
+            "answer_text": "Yes. The cited embargo excerpt imposes licensing requirements for embargoed destinations.",
             "justification": "The quote supports a license requirement for the described activity.",
             "citations": [
                 {
@@ -248,7 +248,7 @@ GOLDEN_LLM_OUTPUTS: dict[str, str] = {
     "gph2-ans-009": _render(
         {
             "label": "false",
-            "answer_text": "False. EAR-744.6(b)(3) concerns U.S. person support related to biological weapons activities, not Part 746 embargo controls.",
+            "answer_text": "False. The cited excerpt describes U.S. person support related to biological weapons activities.",
             "justification": "The cited excerpt describes a BIS license requirement tied to biological weapons support activities.",
             "citations": [
                 {
@@ -322,6 +322,114 @@ GOLDEN_LLM_OUTPUTS: dict[str, str] = {
             "assumptions": [],
         }
     ),
+    "ambiguity-001": _render(
+        {
+            "label": "unanswerable",
+            "answer_text": "Insufficient information to determine. Need ECCN details for the item before assessing a License Exception.",
+            "justification": "The retrieved Part 740 excerpt is general and does not identify the item's classification.",
+            "citations": [],
+            "evidence_okay": {"ok": True, "reasons": ["no_grounded_quote_for_key_claim"]},
+            "assumptions": [],
+        }
+    ),
+    "ambiguity-002": _render(
+        {
+            "label": "unanswerable",
+            "answer_text": "Insufficient information to determine. Need the destination country to assess the applicable controls.",
+            "justification": "The retrieved NS-control excerpt is destination-specific and cannot answer a destination-free question.",
+            "citations": [],
+            "evidence_okay": {"ok": True, "reasons": ["no_grounded_quote_for_key_claim"]},
+            "assumptions": [],
+        }
+    ),
+    "ambiguity-003": _render(
+        {
+            "label": "unanswerable",
+            "answer_text": "Insufficient information to determine. Need the end use and end user for the support activity.",
+            "justification": "The retrieved Part 744 excerpt depends on the covered end use and end user facts.",
+            "citations": [],
+            "evidence_okay": {"ok": True, "reasons": ["no_grounded_quote_for_key_claim"]},
+            "assumptions": [],
+        }
+    ),
+    "adv-cite-001": _render(
+        {
+            "label": "true",
+            "answer_text": "Yes. The cited General Prohibitions require authorization before proceeding.",
+            "justification": "The quote supports the authorization requirement.",
+            "citations": [
+                {
+                    "section_id": "736.2(b)",
+                    "quote": "you may not proceed unless a BIS license or License Exception applies.",
+                    "span_id": "736.2(b)",
+                }
+            ],
+            "evidence_okay": {
+                "ok": True,
+                "reasons": ["citation_quote_is_substring_of_context"],
+            },
+            "assumptions": [],
+        }
+    ),
+    "adv-cite-002": _render(
+        {
+            "label": "true",
+            "answer_text": "Yes. The cited General Prohibitions require authorization before proceeding.",
+            "justification": "The quote supports the authorization requirement.",
+            "citations": [
+                {
+                    "section_id": "EAR-736.2(b).",
+                    "quote": "you may not proceed unless a BIS license or License Exception applies.",
+                    "span_id": "736.2(b)",
+                }
+            ],
+            "evidence_okay": {
+                "ok": True,
+                "reasons": ["citation_quote_is_substring_of_context"],
+            },
+            "assumptions": [],
+        }
+    ),
+    "adv-cite-003": _render(
+        {
+            "label": "true",
+            "answer_text": "Yes. The cited License Exception provision requires authorization before proceeding.",
+            "justification": "This output intentionally mismatches the quote and cited section.",
+            "citations": [
+                {
+                    "section_id": "EAR-740.1",
+                    "quote": "you may not proceed unless a BIS license or License Exception applies.",
+                    "span_id": "740.1",
+                }
+            ],
+            "evidence_okay": {
+                "ok": True,
+                "reasons": ["citation_quote_is_substring_of_context"],
+            },
+            "assumptions": [],
+        }
+    ),
+    "adv-cite-004": _render(
+        {
+            "label": "true",
+            "answer_text": "Yes. License Exceptions authorize exports without a license when conditions are met. A BIS license application must still be filed before shipment.",
+            "justification": "The second decisive claim is intentionally unsupported to exercise overclaim detection.",
+            "citations": [
+                {
+                    "section_id": "EAR-740.1",
+                    "quote": "License Exceptions authorize exports without a license when all stated conditions are met.",
+                    "span_id": "740.1",
+                }
+            ],
+            "evidence_okay": {
+                "ok": True,
+                "reasons": ["citation_quote_is_substring_of_context"],
+            },
+            "assumptions": [],
+        }
+    ),
+    "thin-001": "__unexpected_llm_call__",
+    "thin-002": "__unexpected_llm_call__",
 }
 
 __all__ = ["GOLDEN_LLM_OUTPUTS"]

@@ -125,6 +125,51 @@
       "minLength": 1,
       "type": "string"
     },
+    "regression": {
+      "additionalProperties": false,
+      "properties": {
+        "env": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "expected_gate": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "expected_outcome": {
+          "enum": [
+            "pass",
+            "fail"
+          ],
+          "type": "string"
+        },
+        "expected_reasons": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "hint_keywords": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "must_skip_llm": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "expected_outcome",
+        "expected_gate",
+        "expected_reasons"
+      ],
+      "type": "object"
+    },
     "task": {
       "minLength": 1,
       "type": "string"

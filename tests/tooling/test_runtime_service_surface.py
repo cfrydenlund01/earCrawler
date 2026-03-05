@@ -6,6 +6,15 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LEGACY_NAME = "kg" + "_service"
+SEARCH_ROOTS = (
+    Path("README.md"),
+    Path("docker"),
+    Path("container"),
+    Path("service"),
+    Path("scripts"),
+    Path("earCrawler"),
+    Path("tests"),
+)
 ALLOWED_MATCHES = {
     Path("README.md"),
     Path("earCrawler/service/legacy") / (LEGACY_NAME + ".py"),
@@ -13,9 +22,10 @@ ALLOWED_MATCHES = {
 
 
 def _grep_files(pattern: str) -> set[Path]:
+    search_roots = [str(path) for path in SEARCH_ROOTS if (REPO_ROOT / path).exists()]
     if shutil.which("rg"):
         proc = subprocess.run(
-            ["rg", "-l", pattern, "README.md", "docker", "service", "scripts", "earCrawler", "tests"],
+            ["rg", "-l", pattern, *search_roots],
             cwd=REPO_ROOT,
             capture_output=True,
             text=True,
@@ -26,15 +36,10 @@ def _grep_files(pattern: str) -> set[Path]:
         return {Path(line.strip()) for line in proc.stdout.splitlines() if line.strip()}
 
     matches: set[Path] = set()
-    for relative in (
-        Path("README.md"),
-        Path("docker"),
-        Path("service"),
-        Path("scripts"),
-        Path("earCrawler"),
-        Path("tests"),
-    ):
+    for relative in SEARCH_ROOTS:
         path = REPO_ROOT / relative
+        if not path.exists():
+            continue
         if path.is_file():
             files = [path]
         else:
@@ -54,10 +59,6 @@ def test_legacy_name_only_appears_in_allowed_quarantine_notes() -> None:
 
 
 def test_runtime_service_entrypoints_use_api_server() -> None:
-    dockerfile = (REPO_ROOT / "docker/api.Dockerfile").read_text(encoding="utf-8")
-    assert "service.api_server.server:app" in dockerfile
-    assert "earCrawler.service.sparql_service:app" not in dockerfile
-
     api_start = (REPO_ROOT / "scripts/api-start.ps1").read_text(encoding="utf-8")
     assert "service.api_server.server:app" in api_start
 
@@ -70,3 +71,24 @@ def test_runtime_service_entrypoints_use_api_server() -> None:
         encoding="utf-8"
     )
     assert "service.api_server.server:app" in install_doc
+
+
+def test_repo_does_not_ship_container_runtime_artifacts() -> None:
+    ci_workflow = (REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    release_workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert not (REPO_ROOT / "docker/api.Dockerfile").exists()
+    assert not (REPO_ROOT / "docker/rag.Dockerfile").exists()
+    assert not (REPO_ROOT / "container/README.md").exists()
+    assert not (REPO_ROOT / "container/earcrawler.def").exists()
+    assert "docker/rag.Dockerfile" not in ci_workflow
+    assert "docker/api.Dockerfile" not in ci_workflow
+    assert "validate-container:" not in ci_workflow
+    assert "docker/login-action@" not in ci_workflow
+    assert "docker/setup-buildx-action@" not in ci_workflow
+    assert "docker/setup-qemu-action@" not in ci_workflow
+    assert "container/earcrawler.def" not in ci_workflow
+    assert "/api:${{ github.ref_name }}" not in ci_workflow
+    assert "/rag:${{ github.ref_name }}" not in ci_workflow
+    assert "ghcr.io/" not in ci_workflow
+    assert "ghcr.io/" not in release_workflow

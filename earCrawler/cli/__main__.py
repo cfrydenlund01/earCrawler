@@ -173,6 +173,8 @@ def _collect_evidence_summary(items: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 @cli.command(name="crawl")
+@policy.require_role("operator")
+@policy.enforce
 @click.option(
     "--sources",
     "-s",
@@ -225,6 +227,8 @@ def crawl(sources: tuple[str, ...], out: str, fixtures: Path, live: bool) -> Non
 
 
 @cli.command(name="report")
+@policy.require_role("reader")
+@policy.enforce
 @click.option(
     "--sources",
     "-s",
@@ -304,6 +308,8 @@ def kg_export(data_dir: str, out_ttl: str) -> None:
 
 
 @click.command()
+@policy.require_role("operator", "maintainer")
+@policy.enforce
 @click.option("--ttl", "-t", default="kg/ear_triples.ttl", help="Turtle file to load.")
 @click.option("--db", "-d", default="db", help="TDB2 DB directory.")
 @click.option(
@@ -330,6 +336,8 @@ cli.add_command(kg_load, name="kg-load")
 
 
 @click.command()
+@policy.require_role("operator", "maintainer")
+@policy.enforce
 @click.option("--db", "-d", default="db", help="Path to TDB2 database directory.")
 @click.option(
     "--dataset",
@@ -383,6 +391,8 @@ cli.add_command(kg_serve, name="kg-serve")
 
 
 @click.command()
+@policy.require_role("reader")
+@policy.enforce
 @click.option(
     "--endpoint", default="http://localhost:3030/ear/sparql", show_default=True
 )
@@ -450,6 +460,8 @@ def _iter_jsonl(path: Path) -> list[dict]:
 
 
 @cli.group(name="eval")
+@policy.require_role("operator", "maintainer")
+@policy.enforce
 def eval_group() -> None:
     """Evaluation utilities."""
 

@@ -1,6 +1,26 @@
 # Research Decision Log
 
 
+## 2026-03-03T00:00:00Z - Remove unsupported RAG container runtime - pass
+Decision: remove.
+Reason: `docker/rag.Dockerfile` targeted `python -m earCrawler.rag.retriever`, but the repo does not define or support a maintained container runtime for that module, and Docker is not part of the active release surface.
+Artifacts:
+- docker/rag.Dockerfile (removed)
+- .github/workflows/ci.yml (RAG image build/push removed)
+- tests/tooling/test_runtime_service_surface.py (guardrail added)
+
+
+## 2026-03-03T00:15:00Z - Remove unsupported API/container validation path - pass
+Decision: remove.
+Reason: Docker and Apptainer are not part of the active runtime or release surface, so the API image build, container validation job, and container artifacts should not be release gates.
+Artifacts:
+- docker/api.Dockerfile (removed)
+- container/README.md (removed)
+- container/earcrawler.def (removed)
+- .github/workflows/ci.yml (container validation and API image publish removed)
+- tests/tooling/test_runtime_service_surface.py (guardrail updated)
+
+
 ## 2025-11-07T21:27:12Z — Immediate Next Steps prompt pack — pass
 Generated Phase A hardening, Phase B baseline, API+RAG touchpoint, Packaging & Ops prompts
 Artifacts:
@@ -293,4 +313,3 @@ Artifacts:
 - dist/eval/grounding_ear_compliance_v2.json (exists)
 - dist/eval/grounding_entity_obligations_v2.json (exists)
 - dist/eval/run_rag_v2_roundrobin_20260114.txt (exists)
-

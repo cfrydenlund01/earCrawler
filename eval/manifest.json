@@ -41,6 +41,14 @@
       "version": 1
     },
     {
+      "description": "Deterministic offline regression pack for ambiguity refusals, adversarial citations, and thin-retrieval refusal behavior.",
+      "file": "eval/golden_phase2.failure_modes.v1.jsonl",
+      "id": "golden_phase2.failure_modes.v1",
+      "num_items": 9,
+      "task": "phase2_failure_modes",
+      "version": 1
+    },
+    {
       "description": "Derived multi-hop slice for Phase 3 ablations. Each item requires evidence across at least two distinct EAR sections, with linked KG paths for entity context.",
       "file": "eval/multihop_slice.v1.jsonl",
       "id": "multihop_slice.v1",

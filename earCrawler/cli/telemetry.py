@@ -6,12 +6,15 @@ import shutil
 
 import click
 
+from earCrawler.security import policy
 from earCrawler.telemetry import config as tconfig
 from earCrawler.telemetry.events import cli_run
 from earCrawler.telemetry.sink_file import FileSink
 
 
 @click.group()
+@policy.require_role("operator")
+@policy.enforce
 def telemetry() -> None:
     """Manage telemetry configuration."""
 

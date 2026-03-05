@@ -1,4 +1,8 @@
-# Shared dependencies for all platforms/workflows
+# Authoritative dependency source for the repository.
+# Derived files:
+# - requirements.txt
+# - requirements-lock.txt
+# - requirements-win-lock.txt (via requirements-win.in)
 beautifulsoup4==4.12.3
 black==24.4.2
 charset-normalizer<3.4
@@ -7,6 +11,7 @@ faiss-cpu==1.8.0 ; sys_platform != "win32"
 fastapi==0.116.1
 flake8==7.1.0
 httpx==0.28.1
+jsonschema==4.23.0
 keyring==24.3.1
 lxml==5.2.2
 numpy==1.26.4
@@ -20,12 +25,9 @@ rdflib==6.3.2 ; sys_platform == "win32"
 rdflib==7.0.0 ; sys_platform != "win32"
 requests==2.32.3
 requests-mock==1.11.0
-sentence-transformers==2.2.2 ; sys_platform != "win32"
 SPARQLWrapper==2.0.0
 tabulate==0.9.0
 tenacity==8.2.3
-torch==2.3.0 ; sys_platform != "win32"
-transformers==4.39.3 ; sys_platform != "win32"
 urllib3==2.2.2
 uvicorn==0.31.1
 vcrpy==5.1.0

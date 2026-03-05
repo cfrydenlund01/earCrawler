@@ -25,18 +25,16 @@ Windows notes
 - The installer script writes output to `dist\\` (configured in `installer/earcrawler.iss`).
 - `scripts/make-installer.ps1` exports `EARCRAWLER_VERSION` automatically; no manual env prep needed.
 
-## Deploying Containers
-1. Tag a release: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-2. GitHub Actions builds and pushes `api` and `rag` images to GHCR.
-3. On the host, pull images:
-   - `docker pull ghcr.io/<org>/earCrawler/api:vX.Y.Z`
-   - `docker pull ghcr.io/<org>/earCrawler/rag:vX.Y.Z`
-4. Restart services with `docker compose up -d`.
+## Container Runtime Status
+- Container deployment is not a supported runtime surface right now.
+- CI and release do not build or publish Docker or Apptainer runtime artifacts.
+- Do not publish, pull, or depend on GHCR `api` or `rag` images; the repo does not ship maintained container entrypoints.
+- Use the Windows packaging and service flows in this runbook for release and rollback operations.
 
 ## Rollback
 1. Locate previous stable tag.
-2. Pull prior images using that tag.
-3. Redeploy containers with the older tag.
+2. Reinstall or redeploy the prior signed Windows artifacts from that release.
+3. Restart the local service/process wrappers that host the API surface.
 4. Run `monitor.ps1` to verify `/health` endpoints report `ok`.
 
 ## Secret Rotation
@@ -185,7 +183,7 @@ Use the Windows `py` launcher so paths resolve correctly on PowerShell:
 
 - Use `--live` during scheduled jobs to hit production sources; fixture runs keep CI deterministic.
 - Outputs land under `data\*_corpus.jsonl`, `data\manifest.json`, and `data\checksums.sha256` and are stable across reruns with the same inputs.
-- These commands require the `operator` (or `maintainer`) role defined in `security\policy.yml`; set `EARCTL_USER=test_operator` during local testing if needed.
+- These commands require the `operator` (or `maintainer`) role defined in `security\policy.yml`; for local test identity impersonation set `EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES=1` and then `EARCTL_USER=test_operator`.
 - Routine verification (byte-for-byte determinism + provenance validation) is enforced by `scripts/ci-corpus-determinism.ps1` and runs in CI.
   - Local: `pwsh scripts/ci-corpus-determinism.ps1`
 

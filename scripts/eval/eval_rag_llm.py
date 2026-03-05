@@ -30,7 +30,16 @@ from earCrawler.eval.citation_metrics import (
     extract_predicted_sections,
     score_citations,
 )
+from earCrawler.eval.groundedness_gates import (
+    evaluate_groundedness_signals,
+    finalize_groundedness_metrics,
+    load_phase2_gate_thresholds,
+)
 from earCrawler.eval.label_inference import infer_label
+from earCrawler.eval.provenance import (
+    build_eval_provenance_snapshot,
+    write_eval_provenance_snapshot,
+)
 from earCrawler.rag.output_schema import DEFAULT_ALLOWED_LABELS
 from earCrawler.rag.pipeline import _normalize_section_id, answer_with_rag
 from earCrawler.security.data_egress import hash_text
@@ -120,6 +129,29 @@ def _resolve_dataset(manifest: dict, dataset_id: str, manifest_path: Path) -> tu
             candidate = manifest_path.parent / file
             return entry, candidate
     raise ValueError(f"Dataset not found: {dataset_id}")
+
+
+def _artifact_root(base_dir: Path, run_id: str) -> Path:
+    return base_dir / run_id
+
+
+def _threshold_snapshot(
+    *,
+    dataset_id: str,
+    answer_score_mode: str,
+    semantic_threshold: float,
+    trace_pack_required_threshold: float | None,
+    fallback_max_uses: int | None,
+) -> dict[str, object]:
+    snapshot: dict[str, object] = {
+        "answer_score_mode": answer_score_mode,
+        "semantic_threshold": semantic_threshold,
+        "trace_pack_required_threshold": trace_pack_required_threshold,
+        "fallback_max_uses": fallback_max_uses,
+    }
+    if dataset_id.startswith("golden_phase2"):
+        snapshot.update(load_phase2_gate_thresholds().as_dict())
+    return snapshot
 
 
 def _iter_items(path: Path) -> Iterable[dict]:
@@ -502,75 +534,11 @@ def _retrieval_id_set(result: Mapping[str, object]) -> set[str]:
 def _evaluate_citation_quality(
     result: Mapping[str, object], reference_sections: set[str] | None
 ) -> dict[str, object]:
-    citations = result.get("citations") or []
-    total_citations = len(citations)
-    items_with_citations = 1 if total_citations else 0
-
-    retrieval_ids = _retrieval_id_set(result)
-    errors: list[str] = []
-    valid_citations = 0
-    supported_citations = 0
-    overclaim = False
-
-    if total_citations == 0:
-        errors.append("missing")
-
-    for cit in citations:
-        section_norm = _normalize_section_id(cit.get("section_id"))
-        canonical = bool(section_norm and section_norm.upper().startswith("EAR-"))
-        if not canonical:
-            errors.append("invalid_format")
-        else:
-            if reference_sections is not None and section_norm not in reference_sections:
-                errors.append("not_in_references")
-            else:
-                valid_citations += 1
-        if section_norm in retrieval_ids:
-            supported_citations += 1
-        else:
-            if total_citations:
-                overclaim = True
-            errors.append("not_in_retrieval")
-
-    return {
-        "ok": not errors,
-        "errors": sorted(set(errors)),
-        "counts": {
-            "items": 1,
-            "items_with_citations": items_with_citations,
-            "total_citations": total_citations,
-            "valid_citations": valid_citations,
-            "supported_citations": supported_citations,
-            "items_overclaim": 1 if overclaim else 0,
-        },
-    }
+    return evaluate_groundedness_signals(result, reference_sections=reference_sections)
 
 
-def _finalize_citation_metrics(counts: Mapping[str, int], num_items: int) -> dict[str, float]:
-    total_citations = counts.get("total_citations", 0) or 0
-    items_with_citations = counts.get("items_with_citations", 0) or 0
-    supported_citations = counts.get("supported_citations", 0) or 0
-    valid_citations = counts.get("valid_citations", 0) or 0
-    items_overclaim = counts.get("items_overclaim", 0) or 0
-
-    presence_rate = items_with_citations / num_items if num_items else 0.0
-    valid_id_rate = valid_citations / total_citations if total_citations else 0.0
-    supported_rate = supported_citations / total_citations if total_citations else 0.0
-    overclaim_rate = items_overclaim / num_items if num_items else 0.0
-
-    return {
-        "presence_rate": presence_rate,
-        "valid_id_rate": valid_id_rate,
-        "supported_rate": supported_rate,
-        "overclaim_rate": overclaim_rate,
-        "counts": {
-            "items_with_citations": items_with_citations,
-            "total_citations": total_citations,
-            "valid_citations": valid_citations,
-            "supported_citations": supported_citations,
-            "items_overclaim": items_overclaim,
-        },
-    }
+def _finalize_citation_metrics(counts: Mapping[str, int], num_items: int) -> dict[str, object]:
+    return finalize_groundedness_metrics(counts, num_items)
 
 
 def _aggregate_citation_scores(scores: Sequence[CitationScore]) -> dict[str, object]:
@@ -923,7 +891,9 @@ def evaluate_dataset(
         "items_with_citations": 0,
         "total_citations": 0,
         "valid_citations": 0,
-        "supported_citations": 0,
+        "total_claims": 0,
+        "supported_claims": 0,
+        "overclaim_count": 0,
         "items_overclaim": 0,
     }
     citation_scores: List[CitationScore] = []
@@ -1002,6 +972,7 @@ def evaluate_dataset(
         kg_paths_used: list[dict] = []
         kg_expansions: list[dict] = []
         kg_related_sections: list[str] = []
+        raw_context: str | None = None
         trace_id: str | None = _make_trace_id(dataset_id, item_id, str(question))
 
         start = time.perf_counter()
@@ -1023,6 +994,7 @@ def evaluate_dataset(
                 run_id=run_id,
             )
             raw_answer = rag_result.get("raw_answer")
+            raw_context = str(rag_result.get("raw_context") or "").strip() or None
             output_ok = bool(rag_result.get("output_ok", True))
             output_error = rag_result.get("output_error")
             answer = (rag_result.get("answer") or "").strip() if output_ok else ""
@@ -1238,6 +1210,7 @@ def evaluate_dataset(
             "output_ok": output_ok,
             "output_error": output_error,
             "raw_answer": raw_answer,
+            "raw_context": raw_context,
             "citations": citations,
             "evidence_okay": evidence_okay,
             "assumptions": assumptions,
@@ -1289,6 +1262,9 @@ def evaluate_dataset(
         citation_eval = _evaluate_citation_quality(result_entry, reference_sections or None)
         result_entry["citations_ok"] = citation_eval["ok"]
         result_entry["citations_errors"] = citation_eval["errors"]
+        result_entry["citation_validity"] = citation_eval["citation_validity"]
+        result_entry["citation_support"] = citation_eval["citation_support"]
+        result_entry["overclaim"] = citation_eval["overclaim"]
         for key, val in citation_eval["counts"].items():
             citation_counts[key] = citation_counts.get(key, 0) + int(val)
 
@@ -1375,6 +1351,7 @@ def evaluate_dataset(
 
     payload = {
         "dataset_id": dataset_id,
+        "dataset_path": str(dataset_meta.get("file") or ""),
         "dataset_version": dataset_meta.get("version"),
         "task": dataset_meta.get("task"),
         "slice_definition": _slice_definition(dataset_meta, multihop_only=multihop_only),
@@ -1424,6 +1401,7 @@ def evaluate_dataset(
         "fallback_max_uses": fallback_max_uses,
         "eval_strictness": eval_strictness,
         "status_counts": status_summary,
+        "run_provenance": trace_run_provenance,
         "results": results,
     }
     audit_scope = _audit_scope()
@@ -1460,6 +1438,39 @@ def evaluate_dataset(
         if path is not None:
             result["trace_pack_path"] = str(path)
 
+    artifact_root = _artifact_root(out_json.parent, run_id)
+    provenance_path = write_eval_provenance_snapshot(
+        build_eval_provenance_snapshot(
+            dataset_id=dataset_id,
+            dataset_path=str(dataset_meta.get("file") or data_path),
+            eval_suite=str(dataset_meta.get("id") or dataset_id),
+            thresholds=_threshold_snapshot(
+                dataset_id=dataset_id,
+                answer_score_mode=mode,
+                semantic_threshold=semantic_threshold,
+                trace_pack_required_threshold=trace_pack_required_threshold,
+                fallback_max_uses=fallback_max_uses,
+            ),
+            manifest_path=manifest_path,
+            run_id=run_id,
+            corpus_digest=str(trace_run_provenance.get("corpus_digest") or ""),
+            index_path=str(trace_run_provenance.get("index_path") or ""),
+            index_digest=str(trace_run_provenance.get("index_sha256") or ""),
+            index_meta_path=str(trace_run_provenance.get("index_meta_path") or ""),
+            index_meta_digest=str(trace_run_provenance.get("index_meta_sha256") or ""),
+            top_k=top_k,
+            strict_output=True,
+            retrieval_backend=None,
+            kg_expansion_enabled=kg_expansion_enabled,
+            llm_mode="remote",
+            llm_provider=provider,
+            llm_model=model,
+            remote_llm_enabled=bool(cfg.enable_remote),
+        ),
+        artifact_root=artifact_root,
+    )
+    payload["provenance_path"] = str(provenance_path)
+
     out_json.parent.mkdir(parents=True, exist_ok=True)
     out_json.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     if emit_hitl_template is not None:
@@ -1487,7 +1498,7 @@ def evaluate_dataset(
         f"- Multi-hop: count={multihop_items}, evidence_recall={multihop_evidence_coverage_recall:.4f}, "
         f"kg_path_usage={kg_path_usage_rate:.4f}, trace_pack_pass_rate={multihop_trace_pass_rate:.4f}",
         f"- Citations: presence={citation_metrics['presence_rate']:.4f}, "
-        f"valid_id={citation_metrics['valid_id_rate']:.4f}, "
+        f"valid_citation={citation_metrics['valid_citation_rate']:.4f}, "
         f"supported={citation_metrics['supported_rate']:.4f}, "
         f"overclaim={citation_metrics['overclaim_rate']:.4f}",
         f"- Citation micro: precision={citation_pr['micro']['precision']:.4f}, "
@@ -1633,6 +1644,7 @@ def _build_ablation_summary(
             name: {
                 "eval_json": str((condition_payloads[name]).get("artifact_json") or ""),
                 "eval_md": str((condition_payloads[name]).get("artifact_md") or ""),
+                "provenance_json": str((condition_payloads[name]).get("provenance_path") or ""),
             }
             for name in sorted(condition_payloads.keys())
         },
@@ -1796,6 +1808,8 @@ def main(argv: list[str] | None = None) -> int:
         root = Path("dist") / "ablations" / run_id
         condition_payloads: dict[str, dict[str, object]] = {}
         try:
+            manifest = _load_manifest(args.manifest)
+            dataset_meta, data_path = _resolve_dataset(manifest, args.dataset_id, args.manifest)
             for cond in _ABLATION_MODES:
                 cond_json = root / "conditions" / f"{args.dataset_id}.{cond}.json"
                 cond_md = root / "conditions" / f"{args.dataset_id}.{cond}.md"
@@ -1845,6 +1859,43 @@ def main(argv: list[str] | None = None) -> int:
             )
             summary_path = root / "ablation_summary.json"
             summary_path.parent.mkdir(parents=True, exist_ok=True)
+            reference_payload = condition_payloads.get("faiss_plus_kg") or condition_payloads.get("faiss_only") or {}
+            run_provenance = (
+                reference_payload.get("run_provenance")
+                if isinstance(reference_payload.get("run_provenance"), Mapping)
+                else {}
+            )
+            provenance_path = write_eval_provenance_snapshot(
+                build_eval_provenance_snapshot(
+                    dataset_id=args.dataset_id,
+                    dataset_path=str(dataset_meta.get("file") or data_path),
+                    eval_suite=str(dataset_meta.get("id") or args.dataset_id),
+                    thresholds={
+                        "comparison_mode": "ablation_compare",
+                        "conditions": list(_ABLATION_MODES),
+                        "answer_score_mode": args.answer_score_mode,
+                        "semantic_threshold": args.semantic_threshold,
+                        "trace_pack_required_threshold": trace_threshold,
+                        "fallback_max_uses": fallback_max_uses,
+                    },
+                    manifest_path=args.manifest,
+                    run_id=run_id,
+                    corpus_digest=str(run_provenance.get("corpus_digest") or ""),
+                    index_path=str(run_provenance.get("index_path") or ""),
+                    index_digest=str(run_provenance.get("index_sha256") or ""),
+                    index_meta_path=str(run_provenance.get("index_meta_path") or ""),
+                    index_meta_digest=str(run_provenance.get("index_meta_sha256") or ""),
+                    top_k=args.top_k,
+                    strict_output=True,
+                    kg_expansion_enabled=True,
+                    llm_mode="remote",
+                    llm_provider=provider,
+                    llm_model=model,
+                    remote_llm_enabled=bool(cfg.enable_remote),
+                ),
+                artifact_root=root,
+            )
+            summary["provenance_path"] = str(provenance_path)
             summary_path.write_text(
                 json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
             )

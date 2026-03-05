@@ -10,6 +10,14 @@ from typing import Any, Mapping, Sequence
 import api_clients.llm_client as llm_client
 from api_clients.llm_client import LLMProviderError
 from earCrawler.eval import citation_metrics
+from earCrawler.eval.groundedness_gates import (
+    evaluate_groundedness_signals,
+    load_phase2_gate_thresholds,
+)
+from earCrawler.eval.provenance import (
+    build_eval_provenance_snapshot,
+    write_eval_provenance_snapshot,
+)
 from earCrawler.rag import pipeline
 from earCrawler.trace.trace_pack import validate_trace_pack
 from scripts.eval import eval_rag_llm
@@ -105,6 +113,7 @@ def _load_index_provenance(index_meta_path: Path) -> dict[str, object]:
 
 
 def main(argv: list[str] | None = None) -> int:
+    thresholds = load_phase2_gate_thresholds()
     parser = argparse.ArgumentParser(
         description="Offline deterministic eval for golden_phase2.v1 using stubbed retrieval + LLM fixtures."
     )
@@ -208,6 +217,15 @@ def main(argv: list[str] | None = None) -> int:
     grounded_pass = 0
     grounding_total = 0
     tp_total = fp_total = fn_total = 0
+    groundedness_counts = {
+        "items_with_citations": 0,
+        "total_citations": 0,
+        "valid_citations": 0,
+        "total_claims": 0,
+        "supported_claims": 0,
+        "overclaim_count": 0,
+        "items_overclaim": 0,
+    }
 
     try:
         pipeline.retrieve_regulation_context = _stub_retrieve  # type: ignore[assignment]
@@ -236,6 +254,9 @@ def main(argv: list[str] | None = None) -> int:
             expected_label, expected_citations = _extract_expected(item)
             predicted_label = str(result.get("label") or "").strip().lower()
             predicted_citations = _extract_predicted(result)
+            groundedness_eval = evaluate_groundedness_signals(result)
+            for key, value in groundedness_eval["counts"].items():
+                groundedness_counts[key] = groundedness_counts.get(key, 0) + int(value)
 
             score = citation_metrics.score_citations(predicted_citations, expected_citations)
             tp_total += score.tp
@@ -313,6 +334,9 @@ def main(argv: list[str] | None = None) -> int:
                     "output_ok": bool(result.get("output_ok")),
                     "grounded": grounded,
                     "grounding_conditions": grounding_conditions,
+                    "citation_validity": groundedness_eval["citation_validity"],
+                    "citation_support": groundedness_eval["citation_support"],
+                    "overclaim": groundedness_eval["overclaim"],
                     "citation_precision": score.precision,
                     "citation_recall": score.recall,
                     "citation_tp": score.tp,
@@ -336,6 +360,21 @@ def main(argv: list[str] | None = None) -> int:
     recall = tp_total / (tp_total + fn_total) if (tp_total + fn_total) else 1.0
     denom = precision + recall
     f1 = (2 * precision * recall / denom) if denom else (1.0 if (tp_total + fp_total + fn_total) == 0 else 0.0)
+    valid_citation_rate = (
+        groundedness_counts["valid_citations"] / groundedness_counts["total_citations"]
+        if groundedness_counts["total_citations"]
+        else 1.0
+    )
+    supported_rate = (
+        groundedness_counts["supported_claims"] / groundedness_counts["total_claims"]
+        if groundedness_counts["total_claims"]
+        else 1.0
+    )
+    overclaim_rate = (
+        groundedness_counts["overclaim_count"] / groundedness_counts["total_claims"]
+        if groundedness_counts["total_claims"]
+        else 0.0
+    )
 
     trace_paths = eval_rag_llm._write_trace_pack_artifacts(
         trace_packs,
@@ -350,6 +389,27 @@ def main(argv: list[str] | None = None) -> int:
 
     trace_pack_pass_count = sum(1 for row in results if bool(row.get("trace_pack_pass")))
     trace_pack_pass_rate = trace_pack_pass_count / num_items if num_items else 0.0
+    provenance_path = write_eval_provenance_snapshot(
+        build_eval_provenance_snapshot(
+            dataset_id=str(args.dataset_id),
+            dataset_path=args.dataset_path,
+            eval_suite=str(args.dataset_id),
+            thresholds=thresholds.as_dict(),
+            run_id=run_id,
+            corpus_digest=str((run_provenance.get("index") or {}).get("corpus_digest") or ""),
+            index_meta_path=args.index_meta,
+            top_k=int(args.top_k),
+            strict_output=True,
+            kg_expansion_enabled=False,
+            llm_mode="stubbed",
+            llm_provider="stubbed",
+            llm_model="stubbed",
+            remote_llm_enabled=(
+                str(os.getenv("EARCRAWLER_ENABLE_REMOTE_LLM") or "").strip() == "1"
+            ),
+        ),
+        artifact_root=args.out_json.parent / run_id,
+    )
 
     payload = {
         "dataset_id": str(args.dataset_id),
@@ -360,6 +420,12 @@ def main(argv: list[str] | None = None) -> int:
         "num_items": num_items,
         "infra_failures": infra_failures,
         "grounded_rate": grounded_rate,
+        "citation_metrics": {
+            "valid_citation_rate": valid_citation_rate,
+            "supported_rate": supported_rate,
+            "overclaim_rate": overclaim_rate,
+            "counts": groundedness_counts,
+        },
         "citation_pr": {
             "micro": {
                 "precision": precision,
@@ -376,7 +442,9 @@ def main(argv: list[str] | None = None) -> int:
             "pass_rate": trace_pack_pass_rate,
             "issues_by_item": trace_pack_issues_by_item,
         },
+        "phase2_gate_thresholds": thresholds.as_dict(),
         "run_provenance": run_provenance,
+        "provenance_path": str(provenance_path),
         "results": results,
     }
 
@@ -391,6 +459,7 @@ def main(argv: list[str] | None = None) -> int:
         f"- Timestamp (UTC): `{payload['timestamp']}`",
         f"- Items: `{num_items}` (top_k=`{args.top_k}`)",
         f"- Grounded rate: `{grounded_rate:.4f}`",
+        f"- Citation validity/support/overclaim: `{valid_citation_rate:.4f}` / `{supported_rate:.4f}` / `{overclaim_rate:.4f}`",
         f"- Citation micro P/R/F1: `{precision:.4f}` / `{recall:.4f}` / `{f1:.4f}`",
         f"- Trace packs: pass_rate=`{trace_pack_pass_rate:.4f}` ({trace_pack_pass_count}/{num_items})",
         "",

@@ -2,6 +2,21 @@
 
 The repository uses a checksum-verified toolchain for Java and Python.
 
+## Dependency sources
+
+`requirements.in` is the authoritative dependency input. Derived files are:
+
+- `requirements.txt` (wrapper used by standard installs/CI)
+- `requirements-lock.txt` (hash-locked output from `requirements.in`)
+- `requirements-win-lock.txt` (hash-locked output from `requirements-win.in`)
+
+Regenerate lockfiles after changing `requirements.in`:
+
+```powershell
+py -m piptools compile --generate-hashes --output-file=requirements-lock.txt requirements.in
+py -m piptools compile --generate-hashes --output-file=requirements-win-lock.txt requirements-win.in
+```
+
 ## Versions and checksums
 
 `tools/versions.json` holds pinned versions and SHA512 checksums for the
