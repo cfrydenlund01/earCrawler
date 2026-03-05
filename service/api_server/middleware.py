@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 import uuid
 from typing import Awaitable, Callable
@@ -16,6 +17,8 @@ from starlette.types import ASGIApp
 from .auth import ApiKeyResolver, Identity, resolve_identity
 from .limits import RateLimitExceeded
 from .schemas.errors import ProblemDetails
+
+_logger = logging.getLogger("earcrawler.api.middleware")
 
 
 class RequestContextMiddleware(BaseHTTPMiddleware):
@@ -75,12 +78,16 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                 identity=identity,
                 trace_id=trace_id,
             )
-        except Exception as exc:
+        except Exception:
+            _logger.exception(
+                "Unhandled API exception",
+                extra={"trace_id": trace_id, "path": request.url.path},
+            )
             problem = ProblemDetails(
                 type="https://earcrawler.gov/problems/internal",
                 title="Internal Server Error",
                 status=500,
-                detail=str(exc),
+                detail="An unexpected server error occurred",
                 instance=str(request.url),
                 trace_id=trace_id,
             )
@@ -118,18 +125,53 @@ class BodyLimitMiddleware(BaseHTTPMiddleware):
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
         length = request.headers.get("content-length")
-        if length and int(length) > self._limit:
-            return _problem_response(
-                status=413,
-                problem=ProblemDetails(
-                    type="https://earcrawler.gov/problems/payload-too-large",
-                    title="Payload Too Large",
+        trace_id = getattr(request.state, "trace_id", "")
+        identity = getattr(request.state, "identity", None)
+        if length:
+            try:
+                declared_length = int(length)
+            except ValueError:
+                return _problem_response(
+                    status=400,
+                    problem=ProblemDetails(
+                        type="https://earcrawler.gov/problems/invalid-content-length",
+                        title="Bad Request",
+                        status=400,
+                        detail="Invalid Content-Length header",
+                        instance=str(request.url),
+                        trace_id=trace_id,
+                    ),
+                    identity=identity,
+                    trace_id=trace_id,
+                )
+            if declared_length < 0:
+                return _problem_response(
+                    status=400,
+                    problem=ProblemDetails(
+                        type="https://earcrawler.gov/problems/invalid-content-length",
+                        title="Bad Request",
+                        status=400,
+                        detail="Invalid Content-Length header",
+                        instance=str(request.url),
+                        trace_id=trace_id,
+                    ),
+                    identity=identity,
+                    trace_id=trace_id,
+                )
+            if declared_length > self._limit:
+                return _problem_response(
                     status=413,
-                    detail=f"Request body exceeds {self._limit} bytes",
-                    instance=str(request.url),
-                    trace_id="",
-                ),
-            )
+                    problem=ProblemDetails(
+                        type="https://earcrawler.gov/problems/payload-too-large",
+                        title="Payload Too Large",
+                        status=413,
+                        detail=f"Request body exceeds {self._limit} bytes",
+                        instance=str(request.url),
+                        trace_id=trace_id,
+                    ),
+                    identity=identity,
+                    trace_id=trace_id,
+                )
         body = await request.body()
         if len(body) > self._limit:
             return _problem_response(
@@ -140,8 +182,10 @@ class BodyLimitMiddleware(BaseHTTPMiddleware):
                     status=413,
                     detail=f"Request body exceeds {self._limit} bytes",
                     instance=str(request.url),
-                    trace_id="",
+                    trace_id=trace_id,
                 ),
+                identity=identity,
+                trace_id=trace_id,
             )
         request._body = body  # type: ignore[attr-defined]  # reuse body downstream
         return await call_next(request)

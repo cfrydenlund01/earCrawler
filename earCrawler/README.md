@@ -23,10 +23,24 @@ from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
 
 tg = TradeGovClient()
-countries = tg.list_countries()
+entity = tg.lookup_entity("ACME Corp")
+print(entity.get("id"), entity.get("name"))
 
 fr = FederalRegisterClient()
-docs = fr.list_documents({'per_page': 5})
+articles = fr.get_ear_articles("export", per_page=1)
+print(articles[0]["id"] if articles else "no articles")
+```
+
+`TradeGovClient.lookup_entity()` and `FederalRegisterClient.get_ear_articles()`
+are the client entrypoints covered by the repository tests. Trade.gov requests
+require a configured API key for live results; without one, the client returns
+an empty record instead of raising.
+
+Smoke checks:
+
+```powershell
+py -c "from api_clients.tradegov_client import TradeGovClient; from api_clients.federalregister_client import FederalRegisterClient; print(hasattr(TradeGovClient, 'lookup_entity'), hasattr(FederalRegisterClient, 'get_ear_articles'))"
+py -m pytest tests/clients/test_tradegov_client.py tests/clients/test_federalregister_client.py tests/test_api_clients_stubs.py -q
 ```
 
 The clients read credentials from the OS credential store (Windows Credential
