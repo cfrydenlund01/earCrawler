@@ -41,7 +41,9 @@ def _build_policy_help() -> str:
     base = [
         "Inspect policy and identity.",
         "",
-        "Set EARCTL_USER to impersonate a configured identity before running commands,",
+        "For local test identity impersonation, explicitly opt in first:",
+        "  $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = '1'",
+        "Then set EARCTL_USER to impersonate a configured identity before running commands,",
         "for example:",
         "  $env:EARCTL_USER = 'test_operator'",
         "Use 'policy whoami' to inspect the active identity.",

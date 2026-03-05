@@ -1,5 +1,2 @@
+# Windows compatibility wrapper.
 -r requirements.txt
-beautifulsoup4==4.12.3
-lxml==5.2.2
-python-dateutil==2.9.0.post0
-rdflib==6.3.2

@@ -16,10 +16,17 @@ from earCrawler.telemetry import redaction
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 POLICY_PATH = _REPO_ROOT / "security" / "policy.yml"
+UNSAFE_OVERRIDE_ENV = "EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES"
 
 
 class PolicyError(Exception):
     """Raised when policy denies access or is misconfigured."""
+
+
+def allow_unsafe_env_overrides() -> bool:
+    """Return True when test/dev env overrides are explicitly enabled."""
+
+    return os.getenv(UNSAFE_OVERRIDE_ENV, "").strip() == "1"
 
 
 @dataclass
@@ -58,7 +65,10 @@ class Policy:
 
 
 def load_policy(path: str | os.PathLike | None = None) -> Policy:
-    pol_setting = path or os.environ.get("EARCTL_POLICY_PATH") or POLICY_PATH
+    env_policy_path = (
+        os.environ.get("EARCTL_POLICY_PATH") if allow_unsafe_env_overrides() else None
+    )
+    pol_setting = path or env_policy_path or POLICY_PATH
     pol_path = Path(pol_setting)
     if not pol_path.is_absolute():
         pol_path = _REPO_ROOT / pol_path

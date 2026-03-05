@@ -12,10 +12,11 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
 - Python 3.11 or newer (`py --version`)
 - Java 11+ JDK (required for Apache Jena; `ensure_jena` auto-detects and sets `JAVA_HOME`)
 - Git
-- Docker Desktop (needed for optional container packaging)
 - Trade.gov CSL API subscription key (required for live data pulls)
 - Apache Jena Fuseki 4/5 (the CLI can auto-download it on Windows)
 - GitHub CLI (`gh`) 2.x (needed for automated pull-request helpers)
+
+Container runtimes are not part of the supported runtime or release flow at this point. The repo does not build or publish Docker or Apptainer artifacts; use the Windows CLI/service paths documented in this repo instead.
 
 ---
 
@@ -44,16 +45,24 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
    python -m pip install --requirement requirements.txt
    python -m pip install -e .
    ```
-   This path keeps the dependencies and console scripts inside `.venv\Scripts\`. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
+   This path keeps the dependencies and console scripts inside `.venv\Scripts\`. `requirements.in` is the single dependency source of truth; `requirements.txt` is a compatibility wrapper that points at it. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
    > Tip: Pip may leave a temporary folder (for example `~aml`) behind or warn that script shims such as `uvicorn.exe` are not on `PATH`. The folder can be deleted safely, and you can either add the scripts directory to `PATH` or continue using `python -m earCrawler.cli ...` to invoke commands.
 
-   > **RAG extras:** The retrieval stack (SentenceTransformers/FAISS) is optional; install it only when you need RAG indexing/querying. This project no longer relies on a specific local model for generation.
+   > **RAG extras (optional):** Base install intentionally excludes `sentence-transformers`, `torch`, and `transformers`. Install RAG/ML dependencies only when you need local indexing or retrieval experiments. This project no longer relies on a specific local model for generation.
    > ```powershell
+   > python -m pip install --requirement requirements-gpu.txt
+   > # or, equivalently:
    > python -m pip install -e .[gpu]
-   > # or use pip install -r requirements-gpu.txt on Linux runners
    > ```
 
-4. **Install GitHub CLI (required for PR automation)**
+4. **Hermetic/offline install (Windows)**
+   Use this only when installing from a prebuilt wheelhouse bundle:
+   ```powershell
+   pwsh .\scripts\install-from-wheelhouse.ps1 -LockFile requirements-win-lock.txt
+   python -m pip install -e . --no-deps
+   ```
+
+5. **Install GitHub CLI (required for PR automation)**
    ```powershell
    # winget (Windows 11 default)
    winget install --id GitHub.cli -e
@@ -77,25 +86,26 @@ py -m earCrawler.cli --help
 py -m earCrawler.cli diagnose
 ```
 
-The CLI enforces role-based access control defined in `security/policy.yml`. Most high-value commands require the `operator` or `maintainer` role. For local testing you can opt into one of the built-in test identities:
+The CLI enforces role-based access control defined in `security/policy.yml` for operational commands. Protected surfaces include `crawl`, `fetch-*`, `warm-cache`, `telemetry`, `kg-load`, `kg-serve`, `kg-query`, `eval`, API/admin helpers, and release/bundle workflows. Local helper commands such as `nsf-parse`, `kg-emit`, `kg-export`, `fr-fetch`, and `rag-index *` remain outside RBAC. For local testing you can opt into one of the built-in test identities:
 
 ```powershell
+$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = '1'  # local test/dev only
 $env:EARCTL_USER = 'test_operator'   # grants operator role
 py -m earCrawler.cli policy whoami   # shows the identity and roles
 ```
 
-Unset `EARCTL_USER` to fall back to the logged-in Windows account (default role: `reader`).
+By default, the CLI ignores `EARCTL_USER`/`EARCTL_POLICY_PATH` unless `EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES=1` is set. This keeps production runs bound to the logged-in OS identity.
 
 Built-in identities and their permissions:
 
 | Identity        | Role(s)      | Highlights                                                                          |
 |-----------------|--------------|-------------------------------------------------------------------------------------|
-| `test_reader`   | `reader`     | Read-only commands such as `diagnose`, `report`, and knowledge-graph queries.      |
-| `test_operator` | `operator`   | Data movement commands including `crawl`, `fetch-*`, `bundle`, `jobs`, and `gc`.   |
-| `test_maintainer` | `maintainer` | Release workflows such as `reconcile`, `bundle`, and API management.             |
+| `test_reader`   | `reader`     | Read-only commands such as `diagnose`, `report`, and `kg-query`.                    |
+| `test_operator` | `operator`   | Data movement and serving commands including `crawl`, `fetch-*`, `telemetry`, `jobs`, `kg-load`, `kg-serve`, and `eval`. |
+| `test_maintainer` | `maintainer` | Release and operational workflows such as `reconcile`, `bundle`, `api`, `kg-load`, `kg-serve`, and `eval`. |
 | `test_admin`    | `admin`      | Full access across the CLI, including `auth` and audit tooling.                    |
 
-Run `py -m earCrawler.cli policy --help` to see these identities inside the CLI along with tips for setting `EARCTL_USER`.
+Run `py -m earCrawler.cli policy --help` to see these identities and the explicit local override instructions.
 
 ---
 
@@ -105,6 +115,7 @@ The FastAPI facade wraps Fuseki with curated SPARQL templates and health checks.
 
 ```powershell
 # 1. ensure you have operator rights
+$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = '1'  # local test/dev only
 $env:EARCTL_USER = 'test_operator'
 
 # 2. start the facade (spawns uvicorn in the background)
@@ -137,6 +148,7 @@ Environment variables:
 The API can generate answers using remote OpenAI-compatible providers (Groq or NVIDIA NIM). Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys loaded from your environment, Windows Credential Store, or an optional local-only `config/llm_secrets.env` (copy from `config/llm_secrets.example.env` and do not commit it).
 
 ```powershell
+$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = '1'  # local test/dev only
 $env:EARCTL_USER = 'test_operator'
 $env:EARCRAWLER_API_ENABLE_RAG = '1'
 $env:EARCRAWLER_ENABLE_REMOTE_LLM = '1'
@@ -199,6 +211,7 @@ Artifacts also include an `eval_strictness` section with fallback counters and t
    ```powershell
    py -m earCrawler.cli kg-serve --dry-run
    ```
+   `kg-load` and `kg-serve` require the `operator` or `maintainer` role; `kg-query` is available to `reader` and above.
 
 2. **Serve a local dataset**  
    The command below hosts the embedded TDB2 database from `.\db` at `http://localhost:3030/ear`:
@@ -320,7 +333,8 @@ To add a new dataset:
 The CLI exposes a convenience command that runs the RAG pipeline against datasets using a remote LLM provider:
 
 ```powershell
-$env:EARCTL_USER = 'test_operator'  # if RBAC is enabled
+$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = '1'  # local test/dev only
+$env:EARCTL_USER = 'test_operator'  # requires operator or maintainer role
 $env:EARCRAWLER_ENABLE_REMOTE_LLM = '1'
 py -m eval.validate_datasets
 py -m earCrawler.cli eval run-rag --dataset-id ear_compliance.v1 --max-items 5 --fallback-max-uses 0
@@ -388,7 +402,7 @@ It creates a new timestamped artifact directory at `runs\<YYYYMMDD_HHMMSS>\` and
   Add the user `Scripts` directory to `PATH` or run the CLI with `py -m earCrawler.cli`.
 
 - **`command 'api' requires role(s): operator, maintainer`**  
-  Set `EARCTL_USER=test_operator` (or configure your identity in `security/policy.yml`).
+  For local test identity use, set `EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES=1` and then `EARCTL_USER=test_operator` (or configure your OS identity/roles in `security/policy.yml`).
 
 - **`ModuleNotFoundError: No module named 'perf'` when starting the CLI**  
   Upgrade to the latest wheel (which bundles `perf`) or run `py -m earCrawler.cli ...` from the repository root when working from source.

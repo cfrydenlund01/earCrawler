@@ -17,6 +17,13 @@ except Exception:  # pragma: no cover - pytest_socket optional in some environme
 
 
 @pytest.fixture(autouse=True)
+def _enable_rbac_test_overrides(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Allow test fixtures to use EARCTL_USER/EARCTL_POLICY_PATH overrides explicitly."""
+
+    monkeypatch.setenv("EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES", "1")
+
+
+@pytest.fixture(autouse=True)
 def _disable_network(request: pytest.FixtureRequest):
     """Restrict network access while allowing opt-in socket usage."""
 

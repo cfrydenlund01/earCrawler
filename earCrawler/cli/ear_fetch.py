@@ -11,9 +11,12 @@ from api_clients.tradegov_client import TradeGovClient
 from api_clients.federalregister_client import FederalRegisterClient
 from earCrawler.kg.loader import enrich_entities_with_tradegov
 from earCrawler.kg.emit_ear import fetch_ear_corpus
+from earCrawler.security import policy
 
 
 @click.command(name="fetch-entities")
+@policy.require_role("operator")
+@policy.enforce
 @click.option("--name", required=True, help="Entity name to lookup")
 def fetch_entities(name: str) -> None:
     """Lookup an entity using Trade.gov and print normalized JSON."""
@@ -23,6 +26,8 @@ def fetch_entities(name: str) -> None:
 
 
 @click.command(name="fetch-ear")
+@policy.require_role("operator")
+@policy.enforce
 @click.option("--term", required=True, help="Search term for EAR articles")
 @click.option(
     "--out-dir",
@@ -39,6 +44,8 @@ def fetch_ear(term: str, out_dir: Path) -> None:
 
 
 @click.command(name="warm-cache")
+@policy.require_role("operator")
+@policy.enforce
 def warm_cache() -> None:
     """Preload API cache for common queries."""
     tg = TradeGovClient()

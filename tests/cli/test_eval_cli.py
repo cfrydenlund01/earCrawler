@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
 from earCrawler.cli.__main__ import cli
@@ -10,6 +11,13 @@ from earCrawler.cli.__main__ import cli
 
 def _write_jsonl(path: Path, rows: list[dict]) -> None:
     path.write_text("\n".join(json.dumps(row) for row in rows), encoding="utf-8")
+
+
+@pytest.fixture(autouse=True)
+def _allow_eval_role(monkeypatch) -> None:
+    monkeypatch.setenv("EARCTL_USER", "test_operator")
+    policy_path = Path(__file__).resolve().parents[2] / "security" / "policy.yml"
+    monkeypatch.setenv("EARCTL_POLICY_PATH", str(policy_path))
 
 
 def _valid_eval_item(
