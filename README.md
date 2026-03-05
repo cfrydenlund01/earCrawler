@@ -86,6 +86,15 @@ py -m earCrawler.cli --help
 py -m earCrawler.cli diagnose
 ```
 
+Supported entrypoints in this repo are:
+
+- `earctl` / `py -m earCrawler.cli ...` for operator workflows.
+- `py -m uvicorn service.api_server.server:app --host 127.0.0.1 --port 9001` for direct FastAPI hosting.
+- `py -m earCrawler.cli eval run-rag ...` for evaluation runs against datasets in `eval/`.
+
+Container runtimes and legacy training entrypoints are not part of the
+supported runtime surface.
+
 The CLI enforces role-based access control defined in `security/policy.yml` for operational commands. Protected surfaces include `crawl`, `fetch-*`, `warm-cache`, `telemetry`, `kg-load`, `kg-serve`, `kg-query`, `eval`, API/admin helpers, and release/bundle workflows. Local helper commands such as `nsf-parse`, `kg-emit`, `kg-export`, `fr-fetch`, and `rag-index *` remain outside RBAC. For local testing you can opt into one of the built-in test identities:
 
 ```powershell
@@ -129,6 +138,13 @@ py -m earCrawler.cli api smoke
 
 # 5. stop the facade
 py -m earCrawler.cli api stop
+```
+
+If you do not need the PowerShell wrapper, you can launch the same ASGI app
+directly:
+
+```powershell
+py -m uvicorn service.api_server.server:app --host 127.0.0.1 --port 9001
 ```
 
 PID files are written to `kg/reports/api.pid`. If the stop command warns that it cannot find the process, the server has already exited; remove the stale PID file before the next start.
