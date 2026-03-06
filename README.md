@@ -79,7 +79,7 @@ Container runtimes are not part of the supported runtime or release flow at this
 
 ## CLI Basics
 
-The console script is installed as `earctl`, and the published wheel bundles the `perf` helpers that the CLI imports. When developing from a checkout you can also drive the commands with `python -m` to avoid PATH issues:
+The console script is installed as `earctl`, and the published wheel bundles the `perf` helpers plus the `service.api_server` package and its runtime assets. That means the documented `uvicorn service.api_server.server:app` entrypoint works from an installed wheel, not just from a checkout. When developing from a checkout you can also drive the commands with `python -m` to avoid PATH issues:
 
 ```powershell
 py -m earCrawler.cli --help
@@ -92,8 +92,14 @@ Supported entrypoints in this repo are:
 - `py -m uvicorn service.api_server.server:app --host 127.0.0.1 --port 9001` for direct FastAPI hosting.
 - `py -m earCrawler.cli eval run-rag ...` for evaluation runs against datasets in `eval/`.
 
-Container runtimes and legacy training entrypoints are not part of the
-supported runtime surface.
+Quarantined or unsupported runtime surfaces in this repo are:
+
+- `earCrawler.service.sparql_service`
+- `earCrawler.service.legacy.kg_service`
+- container runtimes and image-based deployments
+- legacy training or research scaffolding
+
+Use `service/api_server` and the CLI/operator paths above as the only supported runtime surface.
 
 The CLI enforces role-based access control defined in `security/policy.yml` for operational commands. Protected surfaces include `crawl`, `fetch-*`, `warm-cache`, `telemetry`, `kg-load`, `kg-serve`, `kg-query`, `eval`, API/admin helpers, and release/bundle workflows. Local helper commands such as `nsf-parse`, `kg-emit`, `kg-export`, `fr-fetch`, and `rag-index *` remain outside RBAC. For local testing you can opt into one of the built-in test identities:
 
@@ -120,7 +126,7 @@ Run `py -m earCrawler.cli policy --help` to see these identities and the explici
 
 ## Starting The API Facade
 
-The FastAPI facade wraps Fuseki with curated SPARQL templates and health checks. The PowerShell helper scripts under `scripts/` handle process management and PID files.
+The FastAPI facade in `service/api_server` is the only supported service runtime in this repository. It wraps Fuseki with curated SPARQL templates and health checks. The PowerShell helper scripts under `scripts/` handle process management and PID files.
 
 ```powershell
 # 1. ensure you have operator rights
@@ -149,7 +155,7 @@ py -m uvicorn service.api_server.server:app --host 127.0.0.1 --port 9001
 
 PID files are written to `kg/reports/api.pid`. If the stop command warns that it cannot find the process, the server has already exited; remove the stale PID file before the next start.
 
-Legacy / Future work: `kg_service` is deferred to a future project and is not a supported entrypoint in this repo. Use `service/api_server/` and the `earctl api ...` commands as the only runtime service surface.
+Legacy / Future work: `earCrawler.service.sparql_service` and `earCrawler.service.legacy.kg_service` are quarantined and are not supported entrypoints in this repo. Use `service/api_server/` and the `earctl api ...` commands as the only runtime service surface.
 
 Environment variables:
 
@@ -310,6 +316,37 @@ Artifacts also include an `eval_strictness` section with fallback counters and t
 ## Evaluation & Benchmarks
 
 earCrawler ships a lightweight evaluation harness for Phase E experiments and regression checks.
+
+### Evaluation Contract
+
+The eval pipeline is contract-first: datasets are versioned, schema-validated, tied to a specific KG snapshot, and expected to produce reproducible artifacts.
+
+- Dataset schema: [`eval/schema.json`](eval/schema.json)
+- Dataset manifest and curated references: [`eval/manifest.json`](eval/manifest.json)
+- Dataset validator entrypoints:
+  ```powershell
+  py -m eval.validate_datasets
+  python eval/validate_datasets.py
+  ```
+
+Primary eval outputs are written under `dist/eval/` and typically include:
+
+- `<dataset>.<run-type>.json` with aggregate metrics, metadata, and per-item records
+- `<dataset>.<run-type>.md` with a short human-readable summary
+
+Validation checks more than JSON shape. The manifest pins:
+
+- dataset ids, files, versions, and item counts
+- the expected KG snapshot via `kg_state.manifest_path` and `kg_state.digest`
+- curated `references.sections`, `references.kg_nodes`, and `references.kg_paths` that dataset items are allowed to cite
+
+For groundedness, evals go beyond citation presence. The split metrics in [`earCrawler/eval/groundedness_gates.py`](earCrawler/eval/groundedness_gates.py) separately track:
+
+- `valid_citation_rate`: are cited section ids and quoted spans structurally valid and present in the allowed references/context?
+- `supported_rate`: do the answer's decisive claims actually map to supported cited evidence?
+- `overclaim_rate`: does the answer make unsupported claims even when some citations are present?
+
+This means a response can cite something and still fail groundedness if the quote is invalid, the claim is not actually supported, or the answer overreaches beyond the cited evidence.
 
 ### Datasets
 

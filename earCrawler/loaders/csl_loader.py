@@ -9,24 +9,32 @@ from typing import Callable, Iterable
 from api_clients import search_entities
 from earCrawler.kg.jena_client import JenaClient
 from earCrawler.kg.provenance_store import ProvenanceRecorder
+from earCrawler.loaders.sparql_utils import (
+    escape_sparql_string,
+    load_sparql_template,
+    sanitize_curie_token,
+)
 from earCrawler.transforms import CanonicalRegistry
 from earCrawler.transforms.csl_to_rdf import entity_iri, to_bindings
 
-ENTITY_TEMPLATE_PATH = "earCrawler/sparql/upsert_entity.sparql"
+ENTITY_TEMPLATE_NAME = "upsert_entity.sparql"
 
 
 def upsert_entity(jena: JenaClient, bindings: dict) -> None:
     """Upsert a single entity into Fuseki using the SPARQL template."""
 
-    with open(ENTITY_TEMPLATE_PATH, "r", encoding="utf-8") as handle:
-        template = handle.read()
-    # id placeholder is reused for CURIE and literal; keep literal replacements afterwards
-    query = template.replace("__ID__", bindings["id"].replace(" ", "_"))
+    template = load_sparql_template(ENTITY_TEMPLATE_NAME)
+    entity_token = sanitize_curie_token(
+        entity_iri({"id": bindings["id"]}).rsplit("/", 1)[-1],
+        field_name="entity_id",
+    )
+    # Keep entity token and quoted literals sanitized separately.
+    query = template.replace("__ID__", entity_token)
     query = (
-        query.replace("__NAME__", bindings["name"])
-        .replace("__SOURCE__", bindings["source"])
-        .replace("__PROGRAMS__", bindings["programs"])
-        .replace("__COUNTRY__", bindings["country"])
+        query.replace("__NAME__", escape_sparql_string(bindings["name"]))
+        .replace("__SOURCE__", escape_sparql_string(bindings["source"]))
+        .replace("__PROGRAMS__", escape_sparql_string(bindings["programs"]))
+        .replace("__COUNTRY__", escape_sparql_string(bindings["country"]))
     )
     jena.update(query)
 

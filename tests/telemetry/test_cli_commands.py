@@ -19,25 +19,31 @@ def prepare(tmp_path, monkeypatch):
 def test_cli_enable_disable_status(tmp_path, monkeypatch):
     prepare(tmp_path, monkeypatch)
     runner = CliRunner()
-    res = runner.invoke(cli, ["telemetry", "status"])
+    env = {"EARCTL_USER": "test_operator"}
+
+    res = runner.invoke(cli, ["telemetry", "status"], env=env)
+    assert res.exit_code == 0, res.output
     data = json.loads(res.output)
     assert data["enabled"] is False
 
-    runner.invoke(cli, ["telemetry", "enable"])
+    enabled = runner.invoke(cli, ["telemetry", "enable"], env=env)
+    assert enabled.exit_code == 0, enabled.output
     cfg = config.load_config()
     assert cfg.enabled is True
 
-    out = runner.invoke(cli, ["telemetry", "test"])
+    out = runner.invoke(cli, ["telemetry", "test"], env=env)
+    assert out.exit_code == 0, out.output
     path = Path(out.output.strip())
     assert path.exists()
 
     try:
-        runner.invoke(cli, ["crash-test"], catch_exceptions=False)
+        runner.invoke(cli, ["crash-test"], env=env, catch_exceptions=False)
     except RuntimeError:
         pass
     lines = path.read_text().strip().splitlines()
     assert any(json.loads(l)["event"] == "crash_report" for l in lines)
 
-    runner.invoke(cli, ["telemetry", "disable"])
+    disabled = runner.invoke(cli, ["telemetry", "disable"], env=env)
+    assert disabled.exit_code == 0, disabled.output
     cfg = config.load_config()
     assert cfg.enabled is False

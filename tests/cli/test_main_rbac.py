@@ -64,14 +64,20 @@ def test_fetch_ear_allows_operator_and_audits(monkeypatch, tmp_path: Path) -> No
     assert entry["exit_code"] == 0
 
 
-def test_telemetry_status_requires_operator(tmp_path: Path) -> None:
+def test_telemetry_status_requires_operator_and_audits(tmp_path: Path) -> None:
     audit_dir = tmp_path / "audit"
     denied = _invoke(["telemetry", "status"], user="test_reader", audit_dir=audit_dir)
     assert denied.exit_code != 0
     assert "command 'telemetry' requires role(s): operator" in denied.output
+    denied_entry = _audit_entries(audit_dir)[-1]
+    assert denied_entry["event"] == "denied"
+    assert denied_entry["command"] == "telemetry"
 
     allowed = _invoke(["telemetry", "status"], user="test_operator", audit_dir=audit_dir)
     assert allowed.exit_code == 0, allowed.output
+    allowed_entry = _audit_entries(audit_dir)[-1]
+    assert allowed_entry["event"] == "command"
+    assert allowed_entry["command"] == "telemetry"
 
 
 def test_crawl_requires_operator(monkeypatch, tmp_path: Path) -> None:

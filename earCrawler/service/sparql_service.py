@@ -1,8 +1,15 @@
 from __future__ import annotations
 
-"""FastAPI service for executing SPARQL SELECT queries."""
+"""Quarantined legacy SPARQL-only FastAPI service.
+
+The only supported runtime service surface for this repository is
+``service.api_server``. This module remains only for isolated future-project
+work. To import it deliberately, set
+``EARCRAWLER_ENABLE_LEGACY_SPARQL_SERVICE=1`` first.
+"""
 
 import logging
+import os
 from typing import Any, List
 
 from fastapi import FastAPI, HTTPException, Query
@@ -15,6 +22,11 @@ from urllib.error import HTTPError, URLError
 from .utils import get_secret
 
 logger = logging.getLogger(__name__)
+
+if os.getenv("EARCRAWLER_ENABLE_LEGACY_SPARQL_SERVICE") != "1":
+    raise RuntimeError(
+        "Legacy sparql_service is quarantined. Use service.api_server instead."
+    )
 
 ENDPOINT_URL = get_secret("SPARQL_ENDPOINT_URL")
 if not ENDPOINT_URL:

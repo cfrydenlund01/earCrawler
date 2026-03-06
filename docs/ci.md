@@ -1,24 +1,36 @@
 # Continuous Integration
 
-The workflow defined in `.github/workflows/ci.yml` runs our automated checks.
+The workflow in `.github/workflows/ci.yml` runs on:
+
+- every push to any branch
+- every pull request
+- every tag matching `v*`
 
 ## Jobs
 
-- **cpu** – Runs on `windows-latest`, installs `requirements.txt` + editable
-  package metadata (`pip install -e .`), lints
-  with Black and Flake8, executes tests excluding GPU markers, and uploads
-  coverage results to Codecov.
-- **gpu** - Runs on `ubuntu-latest` with `continue-on-error: true`, installs
-  `requirements-gpu.txt` (the base stack plus the `gpu` extra), caches the
-  Hugging Face model hub, and runs tests marked with `gpu`.
-- **release** – Runs the tag-gated staging monitor check after the CPU job passes.
+- `cpu`
+  Runs on `windows-latest` for pushes, pull requests, and tags. It checks out the repo, validates pinned versions, sets up Python 3.11, caches pip, installs `requirements.txt` plus the editable package, runs `scripts/package-wheel-smoke.ps1`, checks formatting/lint with Black and Flake8, runs `pytest -q --disable-warnings --maxfail=1`, executes the offline corpus determinism gate, builds and validates TTL artifacts, enforces the Phase B baseline drift and determinism gates, runs the KG emit/validate smoke, validates eval datasets, and uploads `dist/eval` as an artifact when present.
+
+- `gpu`
+  Runs only on pushes to `main`, on `ubuntu-latest`, with `continue-on-error: true`. It sets up Python 3.11, installs `requirements-gpu.txt`, caches the Hugging Face model directory, and runs `pytest -m gpu`.
+
+- `benchmark`
+  Runs only on pushes to `main`, on `windows-gpu-t4`, after `cpu`, with `continue-on-error: true`. It installs `requirements-gpu.txt`, runs `eval/collect_benchmark.sh`, and uploads `benchmark.md` as an artifact.
+
+- `release`
+  Runs only for tag refs after `cpu` passes, on `windows-latest`. It performs the staging monitor check via `monitor.ps1`.
 
 ## Secrets
 
-Each job exposes the following secrets as environment variables:
+The workflow exposes these repository secrets to jobs that declare them:
 
 - `TRADEGOV_API_KEY`
 - `FEDREG_API_KEY`
 
-Define these in the repository settings under **Secrets and variables ➔ Actions**.
-They are consumed by the workflow but never printed to logs.
+Define them under GitHub repository **Secrets and variables -> Actions**.
+
+## Notes
+
+- The CPU job includes the packaging smoke gate; `docs/ci.md` should be updated if that script or its position in the workflow changes.
+- The workflow does not currently upload coverage to Codecov.
+- The GPU and benchmark jobs are non-blocking because both are marked `continue-on-error: true`.

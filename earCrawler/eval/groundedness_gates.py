@@ -104,7 +104,11 @@ class Phase2GateThresholds:
 
 
 def load_phase2_gate_thresholds(path: Path | None = None) -> Phase2GateThresholds:
-    raw = json.loads((path or DEFAULT_PHASE2_GATES_PATH).read_text(encoding="utf-8"))
+    config_path = path or DEFAULT_PHASE2_GATES_PATH
+    try:
+        raw = json.loads(config_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"invalid JSON in phase2 groundedness gate config: {config_path}") from exc
     payload = raw.get("golden_phase2") if isinstance(raw, Mapping) else {}
     if not isinstance(payload, Mapping):
         raise ValueError("phase2 groundedness gate config must contain a golden_phase2 object")

@@ -31,6 +31,10 @@ Windows notes
 - Do not publish, pull, or depend on GHCR `api` or `rag` images; the repo does not ship maintained container entrypoints.
 - Use the Windows packaging and service flows in this runbook for release and rollback operations.
 
+## Supported Runtime Surface
+- Supported operator/runtime entrypoints are `earctl` / `py -m earCrawler.cli ...` and the FastAPI facade at `service.api_server` (typically via `py -m earCrawler.cli api ...` or `py -m uvicorn service.api_server.server:app ...`).
+- Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
+
 ## Rollback
 1. Locate previous stable tag.
 2. Reinstall or redeploy the prior signed Windows artifacts from that release.

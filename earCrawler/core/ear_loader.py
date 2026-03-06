@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
 from typing import Dict, Iterator, Iterable
 
@@ -23,7 +24,7 @@ class EARLoader(CorpusLoader):
         for doc in self.client.search_documents(self.query):
             doc_number = str(doc.get("document_number", ""))
             detail = self.client.get_document(doc_number)
-            html = detail.get("html", "")
+            html = self._extract_document_html(detail, doc_number)
             yield from self._parse_document(doc_number, html)
 
     def _parse_document(
@@ -66,3 +67,16 @@ class EARLoader(CorpusLoader):
             html = path.read_text(encoding="utf-8")
             stem = path.stem.split("ear_", 1)[-1]
             yield from self._parse_document(stem, html)
+
+    def _extract_document_html(self, detail: Dict[str, object], doc_number: str) -> str:
+        for key in ("html", "body_html"):
+            value = detail.get(key)
+            if isinstance(value, str) and value.strip():
+                return value
+        body_text = detail.get("body_text")
+        if isinstance(body_text, str) and body_text.strip():
+            return f"<p>{escape(body_text)}</p>"
+        raise ValueError(
+            f"Federal Register document {doc_number} is missing content fields: "
+            "html, body_html, body_text"
+        )

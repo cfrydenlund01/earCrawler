@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
+import pickle
 import sys
 from datetime import datetime
 
@@ -173,6 +174,7 @@ def test_add_documents_creates_index(monkeypatch, tmp_path):
     datetime.fromisoformat(meta["build_timestamp_utc"].replace("Z", "+00:00"))
     assert meta["doc_count"] == 2
     assert [row["doc_id"] for row in meta["rows"]] == ["EAR-736.2", "EAR-736.3"]
+    assert not r.legacy_meta_path.exists()
 
 
 def test_add_documents_empty(monkeypatch, tmp_path):
@@ -217,6 +219,31 @@ def test_query_missing_metadata(monkeypatch, tmp_path):
     r.index_path.touch()
     with pytest.raises(retriever_mod.IndexBuildRequiredError):
         r.query("hi")
+
+
+def test_query_ignores_legacy_pickle_metadata_by_default(monkeypatch, tmp_path):
+    r, _m, _index, _f, retriever_mod = _load_retriever(monkeypatch, tmp_path)
+    r.index_path.parent.mkdir(parents=True, exist_ok=True)
+    r.index_path.touch()
+    with r.legacy_meta_path.open("wb") as fh:
+        pickle.dump([_doc("EAR-736.2", "a")], fh)
+
+    with pytest.raises(retriever_mod.IndexBuildRequiredError, match="metadata file missing"):
+        r.query("hi")
+
+
+def test_query_can_load_legacy_pickle_metadata_with_opt_in(monkeypatch, tmp_path):
+    monkeypatch.setenv("EARCRAWLER_ENABLE_LEGACY_PICKLE_METADATA", "1")
+    r, _m, index, _f, _retriever = _load_retriever(monkeypatch, tmp_path)
+    r.index_path.parent.mkdir(parents=True, exist_ok=True)
+    r.index_path.touch()
+    docs = [_doc("EAR-736.2", "a"), _doc("EAR-736.3", "b")]
+    with r.legacy_meta_path.open("wb") as fh:
+        pickle.dump(docs, fh)
+
+    result = r.query("hi", k=2)
+
+    assert [row["doc_id"] for row in result] == ["EAR-736.2", "EAR-736.3"]
 
 
 def test_query_returns_empty_when_no_hits(monkeypatch, tmp_path):

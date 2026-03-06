@@ -5,7 +5,10 @@ from pathlib import Path
 
 from earCrawler.kg.anchors import AnchorIndex
 from earCrawler.kg.provenance_store import ProvenanceRecorder
-from earCrawler.loaders.ear_parts_loader import load_parts_from_fr
+from earCrawler.loaders.ear_parts_loader import (
+    link_entities_to_parts_by_name_contains,
+    load_parts_from_fr,
+)
 
 
 class DummyJena:
@@ -72,3 +75,67 @@ def test_fr_loader_records_anchors_and_delta(tmp_path: Path) -> None:
         entity_names={"acme": "ACME Corp"},
     )
     assert len(jena_second.queries) == 0
+
+
+def test_fr_loader_uses_packaged_templates_outside_repo_root(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    def _quoted_stub(*args, **kwargs):
+        return {
+            "results": [
+                {
+                    "document_number": "2024-98765",
+                    "title": 'EAR "Update"',
+                    "abstract": "Amends 15 CFR Part 734 with \"quoted\" text.",
+                    "excerpts": ['Applies to ACME "Corp"'],
+                    "html_url": "https://www.federalregister.gov/doc/2024-98765",
+                    "publication_date": "2024-03-01",
+                }
+            ]
+        }
+
+    monkeypatch.chdir(tmp_path)
+    manifest = tmp_path / "prov.json"
+    prov_dir = tmp_path / "prov"
+    anchors_path = tmp_path / "anchors.json"
+
+    jena = DummyJena()
+    recorder = ProvenanceRecorder(manifest_path=manifest, prov_dir=prov_dir)
+    anchors = AnchorIndex(storage_path=anchors_path)
+    parts = load_parts_from_fr(
+        "EAR",
+        jena=jena,
+        provenance=recorder,
+        anchor_index=anchors,
+        search_fn=_quoted_stub,
+    )
+
+    assert "734" in parts
+    anchor_queries = [q for q in jena.queries if "ear:hasAnchor" in q]
+    assert anchor_queries
+    assert '\\"' in anchor_queries[0]
+
+
+def test_link_entities_name_filter_escapes_literal() -> None:
+    class SelectOnlyJena:
+        def __init__(self) -> None:
+            self.last_select = ""
+            self.updates: list[str] = []
+
+        def select(self, query: str) -> dict:
+            self.last_select = query
+            return {"results": {"bindings": []}}
+
+        def update(self, query: str) -> None:
+            self.updates.append(query)
+
+    jena = SelectOnlyJena()
+    linked = link_entities_to_parts_by_name_contains(
+        jena,
+        'acme" ) } UNION { ?s ?p ?o . #',
+        ["734"],
+    )
+    assert linked == 0
+    assert '\\"' in jena.last_select
+    assert 'UNION { ?s ?p ?o' in jena.last_select

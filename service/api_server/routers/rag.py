@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import math
@@ -105,6 +106,23 @@ def _elapsed_ms(start: float) -> float:
     return round((time.perf_counter() - start) * 1000.0, 3)
 
 
+async def _run_retriever_query(
+    retriever: RetrieverProtocol, query: str, top_k: int
+) -> list[dict]:
+    return await asyncio.to_thread(retriever.query, query, top_k)
+
+
+async def _run_generate_chat(
+    prompt: list[dict[str, str]] | list[dict], *, provider: str, model: str
+) -> str:
+    return await asyncio.to_thread(
+        generate_chat,
+        prompt,
+        provider=provider,
+        model=model,
+    )
+
+
 @router.post(
     "/rag/query",
     response_model=RagResponse,
@@ -194,7 +212,9 @@ async def rag_query(
     else:
         retrieve_start = time.perf_counter()
         try:
-            documents = retriever.query(payload.query, k=payload.top_k)
+            documents = await _run_retriever_query(
+                retriever, payload.query, payload.top_k
+            )
             t_retrieve_ms += _elapsed_ms(retrieve_start)
             cache_start = time.perf_counter()
             expires_at = cache.put(cache_key, documents)
@@ -444,7 +464,9 @@ async def rag_answer(
         else:
             retrieve_start = time.perf_counter()
             try:
-                documents = retriever.query(payload.query, k=payload.top_k)
+                documents = await _run_retriever_query(
+                    retriever, payload.query, payload.top_k
+                )
                 t_retrieve_ms += _elapsed_ms(retrieve_start)
                 cache_start = time.perf_counter()
                 expires_at = cache.put(cache_key, documents)
@@ -677,7 +699,7 @@ async def rag_answer(
                     else:
                         remote_attempted = True
                         llm_start = time.perf_counter()
-                        raw_answer = generate_chat(
+                        raw_answer = await _run_generate_chat(
                             prompt,
                             provider=provider_label,
                             model=model_label,
