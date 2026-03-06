@@ -3,6 +3,7 @@ from __future__ import annotations
 """Authentication helpers for API key and anonymous access."""
 
 from dataclasses import dataclass
+import hmac
 import os
 from typing import Dict, Optional
 
@@ -37,28 +38,58 @@ class ApiKeyResolver:
             keys[label.strip()] = value.strip()
         return keys
 
+    @staticmethod
+    def _secrets_match(expected: str, provided: str) -> bool:
+        return bool(expected and provided) and hmac.compare_digest(expected, provided)
+
+    @staticmethod
+    def _parse_labeled_key(candidate: str) -> Optional[tuple[str, str]]:
+        if ":" not in candidate:
+            return None
+        label, secret = candidate.split(":", 1)
+        label = label.strip()
+        secret = secret.strip()
+        if not label or not secret:
+            return None
+        return label, secret
+
+    def _resolve_labeled(self, label: str, presented_secret: str) -> Optional[Identity]:
+        env_secret = self._env_keys.get(label)
+        if env_secret and self._secrets_match(env_secret, presented_secret):
+            return Identity(
+                key=f"api:{label}",
+                display_name=label,
+                authenticated=True,
+                api_key_label=label,
+            )
+        try:
+            stored = keyring.get_password(self._service_name, label)
+        except (
+            Exception
+        ):  # pragma: no cover - defensive for environments without keyring backend
+            return None
+        if stored and self._secrets_match(stored, presented_secret):
+            return Identity(
+                key=f"api:{label}",
+                display_name=label,
+                authenticated=True,
+                api_key_label=label,
+            )
+        return None
+
     def resolve(self, candidate: str) -> Optional[Identity]:
+        parsed = self._parse_labeled_key(candidate)
+        if parsed:
+            label, presented_secret = parsed
+            return self._resolve_labeled(label, presented_secret)
         for label, value in self._env_keys.items():
-            if value and value == candidate:
+            if value and self._secrets_match(value, candidate):
                 return Identity(
                     key=f"api:{label}",
                     display_name=label,
                     authenticated=True,
                     api_key_label=label,
                 )
-        try:
-            stored = keyring.get_password(self._service_name, candidate)
-            if stored:
-                return Identity(
-                    key=f"api:{candidate}",
-                    display_name=candidate,
-                    authenticated=True,
-                    api_key_label=candidate,
-                )
-        except (
-            Exception
-        ):  # pragma: no cover - defensive for environments without keyring backend
-            pass
         return None
 
 

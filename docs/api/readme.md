@@ -107,6 +107,15 @@ from the Windows Credential Manager (`EarCrawler-API` service name) or the
 `EARCRAWLER_API_KEYS` environment variable (semicolon-separated
 `label=value` pairs). Anonymous access is allowed with lower quotas.
 
+Credential formats:
+
+- Env-backed keys: `X-Api-Key: <secret>` or `X-Api-Key: <label>:<secret>`.
+- Keyring-backed keys: `X-Api-Key: <label>:<secret>`.
+
+Keyring mode now validates the presented secret against the stored secret for
+that label using constant-time comparison; presenting only a label is not
+accepted.
+
 ## Windows Service
 
 Use the placeholder guides in `service/windows/` to install the API via NSSM.

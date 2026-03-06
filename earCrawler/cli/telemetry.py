@@ -13,13 +13,13 @@ from earCrawler.telemetry.sink_file import FileSink
 
 
 @click.group()
-@policy.require_role("operator")
-@policy.enforce
 def telemetry() -> None:
     """Manage telemetry configuration."""
 
 
 @telemetry.command()
+@policy.require_role("operator")
+@policy.enforce
 def enable() -> None:
     cfg = tconfig.load_config()
     cfg.enabled = True
@@ -28,6 +28,8 @@ def enable() -> None:
 
 
 @telemetry.command()
+@policy.require_role("operator")
+@policy.enforce
 def disable() -> None:
     cfg = tconfig.load_config()
     cfg.enabled = False
@@ -36,6 +38,8 @@ def disable() -> None:
 
 
 @telemetry.command()
+@policy.require_role("operator")
+@policy.enforce
 def status() -> None:
     cfg = tconfig.load_config()
     sink = FileSink(cfg)
@@ -49,6 +53,8 @@ def status() -> None:
 
 
 @telemetry.command()
+@policy.require_role("operator")
+@policy.enforce
 def test() -> None:
     cfg = tconfig.load_config()
     sink = FileSink(cfg)
@@ -59,6 +65,8 @@ def test() -> None:
 
 @telemetry.command()
 @click.option("--yes", is_flag=True, help="Skip confirmation.")
+@policy.require_role("operator")
+@policy.enforce
 def purge(yes: bool) -> None:
     cfg = tconfig.load_config()
     path = Path(cfg.spool_dir)
@@ -74,6 +82,8 @@ def purge(yes: bool) -> None:
 
 
 @click.command(name="crash-test")
+@policy.require_role("operator")
+@policy.enforce
 def crash_test() -> None:
     cfg = tconfig.load_config()
     sink = FileSink(cfg)

@@ -95,6 +95,25 @@ def test_rag_endpoint_without_lineage():
     assert data["retrieval_empty"] is False
 
 
+def test_rag_query_offloads_retriever_to_thread(monkeypatch):
+    retriever = _StubRetriever()
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+
+    offload_calls: list[tuple[object, tuple[object, ...], dict[str, object]]] = []
+
+    async def _fake_to_thread(func, *args, **kwargs):
+        offload_calls.append((func, args, kwargs))
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(rag_router.asyncio, "to_thread", _fake_to_thread)
+
+    resp = client.post("/v1/rag/query", json={"query": "export controls", "top_k": 2})
+    assert resp.status_code == 200
+    assert any(getattr(func, "__name__", "") == "query" for func, _, _ in offload_calls)
+
+
 def test_llm_endpoint_disabled_returns_stub(monkeypatch):
     retriever = _StubRetriever()
     client = _app(retriever)
@@ -121,6 +140,40 @@ def test_llm_endpoint_disabled_returns_stub(monkeypatch):
     assert data["egress"]["disabled_reason"]
     assert "prompt_hash" in data["egress"]
     assert "context_hashes" in data["egress"]
+
+
+def test_llm_endpoint_offloads_generate_to_thread(monkeypatch):
+    retriever = _StubRetriever()
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+
+    def _stub_generate(_messages, *a, **k):
+        return (
+            "{"
+            '"label":"permitted",'
+            '"answer_text":"offloaded answer",'
+            '"citations":[{"section_id":"EAR-734.3","quote":"Example EAR passage text about exports.","span_id":""}],'
+            '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+            '"assumptions":[]'
+            "}"
+        )
+
+    offload_calls: list[tuple[object, tuple[object, ...], dict[str, object]]] = []
+
+    async def _fake_to_thread(func, *args, **kwargs):
+        offload_calls.append((func, args, kwargs))
+        return func(*args, **kwargs)
+
+    monkeypatch.setattr(rag_router, "generate_chat", _stub_generate)
+    monkeypatch.setattr(rag_router.asyncio, "to_thread", _fake_to_thread)
+    monkeypatch.setenv("EARCRAWLER_REMOTE_LLM_POLICY", "allow")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_REMOTE_LLM", "1")
+
+    resp = client.post("/v1/rag/answer", json={"query": "export controls", "top_k": 2})
+    assert resp.status_code == 200
+    assert any(getattr(func, "__name__", "") == "query" for func, _, _ in offload_calls)
+    assert any(func is _stub_generate for func, _, _ in offload_calls)
 
 
 def test_llm_endpoint_returns_answer_and_contexts(monkeypatch):

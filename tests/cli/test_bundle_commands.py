@@ -25,6 +25,28 @@ def test_bundle_command_rbac(monkeypatch):
     assert res.exit_code != 0
 
 
+def test_bundle_build_uses_repo_root_script(monkeypatch):
+    calls: list[tuple[Path, tuple[str, ...]]] = []
+
+    def fake_run(script: Path, *args: str) -> None:
+        calls.append((script, args))
+
+    monkeypatch.setattr(bundle_cli, "_run_ps", fake_run)
+
+    runner = CliRunner()
+    res = runner.invoke(cli, ["bundle", "build"], env={"EARCTL_USER": "test_operator"})
+    assert res.exit_code == 0
+
+    expected_script = (
+        Path(bundle_cli.__file__).resolve().parents[2]
+        / "scripts"
+        / "build-offline-bundle.ps1"
+    )
+    assert calls and calls[0][0] == expected_script
+    # Guards against resolving ".../earCrawler/scripts" instead of "<repo>/scripts".
+    assert calls[0][0].exists()
+
+
 def test_bundle_verify_and_smoke(monkeypatch, tmp_path):
     calls: list[tuple[Path, tuple[str, ...]]] = []
 

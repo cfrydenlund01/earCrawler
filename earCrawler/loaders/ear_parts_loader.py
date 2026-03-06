@@ -12,26 +12,27 @@ from api_clients import search_documents
 from earCrawler.kg.anchors import Anchor, AnchorIndex
 from earCrawler.kg.jena_client import JenaClient
 from earCrawler.kg.provenance_store import ProvenanceRecorder
+from earCrawler.loaders.sparql_utils import (
+    escape_sparql_string,
+    load_sparql_template,
+    sanitize_curie_token,
+)
 from earCrawler.policy import HINTS_FILE, load_hints, hints_manifest
 from earCrawler.transforms import MentionExtractor
 from earCrawler.transforms.ear_fr_to_rdf import extract_parts_from_text, pick_parts
 
-PART_TEMPLATE_PATH = "earCrawler/sparql/upsert_part.sparql"
-PART_ANCHOR_TEMPLATE_PATH = "earCrawler/sparql/upsert_part_anchor.sparql"
-POLICY_HINT_TEMPLATE_PATH = "earCrawler/sparql/upsert_policy_hint.sparql"
+PART_TEMPLATE_NAME = "upsert_part.sparql"
+PART_ANCHOR_TEMPLATE_NAME = "upsert_part_anchor.sparql"
+POLICY_HINT_TEMPLATE_NAME = "upsert_policy_hint.sparql"
 
 
 def upsert_part(jena: JenaClient, part_no: str) -> None:
     """Ensure the given part number exists as an EAR Part node."""
 
-    with open(PART_TEMPLATE_PATH, "r", encoding="utf-8") as handle:
-        template = handle.read()
-    query = template.replace("__PARTNO__", part_no)
+    template = load_sparql_template(PART_TEMPLATE_NAME)
+    part_token = sanitize_curie_token(part_no, field_name="part_no")
+    query = template.replace("__PARTNO__", part_token)
     jena.update(query)
-
-
-def _escape(value: str) -> str:
-    return value.replace("\\", "\\\\").replace('"', '\\"')
 
 
 def _anchor_identifier(part_no: str, anchor: Anchor) -> str:
@@ -42,16 +43,19 @@ def _anchor_identifier(part_no: str, anchor: Anchor) -> str:
 def upsert_part_anchor(jena: JenaClient, part_no: str, anchor: Anchor) -> None:
     """Insert/update an anchor node linked to ``part_no``."""
 
-    anchor_id = _anchor_identifier(part_no, anchor)
-    with open(PART_ANCHOR_TEMPLATE_PATH, "r", encoding="utf-8") as handle:
-        template = handle.read()
+    part_token = sanitize_curie_token(part_no, field_name="part_no")
+    anchor_id = sanitize_curie_token(
+        _anchor_identifier(part_token, anchor),
+        field_name="anchor_id",
+    )
+    template = load_sparql_template(PART_ANCHOR_TEMPLATE_NAME)
     query = (
-        template.replace("__PARTNO__", part_no)
+        template.replace("__PARTNO__", part_token)
         .replace("__ANCHOR_ID__", anchor_id)
-        .replace("__DOC_ID__", _escape(anchor.document_id))
-        .replace("__TITLE__", _escape(anchor.title))
-        .replace("__SOURCE__", _escape(anchor.source_url))
-        .replace("__SNIPPET__", _escape(anchor.snippet))
+        .replace("__DOC_ID__", escape_sparql_string(anchor.document_id))
+        .replace("__TITLE__", escape_sparql_string(anchor.title))
+        .replace("__SOURCE__", escape_sparql_string(anchor.source_url))
+        .replace("__SNIPPET__", escape_sparql_string(anchor.snippet))
     )
     jena.update(query)
 
@@ -65,14 +69,18 @@ def link_entity_to_part(
 ) -> None:
     """Materialise a relationship between an entity and a part."""
 
-    normalized_id = entity_id.replace(" ", "_")
+    normalized_id = sanitize_curie_token(
+        entity_id.replace(" ", "_"),
+        field_name="entity_id",
+    )
+    part_token = sanitize_curie_token(part_no, field_name="part_no")
     if strength is None:
         update = f"""
 PREFIX ear:  <https://ear.example.org/schema#>
 PREFIX ent:  <https://ear.example.org/entity/>
 PREFIX part: <https://ear.example.org/part/>
 INSERT DATA {{
-  ent:{normalized_id} ear:mentionedInPart part:{part_no} .
+  ent:{normalized_id} ear:mentionedInPart part:{part_token} .
 }}
 """
     else:
@@ -80,7 +88,7 @@ INSERT DATA {{
         if not decimal_str:
             decimal_str = "0"
         mention_hash = hashlib.sha256(
-            f"{normalized_id}:{part_no}".encode("utf-8")
+            f"{normalized_id}:{part_token}".encode("utf-8")
         ).hexdigest()[:16]
         update = f"""
 PREFIX ear:  <https://ear.example.org/schema#>
@@ -92,10 +100,10 @@ DELETE {{
   mention:{mention_hash} ear:mentionStrength ?oldStrength .
 }}
 INSERT {{
-  ent:{normalized_id} ear:mentionedInPart part:{part_no} .
+  ent:{normalized_id} ear:mentionedInPart part:{part_token} .
   mention:{mention_hash} a ear:Mention ;
                          ear:mentionsEntity ent:{normalized_id} ;
-                         ear:mentionsPart part:{part_no} ;
+                         ear:mentionsPart part:{part_token} ;
                          ear:mentionStrength "{decimal_str}"^^xsd:decimal .
 }}
 WHERE {{
@@ -244,17 +252,18 @@ def _apply_policy_hints(
 
 
 def upsert_policy_hint(jena: JenaClient, hint) -> None:
-    hint_id = hashlib.sha256(f"{hint.part}:{hint.program}".encode("utf-8")).hexdigest()[
-        :16
-    ]
-    with open(POLICY_HINT_TEMPLATE_PATH, "r", encoding="utf-8") as handle:
-        template = handle.read()
+    part_token = sanitize_curie_token(hint.part, field_name="part_no")
+    hint_id = sanitize_curie_token(
+        hashlib.sha256(f"{part_token}:{hint.program}".encode("utf-8")).hexdigest()[:16],
+        field_name="hint_id",
+    )
+    template = load_sparql_template(POLICY_HINT_TEMPLATE_NAME)
     query = (
-        template.replace("__PARTNO__", hint.part)
+        template.replace("__PARTNO__", part_token)
         .replace("__HINT_ID__", hint_id)
-        .replace("__PROGRAM__", _escape(hint.program))
+        .replace("__PROGRAM__", escape_sparql_string(hint.program))
         .replace("__PRIORITY__", f"{hint.priority:.3f}".rstrip("0").rstrip("."))
-        .replace("__RATIONALE__", _escape(hint.rationale))
+        .replace("__RATIONALE__", escape_sparql_string(hint.rationale))
     )
     jena.update(query)
 
@@ -275,7 +284,7 @@ PREFIX ear: <https://ear.example.org/schema#>
 SELECT ?id ?name WHERE {{
   ?id a ear:Entity ;
       ear:name ?name .
-  FILTER CONTAINS(LCASE(?name), LCASE("{name_contains}"))
+  FILTER CONTAINS(LCASE(?name), LCASE("{escape_sparql_string(name_contains)}"))
 }}
 """
     response = jena.select(select)

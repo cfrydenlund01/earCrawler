@@ -1,5 +1,7 @@
 # EarCrawler Read-only API
 
+`service/api_server` is the only supported service runtime surface in this repository. The legacy modules `earCrawler.service.sparql_service` and `earCrawler.service.legacy.kg_service` are quarantined and should not be used for operator deployments.
+
 The EarCrawler API exposes a curated read-only surface for SPARQL datasets. All
 queries execute against allowlisted templates and are constrained by size,
 latency and rate-limit budgets. Use the `/openapi.yaml` document for schema

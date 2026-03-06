@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-LEGACY_NAME = "kg" + "_service"
+LEGACY_KG_NAME = "kg" + "_service"
+LEGACY_SPARQL_NAME = "sparql" + "_service"
 SEARCH_ROOTS = (
     Path("README.md"),
     Path("docker"),
@@ -15,9 +17,17 @@ SEARCH_ROOTS = (
     Path("earCrawler"),
     Path("tests"),
 )
-ALLOWED_MATCHES = {
+ALLOWED_KG_MATCHES = {
     Path("README.md"),
-    Path("earCrawler/service/legacy") / (LEGACY_NAME + ".py"),
+    Path("earCrawler/service/legacy") / (LEGACY_KG_NAME + ".py"),
+    Path("service/docs/index.md"),
+}
+ALLOWED_SPARQL_MATCHES = {
+    Path("README.md"),
+    Path("earCrawler/service") / (LEGACY_SPARQL_NAME + ".py"),
+    Path("service/docs/index.md"),
+    Path("tests/service/test_sparql_service.py"),
+    Path("tests/tooling/test_runtime_service_surface.py"),
 }
 
 
@@ -55,7 +65,11 @@ def _grep_files(pattern: str) -> set[Path]:
 
 
 def test_legacy_name_only_appears_in_allowed_quarantine_notes() -> None:
-    assert _grep_files(LEGACY_NAME) == ALLOWED_MATCHES
+    assert _grep_files(LEGACY_KG_NAME) == ALLOWED_KG_MATCHES
+
+
+def test_legacy_sparql_service_only_appears_in_allowed_quarantine_notes() -> None:
+    assert _grep_files(LEGACY_SPARQL_NAME) == ALLOWED_SPARQL_MATCHES
 
 
 def test_runtime_service_entrypoints_use_api_server() -> None:
@@ -71,6 +85,27 @@ def test_runtime_service_entrypoints_use_api_server() -> None:
         encoding="utf-8"
     )
     assert "service.api_server.server:app" in install_doc
+
+
+def test_wheel_packaging_includes_service_runtime_surface() -> None:
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    includes = pyproject["tool"]["setuptools"]["packages"]["find"]["include"]
+    package_data = pyproject["tool"]["setuptools"]["package-data"]
+    dependencies = pyproject["project"]["dependencies"]
+
+    assert "service*" in includes
+    assert package_data["service"] == [
+        "config/*.yml",
+        "docs/*.md",
+        "openapi/*.yaml",
+        "templates/*.json",
+        "templates/*.rq",
+    ]
+    for requirement in ("httpx", "keyring", "tenacity", "uvicorn"):
+        assert any(
+            str(dep).lower().startswith(requirement)
+            for dep in dependencies
+        ), f"Missing runtime dependency for packaged service import: {requirement}"
 
 
 def test_repo_does_not_ship_container_runtime_artifacts() -> None:

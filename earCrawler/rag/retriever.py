@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import pickle
 import json
 import os
 import time
@@ -39,6 +38,7 @@ _CFR_CITATION_RE = re.compile(
     flags=re.IGNORECASE,
 )
 _RETRIEVAL_BACKEND_ENV = "EARCRAWLER_RETRIEVAL_BACKEND"
+_LEGACY_PICKLE_METADATA_ENV = "EARCRAWLER_ENABLE_LEGACY_PICKLE_METADATA"
 _SUPPORTED_RETRIEVAL_BACKENDS = {"faiss", "bruteforce"}
 _SCORE_TIE_EPSILON = 1e-6
 
@@ -75,6 +75,13 @@ def _is_windows_platform() -> bool:
 
 def _default_backend_name() -> str:
     return "bruteforce" if _is_windows_platform() else "faiss"
+
+
+def _legacy_pickle_metadata_enabled() -> bool:
+    raw = os.getenv(_LEGACY_PICKLE_METADATA_ENV)
+    if raw is None:
+        return False
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _resolve_backend_name(explicit_backend: str | None = None) -> tuple[str, str]:
@@ -375,6 +382,7 @@ class Retriever:
         self.index_path = Path(index_path)
         self.meta_path = self.index_path.with_suffix(".meta.json")
         self.legacy_meta_path = self.index_path.with_suffix(".pkl")
+        self.allow_legacy_pickle_metadata = _legacy_pickle_metadata_enabled()
         self.logger = logging.getLogger(__name__)
         try:
             self.model = self._load_model(model_name)
@@ -536,7 +544,7 @@ class Retriever:
             raise IndexBuildRequiredError(
                 self.index_path, reason="metadata rows missing or invalid"
             )
-        if self.legacy_meta_path.exists():
+        if self.allow_legacy_pickle_metadata and self.legacy_meta_path.exists():
             key = str(self.legacy_meta_path)
             token = self._cache_token(self.legacy_meta_path)
             with _CACHE_LOCK:
@@ -544,6 +552,13 @@ class Retriever:
             if cached is not None and cached[:2] == token:
                 return _materialize_metadata_rows(list(cached[2]))
             try:
+                import pickle
+
+                self.logger.warning(
+                    "rag.retriever.legacy_pickle_metadata_enabled env_var=%s path=%s",
+                    _LEGACY_PICKLE_METADATA_ENV,
+                    self.legacy_meta_path,
+                )
                 with self.legacy_meta_path.open("rb") as fh:
                     rows = pickle.load(fh)
             except Exception as exc:
@@ -590,9 +605,6 @@ class Retriever:
             json.dumps(meta_payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
-        # Legacy pickle for backward compatibility with older tooling.
-        with self.legacy_meta_path.open("wb") as fh:
-            pickle.dump(metadata, fh)
         with _CACHE_LOCK:
             if self.index_path.exists() and index is not None:
                 _INDEX_CACHE[str(self.index_path)] = (
@@ -605,16 +617,8 @@ class Retriever:
                 *self._cache_token(self.meta_path),
                 list(metadata),
             )
-            _META_CACHE[str(self.legacy_meta_path)] = (
-                *self._cache_token(self.legacy_meta_path),
-                list(metadata),
-            )
             _EMBEDDING_CACHE.pop(
                 f"{self.model_name}::{self.meta_path.resolve()}",
-                None,
-            )
-            _EMBEDDING_CACHE.pop(
-                f"{self.model_name}::{self.legacy_meta_path.resolve()}",
                 None,
             )
 
@@ -669,7 +673,14 @@ class Retriever:
 
     # ------------------------------------------------------------------
     def _load_embedding_matrix(self, metadata: List[dict]):
-        cache_path = self.meta_path if self.meta_path.exists() else self.legacy_meta_path
+        if self.meta_path.exists():
+            cache_path = self.meta_path
+        elif self.allow_legacy_pickle_metadata and self.legacy_meta_path.exists():
+            cache_path = self.legacy_meta_path
+        else:
+            raise IndexBuildRequiredError(
+                self.index_path, reason="metadata file missing"
+            )
         key = f"{self.model_name}::{cache_path.resolve()}"
         token = self._cache_token(cache_path)
         with _CACHE_LOCK:
@@ -776,7 +787,9 @@ class Retriever:
         """Return top ``k`` documents matching ``prompt``."""
         if self.backend == "faiss" and not self.index_path.exists():
             raise IndexMissingError(self.index_path)
-        if not (self.meta_path.exists() or self.legacy_meta_path.exists()):
+        if not self.meta_path.exists() and not (
+            self.allow_legacy_pickle_metadata and self.legacy_meta_path.exists()
+        ):
             raise IndexBuildRequiredError(
                 self.index_path, reason="metadata file missing"
             )
@@ -810,7 +823,9 @@ class Retriever:
         if self.backend == "faiss" and self.index_path.exists():
             self._load_index(dim)
         metadata: list[dict] = []
-        if self.meta_path.exists() or self.legacy_meta_path.exists():
+        if self.meta_path.exists() or (
+            self.allow_legacy_pickle_metadata and self.legacy_meta_path.exists()
+        ):
             metadata = self._load_metadata(allow_create=True)
         if self.backend == "bruteforce" and metadata:
             self._load_embedding_matrix(metadata)

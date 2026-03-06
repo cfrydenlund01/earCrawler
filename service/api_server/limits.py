@@ -35,9 +35,9 @@ class RateLimiter:
         self._lock = threading.Lock()
         self._buckets: Dict[Tuple[str, str], BucketState] = {}
 
-    def _get_bucket(
+    def _consume(
         self, key: Tuple[str, str], refill_rate: float, capacity: int
-    ) -> BucketState:
+    ) -> Tuple[int, float]:
         now = time.monotonic()
         with self._lock:
             state = self._buckets.get(key)
@@ -48,19 +48,15 @@ class RateLimiter:
                 elapsed = max(0.0, now - state.last_refill)
                 state.tokens = min(capacity, state.tokens + elapsed * refill_rate)
                 state.last_refill = now
-            return state
 
-    def _consume(
-        self, key: Tuple[str, str], refill_rate: float, capacity: int
-    ) -> Tuple[int, float]:
-        state = self._get_bucket(key, refill_rate, capacity)
-        if state.tokens >= 1:
-            state.tokens -= 1
-            remaining = max(0, int(state.tokens))
-            return remaining, 0.0
-        retry = (1 - state.tokens) / refill_rate if refill_rate else 60.0
-        remaining = int(state.tokens)
-        return remaining, retry
+            if state.tokens >= 1:
+                state.tokens -= 1
+                remaining = max(0, int(state.tokens))
+                return remaining, 0.0
+
+            retry = (1 - state.tokens) / refill_rate if refill_rate else 60.0
+            remaining = int(state.tokens)
+            return remaining, retry
 
     def check(
         self, identity: str, scope: str, authenticated: bool

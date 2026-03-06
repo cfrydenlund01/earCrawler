@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import sys
 from typing import Any
 from urllib.error import HTTPError
 
@@ -19,6 +20,7 @@ def _allow_socket():
 
 def _load_app(monkeypatch, wrapper_cls):
     monkeypatch.setenv("SPARQL_ENDPOINT_URL", "http://example.com")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_LEGACY_SPARQL_SERVICE", "1")
     import earCrawler.service.sparql_service as svc
 
     importlib.reload(svc)
@@ -54,6 +56,15 @@ class _BadQueryWrapper(_GoodWrapper):
 class _HttpErrorWrapper(_GoodWrapper):
     def query(self):  # noqa: D401,N802
         raise HTTPError(None, 500, "boom", None, None)
+
+
+def test_import_requires_explicit_legacy_opt_in(monkeypatch):
+    monkeypatch.delenv("EARCRAWLER_ENABLE_LEGACY_SPARQL_SERVICE", raising=False)
+    monkeypatch.setenv("SPARQL_ENDPOINT_URL", "http://example.com")
+    sys.modules.pop("earCrawler.service.sparql_service", None)
+
+    with pytest.raises(RuntimeError, match="Legacy sparql_service is quarantined"):
+        import earCrawler.service.sparql_service  # noqa: F401
 
 
 def test_query_success(monkeypatch):

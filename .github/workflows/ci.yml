@@ -40,6 +40,9 @@ jobs:
           pip install --upgrade --retries 5 -r requirements.txt
           pip install --upgrade --retries 5 -e .
           pip install --upgrade "coverage[toml]"
+      - name: Packaging smoke (wheel in isolated venv)
+        shell: pwsh
+        run: scripts/package-wheel-smoke.ps1
       - name: Lint
         run: black --check . && flake8 .
       - name: Tests
