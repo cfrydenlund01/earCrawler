@@ -2,6 +2,11 @@
 
 `service/api_server` is the only supported service runtime surface in this repository. The legacy modules `earCrawler.service.sparql_service` and `earCrawler.service.legacy.kg_service` are quarantined and should not be used for operator deployments.
 
+Capability status follows `README.md`: `/health`, `/v1/entities/{entity_id}`,
+`/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query` are `Supported`;
+`/v1/rag/answer` is `Optional`; `/v1/search` is `Quarantined` until
+`docs/kg_quarantine_exit_gate.md` is passed and recorded.
+
 The EarCrawler API exposes a curated read-only surface for SPARQL datasets. All
 queries execute against allowlisted templates and are constrained by size,
 latency and rate-limit budgets. Use the `/openapi.yaml` document for schema
@@ -13,7 +18,7 @@ details.
 # Health probe
 curl.exe -s http://localhost:9001/health | ConvertFrom-Json
 
-# Search for an entity label
+# Quarantined text-index search surface
 $headers = @{ 'Accept' = 'application/json' }
 curl.exe -s -H @headers "http://localhost:9001/v1/search?q=export&limit=5"
 

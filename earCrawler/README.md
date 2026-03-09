@@ -5,6 +5,11 @@ This directory contains the installable Python package that backs the
 [`README.md`](../README.md). Use the top-level guide for environment setup,
 tooling, and release instructions.
 
+This package directory is part of the supported runtime surface. Proposal and
+research materials live elsewhere in the repo; use
+[`docs/runtime_research_boundary.md`](../docs/runtime_research_boundary.md) if
+you need the repo-level support boundary.
+
 ## Local Installation
 
 ```powershell

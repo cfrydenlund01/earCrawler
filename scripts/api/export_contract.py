@@ -73,7 +73,7 @@ def _build_postman_collection(base_url: str) -> Dict[str, Any]:
             "key": "search_query",
             "value": "export controls",
             "type": "string",
-            "description": "Default /v1/search query string",
+            "description": "Default query for the quarantined /v1/search route",
         },
     )
 
@@ -83,7 +83,11 @@ def _build_postman_collection(base_url: str) -> Dict[str, Any]:
             "Search",
             "GET",
             "/v1/search",
-            description="Label search against curated indexes",
+            description=(
+                "Quarantined text-index search surface; available for local "
+                "validation but not part of the supported production contract "
+                "until docs/kg_quarantine_exit_gate.md is passed."
+            ),
             query={
                 "q": ("{{search_query}}", "Search term"),
                 "limit": ("5", "Result cap"),
@@ -115,7 +119,7 @@ def _build_postman_collection(base_url: str) -> Dict[str, Any]:
             "RAG Query",
             "POST",
             "/v1/rag/query",
-            description="Retrieve cached RAG answers with lineage metadata",
+            description="Supported retrieval endpoint with lineage metadata",
             body={
                 "query": "What changed in Part 734?",
                 "top_k": 3,

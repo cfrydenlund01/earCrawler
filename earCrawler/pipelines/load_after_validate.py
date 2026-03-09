@@ -49,7 +49,10 @@ def load_file(ttl: Path) -> None:
 def main(args: list[str]) -> int:
     target = Path(args[0]) if args else DIST / "bundle.ttl"
     if not target.exists():
-        raise SystemExit(f"Missing {target}. Run build_ttl.py first.")
+        raise SystemExit(
+            "Missing "
+            f"{target}. Run python -m earCrawler.pipelines.build_sample_fixture_ttl first."
+        )
     validate_file(target)
     if os.getenv("EAR_ENABLE_LOAD", "0") == "1":
         load_file(target)
