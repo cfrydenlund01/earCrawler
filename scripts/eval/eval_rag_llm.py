@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import time
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Mapping, Sequence
@@ -168,6 +169,7 @@ def _safe_name(value: str) -> str:
 
 _ANSWER_SCORE_MODES = ("semantic", "normalized", "exact")
 _ABLATION_MODES = ("faiss_only", "faiss_plus_kg")
+_RETRIEVAL_MODES = ("dense", "hybrid")
 _DEFAULT_FALLBACK_MAX_USES = 0
 
 
@@ -459,6 +461,8 @@ def _sanitize_trace_run_provenance(provenance: Mapping[str, object]) -> dict[str
         "index_meta_schema_version",
         "index_build_timestamp_utc",
         "embedding_model",
+        "retrieval_mode",
+        "retrieval_backend",
         "llm_provider",
         "llm_model",
     )
@@ -470,13 +474,23 @@ def _sanitize_trace_run_provenance(provenance: Mapping[str, object]) -> dict[str
     return sanitized
 
 
-def _collect_trace_run_provenance(*, llm_provider: str, llm_model: str) -> dict[str, str]:
+def _collect_trace_run_provenance(
+    *,
+    llm_provider: str,
+    llm_model: str,
+    retrieval_mode: str | None = None,
+    retrieval_backend: str | None = None,
+) -> dict[str, str]:
+    from earCrawler.rag.retriever import _resolve_backend_name, _resolve_retrieval_mode
+
     index_override = str(os.getenv("EARCRAWLER_FAISS_INDEX") or "").strip()
     index_path = Path(index_override) if index_override else Path("data") / "faiss" / "index.faiss"
     model_override = str(os.getenv("EARCRAWLER_FAISS_MODEL") or "").strip() or "all-MiniLM-L12-v2"
     meta_path = index_path.with_suffix(".meta.json")
     meta = _load_index_meta(meta_path) or {}
     snapshot = meta.get("snapshot") if isinstance(meta.get("snapshot"), Mapping) else {}
+    resolved_mode = str(retrieval_mode or _resolve_retrieval_mode()[0]).strip() or "dense"
+    resolved_backend = str(retrieval_backend or _resolve_backend_name()[0]).strip() or "faiss"
 
     provenance: dict[str, object] = {
         "snapshot_id": str(snapshot.get("snapshot_id") or "unknown").strip() or "unknown",
@@ -484,6 +498,8 @@ def _collect_trace_run_provenance(*, llm_provider: str, llm_model: str) -> dict[
         "corpus_digest": str(meta.get("corpus_digest") or "unknown").strip() or "unknown",
         "index_path": str(index_path.resolve()),
         "embedding_model": str(meta.get("embedding_model") or model_override or "unknown").strip() or "unknown",
+        "retrieval_mode": resolved_mode,
+        "retrieval_backend": resolved_backend,
         "llm_provider": str(llm_provider or "unknown").strip() or "unknown",
         "llm_model": str(llm_model or "unknown").strip() or "unknown",
     }
@@ -504,6 +520,24 @@ def _collect_trace_run_provenance(*, llm_provider: str, llm_model: str) -> dict[
 
     return _sanitize_trace_run_provenance(provenance)
 
+
+@contextmanager
+def _temporary_env(overrides: Mapping[str, str | None]):
+    previous: dict[str, str | None] = {}
+    for key, value in overrides.items():
+        previous[key] = os.environ.get(key)
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = str(value)
+    try:
+        yield
+    finally:
+        for key, prior in previous.items():
+            if prior is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = prior
 
 def _audit_scope() -> str:
     return str(os.getenv("EARCRAWLER_AUDIT_EVENT_SCOPE", "ci_eval")).strip().lower()
@@ -801,6 +835,7 @@ def evaluate_dataset(
     llm_provider: str | None,
     llm_model: str | None,
     top_k: int,
+    retrieval_mode: str | None = None,
     max_items: int | None,
     out_json: Path,
     out_md: Path,
@@ -829,9 +864,13 @@ def evaluate_dataset(
         )
     provider = cfg.provider.provider
     model = cfg.provider.model
+    retrieval_mode_value = (retrieval_mode or "").strip().lower() or None
+    if retrieval_mode_value and retrieval_mode_value not in _RETRIEVAL_MODES:
+        raise ValueError(f"Unsupported retrieval mode: {retrieval_mode_value}")
     trace_run_provenance = _collect_trace_run_provenance(
         llm_provider=provider,
         llm_model=model,
+        retrieval_mode=retrieval_mode_value,
     )
     run_id = _safe_name(out_json.stem)
     os.environ["EARCTL_AUDIT_RUN_ID"] = run_id
@@ -852,6 +891,7 @@ def evaluate_dataset(
         "kg_state_digest": kg_digest,
         "manifest_path": str(manifest_path),
         "ablation": ablation_mode,
+        "retrieval_mode": str(trace_run_provenance.get("retrieval_mode") or "dense"),
         "kg_expansion": kg_expansion_enabled,
         "multihop_only": bool(multihop_only),
         "trace_run_provenance": trace_run_provenance,
@@ -866,6 +906,7 @@ def evaluate_dataset(
             "model": model,
             "top_k": top_k,
             "ablation": ablation_mode,
+            "retrieval_mode": str(trace_run_provenance.get("retrieval_mode") or "dense"),
             "kg_expansion": kg_expansion_enabled,
             "multihop_only": bool(multihop_only),
         },
@@ -944,6 +985,8 @@ def evaluate_dataset(
         gt_answer = (ground_truth.get("answer_text") or "").strip()
         gt_label = (ground_truth.get("label") or "").strip().lower()
         task = str(item.get("task", "") or "").strip()
+        temporal = item.get("temporal") if isinstance(item.get("temporal"), Mapping) else {}
+        effective_date = str(temporal.get("effective_date") or "").strip() or None
         ear_sections = item.get("ear_sections") or []
         item_id = str(item.get("id") or f"item-{idx+1:04d}")
         item_multihop = _is_multihop_item(item)
@@ -980,19 +1023,39 @@ def evaluate_dataset(
             label_schema = None
             if gt_label in {"true", "false"}:
                 label_schema = "truthiness"
-            rag_result = answer_with_rag(
-                question,
-                task=task or None,
-                label_schema=label_schema,
-                provider=provider,
-                model=model,
-                top_k=top_k,
-                kg_expansion=kg_expansion_enabled,
-                strict_retrieval=False,
-                strict_output=True,
-                trace_id=trace_id,
-                run_id=run_id,
-            )
+            if retrieval_mode_value is None:
+                rag_result = answer_with_rag(
+                    question,
+                    task=task or None,
+                    label_schema=label_schema,
+                    provider=provider,
+                    model=model,
+                    top_k=top_k,
+                    retriever=None,
+                    kg_expansion=kg_expansion_enabled,
+                    strict_retrieval=False,
+                    strict_output=True,
+                    effective_date=effective_date,
+                    trace_id=trace_id,
+                    run_id=run_id,
+                )
+            else:
+                with _temporary_env({"EARCRAWLER_RETRIEVAL_MODE": retrieval_mode_value}):
+                    rag_result = answer_with_rag(
+                        question,
+                        task=task or None,
+                        label_schema=label_schema,
+                        provider=provider,
+                        model=model,
+                        top_k=top_k,
+                        retriever=None,
+                        kg_expansion=kg_expansion_enabled,
+                        strict_retrieval=False,
+                        strict_output=True,
+                        effective_date=effective_date,
+                        trace_id=trace_id,
+                        run_id=run_id,
+                    )
             raw_answer = rag_result.get("raw_answer")
             raw_context = str(rag_result.get("raw_context") or "").strip() or None
             output_ok = bool(rag_result.get("output_ok", True))
@@ -1187,6 +1250,7 @@ def evaluate_dataset(
             "id": item_id,
             "question": question,
             "task": task,
+            "effective_date": effective_date,
             "ground_truth_answer": gt_answer,
             "ground_truth_label": gt_label,
             "pred_answer": answer,
@@ -1361,6 +1425,7 @@ def evaluate_dataset(
         "run_id": run_id,
         "top_k": top_k,
         "ablation": ablation_mode,
+        "retrieval_mode": str(trace_run_provenance.get("retrieval_mode") or "dense"),
         "kg_expansion": kg_expansion_enabled,
         "multihop_only": bool(multihop_only),
         "kg_state_digest": kg_digest,
@@ -1460,6 +1525,7 @@ def evaluate_dataset(
             index_meta_digest=str(trace_run_provenance.get("index_meta_sha256") or ""),
             top_k=top_k,
             strict_output=True,
+            retrieval_mode=str(trace_run_provenance.get("retrieval_mode") or "dense"),
             retrieval_backend=None,
             kg_expansion_enabled=kg_expansion_enabled,
             llm_mode="remote",
@@ -1489,6 +1555,7 @@ def evaluate_dataset(
         f"- Dataset: {dataset_id} (task={dataset_meta.get('task')})",
         f"- Provider/model: {provider} / {model}",
         f"- Items: {num_items}, top_k={top_k}",
+        f"- Retrieval mode: {trace_run_provenance.get('retrieval_mode') or 'dense'}",
         f"- Ablation: {ablation_mode or 'none'} (kg_expansion={kg_expansion_enabled})",
         f"- Primary metric: {primary_metric}",
         f"- Answer scoring: {mode}"
@@ -1651,6 +1718,191 @@ def _build_ablation_summary(
     }
 
 
+def _build_retrieval_compare_summary(
+    *,
+    dataset_id: str,
+    slice_definition: Mapping[str, object],
+    run_id: str,
+    manifest_path: Path,
+    provider: str,
+    model: str,
+    top_k: int,
+    ablation: str | None,
+    kg_expansion: bool | None,
+    condition_payloads: Mapping[str, Mapping[str, object]],
+) -> dict[str, object]:
+    condition_metrics = {
+        name: _ablation_metrics(payload) for name, payload in condition_payloads.items()
+    }
+    baseline = condition_metrics.get("dense", {})
+    candidate = condition_metrics.get("hybrid", {})
+    metric_names = sorted(set(baseline.keys()) | set(candidate.keys()))
+    deltas: dict[str, float] = {}
+    comparison_table: list[dict[str, object]] = []
+    for metric in metric_names:
+        dense_value = float(baseline.get(metric) or 0.0)
+        hybrid_value = float(candidate.get(metric) or 0.0)
+        delta = hybrid_value - dense_value
+        deltas[metric] = delta
+        comparison_table.append(
+            {
+                "metric": metric,
+                "dense": dense_value,
+                "hybrid": hybrid_value,
+                "delta": delta,
+            }
+        )
+
+    n = int((condition_payloads.get("hybrid") or {}).get("num_items") or 0)
+    confidence_caveat = (
+        f"small_sample_warning: N={n}; treat deltas as directional"
+        if n < 30
+        else None
+    )
+    return {
+        "run_id": run_id,
+        "dataset_id": dataset_id,
+        "comparison_dimension": "retrieval_mode",
+        "slice_definition": dict(slice_definition),
+        "conditions": condition_metrics,
+        "deltas": deltas,
+        "comparison_table": comparison_table,
+        "confidence_caveat": confidence_caveat,
+        "run_configuration": {
+            "manifest_path": str(manifest_path),
+            "top_k": top_k,
+            "provider": provider,
+            "model": model,
+            "ablation": ablation,
+            "kg_expansion": kg_expansion,
+        },
+        "artifacts": {
+            name: {
+                "eval_json": str((condition_payloads[name]).get("artifact_json") or ""),
+                "eval_md": str((condition_payloads[name]).get("artifact_md") or ""),
+                "provenance_json": str((condition_payloads[name]).get("provenance_path") or ""),
+            }
+            for name in sorted(condition_payloads.keys())
+        },
+    }
+
+
+def compare_retrieval_modes(
+    dataset_id: str,
+    *,
+    manifest_path: Path,
+    llm_provider: str | None,
+    llm_model: str | None,
+    top_k: int,
+    max_items: int | None,
+    answer_score_mode: str,
+    semantic_threshold: float,
+    semantic: bool,
+    ablation: str | None,
+    kg_expansion: bool | None,
+    multihop_only: bool,
+    emit_hitl_template: Path | None,
+    trace_pack_required_threshold: float | None,
+    fallback_max_uses: int | None,
+    out_root: Path,
+    run_id: str,
+) -> Path:
+    manifest = _load_manifest(manifest_path)
+    dataset_meta, data_path = _resolve_dataset(manifest, dataset_id, manifest_path)
+    root = Path(out_root) / run_id
+    condition_payloads: dict[str, dict[str, object]] = {}
+    for mode in _RETRIEVAL_MODES:
+        cond_json = root / "conditions" / f"{dataset_id}.{mode}.json"
+        cond_md = root / "conditions" / f"{dataset_id}.{mode}.md"
+        j, m = evaluate_dataset(
+            dataset_id,
+            manifest_path=manifest_path,
+            llm_provider=llm_provider,
+            llm_model=llm_model,
+            top_k=top_k,
+            retrieval_mode=mode,
+            max_items=max_items,
+            out_json=cond_json,
+            out_md=cond_md,
+            answer_score_mode=answer_score_mode,
+            semantic_threshold=semantic_threshold,
+            semantic=semantic,
+            ablation=ablation,
+            kg_expansion=kg_expansion,
+            multihop_only=multihop_only,
+            emit_hitl_template=emit_hitl_template,
+            trace_pack_require_kg_paths=False,
+            trace_pack_required_threshold=trace_pack_required_threshold,
+            fallback_max_uses=fallback_max_uses,
+        )
+        payload = _load_eval_payload(j)
+        payload["artifact_json"] = str(j)
+        payload["artifact_md"] = str(m)
+        condition_payloads[mode] = payload
+
+    slice_definition = (
+        condition_payloads.get("hybrid", {}).get("slice_definition")
+        or condition_payloads.get("dense", {}).get("slice_definition")
+        or {}
+    )
+    summary = _build_retrieval_compare_summary(
+        dataset_id=dataset_id,
+        slice_definition=slice_definition if isinstance(slice_definition, Mapping) else {},
+        run_id=run_id,
+        manifest_path=manifest_path,
+        provider=str((condition_payloads.get("hybrid") or condition_payloads.get("dense") or {}).get("provider") or ""),
+        model=str((condition_payloads.get("hybrid") or condition_payloads.get("dense") or {}).get("model") or ""),
+        top_k=top_k,
+        ablation=ablation,
+        kg_expansion=kg_expansion,
+        condition_payloads=condition_payloads,
+    )
+    reference_payload = condition_payloads.get("hybrid") or condition_payloads.get("dense") or {}
+    run_provenance = (
+        reference_payload.get("run_provenance")
+        if isinstance(reference_payload.get("run_provenance"), Mapping)
+        else {}
+    )
+    provenance_path = write_eval_provenance_snapshot(
+        build_eval_provenance_snapshot(
+            dataset_id=dataset_id,
+            dataset_path=str(dataset_meta.get("file") or data_path),
+            eval_suite=str(dataset_meta.get("id") or dataset_id),
+            thresholds={
+                "comparison_mode": "retrieval_compare",
+                "conditions": list(_RETRIEVAL_MODES),
+                "answer_score_mode": answer_score_mode,
+                "semantic_threshold": semantic_threshold,
+                "trace_pack_required_threshold": trace_pack_required_threshold,
+                "fallback_max_uses": fallback_max_uses,
+            },
+            manifest_path=manifest_path,
+            run_id=run_id,
+            corpus_digest=str(run_provenance.get("corpus_digest") or ""),
+            index_path=str(run_provenance.get("index_path") or ""),
+            index_digest=str(run_provenance.get("index_sha256") or ""),
+            index_meta_path=str(run_provenance.get("index_meta_path") or ""),
+            index_meta_digest=str(run_provenance.get("index_meta_sha256") or ""),
+            top_k=top_k,
+            strict_output=True,
+            retrieval_mode="hybrid",
+            kg_expansion_enabled=kg_expansion,
+            llm_mode="remote",
+            llm_provider=str(summary["run_configuration"].get("provider") or ""),
+            llm_model=str(summary["run_configuration"].get("model") or ""),
+            remote_llm_enabled=True,
+        ),
+        artifact_root=root,
+    )
+    summary["provenance_path"] = str(provenance_path)
+    summary_path = root / "retrieval_compare.json"
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    summary_path.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return summary_path
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Evaluate eval/* datasets using the RAG pipeline + remote LLMs."
@@ -1682,6 +1934,12 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=5,
         help="Number of contexts to retrieve before generation.",
+    )
+    parser.add_argument(
+        "--retrieval-mode",
+        choices=list(_RETRIEVAL_MODES),
+        default=None,
+        help="Retrieval mode override: dense (default) or hybrid BM25+dense fusion.",
     )
     parser.add_argument(
         "--max-items",
@@ -1736,9 +1994,19 @@ def main(argv: list[str] | None = None) -> int:
         help="Run both ablations and write a combined comparison summary.",
     )
     parser.add_argument(
+        "--retrieval-compare",
+        action="store_true",
+        help="Run both retrieval modes (dense, hybrid) and write a comparison summary.",
+    )
+    parser.add_argument(
         "--ablation-run-id",
         default=None,
         help="Run id for dist/ablations/<run_id>/ outputs when --ablation-compare is used.",
+    )
+    parser.add_argument(
+        "--retrieval-run-id",
+        default=None,
+        help="Run id for dist/retrieval_compare/<run_id>/ outputs when --retrieval-compare is used.",
     )
     parser.add_argument(
         "--trace-pack-threshold",
@@ -1787,6 +2055,8 @@ def main(argv: list[str] | None = None) -> int:
     model = cfg.provider.model
     safe_model = _safe_name(model or "default")
     suffix = f".{args.ablation}" if args.ablation else ""
+    if args.retrieval_mode:
+        suffix += f".{args.retrieval_mode}"
     default_json = Path("dist") / "eval" / f"{args.dataset_id}.rag.{provider}.{safe_model}{suffix}.json"
     default_md = Path("dist") / "eval" / f"{args.dataset_id}.rag.{provider}.{safe_model}{suffix}.md"
     out_json = args.out_json or default_json
@@ -1798,10 +2068,45 @@ def main(argv: list[str] | None = None) -> int:
     if args.ablation == "faiss_plus_kg" and kg_expansion_flag is False:
         print("Failed: --ablation faiss_plus_kg conflicts with --kg-expansion 0")
         return 1
+    if args.retrieval_compare and args.retrieval_mode is not None:
+        print("Failed: --retrieval-compare cannot be combined with --retrieval-mode")
+        return 1
+    if args.retrieval_compare and args.ablation_compare:
+        print("Failed: choose either --retrieval-compare or --ablation-compare")
+        return 1
     default_trace_threshold = (
         0.9 if args.ablation == "faiss_plus_kg" and (args.multihop_only or "multihop" in args.dataset_id.lower()) else None
     )
     trace_threshold = args.trace_pack_threshold if args.trace_pack_threshold is not None else default_trace_threshold
+
+    if args.retrieval_compare:
+        run_id = _safe_name(args.retrieval_run_id or f"{args.dataset_id}.retrieval")
+        out_root = Path("dist") / "retrieval_compare"
+        try:
+            summary_path = compare_retrieval_modes(
+                args.dataset_id,
+                manifest_path=args.manifest,
+                llm_provider=args.llm_provider,
+                llm_model=args.llm_model,
+                top_k=args.top_k,
+                max_items=args.max_items,
+                answer_score_mode=args.answer_score_mode,
+                semantic_threshold=args.semantic_threshold,
+                semantic=args.semantic,
+                ablation=args.ablation,
+                kg_expansion=kg_expansion_flag,
+                multihop_only=args.multihop_only,
+                emit_hitl_template=args.emit_hitl_template,
+                trace_pack_required_threshold=trace_threshold,
+                fallback_max_uses=fallback_max_uses,
+                out_root=out_root,
+                run_id=run_id,
+            )
+        except Exception as exc:
+            print(f"Failed: {exc}")
+            return 1
+        print(f"Wrote {summary_path}")
+        return 0
 
     if args.ablation_compare:
         run_id = _safe_name(args.ablation_run_id or f"{args.dataset_id}.ablation")
@@ -1824,6 +2129,7 @@ def main(argv: list[str] | None = None) -> int:
                     llm_provider=args.llm_provider,
                     llm_model=args.llm_model,
                     top_k=args.top_k,
+                    retrieval_mode=None,
                     max_items=args.max_items,
                     out_json=cond_json,
                     out_md=cond_md,
@@ -1912,6 +2218,7 @@ def main(argv: list[str] | None = None) -> int:
             llm_provider=args.llm_provider,
             llm_model=args.llm_model,
             top_k=args.top_k,
+            retrieval_mode=args.retrieval_mode,
             max_items=args.max_items,
             out_json=out_json,
             out_md=out_md,

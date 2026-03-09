@@ -37,8 +37,9 @@ performed separately using the instructions in `manifest.sig.PLACEHOLDER.txt`.
 * Runs `scripts/bundle-verify.ps1` to ensure the payload is intact.
 * Loads the canonical dataset (`kg/dataset.nq`) into a read-only TDB2 store at
   `fuseki/databases/tdb2` using `tdb2_tdbloader.bat`.
-* Starts the Fuseki server with the read-only `/ds` service and executes a
-  health probe plus a sample SPARQL query.
+* Starts the Fuseki server with the read-only `/ds` service using the
+  text-enabled assembler (`fuseki/tdb2-readonly.ttl`) and executes a
+  health probe plus a SPARQL text-query check.
 * Stops the server and writes `fuseki/databases/first_run.ok` along with a smoke
   report at `kg/reports/bundle-smoke.txt`.
 

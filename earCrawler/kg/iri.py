@@ -15,6 +15,7 @@ _EAR_SECTION_RE = re.compile(
     r"^(?:15\s*CFR\s*)?(?P<section>\d{3}(?:\.\S+)?)$",
     re.IGNORECASE,
 )
+_SHA256_HEX_RE = re.compile(r"^[0-9a-f]{64}$", re.IGNORECASE)
 
 
 def canonical_section_id(value: object | None) -> str | None:
@@ -42,11 +43,15 @@ def section_iri(section_id: str) -> str:
     return f"{RESOURCE_NS}ear/section/{_quote_segment(canonical)}"
 
 
-def paragraph_iri(sha256_hex: str) -> str:
-    digest = str(sha256_hex).strip()
-    if not digest:
-        raise ValueError("sha256_hex must be non-empty")
-    return f"{RESOURCE_NS}ear/paragraph/{digest[:16]}"
+def paragraph_iri(identity_token: str) -> str:
+    token = str(identity_token).strip()
+    if not token:
+        raise ValueError("identity_token must be non-empty")
+    if _SHA256_HEX_RE.fullmatch(token):
+        encoded = token[:16].lower()
+    else:
+        encoded = _quote_segment(token)
+    return f"{RESOURCE_NS}ear/paragraph/{encoded}"
 
 
 def entity_iri(entity_id: str) -> str:

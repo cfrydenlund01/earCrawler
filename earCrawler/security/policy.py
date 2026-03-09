@@ -15,7 +15,9 @@ from earCrawler.audit import ledger
 from earCrawler.telemetry import redaction
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-POLICY_PATH = _REPO_ROOT / "security" / "policy.yml"
+REPO_POLICY_PATH = _REPO_ROOT / "security" / "policy.yml"
+PACKAGED_POLICY_PATH = Path(__file__).resolve().with_name("default_policy.yml")
+POLICY_PATH = REPO_POLICY_PATH
 UNSAFE_OVERRIDE_ENV = "EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES"
 
 
@@ -68,10 +70,16 @@ def load_policy(path: str | os.PathLike | None = None) -> Policy:
     env_policy_path = (
         os.environ.get("EARCTL_POLICY_PATH") if allow_unsafe_env_overrides() else None
     )
-    pol_setting = path or env_policy_path or POLICY_PATH
-    pol_path = Path(pol_setting)
-    if not pol_path.is_absolute():
-        pol_path = _REPO_ROOT / pol_path
+    pol_setting = path or env_policy_path
+    if pol_setting is None:
+        if REPO_POLICY_PATH.exists():
+            pol_path = REPO_POLICY_PATH
+        else:
+            pol_path = PACKAGED_POLICY_PATH
+    else:
+        pol_path = Path(pol_setting)
+        if not pol_path.is_absolute():
+            pol_path = _REPO_ROOT / pol_path
     if not pol_path.exists():
         raise PolicyError(f"policy file not found at {pol_path}")
     with pol_path.open("r", encoding="utf-8") as fh:

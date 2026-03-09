@@ -396,6 +396,7 @@ def test_eval_writes_provenance_snapshot_and_redacts_secrets(
         llm_provider="stub",
         llm_model="stub-model",
         top_k=2,
+        retrieval_mode="hybrid",
         max_items=1,
         out_json=out_json,
         out_md=out_md,
@@ -431,7 +432,9 @@ def test_eval_writes_provenance_snapshot_and_redacts_secrets(
     assert payload["index_meta_digest"] == hashlib.sha256(
         meta_path.read_bytes()
     ).hexdigest()
+    assert payload["retrieval"]["mode"] == "hybrid"
     assert payload["retrieval"]["backend"] in {"faiss", "bruteforce"}
+    assert payload["retrieval"]["fusion"] == {"algorithm": "rrf", "rrf_k": 60}
     assert payload["retrieval"]["k"] == 2
     assert payload["retrieval"]["thin_retrieval_refusal"]["enabled"] is True
     assert payload["retrieval"]["thin_retrieval_refusal"]["min_top_score"] == pytest.approx(

@@ -47,6 +47,15 @@ class KeywordModel:
         return np.asarray([self._encode_one(text) for text in texts], dtype="float32")
 
 
+class FlatModel:
+    def __init__(self, _name: str) -> None:
+        self.calls: list[list[str]] = []
+
+    def encode(self, texts, show_progress_bar=False):
+        self.calls.append(list(texts))
+        return np.ones((len(texts), 3), dtype="float32")
+
+
 class StubIndex:
     def __init__(self) -> None:
         self.added = []
@@ -116,7 +125,7 @@ def _doc(doc_id: str, text: str, *, chunk_kind: str = "section") -> dict:
     }
 
 
-def _load_retriever(monkeypatch, tmp_path, fail_encode=False, *, backend="faiss"):
+def _load_retriever(monkeypatch, tmp_path, fail_encode=False, *, backend="faiss", retrieval_mode=None):
     index = StubIndex()
     faiss_mod = StubFaiss(index)
     monkeypatch.setitem(sys.modules, "faiss", faiss_mod)
@@ -159,6 +168,7 @@ def _load_retriever(monkeypatch, tmp_path, fail_encode=False, *, backend="faiss"
         SimpleNamespace(),
         index_path=Path(tmp_path / "idx.faiss"),
         backend=backend,
+        retrieval_mode=retrieval_mode,
     )
     return r, model, index, faiss_mod, retriever
 
@@ -391,3 +401,90 @@ def test_faiss_backend_breaks_ties_deterministically_on_windows(monkeypatch, tmp
     assert faiss_mod.threads == 1
     assert [row["doc_id"] for row in first] == ["EAR-736.2", "EAR-736.3"]
     assert [row["doc_id"] for row in second] == ["EAR-736.2", "EAR-736.3"]
+
+
+def test_hybrid_mode_fuses_bm25_with_dense_rank(monkeypatch, tmp_path):
+    tg_mod = SimpleNamespace(TradeGovClient=object)
+    fr_mod = SimpleNamespace(FederalRegisterClient=object)
+    pkg_mod = SimpleNamespace(
+        TradeGovClient=object,
+        TradeGovError=Exception,
+        FederalRegisterClient=object,
+        FederalRegisterError=Exception,
+    )
+    monkeypatch.setitem(sys.modules, "api_clients.tradegov_client", tg_mod)
+    monkeypatch.setitem(sys.modules, "api_clients.federalregister_client", fr_mod)
+    monkeypatch.setitem(sys.modules, "api_clients", pkg_mod)
+
+    import earCrawler.rag.retriever as retriever_mod
+
+    importlib.reload(retriever_mod)
+    monkeypatch.setattr(retriever_mod, "SentenceTransformer", lambda name: FlatModel(name))
+    monkeypatch.setattr(retriever_mod, "faiss", None)
+
+    rows = [
+        _doc("EAR-736.2", "General prohibitions apply to exports."),
+        _doc("EAR-740.1", "License exceptions can authorize some exports."),
+    ]
+    meta_path = tmp_path / "hybrid.meta.json"
+    meta_path.write_text(
+        json.dumps({"rows": rows}, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+
+    dense = retriever_mod.Retriever(
+        SimpleNamespace(),
+        SimpleNamespace(),
+        model_name="stub-model",
+        index_path=tmp_path / "hybrid.faiss",
+        backend="bruteforce",
+        retrieval_mode="dense",
+    )
+    hybrid = retriever_mod.Retriever(
+        SimpleNamespace(),
+        SimpleNamespace(),
+        model_name="stub-model",
+        index_path=tmp_path / "hybrid.faiss",
+        backend="bruteforce",
+        retrieval_mode="hybrid",
+    )
+
+    dense_results = dense.query("license exception", k=2)
+    hybrid_results = hybrid.query("license exception", k=2)
+    hybrid_cfg = retriever_mod.describe_retriever_config(hybrid)
+
+    assert [row["doc_id"] for row in dense_results] == ["EAR-736.2", "EAR-740.1"]
+    assert [row["doc_id"] for row in hybrid_results] == ["EAR-740.1", "EAR-736.2"]
+    assert hybrid_results[0]["retrieval_mode"] == "hybrid"
+    assert hybrid_results[0]["bm25_rank"] == 1
+    assert hybrid_results[0]["dense_rank"] == 2
+    assert hybrid_cfg["mode"] == "hybrid"
+
+
+def test_invalid_retrieval_mode_raises(monkeypatch, tmp_path):
+    tg_mod = SimpleNamespace(TradeGovClient=object)
+    fr_mod = SimpleNamespace(FederalRegisterClient=object)
+    pkg_mod = SimpleNamespace(
+        TradeGovClient=object,
+        TradeGovError=Exception,
+        FederalRegisterClient=object,
+        FederalRegisterError=Exception,
+    )
+    monkeypatch.setitem(sys.modules, "api_clients.tradegov_client", tg_mod)
+    monkeypatch.setitem(sys.modules, "api_clients.federalregister_client", fr_mod)
+    monkeypatch.setitem(sys.modules, "api_clients", pkg_mod)
+
+    import earCrawler.rag.retriever as retriever_mod
+
+    importlib.reload(retriever_mod)
+    monkeypatch.setattr(retriever_mod, "SentenceTransformer", lambda name: FlatModel(name))
+    monkeypatch.setattr(retriever_mod, "faiss", None)
+
+    with pytest.raises(retriever_mod.RetrieverMisconfiguredError, match="Unsupported retrieval mode"):
+        retriever_mod.Retriever(
+            SimpleNamespace(),
+            SimpleNamespace(),
+            index_path=tmp_path / "hybrid.faiss",
+            backend="bruteforce",
+            retrieval_mode="invalid",
+        )

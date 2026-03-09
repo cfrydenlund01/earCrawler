@@ -48,7 +48,7 @@ Container runtimes are not part of the supported runtime or release flow at this
    This path keeps the dependencies and console scripts inside `.venv\Scripts\`. `requirements.in` is the single dependency source of truth; `requirements.txt` is a compatibility wrapper that points at it. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
    > Tip: Pip may leave a temporary folder (for example `~aml`) behind or warn that script shims such as `uvicorn.exe` are not on `PATH`. The folder can be deleted safely, and you can either add the scripts directory to `PATH` or continue using `python -m earCrawler.cli ...` to invoke commands.
 
-   > **RAG extras (optional):** Base install intentionally excludes `sentence-transformers`, `torch`, and `transformers`. Install RAG/ML dependencies only when you need local indexing or retrieval experiments. This project no longer relies on a specific local model for generation.
+   > **RAG extras (optional):** Base install intentionally excludes `sentence-transformers`, `torch`, and `transformers`. Install these extras only for local embedding/indexing and retrieval experiments. They do not provide a supported model-training, fine-tuning, agent, or quantization stack, and this project does not ship local checkpoint workflows for generation.
    > ```powershell
    > python -m pip install --requirement requirements-gpu.txt
    > # or, equivalently:
@@ -97,7 +97,7 @@ Quarantined or unsupported runtime surfaces in this repo are:
 - `earCrawler.service.sparql_service`
 - `earCrawler.service.legacy.kg_service`
 - container runtimes and image-based deployments
-- legacy training or research scaffolding
+- legacy training or research scaffolding; see `docs/model_training_surface_adr.md`
 
 Use `service/api_server` and the CLI/operator paths above as the only supported runtime surface.
 
@@ -191,7 +191,12 @@ Invoke-WebRequest `
 
 The response includes `question`, `answer`, `contexts` (the passages passed to the LLM), `retrieved` (document metadata), `provider`, `model`, and flags `rag_enabled` / `llm_enabled` indicating whether the stack is active.
 
-Retrieval backend selection is controlled by `EARCRAWLER_RETRIEVAL_BACKEND`:
+Retrieval mode selection is controlled by `EARCRAWLER_RETRIEVAL_MODE`:
+
+- `dense`: existing dense retrieval only; this remains the default.
+- `hybrid`: experimental BM25+dense fusion using reciprocal rank fusion over the existing retrieval metadata. Keep this opt-in until the gate in `docs/kg_quarantine_exit_gate.md` is formally passed.
+
+Dense backend selection is still controlled by `EARCRAWLER_RETRIEVAL_BACKEND`:
 
 - `bruteforce`: deterministic cosine search over the metadata corpus embeddings; this is the default on Windows because the project does not package `faiss-cpu` on `win32`.
 - `faiss`: uses the existing FAISS index; on Windows the retriever forces FAISS to one thread and applies a stable tie-break on equal-score hits.
@@ -219,6 +224,8 @@ py -m eval.validate_datasets
 python scripts/eval/eval_rag_llm.py --dataset-id ear_compliance.v1 --llm-provider groq --llm-model llama-3.1-8b-instant
 python scripts/eval/eval_rag_llm.py --dataset-id entity_obligations.v1 --llm-provider nvidia_nim
 python scripts/eval/eval_rag_llm.py --dataset-id unanswerable.v1 --llm-provider groq --max-items 2
+python scripts/eval/eval_rag_llm.py --dataset-id ear_compliance.v1 --retrieval-mode hybrid
+python scripts/eval/eval_rag_llm.py --dataset-id multihop_slice.v1 --retrieval-compare
 ```
 
 Outputs land under `dist/eval/` with filenames like `<dataset>.rag.<provider>.<model>.json`/`.md`. Metrics include accuracy, label accuracy, unanswerable accuracy, grounded_rate (section overlap), by-task breakdowns, provider/model metadata, and per-item records (with any LLM errors captured without stopping the run).
@@ -406,7 +413,7 @@ Other useful options:
 - `--max-items` – cap the number of items for a quick smoke run.
 - `--answer-score-mode` – `semantic` (default), `normalized`, or `exact`.
 
-To log the results in `Research/decision_log.md`, run `python scripts/eval/log_eval_summary.py dist/eval/*.json` to emit a markdown-ready set of bullet points for all benchmark outputs in one go. This helper accepts one or many metrics files, making it easy to paste consolidated summaries into the research log.
+To log the results in `Research/decision_log.md`, run `python scripts/eval/log_eval_summary.py dist/eval/*.json` to emit a markdown-ready set of bullet points for all benchmark outputs in one go. This helper accepts one or many metrics files, making it easy to paste consolidated summaries into the research log. The `Research/` folder is for notes and proposal artifacts, not for a supported model-training runtime.
 
 These outputs are suitable for CI artefacts and for logging Phase E endpoints in `Research/decision_log.md`.
 

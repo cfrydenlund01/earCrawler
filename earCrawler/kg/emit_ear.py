@@ -11,6 +11,11 @@ from api_clients.federalregister_client import FederalRegisterClient
 
 from rdflib import RDF, Graph, URIRef
 
+from earCrawler.corpus.identity import (
+    build_record_id,
+    paragraph_identity_token,
+    source_identifier_for_record,
+)
 from .ontology import (
     EAR_NS,
     DCT,
@@ -37,11 +42,18 @@ def fetch_ear_corpus(
     with out_path.open("w", encoding="utf-8") as fh:
         for art in articles:
             sha = hashlib.sha256(art["text"].encode("utf-8")).hexdigest()
+            identifier = str(art["id"])
+            record_id = build_record_id("ear", identifier) or identifier
             rec = {
+                "source": "ear",
+                "content_sha256": sha,
                 "sha256": sha,
                 "source_url": art["source_url"],
                 "date": art["publication_date"],
-                "id": art["id"],
+                "id": record_id,
+                "record_id": record_id,
+                "identifier": identifier,
+                "identifiers": [identifier],
                 "section": "1",
             }
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
@@ -92,10 +104,10 @@ def emit_ear(
             if not line.strip():
                 continue
             rec = json.loads(line)
-            para_hash = rec.get("sha256")
-            if not para_hash:
+            para_token = paragraph_identity_token(rec)
+            if not para_token:
                 continue
-            para_iri = iri_for_paragraph(para_hash)
+            para_iri = iri_for_paragraph(para_token)
             g.add((para_iri, RDF.type, EAR_NS.Paragraph))
             source = rec.get("source_url")
             date_str = rec.get("date")
@@ -112,7 +124,7 @@ def emit_ear(
                         provider_domain="federalregister.gov",
                         request_url=source,
                         generated_at=date_str,
-                        response_sha256=para_hash,
+                        response_sha256=str(rec.get("content_sha256") or rec.get("sha256") or ""),
                     )
             if date_str:
                 try:
@@ -120,9 +132,12 @@ def emit_ear(
                     g.add((para_iri, DCT.issued, safe_literal(d)))
                 except Exception:
                     g.add((para_iri, DCT.issued, safe_literal(date_str)))
-            rec_id = rec.get("id")
+            rec_id = rec.get("record_id") or rec.get("id")
             if rec_id is not None:
                 g.add((para_iri, PROV.wasDerivedFrom, safe_literal(str(rec_id))))
+            source_identifier = source_identifier_for_record(rec)
+            if source_identifier:
+                g.add((para_iri, DCT.identifier, safe_literal(source_identifier)))
             sec_id = rec.get("section")
             if sec_id:
                 sec_iri = iri_for_section(str(sec_id))

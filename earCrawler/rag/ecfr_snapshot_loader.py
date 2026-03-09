@@ -8,9 +8,11 @@ from typing import List, Dict, Any
 
 from earCrawler.rag.corpus_contract import (
     SCHEMA_VERSION,
+    normalize_ear_doc_id,
     normalize_ear_section_id,
     require_valid_corpus,
 )
+from earCrawler.rag.temporal import infer_snapshot_date, normalize_iso_date
 
 CorpusDocument = Dict[str, Any]
 
@@ -53,10 +55,12 @@ def load_ecfr_snapshot(path: Path) -> List[CorpusDocument]:
             raw_section = payload.get("section_id")
             norm_section = normalize_ear_section_id(raw_section)
             section_value = norm_section or _coerce_str(raw_section).strip()
+            raw_doc_id = payload.get("doc_id")
+            norm_doc_id = normalize_ear_doc_id(raw_doc_id) if raw_doc_id else None
             raw_text = _coerce_str(payload.get("text"))
             doc: CorpusDocument = {
                 "schema_version": SCHEMA_VERSION,
-                "doc_id": section_value,
+                "doc_id": norm_doc_id or section_value,
                 "section_id": section_value,
                 "text": raw_text,
                 "chunk_kind": "section",
@@ -69,6 +73,22 @@ def load_ecfr_snapshot(path: Path) -> List[CorpusDocument]:
             url = _coerce_str(payload.get("url")).strip()
             if url:
                 doc["url"] = url
+            effective_date = normalize_iso_date(payload.get("effective_date"))
+            if effective_date:
+                doc["effective_date"] = effective_date
+            effective_from = normalize_iso_date(payload.get("effective_from"))
+            if effective_from:
+                doc["effective_from"] = effective_from
+            effective_to = normalize_iso_date(payload.get("effective_to"))
+            if effective_to:
+                doc["effective_to"] = effective_to
+            snapshot_date = infer_snapshot_date(
+                snapshot_date=payload.get("snapshot_date"),
+                source_ref=payload.get("source_ref"),
+                snapshot_id=payload.get("snapshot_id"),
+            )
+            if snapshot_date:
+                doc["snapshot_date"] = snapshot_date
             docs.append(doc)
 
     if not docs:
@@ -78,8 +98,9 @@ def load_ecfr_snapshot(path: Path) -> List[CorpusDocument]:
     for doc in docs:
         norm = normalize_ear_section_id(doc.get("section_id"))
         if norm:
-            doc["doc_id"] = norm
             doc["section_id"] = norm
+            if not doc.get("doc_id"):
+                doc["doc_id"] = norm
 
     docs = sorted(docs, key=lambda d: str(d.get("doc_id") or ""))
     require_valid_corpus(docs)

@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from rdflib import RDF, Graph, URIRef
 
+from earCrawler.corpus.identity import paragraph_identity_token, source_identifier_for_record
 from .ontology import (
     EAR_NS,
     ENT_NS,
@@ -70,10 +71,10 @@ def emit_nsf(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
             if not line.strip():
                 continue
             rec = json.loads(line)
-            para_hash = rec.get("sha256")
-            if not para_hash:
+            para_token = paragraph_identity_token(rec)
+            if not para_token:
                 continue
-            para_iri = iri_for_paragraph(para_hash)
+            para_iri = iri_for_paragraph(para_token)
             g.add((para_iri, RDF.type, EAR_NS.Paragraph))
             sec_id = rec.get("section") or rec.get("id")
             sec_iri = iri_for_section(str(sec_id))
@@ -93,9 +94,12 @@ def emit_nsf(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
                     g.add((para_iri, DCT.issued, safe_literal(d)))
                 except Exception:
                     g.add((para_iri, DCT.issued, safe_literal(date_str)))
-            rec_id = rec.get("id")
+            rec_id = rec.get("record_id") or rec.get("id")
             if rec_id is not None:
                 g.add((para_iri, PROV.wasDerivedFrom, safe_literal(str(rec_id))))
+            source_identifier = source_identifier_for_record(rec)
+            if source_identifier:
+                g.add((para_iri, DCT.identifier, safe_literal(source_identifier)))
             for ent in rec.get("entities", []) or []:
                 ent_iri = _iri_for_entity(str(ent))
                 g.add((ent_iri, RDF.type, EAR_NS.Entity))

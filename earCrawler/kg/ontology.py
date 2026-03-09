@@ -43,10 +43,10 @@ def graph_with_prefixes(*, identifier: rdflib.term.Identifier | None = None) -> 
     return g
 
 
-def iri_for_paragraph(hash_hex: str) -> rdflib.term.Identifier:
-    """Return deterministic paragraph IRI based on a SHA256 hex digest."""
+def iri_for_paragraph(identity_token: str) -> rdflib.term.Identifier:
+    """Return deterministic paragraph IRI for a corpus record identity token."""
 
-    return URIRef(paragraph_iri(hash_hex))
+    return URIRef(paragraph_iri(identity_token))
 
 
 def iri_for_section(sec_id: str) -> rdflib.term.Identifier:

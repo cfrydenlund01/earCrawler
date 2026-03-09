@@ -11,7 +11,7 @@ from importlib import metadata as importlib_metadata
 from pathlib import Path
 from typing import Any, Mapping
 
-from earCrawler.rag.retriever import _resolve_backend_name
+from earCrawler.rag.retriever import _resolve_backend_name, _resolve_retrieval_mode
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _ENV_PREFIXES = (
@@ -243,6 +243,7 @@ def build_eval_provenance_snapshot(
     index_digest: str | None = None,
     index_meta_path: str | Path | None = None,
     index_meta_digest: str | None = None,
+    retrieval_mode: str | None = None,
     retrieval_backend: str | None = None,
     thin_retrieval_enabled: bool | None = None,
     thin_retrieval_min_docs: int | None = None,
@@ -313,6 +314,7 @@ def build_eval_provenance_snapshot(
         repo_root=repo,
     )
 
+    resolved_mode = retrieval_mode or _resolve_retrieval_mode()[0]
     resolved_backend = retrieval_backend or _resolve_backend_name()[0]
     llm_mode_value = str(llm_mode or "stubbed").strip().lower() or "stubbed"
     if llm_mode_value not in {"stubbed", "remote"}:
@@ -338,7 +340,13 @@ def build_eval_provenance_snapshot(
         "index_meta_digest": resolved_index_meta_digest,
         "index_meta_path": index_meta_path_display,
         "retrieval": {
+            "mode": resolved_mode,
             "backend": resolved_backend,
+            "fusion": (
+                {"algorithm": "rrf", "rrf_k": 60}
+                if resolved_mode == "hybrid"
+                else None
+            ),
             "k": int(top_k),
             "thin_retrieval_refusal": _thin_retrieval_snapshot(
                 env_map,

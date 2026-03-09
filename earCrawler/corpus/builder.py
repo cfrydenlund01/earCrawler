@@ -17,6 +17,12 @@ from earCrawler.core.ear_crawler import EARCrawler
 from earCrawler.core.ear_loader import EARLoader
 from earCrawler.core.nsf_case_parser import NSFCaseParser
 from earCrawler.core.nsf_loader import NSFLoader
+from earCrawler.corpus.identity import (
+    build_record_id,
+    compute_content_sha256,
+    content_sha256_for_record,
+    normalize_corpus_record,
+)
 from earCrawler.policy import load_hints
 from earCrawler.privacy import scrub_text
 from earCrawler.transforms.canonical import CanonicalRegistry
@@ -48,10 +54,6 @@ def _now() -> datetime:
         except (TypeError, ValueError, OSError):
             pass
     return datetime.now(timezone.utc).replace(microsecond=0)
-
-
-def _sha256_text(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _normalise_date(value: str | None) -> str:
@@ -199,53 +201,21 @@ class CorpusBuilder:
 
     def build(self, sources: Sequence[str]) -> dict:
         resolved_sources = self._normalise_sources(sources)
-        source_priority = {src: idx for idx, src in enumerate(resolved_sources)}
-        global_records: dict[str, dict] = {}
-        owners: dict[str, str] = {}
-
-        for source in resolved_sources:
-            existing_path = self.out_dir / f"{source}_corpus.jsonl"
-            for record in _read_records(existing_path):
-                sha = record.get("sha256")
-                if not sha:
-                    continue
-                record.setdefault("source", source)
-                if sha not in global_records:
-                    global_records[sha] = record
-                    owners[sha] = source
-
-        for source in resolved_sources:
-            if source == "ear":
-                new_records = self._build_ear_records()
-            else:
-                new_records = self._build_nsf_records()
-            for record in new_records:
-                sha = record["sha256"]
-                if sha in global_records:
-                    current_owner = owners[sha]
-                    if current_owner == source:
-                        global_records[sha] = _merge_records(
-                            global_records[sha], record
-                        )
-                    else:
-                        prev_rank = source_priority.get(current_owner, 999)
-                        new_rank = source_priority.get(source, 999)
-                        if new_rank < prev_rank:
-                            global_records[sha] = _merge_records(
-                                record, global_records[sha]
-                            )
-                            owners[sha] = source
-                    continue
-                global_records[sha] = record
-                owners[sha] = source
 
         summary: dict[str, int] = {}
         for source in resolved_sources:
-            records = [
-                global_records[sha]
-                for sha in sorted(global_records.keys())
-                if owners.get(sha) == source
-            ]
+            source_records = self._build_ear_records() if source == "ear" else self._build_nsf_records()
+            records_by_id: dict[str, dict] = {}
+            for record in source_records:
+                normalized = normalize_corpus_record(record)
+                record_id = str(normalized.get("record_id") or normalized.get("id") or "").strip()
+                if not record_id:
+                    raise ValueError(f"{source} corpus record is missing a source-aware id")
+                if record_id in records_by_id:
+                    records_by_id[record_id] = _merge_records(records_by_id[record_id], normalized)
+                else:
+                    records_by_id[record_id] = normalized
+            records = [records_by_id[key] for key in sorted(records_by_id)]
             _write_records(self.out_dir / f"{source}_corpus.jsonl", records)
             summary[source] = len(records)
         manifest = _write_manifest(self.out_dir)
@@ -333,12 +303,17 @@ class CorpusBuilder:
         paragraph = scrub_text(normalized)
         if not paragraph:
             return None
-        sha = _sha256_text(paragraph)
+        sha = compute_content_sha256(paragraph)
+        record_id = build_record_id(source, identifier)
+        if not record_id:
+            raise ValueError(f"Unable to build canonical record id for source={source!r} identifier={identifier!r}")
         record = {
-            "id": identifier,
+            "id": record_id,
+            "record_id": record_id,
             "identifier": identifier,
             "source": source,
             "sha256": sha,
+            "content_sha256": sha,
             "paragraph": paragraph,
             "text": paragraph,
             "source_url": meta.source_url,
@@ -502,7 +477,7 @@ def _write_records(path: Path, records: Sequence[dict]) -> None:
         records,
         key=lambda rec: (
             rec.get("source") or "",
-            rec.get("sha256") or "",
+            rec.get("record_id") or rec.get("id") or "",
             rec.get("id") or "",
         ),
     )
@@ -513,16 +488,44 @@ def _write_records(path: Path, records: Sequence[dict]) -> None:
 
 
 def _merge_records(primary: dict, secondary: dict) -> dict:
-    merged = dict(primary)
+    primary_norm = normalize_corpus_record(primary)
+    secondary_norm = normalize_corpus_record(secondary)
+    primary_id = str(primary_norm.get("record_id") or primary_norm.get("id") or "").strip()
+    secondary_id = str(secondary_norm.get("record_id") or secondary_norm.get("id") or "").strip()
+    if primary_id and secondary_id and primary_id != secondary_id:
+        raise ValueError(
+            f"Conflicting corpus identities cannot be merged: {primary_id!r} != {secondary_id!r}"
+        )
+    primary_fp = content_sha256_for_record(primary_norm)
+    secondary_fp = content_sha256_for_record(secondary_norm)
+    if primary_fp and secondary_fp and primary_fp != secondary_fp:
+        raise ValueError(
+            f"Conflicting content fingerprints for record {primary_id or secondary_id}: "
+            f"{primary_fp} != {secondary_fp}"
+        )
+
+    merged = dict(primary_norm)
     merged_ids = list(
-        {*(primary.get("identifiers") or []), *(secondary.get("identifiers") or [])}
+        {*(primary_norm.get("identifiers") or []), *(secondary_norm.get("identifiers") or [])}
     )
     merged["identifiers"] = sorted(merged_ids)
-    for field in ("source_url", "date", "provider", "section", "paragraph", "text"):
-        if not merged.get(field) and secondary.get(field):
-            merged[field] = secondary[field]
+    for field in (
+        "id",
+        "record_id",
+        "identifier",
+        "content_sha256",
+        "sha256",
+        "source_url",
+        "date",
+        "provider",
+        "section",
+        "paragraph",
+        "text",
+    ):
+        if not merged.get(field) and secondary_norm.get(field):
+            merged[field] = secondary_norm[field]
     entities: dict[str, set[str]] = {}
-    for payload in (primary.get("entities") or {}, secondary.get("entities") or {}):
+    for payload in (primary_norm.get("entities") or {}, secondary_norm.get("entities") or {}):
         for key, values in payload.items():
             entities.setdefault(key, set()).update(values)
     merged["entities"] = {k: sorted(v) for k, v in entities.items() if v}
@@ -602,9 +605,22 @@ def validate_corpus(data_dir: Path) -> list[str]:
             source = record.get("source")
             if source not in SUPPORTED_SOURCES:
                 problems.append(f"{path.name}:{idx} invalid source")
-            sha = record.get("sha256")
+            identifier = str(record.get("identifier") or "").strip()
+            if not identifier:
+                problems.append(f"{path.name}:{idx} missing identifier")
+            expected_record_id = build_record_id(source, identifier)
+            record_id = str(record.get("record_id") or record.get("id") or "").strip()
+            if not record_id:
+                problems.append(f"{path.name}:{idx} missing record id")
+            elif expected_record_id and record_id != expected_record_id:
+                problems.append(f"{path.name}:{idx} non-canonical record id")
+            if record.get("record_id") and record.get("id") and record["record_id"] != record["id"]:
+                problems.append(f"{path.name}:{idx} record_id/id mismatch")
+            sha = content_sha256_for_record(record)
             if not sha or len(str(sha)) != 64:
                 problems.append(f"{path.name}:{idx} missing sha256")
+            elif not record.get("content_sha256"):
+                problems.append(f"{path.name}:{idx} missing content_sha256")
             for field in ("source_url", "date", "provider"):
                 if not record.get(field):
                     problems.append(f"{path.name}:{idx} missing {field}")
@@ -619,6 +635,8 @@ def validate_corpus(data_dir: Path) -> list[str]:
             paragraph = record.get("paragraph") or record.get("text", "")
             if not isinstance(paragraph, str) or not paragraph.strip():
                 problems.append(f"{path.name}:{idx} empty paragraph")
+            elif sha and compute_content_sha256(paragraph.strip()) != sha:
+                problems.append(f"{path.name}:{idx} sha256 does not match paragraph")
             identifiers = record.get("identifiers")
             if not isinstance(identifiers, list) or not identifiers:
                 problems.append(f"{path.name}:{idx} missing identifiers")

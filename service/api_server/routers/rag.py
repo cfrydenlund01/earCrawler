@@ -20,6 +20,11 @@ from earCrawler.rag.output_schema import (
     make_unanswerable_payload,
     validate_and_extract_strict_answer,
 )
+from earCrawler.rag.temporal import (
+    resolve_temporal_request,
+    select_temporal_documents,
+    temporal_candidate_count,
+)
 from earCrawler.security.data_egress import (
     build_data_egress_decision,
     redact_contexts,
@@ -106,6 +111,18 @@ def _elapsed_ms(start: float) -> float:
     return round((time.perf_counter() - start) * 1000.0, 3)
 
 
+def _apply_temporal_selection(
+    *,
+    query: str,
+    effective_date: str | None,
+    documents: list[dict],
+    top_k: int,
+) -> tuple[list[dict], dict[str, object]]:
+    request = resolve_temporal_request(query, effective_date=effective_date)
+    selection = select_temporal_documents(documents, request=request, top_k=top_k)
+    return list(selection.selected_docs), selection.to_dict()
+
+
 async def _run_retriever_query(
     retriever: RetrieverProtocol, query: str, top_k: int
 ) -> list[dict]:
@@ -144,6 +161,14 @@ async def rag_query(
     failure_type = getattr(retriever, "failure_type", None)
     index_path = getattr(retriever, "index_path", None)
     model_name = getattr(retriever, "model_name", None)
+    temporal_request = resolve_temporal_request(
+        payload.query, effective_date=payload.effective_date
+    )
+    temporal_state = (
+        select_temporal_documents([], request=temporal_request, top_k=payload.top_k).to_dict()
+        if temporal_request.refusal_reason
+        else temporal_request.to_dict()
+    )
     t_cache_ms = 0.0
     t_retrieve_ms = 0.0
     t_prompt_ms = 0.0
@@ -209,16 +234,29 @@ async def rag_query(
         documents = cached or []
         expires_at = cache.expires_at(cache_key)
         t_cache_ms += _elapsed_ms(cache_start)
+    elif temporal_request.refusal_reason:
+        documents = []
     else:
         retrieve_start = time.perf_counter()
         try:
             documents = await _run_retriever_query(
-                retriever, payload.query, payload.top_k
+                retriever,
+                payload.query,
+                temporal_candidate_count(payload.top_k)
+                if temporal_request.requested
+                else payload.top_k,
             )
+            if temporal_request.requested:
+                selection = select_temporal_documents(
+                    documents, request=temporal_request, top_k=payload.top_k
+                )
+                temporal_state = selection.to_dict()
+                documents = list(selection.selected_docs)
             t_retrieve_ms += _elapsed_ms(retrieve_start)
-            cache_start = time.perf_counter()
-            expires_at = cache.put(cache_key, documents)
-            t_cache_ms += _elapsed_ms(cache_start)
+            if (not temporal_request.requested) or documents:
+                cache_start = time.perf_counter()
+                expires_at = cache.put(cache_key, documents)
+                t_cache_ms += _elapsed_ms(cache_start)
         except RetrieverError as exc:
             t_retrieve_ms += _elapsed_ms(retrieve_start)
             retrieval_failure = exc
@@ -278,7 +316,11 @@ async def rag_query(
     latency_ms = _elapsed_ms(start_total)
     cache_state = CacheState(hit=cache_hit, expires_at=expires_at)
     retrieval_empty = len(documents) == 0
-    retrieval_empty_reason = "no_hits" if retrieval_empty else None
+    retrieval_empty_reason = (
+        (str(temporal_state.get("refusal_reason") or "").strip() or "no_temporally_applicable_evidence")
+        if retrieval_empty and temporal_request.requested
+        else ("no_hits" if retrieval_empty else None)
+    )
     _log_retrieval(
         request,
         "rag.query.success",
@@ -436,6 +478,14 @@ async def rag_answer(
     failure_type = getattr(retriever, "failure_type", None)
     index_path = getattr(retriever, "index_path", None)
     model_name = getattr(retriever, "model_name", None)
+    temporal_request = resolve_temporal_request(
+        payload.query, effective_date=payload.effective_date
+    )
+    temporal_state = (
+        select_temporal_documents([], request=temporal_request, top_k=payload.top_k).to_dict()
+        if temporal_request.refusal_reason
+        else temporal_request.to_dict()
+    )
     redaction_mode = resolve_redaction_mode()
     t_cache_ms = 0.0
     t_retrieve_ms = 0.0
@@ -461,16 +511,29 @@ async def rag_answer(
             documents = cached or []
             expires_at = cache.expires_at(cache_key)
             t_cache_ms += _elapsed_ms(cache_start)
+        elif temporal_request.refusal_reason:
+            documents = []
         else:
             retrieve_start = time.perf_counter()
             try:
                 documents = await _run_retriever_query(
-                    retriever, payload.query, payload.top_k
+                    retriever,
+                    payload.query,
+                    temporal_candidate_count(payload.top_k)
+                    if temporal_request.requested
+                    else payload.top_k,
                 )
+                if temporal_request.requested:
+                    selection = select_temporal_documents(
+                        documents, request=temporal_request, top_k=payload.top_k
+                    )
+                    temporal_state = selection.to_dict()
+                    documents = list(selection.selected_docs)
                 t_retrieve_ms += _elapsed_ms(retrieve_start)
-                cache_start = time.perf_counter()
-                expires_at = cache.put(cache_key, documents)
-                t_cache_ms += _elapsed_ms(cache_start)
+                if (not temporal_request.requested) or documents:
+                    cache_start = time.perf_counter()
+                    expires_at = cache.put(cache_key, documents)
+                    t_cache_ms += _elapsed_ms(cache_start)
             except RetrieverError as exc:
                 t_retrieve_ms += _elapsed_ms(retrieve_start)
                 retrieval_failure = exc
@@ -563,7 +626,12 @@ async def rag_answer(
     else:
         retrieval_empty = len(documents) == 0
         retrieval_empty_reason = (
-            retrieval_empty_reason or ("no_hits" if retrieval_empty else None)
+            retrieval_empty_reason
+            or (
+                str(temporal_state.get("refusal_reason") or "").strip()
+                if retrieval_empty and temporal_request.requested
+                else ("no_hits" if retrieval_empty else None)
+            )
         )
         prompt_contexts: list[str] = []
         for doc in documents:
@@ -584,7 +652,17 @@ async def rag_answer(
                 or doc.get("entity_id")
                 or ""
             ).strip()
-            prefix = f"[{section}] " if section else ""
+            temporal_parts: list[str] = []
+            if doc.get("snapshot_date"):
+                temporal_parts.append(f"snapshot={doc['snapshot_date']}")
+            if doc.get("effective_from"):
+                temporal_parts.append(f"from={doc['effective_from']}")
+            if doc.get("effective_to"):
+                temporal_parts.append(f"to={doc['effective_to']}")
+            if section and temporal_parts:
+                prefix = f"[{section} | {'; '.join(temporal_parts)}] "
+            else:
+                prefix = f"[{section}] " if section else ""
             prompt_contexts.append(prefix + text)
         contexts = prompt_contexts
 
@@ -609,7 +687,9 @@ async def rag_answer(
             min_top_score = _env_float("EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE", default=0.0, min_value=0.0)
             min_total_chars = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS", default=0, min_value=0)
 
-            thin_retrieval = retrieval_empty
+            thin_retrieval = temporal_request.requested and bool(temporal_state.get("should_refuse"))
+            if not thin_retrieval:
+                thin_retrieval = retrieval_empty
             if not thin_retrieval and refuse_on_thin:
                 if len(documents) < min_docs:
                     thin_retrieval = True
@@ -628,7 +708,10 @@ async def rag_answer(
                 prompt_start = time.perf_counter()
                 redacted_contexts = redact_contexts(prompt_contexts, mode=redaction_mode)
                 prompt = rag_pipeline._build_prompt(
-                    redacted_question, redacted_contexts, label_schema=None
+                    redacted_question,
+                    redacted_contexts,
+                    label_schema=None,
+                    effective_date=str(temporal_state.get("effective_date") or "").strip() or None,
                 )
                 t_prompt_ms += _elapsed_ms(prompt_start)
                 egress_decision = build_data_egress_decision(
@@ -643,11 +726,17 @@ async def rag_answer(
                     trace_id=trace_id,
                 )
 
-                refusal = make_unanswerable_payload(
-                    hint="the relevant EAR excerpt(s) for this scenario (for example: ECCN, destination, end user/end use)",
-                    justification="Retrieval evidence was empty or too thin to ground a compliant answer.",
-                    evidence_reasons=["thin_or_empty_retrieval"],
-                )
+                if temporal_request.requested and bool(temporal_state.get("should_refuse")):
+                    disabled_reason = str(
+                        temporal_state.get("refusal_reason") or "temporal_evidence_ambiguous"
+                    )
+                    refusal = rag_pipeline._temporal_refusal_payload(temporal_state)
+                else:
+                    refusal = make_unanswerable_payload(
+                        hint="the relevant EAR excerpt(s) for this scenario (for example: ECCN, destination, end user/end use)",
+                        justification="Retrieval evidence was empty or too thin to ground a compliant answer.",
+                        evidence_reasons=["thin_or_empty_retrieval"],
+                    )
                 rendered = json.dumps(refusal, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
                 validated = validate_and_extract_strict_answer(
                     rendered,
@@ -670,7 +759,10 @@ async def rag_answer(
                     prompt_start = time.perf_counter()
                     redacted_contexts = redact_contexts(prompt_contexts, mode=redaction_mode)
                     prompt = rag_pipeline._build_prompt(
-                        redacted_question, redacted_contexts, label_schema=None
+                        redacted_question,
+                        redacted_contexts,
+                        label_schema=None,
+                        effective_date=str(temporal_state.get("effective_date") or "").strip() or None,
                     )
                     t_prompt_ms += _elapsed_ms(prompt_start)
                     if not cfg.enable_remote:

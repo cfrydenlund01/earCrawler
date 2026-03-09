@@ -622,6 +622,18 @@ def build_kg_expansion(manifest: Path, corpus: Path, out: Path) -> None:
     help="Number of contexts to retrieve before generation.",
 )
 @click.option(
+    "--retrieval-mode",
+    type=click.Choice(["dense", "hybrid"]),
+    default=None,
+    help="Retrieval mode override: dense (default) or hybrid BM25+dense fusion.",
+)
+@click.option(
+    "--compare-retrieval-modes/--no-compare-retrieval-modes",
+    default=False,
+    show_default=True,
+    help="Run dense and hybrid retrieval side by side and write a comparison summary.",
+)
+@click.option(
     "--max-items",
     type=int,
     default=None,
@@ -667,6 +679,8 @@ def eval_run_rag(
     provider: str,
     model: str,
     top_k: int,
+    retrieval_mode: str | None,
+    compare_retrieval_modes: bool,
     max_items: int | None,
     answer_score_mode: str,
     semantic_threshold: float,
@@ -676,6 +690,10 @@ def eval_run_rag(
 ) -> None:
     """Run RAG-based evals for each dataset in the manifest."""
     fallback_threshold = None if fallback_max_uses < 0 else fallback_max_uses
+    if compare_retrieval_modes and retrieval_mode is not None:
+        raise click.ClickException(
+            "--compare-retrieval-modes cannot be combined with --retrieval-mode"
+        )
 
     try:
         from eval.validate_datasets import ensure_valid_datasets
@@ -713,15 +731,40 @@ def eval_run_rag(
     for entry in dataset_entries:
         ds_id = entry.get("id")
         safe_model = eval_rag_llm._safe_name(model or "default")
-        out_json = Path(out_dir) / f"{ds_id}.rag.{provider}.{safe_model}.json"
-        out_md = Path(out_dir) / f"{ds_id}.rag.{provider}.{safe_model}.md"
+        suffix = f".{retrieval_mode}" if retrieval_mode else ""
+        out_json = Path(out_dir) / f"{ds_id}.rag.{provider}.{safe_model}{suffix}.json"
+        out_md = Path(out_dir) / f"{ds_id}.rag.{provider}.{safe_model}{suffix}.md"
         try:
+            if compare_retrieval_modes:
+                summary_path = eval_rag_llm.compare_retrieval_modes(
+                    ds_id,
+                    manifest_path=manifest,
+                    llm_provider=provider,
+                    llm_model=model,
+                    top_k=top_k,
+                    max_items=max_items,
+                    answer_score_mode=answer_score_mode,
+                    semantic_threshold=semantic_threshold,
+                    semantic=semantic,
+                    ablation=None,
+                    kg_expansion=None,
+                    multihop_only=False,
+                    emit_hitl_template=None,
+                    trace_pack_required_threshold=None,
+                    fallback_max_uses=fallback_threshold,
+                    out_root=Path(out_dir) / "retrieval_compare",
+                    run_id=eval_rag_llm._safe_name(f"{ds_id}.retrieval"),
+                )
+                click.echo(f"{ds_id}: wrote {summary_path}")
+                continue
+
             eval_rag_llm.evaluate_dataset(
                 ds_id,
                 manifest_path=manifest,
                 llm_provider=provider,
                 llm_model=model,
                 top_k=top_k,
+                retrieval_mode=retrieval_mode,
                 max_items=max_items,
                 out_json=out_json,
                 out_md=out_md,
@@ -776,6 +819,12 @@ def eval_run_rag(
     help="Top-k to search in the FAISS retriever when computing ranks.",
 )
 @click.option(
+    "--retrieval-mode",
+    type=click.Choice(["dense", "hybrid"]),
+    default=None,
+    help="Retrieval mode override used for FR coverage checks.",
+)
+@click.option(
     "--max-items",
     type=int,
     default=None,
@@ -827,6 +876,7 @@ def eval_fr_coverage(
     only_v2: bool,
     dataset_id_pattern: str | None,
     retrieval_k: int,
+    retrieval_mode: str | None,
     max_items: int | None,
     out: Path,
     summary_out: Path,
@@ -871,6 +921,7 @@ def eval_fr_coverage(
             only_v2=only_v2,
             dataset_id_pattern=dataset_id_pattern,
             retrieval_k=retrieval_k,
+            retrieval_mode=retrieval_mode,
             max_items=max_items,
             top_missing_sections=top_missing_sections,
         )
@@ -1126,6 +1177,12 @@ def llm() -> None:
     help="Number of retrieved contexts to pass to the LLM.",
 )
 @click.option(
+    "--effective-date",
+    type=str,
+    default=None,
+    help="Optional as-of date (YYYY-MM-DD) used for temporal applicability filtering.",
+)
+@click.option(
     "--retrieval-only",
     is_flag=True,
     default=False,
@@ -1136,6 +1193,7 @@ def llm_ask(
     llm_provider: str | None,
     llm_model: str | None,
     top_k: int,
+    effective_date: str | None,
     retrieval_only: bool,
     question: str,
 ) -> None:
@@ -1148,6 +1206,7 @@ def llm_ask(
             model=llm_model,
             top_k=top_k,
             generate=not retrieval_only,
+            effective_date=effective_date,
         )
     except LLMProviderError as exc:
         raise click.ClickException(str(exc))

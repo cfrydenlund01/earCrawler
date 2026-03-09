@@ -97,6 +97,8 @@ provided and returns parsed JSON dictionaries for each call.
   * Authenticated (`X-Api-Key`): **120 requests/min**, burst 20
 * Fuseki endpoint must be read-only. Queries outside of `registry.json` are
 denied with `400`.
+* `/v1/search` requires a text-enabled Fuseki dataset (Jena `text:TextDataset`
+  over `rdfs:label`, as configured in `bundle/assembler/tdb2-readonly.ttl`).
 
 Rate-limit state is surfaced via the `X-RateLimit-*` headers and `Retry-After`.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from earCrawler.corpus.identity import build_record_id
 from earCrawler.kg.emit_ear import emit_ear
 from earCrawler.kg.iri import paragraph_iri
 
@@ -44,3 +45,44 @@ def test_emit_ear_deterministic(tmp_path: Path) -> None:
     assert f"<{paragraph_iri('a' * 64)}>" in text
     assert "dct:source" in text
     assert "dct:issued" in text
+
+
+def test_emit_ear_keeps_distinct_paragraph_nodes_for_duplicate_text(tmp_path: Path) -> None:
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    shared_hash = "d" * 64
+    records = [
+        {
+            "source": "ear",
+            "id": build_record_id("ear", "EAR-001:0"),
+            "record_id": build_record_id("ear", "EAR-001:0"),
+            "identifier": "EAR-001:0",
+            "content_sha256": shared_hash,
+            "sha256": shared_hash,
+            "source_url": "http://example.com/a",
+            "date": "2020-01-01",
+            "section": "734.1",
+        },
+        {
+            "source": "ear",
+            "id": build_record_id("ear", "EAR-002:0"),
+            "record_id": build_record_id("ear", "EAR-002:0"),
+            "identifier": "EAR-002:0",
+            "content_sha256": shared_hash,
+            "sha256": shared_hash,
+            "source_url": "http://example.com/b",
+            "date": "2020-01-02",
+            "section": "734.2",
+        },
+    ]
+    _write_records(data_dir / "ear_corpus.jsonl", records)
+
+    out_dir = tmp_path / "out"
+    path, _ = emit_ear(data_dir, out_dir)
+    text = path.read_text(encoding="utf-8")
+
+    first_iri = paragraph_iri(build_record_id("ear", "EAR-001:0"))
+    second_iri = paragraph_iri(build_record_id("ear", "EAR-002:0"))
+    assert f"<{first_iri}>" in text
+    assert f"<{second_iri}>" in text
+    assert first_iri != second_iri

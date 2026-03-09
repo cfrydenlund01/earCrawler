@@ -17,9 +17,35 @@ from earCrawler.rag.offline_snapshot_manifest import (
     require_offline_snapshot_manifest,
     validate_offline_snapshot,
 )
+from earCrawler.rag.temporal import apply_version_suffix, infer_snapshot_date
 from earCrawler.utils.log_json import JsonLogger
 
 _logger = JsonLogger("rag-corpus")
+
+
+def _version_suffix_from_doc_id(doc_id: object | None) -> str | None:
+    raw = str(doc_id or "").strip()
+    if "#" not in raw:
+        return None
+    _left, suffix = raw.split("#", 1)
+    return suffix.strip() or None
+
+
+def _apply_chunk_version_suffix(chunks: List[CorpusDocument], version_suffix: str | None) -> List[CorpusDocument]:
+    if not version_suffix:
+        return chunks
+
+    versioned: List[CorpusDocument] = []
+    for chunk in chunks:
+        updated = dict(chunk)
+        doc_id = str(updated.get("doc_id") or "").strip()
+        if doc_id:
+            updated["doc_id"] = apply_version_suffix(doc_id, version_suffix)
+        parent_id = str(updated.get("parent_id") or "").strip()
+        if parent_id:
+            updated["parent_id"] = apply_version_suffix(parent_id, version_suffix)
+        versioned.append(updated)
+    return versioned
 
 
 def extract_ear_part(section_id: object | None) -> str | None:
@@ -85,12 +111,19 @@ def build_retrieval_corpus(
             )
         heading = section.get("title") or section.get("heading")
         url = section.get("url")
+        version_suffix = _version_suffix_from_doc_id(section.get("doc_id"))
         chunks = chunk_section_text(
             section["section_id"],
             heading,
             section.get("text") or "",
             max_chars=chunk_max_chars,
             strategy="section_subsection",
+        )
+        chunks = _apply_chunk_version_suffix(chunks, version_suffix)
+        snapshot_date = infer_snapshot_date(
+            snapshot_date=section.get("snapshot_date"),
+            source_ref=resolved_source_ref,
+            snapshot_id=snapshot_id,
         )
         for chunk in chunks:
             part = extract_ear_part(chunk.get("section_id"))
@@ -123,6 +156,12 @@ def build_retrieval_corpus(
                 doc["title"] = heading
             if url and "url" not in doc:
                 doc["url"] = url
+            for field in ("effective_date", "effective_from", "effective_to"):
+                value = section.get(field)
+                if value:
+                    doc[field] = value
+            if snapshot_date:
+                doc["snapshot_date"] = snapshot_date
             docs.append(doc)
 
     docs = sorted(docs, key=lambda d: str(d.get("doc_id") or ""))

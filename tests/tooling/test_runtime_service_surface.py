@@ -127,3 +127,13 @@ def test_repo_does_not_ship_container_runtime_artifacts() -> None:
     assert "/rag:${{ github.ref_name }}" not in ci_workflow
     assert "ghcr.io/" not in ci_workflow
     assert "ghcr.io/" not in release_workflow
+
+
+def test_repo_does_not_ship_placeholder_training_surface() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert not (REPO_ROOT / "agent").exists()
+    assert not (REPO_ROOT / "models" / "legalbert").exists()
+    assert not (REPO_ROOT / "earCrawler" / "quant" / "__init__.py").exists()
+    assert "supported model-training, fine-tuning, agent, or quantization stack" in readme
+    assert "docs/model_training_surface_adr.md" in readme
