@@ -51,14 +51,43 @@ jobs:
       - name: Corpus determinism gate (offline fixtures)
         shell: pwsh
         env:
+          EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES: "1"
           EARCTL_USER: test_operator
           SOURCE_DATE_EPOCH: "946684800"
         run: pwsh scripts/ci-corpus-determinism.ps1
 
-      - name: Build TTL bundle
-        run: python -m earCrawler.pipelines.build_ttl
-      - name: SHACL gate on bundle
-        run: python -m earCrawler.validation.validate_shapes
+      - name: Supported corpus build gate (offline fixtures)
+        shell: pwsh
+        env:
+          EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES: "1"
+          EARCTL_USER: test_operator
+        run: py -m earCrawler.cli corpus build -s ear -s nsf --out dist\ci_supported_path\data --fixtures tests/fixtures
+      - name: Supported corpus validate gate
+        shell: pwsh
+        env:
+          EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES: "1"
+          EARCTL_USER: test_operator
+        run: py -m earCrawler.cli corpus validate --dir dist\ci_supported_path\data
+      - name: Supported KG emit gate
+        shell: pwsh
+        env:
+          EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES: "1"
+          EARCTL_USER: test_operator
+        run: py -m earCrawler.cli kg-emit -s ear -s nsf -i dist\ci_supported_path\data -o dist\ci_supported_path\kg
+      - name: Supported KG SHACL gate
+        run: py -m cli.kg_validate --glob "dist\ci_supported_path\kg\*.ttl" --fail-on shacl-only
+      - name: Start supported API smoke service
+        shell: pwsh
+        run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
+      - name: Supported API smoke gate
+        shell: pwsh
+        run: scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001
+      - name: Stop supported API smoke service
+        if: always()
+        shell: pwsh
+        run: scripts/api-stop.ps1
+      - name: No-network RAG smoke gate
+        run: py -m pytest -q tests/golden/test_phase2_golden_gate.py
       - name: Phase B baseline drift gate
         shell: pwsh
         run: |
@@ -67,21 +96,6 @@ jobs:
       - name: Phase B determinism check
         shell: pwsh
         run: scripts/rebuild-compare.ps1 -Version ci
-      - name: Conditional Fuseki load (skipped in CI)
-        run: echo "Skipping network load in CI"
-
-      - name: Smoke test emit and validate
-        shell: pwsh
-        run: |
-          python -m cli.kg_emit --sources ear --sources nsf --in tests\kg\fixtures --out tests\kg\artifacts
-          python -m cli.kg_validate --glob "tests\kg\artifacts\*.ttl"
-          $code = @'
-          import glob
-          from rdflib import Graph
-          for path in glob.glob(r"tests\kg\artifacts\*.ttl"):
-              Graph().parse(path, format="turtle")
-          '@
-          python -c $code
       - name: Validate evaluation datasets
         run: python eval/validate_datasets.py
       - name: Upload eval artifacts

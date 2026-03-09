@@ -35,8 +35,13 @@ Windows notes
 
 ## Supported Runtime Surface
 - Supported operator/runtime entrypoints are `earctl` / `py -m earCrawler.cli ...` and the FastAPI facade at `service.api_server` (typically via `py -m earCrawler.cli api ...` or `py -m uvicorn service.api_server.server:app ...`).
+- Capability tags match the canonical matrix in `README.md`: `Supported`, `Optional`, `Quarantined`, and `Proposal-only`.
+- Supported API routes are `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`.
+- Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt`.
+- Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior.
 - Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
 - KG-backed runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded.
+- For the repo-level boundary between supported runtime code and research/proposal material, see `docs/runtime_research_boundary.md`.
 
 ## Rollback
 1. Locate previous stable tag.
@@ -212,6 +217,11 @@ python -m earCrawler.cli report --sources ear nsf --type top-entities --entity O
 Use `--out report.json` to save the results to a file.
 
 ## Phase B: Knowledge Graph
+
+Status: `Quarantined`. The commands and procedures in this section are for local
+validation, CI, and quarantine work. Do not present them as supported
+production-runtime commitments until `docs/kg_quarantine_exit_gate.md` is
+explicitly passed and recorded.
 
 ### Ontology
 Classes: `ear:Reg`, `ear:Section`, `ear:Paragraph`, `ear:Citation`, `ent:Entity`

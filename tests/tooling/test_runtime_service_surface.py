@@ -137,3 +137,78 @@ def test_repo_does_not_ship_placeholder_training_surface() -> None:
     assert not (REPO_ROOT / "earCrawler" / "quant" / "__init__.py").exists()
     assert "supported model-training, fine-tuning, agent, or quantization stack" in readme
     assert "docs/model_training_surface_adr.md" in readme
+
+
+def test_repo_documents_runtime_vs_research_boundary() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
+    boundary_doc = (REPO_ROOT / "docs/runtime_research_boundary.md").read_text(
+        encoding="utf-8"
+    )
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+
+    assert "docs/runtime_research_boundary.md" in readme
+    assert "docs/runtime_research_boundary.md" in runbook
+    assert "supported product/runtime surface" in boundary_doc
+    assert "Research/" in boundary_doc
+    assert "not a supported runtime surface" in gitignore
+
+
+def test_repo_freezes_capability_matrix_and_api_search_status() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
+    api_readme = (REPO_ROOT / "docs" / "api" / "readme.md").read_text(
+        encoding="utf-8"
+    )
+    openapi_yaml = (REPO_ROOT / "service" / "openapi" / "openapi.yaml").read_text(
+        encoding="utf-8"
+    )
+    openapi_json = (REPO_ROOT / "docs" / "api" / "openapi.json").read_text(
+        encoding="utf-8"
+    )
+    postman = (REPO_ROOT / "docs" / "api" / "postman_collection.json").read_text(
+        encoding="utf-8"
+    )
+
+    assert "## Capability Matrix" in readme
+    for status in ("Supported", "Optional", "Quarantined", "Proposal-only"):
+        assert status in readme
+    assert "Quarantined runtime features include `/v1/search`" in runbook
+    assert "| `/v1/search` | Quarantined |" in api_readme
+    assert "Status: Quarantined" in openapi_yaml
+    assert "quarantined" in openapi_json.lower()
+    assert "quarantined /v1/search route" in postman
+
+
+def test_sample_ttl_pipeline_is_named_as_synthetic_fixture() -> None:
+    ci_workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+
+    assert "earCrawler.pipelines.build_ttl" not in ci_workflow
+    assert "Synthetic Sample TTL Build and Gated Load (Quarantined)" in readme
+
+
+def test_ci_uses_supported_evidence_path_gate() -> None:
+    ci_workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
+        encoding="utf-8"
+    )
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    ci_doc = (REPO_ROOT / "docs" / "ci.md").read_text(encoding="utf-8")
+    api_smoke = (REPO_ROOT / "scripts" / "api-smoke.ps1").read_text(encoding="utf-8")
+
+    assert "Build synthetic sample TTL fixture bundle" not in ci_workflow
+    assert "Supported corpus build gate" in ci_workflow
+    assert "Supported corpus validate gate" in ci_workflow
+    assert "Supported KG emit gate" in ci_workflow
+    assert "Supported KG SHACL gate" in ci_workflow
+    assert "Supported API smoke gate" in ci_workflow
+    assert "No-network RAG smoke gate" in ci_workflow
+    assert "tests/golden/test_phase2_golden_gate.py" in ci_workflow
+    assert "Supported CI Evidence Path" in readme
+    assert "supported evidence path" in ci_doc
+    assert "/v1/search" not in api_smoke
+    assert "/v1/entities/" in api_smoke
+    assert "/v1/lineage/" in api_smoke
+    assert "/v1/sparql" in api_smoke

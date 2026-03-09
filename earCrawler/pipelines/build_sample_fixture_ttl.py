@@ -33,7 +33,8 @@ def part_triples(graph: Graph, parts: list[str]) -> None:
         graph.add((node, EAR.title, Literal(f"15 CFR Part {notation}")))
 
 
-def build_samples() -> Path:
+def build_synthetic_sample_bundle() -> Path:
+    """Build a tiny synthetic TTL fixture bundle for local/demo validation only."""
     ensure_dirs()
     graph = Graph()
     binding = to_bindings(
@@ -53,4 +54,4 @@ def build_samples() -> Path:
 
 
 if __name__ == "__main__":
-    print(build_samples())
+    print(build_synthetic_sample_bundle())

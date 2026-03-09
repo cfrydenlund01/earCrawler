@@ -1,20 +1,29 @@
 # Read-only API Surface
 
-The EarCrawler API exposes curated read-only access to the KG. Endpoints mirror
-the allowlisted SPARQL templates stored under `service/templates/`. All
-responses are validated against Pydantic schemas and must complete within the
-configured latency budget.
+This document follows the canonical capability matrix in `README.md`. Treat the
+status labels here as normative for the API surface:
+
+- `Supported`: part of the supported production API contract.
+- `Optional`: supported only when explicitly enabled/configured.
+- `Quarantined`: implemented or testable, but not a supported production
+  commitment yet.
+
+The EarCrawler API exposes curated read-only access to the supported service
+surface. Endpoints mirror the allowlisted SPARQL templates stored under
+`service/templates/`. All responses are validated against Pydantic schemas and
+must complete within the configured latency budget.
 
 ## Endpoints
 
-| Path | Description |
-| ---- | ----------- |
-| `/health` | Liveness and readiness probe. |
-| `/v1/entities/{entity_id}` | Curated entity projection (labels, provenance, sameAs). |
-| `/v1/search` | Label search against text indexes. |
-| `/v1/sparql` | Proxy for allowlisted SPARQL templates only. |
-| `/v1/lineage/{entity_id}` | PROV-O lineage graph. |
-| `/v1/rag/query` | Cached RAG answer surface with lineage metadata. |
+| Path | Status | Description |
+| ---- | ------ | ----------- |
+| `/health` | Supported | Liveness and readiness probe. |
+| `/v1/entities/{entity_id}` | Supported | Curated entity projection (labels, provenance, sameAs). |
+| `/v1/lineage/{entity_id}` | Supported | PROV-O lineage graph. |
+| `/v1/sparql` | Supported | Proxy for allowlisted SPARQL templates only. |
+| `/v1/rag/query` | Supported | Retrieval surface with lineage metadata. |
+| `/v1/rag/answer` | Optional | Remote-LLM answer generation; requires explicit env enablement and provider credentials. |
+| `/v1/search` | Quarantined | Text-index-backed label search. Available for local validation, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. |
 
 Refer to `service/openapi/openapi.yaml` for exhaustive schemas and examples.
 
@@ -32,7 +41,7 @@ Import the Postman collection, then edit the collection variables:
 | `base_url` | Target FastAPI facade (include scheme + port). | `http://localhost:9001` |
 | `api_key` | Optional X-Api-Key header. Leave blank for anonymous quotas. | _(blank)_ |
 | `entity_id` | Sample KG entity to drive `/entities` and `/lineage`. | `urn:ear:entity:demo` |
-| `search_query` | Default `/v1/search` and SPARQL template query string. | `export controls` |
+| `search_query` | Default query string for the quarantined `/v1/search` route and SPARQL `search_entities` template. | `export controls` |
 
 The collection attaches `X-Api-Key` automatically when the variable is populated.
 
@@ -68,7 +77,7 @@ Use the dotenv-driven helper when you want to verify the endpoints without insta
 2. Start the facade (`earctl api start`) so `http://localhost:9001` is reachable, or edit `EAR_BASE_URL` for remote hosts.
 3. Run `pwsh scripts/api/curl_facade.ps1 [-EnvFile .env.local] [-BaseUrl ...] [-EntityId ...]`.
 
-The script issues curl calls for `/health`, `/v1/search`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`. When `EAR_ENTITY_ID` is empty it auto-discovers a live identifier by asking `/v1/search`, then falls back to the deterministic fixture `urn:ear:entity:demo`. This keeps the workflow useful for both local fixture runs and real deployments.
+The script issues curl calls for `/health`, `/v1/search`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`. Because `/v1/search` is quarantined, supported production checks should provide `EAR_ENTITY_ID` explicitly instead of relying on search-based auto-discovery. When `EAR_ENTITY_ID` is empty the helper still tries `/v1/search` first, then falls back to the deterministic fixture `urn:ear:entity:demo` for local validation workflows.
 
 ## SDK usage
 
@@ -97,8 +106,9 @@ provided and returns parsed JSON dictionaries for each call.
   * Authenticated (`X-Api-Key`): **120 requests/min**, burst 20
 * Fuseki endpoint must be read-only. Queries outside of `registry.json` are
 denied with `400`.
-* `/v1/search` requires a text-enabled Fuseki dataset (Jena `text:TextDataset`
-  over `rdfs:label`, as configured in `bundle/assembler/tdb2-readonly.ttl`).
+* `/v1/search` remains `Quarantined` and requires a text-enabled Fuseki dataset
+  (Jena `text:TextDataset` over `rdfs:label`, as configured in
+  `bundle/assembler/tdb2-readonly.ttl`).
 
 Rate-limit state is surfaced via the `X-RateLimit-*` headers and `Retry-After`.
 

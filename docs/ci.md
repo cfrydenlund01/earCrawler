@@ -9,7 +9,7 @@ The workflow in `.github/workflows/ci.yml` runs on:
 ## Jobs
 
 - `cpu`
-  Runs on `windows-latest` for pushes, pull requests, and tags. It checks out the repo, validates pinned versions, sets up Python 3.11, caches pip, installs `requirements.txt` plus the editable package, runs `scripts/package-wheel-smoke.ps1` (clean-room wheel install/entrypoint/resource validation in an isolated temp venv), checks formatting/lint with Black and Flake8, runs `pytest -q --disable-warnings --maxfail=1`, executes the offline corpus determinism gate, builds and validates TTL artifacts, enforces the Phase B baseline drift and determinism gates, runs the KG emit/validate smoke, validates eval datasets, and uploads `dist/eval` as an artifact when present.
+  Runs on `windows-latest` for pushes, pull requests, and tags. It checks out the repo, validates pinned versions, sets up Python 3.11, caches pip, installs `requirements.txt` plus the editable package, runs `scripts/package-wheel-smoke.ps1` (clean-room wheel install/entrypoint/resource validation in an isolated temp venv), checks formatting/lint with Black and Flake8, runs `pytest -q --disable-warnings --maxfail=1`, executes the offline corpus determinism gate, then validates the supported evidence path in this order: corpus build, corpus validate, KG emit, SHACL-only KG validation, supported-route API smoke, and no-network RAG smoke. After that it enforces the Phase B baseline drift and determinism gates, validates eval datasets, and uploads `dist/eval` as an artifact when present.
 
 - `gpu`
   Runs only on pushes to `main`, on `ubuntu-latest`, with `continue-on-error: true`. It sets up Python 3.11, installs `requirements-gpu.txt`, caches the Hugging Face model directory, and runs `pytest -m gpu`.

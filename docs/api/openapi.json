@@ -3,7 +3,7 @@
   "info": {
     "title": "EarCrawler Read-only API",
     "version": "0.2.5",
-    "description": "Read-only HTTP facade exposing curated SPARQL resources with rate limiting and immutable query templates."
+    "description": "Read-only HTTP facade exposing curated SPARQL resources with rate limiting and immutable query templates. Supported endpoints are /health, /v1/entities/{entity_id}, /v1/lineage/{entity_id}, /v1/sparql, and /v1/rag/query. /v1/rag/answer is optional and requires explicit remote-LLM enablement. /v1/search remains quarantined until docs/kg_quarantine_exit_gate.md is passed and recorded."
   },
   "servers": [
     {
@@ -276,6 +276,71 @@
           }
         }
       },
+      "OutputError": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object",
+            "nullable": true,
+            "additionalProperties": true
+          },
+          "raw_preview": {
+            "type": "string",
+            "nullable": true
+          },
+          "raw_len": {
+            "type": "integer",
+            "nullable": true
+          }
+        }
+      },
+      "RagCitation": {
+        "type": "object",
+        "required": [
+          "section_id",
+          "quote"
+        ],
+        "properties": {
+          "section_id": {
+            "type": "string"
+          },
+          "quote": {
+            "type": "string"
+          },
+          "span_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "EvidenceOkay": {
+        "type": "object",
+        "required": [
+          "ok",
+          "reasons"
+        ],
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
       "RagResponse": {
         "type": "object",
         "required": [
@@ -322,9 +387,150 @@
             "maximum": 10,
             "default": 3
           },
+          "effective_date": {
+            "type": "string",
+            "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+            "nullable": true,
+            "description": "Optional as-of date (YYYY-MM-DD) used for temporal applicability filtering."
+          },
           "include_lineage": {
             "type": "boolean",
             "default": false
+          },
+          "generate": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "RetrievedDocument": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Source identifier"
+          },
+          "score": {
+            "type": "number"
+          },
+          "title": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "section": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          }
+        }
+      },
+      "RagGeneratedResponse": {
+        "type": "object",
+        "required": [
+          "trace_id",
+          "latency_ms",
+          "question",
+          "cache",
+          "rag_enabled",
+          "llm_enabled",
+          "contexts",
+          "retrieved",
+          "retrieval_empty",
+          "output_ok",
+          "citations",
+          "assumptions"
+        ],
+        "properties": {
+          "trace_id": {
+            "type": "string"
+          },
+          "latency_ms": {
+            "type": "number"
+          },
+          "question": {
+            "type": "string"
+          },
+          "answer": {
+            "type": "string",
+            "nullable": true
+          },
+          "contexts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "retrieved": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RetrievedDocument"
+            }
+          },
+          "model": {
+            "type": "string",
+            "nullable": true
+          },
+          "provider": {
+            "type": "string",
+            "nullable": true
+          },
+          "rag_enabled": {
+            "type": "boolean"
+          },
+          "llm_enabled": {
+            "type": "boolean"
+          },
+          "disabled_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "cache": {
+            "$ref": "#/components/schemas/CacheState"
+          },
+          "retrieval_empty": {
+            "type": "boolean"
+          },
+          "retrieval_empty_reason": {
+            "type": "string",
+            "nullable": true
+          },
+          "output_ok": {
+            "type": "boolean"
+          },
+          "output_error": {
+            "$ref": "#/components/schemas/OutputError",
+            "nullable": true
+          },
+          "raw_answer": {
+            "type": "string",
+            "nullable": true
+          },
+          "label": {
+            "type": "string",
+            "nullable": true
+          },
+          "justification": {
+            "type": "string",
+            "nullable": true
+          },
+          "citations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RagCitation"
+            }
+          },
+          "evidence_okay": {
+            "$ref": "#/components/schemas/EvidenceOkay",
+            "nullable": true
+          },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         }
       },
@@ -430,6 +636,7 @@
     "/v1/search": {
       "get": {
         "summary": "Search entity labels",
+        "description": "Status: Quarantined. This text-index-backed route is available for local validation and research workflows, but it is not part of the supported production contract until docs/kg_quarantine_exit_gate.md is passed and recorded.",
         "parameters": [
           {
             "name": "q",
@@ -591,6 +798,7 @@
     "/v1/rag/query": {
       "post": {
         "summary": "Retrieve cached RAG passages with lineage metadata",
+        "description": "Status: Supported. This is the supported retrieval endpoint in the API contract.",
         "requestBody": {
           "required": true,
           "content": {
@@ -614,6 +822,81 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RagResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit exceeded",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/rag/answer": {
+      "post": {
+        "summary": "Generate an answer using a remote LLM provider",
+        "description": "Status: Optional. This route requires explicit RAG and remote-LLM enablement plus provider credentials.",
+        "parameters": [
+          {
+            "name": "generate",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "When false, returns retrieval-only output without calling an LLM."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RagQueryRequest"
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "ApiKey": []
+          },
+          {}
+        ],
+        "responses": {
+          "200": {
+            "description": "Generated answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RagGeneratedResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "LLM output failed schema validation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RagGeneratedResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "RAG or remote LLM disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RagGeneratedResponse"
                 }
               }
             }

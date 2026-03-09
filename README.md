@@ -101,6 +101,29 @@ Quarantined or unsupported runtime surfaces in this repo are:
 
 Use `service/api_server` and the CLI/operator paths above as the only supported runtime surface.
 
+## Capability Matrix
+
+This table is the canonical capability/status map for the repository. If another
+document sounds broader, follow this table.
+
+| Surface | Status | Notes |
+| --- | --- | --- |
+| `earctl` / `py -m earCrawler.cli ...` and the documented Windows helper scripts | Supported | These are the supported operator entrypoints. Capability-level status still matters; use the rows below for feature-specific claims. |
+| `service.api_server`, `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, `/v1/rag/query` | Supported | These are the supported service/API surfaces for the Windows-first single-host runtime. |
+| `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Default installs and baseline operator flows do not require them. |
+| `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. |
+| `Research/`, `docs/proposal/`, benchmark planning, model-training/fine-tuning notes, and other future-work design docs | Proposal-only | Useful for planning and evaluation, not an operator/runtime commitment. |
+
+## Runtime vs Research Boundary
+
+If you are new to the repo, use this rule first:
+
+- `README.md`, `RUNBOOK.md`, `service/api_server`, `earctl`, and the code and scripts they directly rely on are the supported product/runtime surface.
+- `Research/`, `docs/proposal/`, and design notes for gated or future work are not production commitments by themselves.
+- If a feature is not described through a supported `earctl` or `service.api_server` path with tests and operator docs, treat it as research, experimental, or quarantined.
+
+The repo-level boundary is documented in `docs/runtime_research_boundary.md`.
+
 The CLI enforces role-based access control defined in `security/policy.yml` for operational commands. Protected surfaces include `crawl`, `fetch-*`, `warm-cache`, `telemetry`, `kg-load`, `kg-serve`, `kg-query`, `eval`, API/admin helpers, and release/bundle workflows. Local helper commands such as `nsf-parse`, `kg-emit`, `kg-export`, `fr-fetch`, and `rag-index *` remain outside RBAC. For local testing you can opt into one of the built-in test identities:
 
 ```powershell
@@ -166,6 +189,9 @@ Environment variables:
 ---
 
 ## RAG / Remote LLM Answering
+
+Status: `Optional`. This path requires explicit environment enablement and
+provider credentials; it is not part of the default baseline runtime.
 
 The API can generate answers using remote OpenAI-compatible providers (Groq or NVIDIA NIM). Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys loaded from your environment, Windows Credential Store, or an optional local-only `config/llm_secrets.env` (copy from `config/llm_secrets.example.env` and do not commit it).
 
@@ -234,6 +260,10 @@ Artifacts also include an `eval_strictness` section with fallback counters and t
 ---
 
 ## Preparing Fuseki & The Knowledge Graph
+
+Status: `Quarantined`. The commands below exist for local validation and
+quarantine work, but they are not part of the supported production contract
+until `docs/kg_quarantine_exit_gate.md` is passed and recorded.
 
 1. **Ensure Jena is available**  
    The first CLI call that needs Jena will download it into `tools/jena` and populate the `JENA_HOME`/`JAVA_HOME` environment variables if they are not already set. If Java cannot be located automatically, install JDK 11+ and set `JAVA_HOME` before retrying. You can pre-flight the download:
@@ -313,10 +343,15 @@ Artifacts also include an `eval_strictness` section with fallback counters and t
 - The Trade.gov and Federal Register clients honour `TRADEGOV_MAX_CALLS` and `FR_MAX_CALLS` environment budgets. Requests use exponential backoff with structured retry logs, and the on-disk cache key now incorporates Accept/User-Agent headers to avoid stale mixes across CLI environments.
 
 ## Proposal Assets
+
+Status: `Proposal-only`. These materials can inform future work but do not
+change the supported runtime contract by themselves.
 - `scripts/demo-end-to-end.ps1` produces a deterministic crawl -> KG -> bundle run with fixtures and emits a summary artefact. The script uses the active `python` interpreter by default; override with `-Python` to call a specific executable.
 - `scripts/build-release.ps1` orchestrates wheel/EXE/installer builds and writes SHA-256 checksums for signing.
 - `docs/proposal/architecture.md`, `docs/proposal/security.md`, and `docs/proposal/observability.md` capture the architecture story, security posture, and SLO model pitched in the proposal.
 - `api_clients.EarCrawlerApiClient` is a typed helper for downstream consumers of the FastAPI facade.
+
+The `docs/proposal/` set is proposal material, not an operator contract. Treat `README.md`, `RUNBOOK.md`, and `docs/runtime_research_boundary.md` as the source of truth for supported runtime commitments.
 
 ---
 
@@ -505,14 +540,22 @@ Pull requests are welcome - open an issue first for substantial changes so we ca
 
 Keep using the Trade.gov Data API for entity lookup and the Federal Register API for EAR text via the packaged clients. Ensure transforms (`csl_to_rdf.py`, `ear_fr_to_rdf.py`) emit IRIs under `ent:` and `part:` to satisfy shapes. Store secrets in the Windows Credential Store or a vault—never hardcode them.
 
-## TTL Build and Gated Load
+## Synthetic Sample TTL Build and Gated Load (Quarantined)
 
-- Transforms now emit `dist/bundle.ttl`.
+- This flow builds a synthetic demo fixture at `dist/bundle.ttl`.
 - A validation gate must pass before any load.
+- It is not the supported production corpus -> KG validation path.
 - Local load (Windows PowerShell):
   ```powershell
   $env:EAR_FUSEKI_DATASET="http://localhost:3030/ear"
   $env:EAR_ENABLE_LOAD="1"
-  python -m earCrawler.pipelines.build_ttl
+  python -m earCrawler.pipelines.build_sample_fixture_ttl
   python -m earCrawler.pipelines.load_after_validate
   ```
+
+## Supported CI Evidence Path
+
+- `ci.yml` validates the supported offline evidence path in this order:
+  corpus build -> corpus validate -> kg-emit -> SHACL gate -> supported API smoke -> no-network RAG smoke.
+- The API smoke gate covers only supported routes: `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, and `/v1/sparql`.
+- The no-network RAG smoke gate runs `tests/golden/test_phase2_golden_gate.py` with stubbed retrieval and stubbed LLM outputs; it does not depend on provider keys, FAISS, or live network access.
