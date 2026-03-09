@@ -4,7 +4,11 @@ info:
   version: 0.2.5
   description: >-
     Read-only HTTP facade exposing curated SPARQL resources with rate limiting
-    and immutable query templates.
+    and immutable query templates. Supported endpoints are /health,
+    /v1/entities/{entity_id}, /v1/lineage/{entity_id}, /v1/sparql, and
+    /v1/rag/query. /v1/rag/answer is optional and requires explicit remote-LLM
+    enablement. /v1/search remains quarantined until
+    docs/kg_quarantine_exit_gate.md is passed and recorded.
 servers:
   - url: http://localhost:9001
     description: Local development
@@ -402,6 +406,11 @@ paths:
   /v1/search:
     get:
       summary: Search entity labels
+      description: >-
+        Status: Quarantined. This text-index-backed route is available for local
+        validation and research workflows, but it is not part of the supported
+        production contract until docs/kg_quarantine_exit_gate.md is passed and
+        recorded.
       parameters:
         - name: q
           in: query
@@ -499,6 +508,9 @@ paths:
   /v1/rag/query:
     post:
       summary: Retrieve cached RAG passages with lineage metadata
+      description: >-
+        Status: Supported. This is the supported retrieval endpoint in the API
+        contract.
       requestBody:
         required: true
         content:
@@ -524,6 +536,9 @@ paths:
   /v1/rag/answer:
     post:
       summary: Generate an answer using a remote LLM provider
+      description: >-
+        Status: Optional. This route requires explicit RAG and remote-LLM
+        enablement plus provider credentials.
       parameters:
         - name: generate
           in: query
