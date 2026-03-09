@@ -76,8 +76,8 @@ def _warm_reason(value: object) -> str:
 def load_retriever() -> RetrieverProtocol:
     """Return a retriever instance when enabled, else a no-op stub.
 
-    The actual FAISS-backed retriever is heavy (SentenceTransformers + FAISS), so we only
-    instantiate it when the operator explicitly opts-in via the
+    The actual retriever is heavy (SentenceTransformers plus the configured dense backend),
+    so we only instantiate it when the operator explicitly opts-in via the
     ``EARCRAWLER_API_ENABLE_RAG`` environment variable. Otherwise we return a stub to keep
     API startup + tests fast and network free.
     """

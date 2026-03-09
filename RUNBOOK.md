@@ -11,10 +11,12 @@
 2. Tag `vX.Y.Z` and push.
 3. Ensure signing secrets `SIGNING_CERT_PFX_BASE64` and `SIGNING_CERT_PASSWORD` are available when signing.
 4. Run `pwsh scripts/build-wheel.ps1`, `pwsh scripts/build-exe.ps1`, and `pwsh scripts/make-installer.ps1`.
-5. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
-6. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
-7. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
-8. Create a GitHub release and upload the wheel, EXE, installer, checksum, and SBOM files.
+5. Run clean-room wheel validation from outside the source checkout:
+   - `pwsh scripts/package-wheel-smoke.ps1 -WheelPath dist\earcrawler-*.whl`
+6. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
+7. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
+8. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
+9. Create a GitHub release and upload the wheel, EXE, installer, checksum, and SBOM files.
 
 Windows notes
 - Inno Setup (iscc.exe): install via winget if not present.
@@ -34,6 +36,7 @@ Windows notes
 ## Supported Runtime Surface
 - Supported operator/runtime entrypoints are `earctl` / `py -m earCrawler.cli ...` and the FastAPI facade at `service.api_server` (typically via `py -m earCrawler.cli api ...` or `py -m uvicorn service.api_server.server:app ...`).
 - Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
+- KG-backed runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded.
 
 ## Rollback
 1. Locate previous stable tag.
@@ -91,10 +94,18 @@ Windows notes
 - CLI helpers:
   - Required before every eval run: `py -m eval.validate_datasets` (or `python eval/validate_datasets.py`).
   - `py -m earCrawler.cli eval run-rag --dataset-id <id> --fallback-max-uses 0` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys.
+  - Add `--retrieval-mode hybrid` for experimental BM25+dense fusion runs, or `--compare-retrieval-modes` to emit dense-vs-hybrid comparison artifacts under the selected output directory.
   - Eval artifacts include strictness counters under `eval_strictness` (`fallbacks_used`, `fallback_counts`, `fallback_items`, threshold/breach flags). Runs fail when fallback count exceeds `fallback_max_uses`.
   - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.
 
 ### Eval/retrieval switches (set explicitly for reproducible agent runs)
+- `EARCRAWLER_RETRIEVAL_MODE=dense|hybrid`
+  - `dense` remains the default.
+  - `hybrid` enables experimental BM25+dense fusion over the existing retrieval metadata.
+  - Keep `hybrid` opt-in until the runtime gate in `docs/kg_quarantine_exit_gate.md` is explicitly passed and recorded.
+- `EARCRAWLER_RETRIEVAL_BACKEND=faiss|bruteforce`
+  - `faiss` uses the built index.
+  - `bruteforce` uses deterministic cosine search over cached corpus embeddings.
 - `EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL=1` forces deterministic unanswerable payloads when retrieval is empty/thin.
 - `EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL=0` keeps normal generation/strict JSON validation flow even when retrieval is empty.
 - Thin-retrieval thresholds (used only when refusal mode is on):
@@ -279,6 +290,11 @@ python -m earCrawler.cli kg-query --sparql "SELECT * WHERE { ?s ?p ?o } LIMIT 5"
 
 # Query (CONSTRUCT)
 python -m earCrawler.cli kg-query --form construct -q "CONSTRUCT WHERE { ?s ?p ?o } LIMIT 10" -o data\graph.nt
+```
+
+Text-backed search smoke (real Fuseki + API search route):
+```powershell
+pwsh kg/scripts/ci-text-search-smoke.ps1
 ```
 
 Stop the server with `Ctrl+C` in the console. For programmatic use, the

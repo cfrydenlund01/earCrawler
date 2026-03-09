@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .lineage import LineageEdge
 
@@ -13,6 +13,11 @@ class RagQueryRequest(BaseModel):
         ..., min_length=1, max_length=512, description="Natural language question"
     )
     top_k: int = Field(3, ge=1, le=10, description="Maximum candidate passages")
+    effective_date: Optional[str] = Field(
+        default=None,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Optional as-of date (YYYY-MM-DD) used for temporal applicability filtering.",
+    )
     include_lineage: bool = Field(
         False, description="Return KG lineage data when available"
     )
@@ -21,9 +26,18 @@ class RagQueryRequest(BaseModel):
         description="When false, run retrieval only and skip any remote LLM generation",
     )
 
+    @field_validator("effective_date")
+    @classmethod
+    def _validate_effective_date(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        date.fromisoformat(value)
+        return value
+
     def cache_key(self) -> str:
         lineage_flag = "1" if self.include_lineage else "0"
-        return f"{self.query.strip()}::{self.top_k}::{lineage_flag}"
+        effective_date = (self.effective_date or "").strip()
+        return f"{self.query.strip()}::{self.top_k}::{lineage_flag}::{effective_date}"
 
 
 class RagSource(BaseModel):

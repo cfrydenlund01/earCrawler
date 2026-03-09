@@ -17,6 +17,7 @@ def test_namespace_constants_are_canonical() -> None:
 def test_iri_builders_use_canonical_bases() -> None:
     assert section_iri("EAR-736.2(b)").startswith(RESOURCE_NS)
     assert paragraph_iri("a" * 64).startswith(RESOURCE_NS)
+    assert paragraph_iri("ear:EAR-001:0").endswith("ear%3AEAR-001%3A0")
 
 
 def test_legacy_iris_canonicalize_deterministically() -> None:
@@ -44,4 +45,3 @@ def test_emitters_do_not_emit_legacy_namespaces(tmp_path: Path) -> None:
         assert "ear.example.org" in text
         for legacy in LEGACY_NS_LIST:
             assert legacy not in text
-

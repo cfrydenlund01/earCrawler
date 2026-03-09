@@ -1,6 +1,22 @@
-param()
+param(
+  [string]$WheelPath = ""
+)
 
 $ErrorActionPreference = "Stop"
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+
+function Invoke-CheckedCommand {
+  param(
+    [Parameter(Mandatory = $true)][string]$Executable,
+    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Arguments
+  )
+
+  & $Executable @Arguments
+  if ($LASTEXITCODE -ne 0) {
+    $joined = $Arguments -join " "
+    throw "Command failed with exit code ${LASTEXITCODE}: $Executable $joined"
+  }
+}
 
 function Resolve-PythonInterpreter {
   if ($env:EARCTL_PYTHON -and (Test-Path $env:EARCTL_PYTHON)) {
@@ -23,12 +39,19 @@ function Resolve-PythonInterpreter {
 
 $python = Resolve-PythonInterpreter
 
-& $python -m pip install --disable-pip-version-check --upgrade build | Out-Null
-& $python -m build --wheel
-
-$wheel = Get-ChildItem dist -Filter "*.whl" |
-  Sort-Object LastWriteTime -Descending |
-  Select-Object -First 1
+if ($WheelPath) {
+  if (-not (Test-Path $WheelPath)) {
+    throw "Requested wheel does not exist: $WheelPath"
+  }
+  $wheel = Get-Item $WheelPath
+}
+else {
+  Invoke-CheckedCommand $python -m pip install --disable-pip-version-check --upgrade build
+  Invoke-CheckedCommand $python -m build --wheel
+  $wheel = Get-ChildItem dist -Filter "*.whl" |
+    Sort-Object LastWriteTime -Descending |
+    Select-Object -First 1
+}
 
 if (-not $wheel) {
   throw "Wheel build failed: no wheel found in dist/."
@@ -37,8 +60,11 @@ if (-not $wheel) {
 $smokeRoot = Join-Path $env:TEMP ("earcrawler-wheel-smoke-" + [guid]::NewGuid().ToString("N"))
 New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
 
+$savedUnsafeOverride = $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES
+$savedUser = $env:EARCTL_USER
+
 try {
-  & $python -m venv (Join-Path $smokeRoot ".venv")
+  Invoke-CheckedCommand $python -m venv (Join-Path $smokeRoot ".venv")
 
   $venvPython = Join-Path $smokeRoot ".venv\Scripts\python.exe"
   $venvScripts = Join-Path $smokeRoot ".venv\Scripts"
@@ -49,8 +75,8 @@ try {
     throw "Virtualenv bootstrap failed: python executable not found."
   }
 
-  & $venvPython -m pip install --disable-pip-version-check --upgrade pip | Out-Null
-  & $venvPython -m pip install --disable-pip-version-check $wheel.FullName
+  Invoke-CheckedCommand $venvPython -m pip install --disable-pip-version-check --upgrade pip
+  Invoke-CheckedCommand $venvPython -m pip install --disable-pip-version-check $wheel.FullName
 
   if (-not (Test-Path $earctl)) {
     throw "Packaging smoke failed: earctl entrypoint was not installed."
@@ -59,10 +85,79 @@ try {
     throw "Packaging smoke failed: kg-validate entrypoint was not installed."
   }
 
-  & $earctl --version
-  & $kgValidate --help | Out-Null
-  & $venvPython -m earCrawler.cli --version
+  $workspace = Join-Path $smokeRoot "workspace"
+  New-Item -ItemType Directory -Force -Path $workspace | Out-Null
+  Push-Location $workspace
+  try {
+    $resourceCheck = @"
+import importlib.resources as resources
+from pathlib import Path
+import earCrawler
+
+repo_root = Path(r"$repoRoot").resolve()
+module_path = Path(earCrawler.__file__).resolve()
+if str(module_path).lower().startswith(str(repo_root).lower()):
+    raise SystemExit(f"clean-room smoke failed: imported earCrawler from source checkout ({module_path})")
+
+required = [
+    ("earCrawler.kg", "shapes.ttl"),
+    ("earCrawler.kg", "shapes_prov.ttl"),
+    ("earCrawler.sparql", "prefixes.sparql"),
+    ("service", "openapi/openapi.yaml"),
+    ("service", "templates/registry.json"),
+    ("service", "config/observability.yml"),
+]
+for package, relative_path in required:
+    candidate = resources.files(package).joinpath(relative_path)
+    if not candidate.is_file():
+        raise SystemExit(f"packaged resource missing: {package}:{relative_path}")
+    if not candidate.read_bytes():
+        raise SystemExit(f"packaged resource is empty: {package}:{relative_path}")
+"@
+    Invoke-CheckedCommand $venvPython -c $resourceCheck
+
+    $seedCorpus = @"
+from pathlib import Path
+import hashlib
+import json
+
+text = "Smoke corpus paragraph for clean-room packaging validation."
+digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+record = {
+    "source": "ear",
+    "id": "ear:SMOKE-001:0",
+    "record_id": "ear:SMOKE-001:0",
+    "identifier": "SMOKE-001:0",
+    "sha256": digest,
+    "content_sha256": digest,
+    "paragraph": text,
+    "text": text,
+    "source_url": "https://example.test/smoke",
+    "date": "2026-01-01",
+    "provider": "example.test",
+    "identifiers": ["SMOKE-001:0"],
+}
+data_dir = Path("data")
+data_dir.mkdir(parents=True, exist_ok=True)
+(data_dir / "ear_corpus.jsonl").write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
+"@
+    Invoke-CheckedCommand $venvPython -c $seedCorpus
+
+    $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = "1"
+    $env:EARCTL_USER = "test_operator"
+
+    Invoke-CheckedCommand $earctl --version
+    Invoke-CheckedCommand $venvPython -m earCrawler.cli --version
+    Invoke-CheckedCommand $kgValidate --help
+    Invoke-CheckedCommand $earctl corpus validate --dir data
+    Invoke-CheckedCommand $venvPython -m earCrawler.cli corpus validate --dir data
+  }
+  finally {
+    Pop-Location
+  }
 }
 finally {
+  $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = $savedUnsafeOverride
+  $env:EARCTL_USER = $savedUser
   Remove-Item -Recurse -Force $smokeRoot -ErrorAction SilentlyContinue
 }

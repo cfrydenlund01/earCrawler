@@ -3,6 +3,7 @@ from __future__ import annotations
 """Schema + validators for the retrieval corpus contract (retrieval-corpus.v1)."""
 
 import re
+from datetime import date
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
@@ -39,6 +40,10 @@ OPTIONAL_FIELDS: tuple[str, ...] = (
     "ordinal",
     "tokens_estimate",
     "hash",
+    "snapshot_date",
+    "effective_date",
+    "effective_from",
+    "effective_to",
 )
 
 
@@ -119,6 +124,16 @@ def _is_non_empty_string(value: object) -> bool:
 
 def _is_int_like(value: object) -> bool:
     return isinstance(value, int) and not isinstance(value, bool)
+
+
+def _is_iso_date(value: object) -> bool:
+    if not isinstance(value, str) or not value.strip():
+        return False
+    try:
+        date.fromisoformat(value.strip())
+    except ValueError:
+        return False
+    return True
 
 
 def validate_corpus_documents(docs: Sequence[Mapping[str, object]]) -> list[Issue]:
@@ -345,6 +360,41 @@ def validate_corpus_documents(docs: Sequence[Mapping[str, object]]) -> list[Issu
                     str(doc.get("doc_id") or ""),
                 )
             )
+
+        for temporal_field in ("snapshot_date", "effective_date", "effective_from", "effective_to"):
+            temporal_value = doc.get(temporal_field)
+            if temporal_value is not None and not _is_iso_date(temporal_value):
+                issues.append(
+                    Issue(
+                        "invalid_temporal_date",
+                        f"{temporal_field} must be an ISO date when provided",
+                        idx,
+                        str(doc.get("doc_id") or ""),
+                    )
+                )
+
+        effective_date = doc.get("effective_date")
+        effective_from = doc.get("effective_from")
+        effective_to = doc.get("effective_to")
+        if effective_date is not None and effective_from is not None and str(effective_date) != str(effective_from):
+            issues.append(
+                Issue(
+                    "invalid_temporal_window",
+                    "effective_date must match effective_from when both are provided",
+                    idx,
+                    str(doc.get("doc_id") or ""),
+                )
+            )
+        if _is_iso_date(effective_from) and _is_iso_date(effective_to):
+            if date.fromisoformat(str(effective_from)) > date.fromisoformat(str(effective_to)):
+                issues.append(
+                    Issue(
+                        "invalid_temporal_window",
+                        "effective_from must be <= effective_to",
+                        idx,
+                        str(doc.get("doc_id") or ""),
+                    )
+                )
 
     # Duplicate doc_id detection
     seen: dict[str, int] = {}

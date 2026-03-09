@@ -75,7 +75,9 @@ def load_corpus_index(path: Path) -> dict[str, list[Mapping[str, object]]]:
     for key in list(index.keys()):
         index[key] = sorted(
             index[key],
-            key=lambda rec: str(rec.get("id") or rec.get("title") or rec.get("section") or ""),
+            key=lambda rec: str(
+                rec.get("record_id") or rec.get("id") or rec.get("title") or rec.get("section") or ""
+            ),
         )
     return index
 
@@ -88,7 +90,7 @@ def _preview(record: Mapping[str, object]) -> CorpusRecordPreview:
             text_raw = str(record.get(key) or "")
             break
     return CorpusRecordPreview(
-        record_id=str(record.get("id") or record.get("section") or ""),
+        record_id=str(record.get("record_id") or record.get("id") or record.get("section") or ""),
         source_url=str(record.get("source_url") or record.get("source") or ""),
         text_preview=preview,
         text_length=len(text_raw),

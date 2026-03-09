@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from earCrawler.corpus import build_corpus, validate_corpus, snapshot_corpus
+from earCrawler.corpus.identity import build_record_id
 
 
 def _read_jsonl(path: Path) -> list[dict]:
@@ -25,7 +26,7 @@ def test_build_corpus_with_fixtures(tmp_path: Path) -> None:
     assert (data_dir / "manifest.json").exists()
     assert (data_dir / "checksums.sha256").exists()
     assert manifest["summary"]["ear"] == 4
-    assert manifest["summary"]["nsf"] == 1
+    assert manifest["summary"]["nsf"] == 2
 
     ear_records = _read_jsonl(data_dir / "ear_corpus.jsonl")
     nsf_records = _read_jsonl(data_dir / "nsf_corpus.jsonl")
@@ -33,9 +34,18 @@ def test_build_corpus_with_fixtures(tmp_path: Path) -> None:
         "[redacted]" in rec["paragraph"] for rec in ear_records
     ), "PII should be redacted"
     assert all("example.com?q" not in rec["paragraph"] for rec in ear_records)
-    assert (
-        len(nsf_records) == 1
-    ), "duplicate NSF paragraph should be removed after dedupe"
+    shared_text = (
+        "John Smith of the University of Testing falsified data in grant "
+        "R01-ABC123 leading to sanctions."
+    )
+    ear_shared = [rec for rec in ear_records if rec["paragraph"] == shared_text]
+    nsf_shared = [rec for rec in nsf_records if rec["paragraph"] == shared_text]
+    assert len(ear_shared) == 1
+    assert len(nsf_shared) == 1
+    assert ear_shared[0]["content_sha256"] == nsf_shared[0]["content_sha256"]
+    assert ear_shared[0]["id"] != nsf_shared[0]["id"]
+    assert ear_shared[0]["id"] == build_record_id("ear", "EAR-001:0")
+    assert nsf_shared[0]["id"] == build_record_id("nsf", "NSF-001:0")
 
     first_run = (data_dir / "ear_corpus.jsonl").read_text(encoding="utf-8")
     second_manifest = build_corpus(

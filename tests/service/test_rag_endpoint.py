@@ -248,6 +248,90 @@ def test_llm_endpoint_retrieval_only_skips_generation(monkeypatch):
     assert data["egress"]["disabled_reason"] == "generation_disabled_by_request"
 
 
+def test_rag_query_filters_results_by_effective_date():
+    class _TemporalRetriever(_StubRetriever):
+        def query(self, prompt: str, k: int = 5) -> list[dict]:
+            self.calls.append((prompt, k))
+            return [
+                {
+                    "id": "urn:entity:future",
+                    "text": "Future rule text.",
+                    "score": 0.95,
+                    "source_url": "https://example.org/doc/future",
+                    "section": "734.3",
+                    "snapshot_date": "2025-01-01",
+                    "provider": "federalregister.gov",
+                },
+                {
+                    "id": "urn:entity:current",
+                    "text": "Rule applicable in 2024.",
+                    "score": 0.90,
+                    "source_url": "https://example.org/doc/current",
+                    "section": "734.3",
+                    "snapshot_date": "2024-01-01",
+                    "provider": "federalregister.gov",
+                },
+            ]
+
+    retriever = _TemporalRetriever()
+    client = _app(retriever)
+
+    resp = client.post(
+        "/v1/rag/query",
+        json={"query": "export controls", "effective_date": "2024-06-01", "top_k": 1},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["retrieval_empty"] is False
+    assert data["results"][0]["content"] == "Rule applicable in 2024."
+    assert retriever.calls[0][1] >= 12
+
+
+def test_llm_endpoint_refuses_when_temporal_evidence_is_not_applicable(monkeypatch):
+    class _TemporalRetriever(_StubRetriever):
+        def query(self, prompt: str, k: int = 5) -> list[dict]:
+            self.calls.append((prompt, k))
+            return [
+                {
+                    "id": "urn:entity:future",
+                    "text": "Future-only rule text.",
+                    "score": 0.95,
+                    "source_url": "https://example.org/doc/future",
+                    "section": "734.3",
+                    "snapshot_date": "2025-01-01",
+                    "provider": "federalregister.gov",
+                }
+            ]
+
+    retriever = _TemporalRetriever()
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+
+    called = {"value": False}
+
+    def _fail(_messages, *a, **k):
+        called["value"] = True
+        raise AssertionError("generate_chat should not run for temporal refusal")
+
+    monkeypatch.setattr(rag_router, "generate_chat", _fail)
+
+    resp = client.post(
+        "/v1/rag/answer",
+        json={"query": "export controls", "effective_date": "2024-06-01"},
+    )
+
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["label"] == "unanswerable"
+    assert data["disabled_reason"] == "no_temporally_applicable_evidence"
+    assert data["retrieval_empty"] is True
+    assert data["retrieval_empty_reason"] == "no_temporally_applicable_evidence"
+    assert data["output_ok"] is True
+    assert called["value"] is False
+
+
 def test_warmup_skips_when_retriever_unavailable(monkeypatch):
     monkeypatch.setenv("EARCRAWLER_WARM_RETRIEVER", "1")
     monkeypatch.setenv("EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS", "1")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Thin RAG pipeline wrapper that reuses the existing FAISS retriever and LLM client."""
+"""Thin RAG pipeline wrapper around the configured dense or hybrid retriever."""
 
 import json
 import re
@@ -28,6 +28,11 @@ from earCrawler.rag.output_schema import (
     OutputSchemaError,
     make_unanswerable_payload,
     validate_and_extract_strict_answer,
+)
+from earCrawler.rag.temporal import (
+    resolve_temporal_request,
+    select_temporal_documents,
+    temporal_candidate_count,
 )
 from earCrawler.security.data_egress import (
     build_data_egress_decision,
@@ -174,6 +179,11 @@ def _summarize_retrieved_doc(doc: Mapping[str, object], *, source: str = "retrie
         "title": title,
         "score": doc.get("score"),
         "source": source,
+        "snapshot_date": doc.get("snapshot_date") or _first(["snapshot_date"]),
+        "effective_from": doc.get("effective_from") or _first(["effective_from", "effective_date"]),
+        "effective_to": doc.get("effective_to") or _first(["effective_to", "expires_on", "superseded_on"]),
+        "temporal_status": doc.get("temporal_status"),
+        "temporal_reason": doc.get("temporal_reason"),
     }
 
 
@@ -184,10 +194,21 @@ def retrieve_regulation_context(
     retriever: object | None = None,
     strict: bool = True,
     warnings: list[dict[str, object]] | None = None,
+    effective_date: str | None = None,
+    temporal_state: dict[str, object] | None = None,
 ) -> list[dict]:
-    """Return top-k regulation snippets using the existing FAISS-backed retriever."""
+    """Return top-k regulation snippets using the configured dense/hybrid retriever."""
 
     warning_list = warnings if warnings is not None else []
+    temporal_request = resolve_temporal_request(query, effective_date=effective_date)
+    if temporal_request.refusal_reason:
+        if temporal_state is not None:
+            temporal_state.clear()
+            temporal_state.update(
+                select_temporal_documents([], request=temporal_request, top_k=top_k).to_dict()
+            )
+        return []
+
     try:
         from earCrawler.rag.retriever import RetrieverError
     except Exception:
@@ -213,7 +234,8 @@ def retrieve_regulation_context(
     if r is None:
         return []
     try:
-        docs = r.query(query, k=top_k)
+        query_k = temporal_candidate_count(top_k) if temporal_request.requested else top_k
+        docs = r.query(query, k=query_k)
     except RetrieverError as exc:
         _logger.error(
             "rag.retrieval.failed", details={"retriever_error": _warn_from_exc(exc)}
@@ -228,6 +250,11 @@ def retrieve_regulation_context(
             raise
         warning_list.append(_warn_from_exc(exc))
         return []
+    selection = select_temporal_documents(docs, request=temporal_request, top_k=top_k)
+    if temporal_state is not None:
+        temporal_state.clear()
+        temporal_state.update(selection.to_dict())
+    docs = list(selection.selected_docs)
     results: list[dict] = []
     for doc in docs:
         text = _extract_text(doc)
@@ -247,6 +274,11 @@ def retrieve_regulation_context(
                 "text": text,
                 "score": doc.get("score"),
                 "raw": doc,
+                "snapshot_date": doc.get("snapshot_date"),
+                "effective_from": doc.get("effective_from"),
+                "effective_to": doc.get("effective_to"),
+                "temporal_status": doc.get("temporal_status"),
+                "temporal_reason": doc.get("temporal_reason"),
             }
         )
     return results
@@ -578,12 +610,53 @@ def expand_with_kg(
         raise
 
 
+def _temporal_refusal_payload(decision: Mapping[str, object]) -> dict[str, object]:
+    reason = str(decision.get("refusal_reason") or "").strip()
+    effective_date = str(decision.get("effective_date") or "").strip()
+    if reason == "conflicting_effective_dates":
+        return make_unanswerable_payload(
+            hint="one effective date for the question (the request parameter and question text disagree)",
+            justification="The request supplied conflicting temporal anchors, so the answer cannot be grounded to one regulatory date.",
+            evidence_reasons=["conflicting_effective_dates"],
+        )
+    if reason == "multiple_dates_in_question":
+        return make_unanswerable_payload(
+            hint="one effective date for the question instead of multiple dates",
+            justification="The question contains multiple effective dates and the runtime refuses to guess which date governs applicability.",
+            evidence_reasons=["multiple_dates_in_question"],
+        )
+    if reason == "temporal_evidence_ambiguous":
+        hint = "regulatory text with explicit effective dates"
+        if effective_date:
+            hint = f"regulatory text with explicit effective dates applicable on {effective_date}"
+        return make_unanswerable_payload(
+            hint=hint,
+            justification="Retrieved evidence does not establish which version is applicable on the requested date.",
+            evidence_reasons=["temporal_evidence_ambiguous"],
+        )
+    hint = "regulatory text applicable on the requested effective date"
+    if effective_date:
+        hint = f"regulatory text applicable on {effective_date}"
+    return make_unanswerable_payload(
+        hint=hint,
+        justification="No retrieved evidence was applicable on the requested effective date.",
+        evidence_reasons=["no_temporally_applicable_evidence"],
+    )
+
+
 def _build_prompt(
     question: str,
     contexts: List[str],
     *,
     label_schema: str | None = None,
+    effective_date: str | None = None,
 ) -> list[dict]:
+    temporal_instruction = ""
+    if effective_date:
+        temporal_instruction = (
+            f"Temporal scope: answer only from evidence applicable on {effective_date}. "
+            "If the dated evidence does not support a grounded answer, respond with label=unanswerable.\n\n"
+        )
     if label_schema == "truthiness":
         allowed_labels = "true, false, unanswerable"
         system = (
@@ -591,6 +664,7 @@ def _build_prompt(
             "Answer ONLY using the provided regulation excerpts and knowledge-graph context. "
             "Cite EAR section IDs when possible. If the answer is not determinable from the "
             "provided text, say so explicitly.\n\n"
+            f"{temporal_instruction}"
             "Truthiness labeling (MUST match exactly):\n"
             f"- Allowed labels: {allowed_labels}\n"
             "- Definitions:\n"
@@ -633,6 +707,7 @@ def _build_prompt(
         "Answer ONLY using the provided regulation excerpts and knowledge-graph context. "
         "Cite EAR section IDs when possible. If the answer is not determinable from the "
         "provided text, say so explicitly.\n\n"
+        f"{temporal_instruction}"
         "Label taxonomy (MUST match exactly):\n"
         f"- Allowed labels: {allowed_labels}\n"
         "- Definitions:\n"
@@ -727,6 +802,7 @@ def answer_with_rag(
     strict_retrieval: bool = True,
     strict_output: bool = True,
     generate: bool = True,
+    effective_date: str | None = None,
     trace_id: str | None = None,
     run_id: str | None = None,
 ) -> dict:
@@ -743,6 +819,7 @@ def answer_with_rag(
     retriever_ready = bool(getattr(retriever, "ready", True)) if retriever is not None else True
 
     retrieval_warnings: list[dict[str, object]] = []
+    temporal_state: dict[str, object] = {}
     retrieve_start = time.perf_counter()
     docs = retrieve_regulation_context(
         question,
@@ -750,6 +827,8 @@ def answer_with_rag(
         retriever=retriever,
         strict=strict_retrieval,
         warnings=retrieval_warnings,
+        effective_date=effective_date,
+        temporal_state=temporal_state,
     )
     t_retrieve_ms = round((time.perf_counter() - retrieve_start) * 1000.0, 3)
     if retrieval_warnings:
@@ -766,6 +845,12 @@ def answer_with_rag(
         if retrieval_empty
         else None
     )
+    temporal_requested = bool(temporal_state.get("requested"))
+    temporal_effective_date = str(temporal_state.get("effective_date") or "").strip() or None
+    temporal_refusal_reason = str(temporal_state.get("refusal_reason") or "").strip() or None
+    temporal_should_refuse = bool(temporal_state.get("should_refuse"))
+    if retrieval_empty and temporal_refusal_reason:
+        retrieval_empty_reason = temporal_refusal_reason
     section_ids = [d["section_id"] for d in docs if d.get("section_id")]
     kg_mode = _kg_expansion_mode()
     kg_expansion_enabled = _should_run_kg_expansion(task=task, explicit=kg_expansion)
@@ -791,8 +876,18 @@ def answer_with_rag(
         if not text:
             continue
         section_id = d.get("section_id")
+        temporal_parts: list[str] = []
+        if d.get("snapshot_date"):
+            temporal_parts.append(f"snapshot={d['snapshot_date']}")
+        if d.get("effective_from"):
+            temporal_parts.append(f"from={d['effective_from']}")
+        if d.get("effective_to"):
+            temporal_parts.append(f"to={d['effective_to']}")
         if section_id:
-            contexts.append(f"[{section_id}] {text}")
+            header = section_id
+            if temporal_parts:
+                header = f"{header} | {'; '.join(temporal_parts)}"
+            contexts.append(f"[{header}] {text}")
         else:
             contexts.append(text)
     for snippet in kg_expansion:
@@ -848,7 +943,12 @@ def answer_with_rag(
     if generate:
         prompt_start = time.perf_counter()
         redacted_contexts = redact_contexts(contexts, mode=redaction_mode)
-        prompt = _build_prompt(redacted_question, redacted_contexts, label_schema=label_schema)
+        prompt = _build_prompt(
+            redacted_question,
+            redacted_contexts,
+            label_schema=label_schema,
+            effective_date=temporal_effective_date,
+        )
         t_prompt_ms = round((time.perf_counter() - prompt_start) * 1000.0, 3)
 
         allowed_labels = (
@@ -860,7 +960,9 @@ def answer_with_rag(
         min_total_chars = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS", default=0, min_value=0)
 
         thin_retrieval = False
-        if refuse_on_thin:
+        if temporal_should_refuse:
+            thin_retrieval = True
+        elif refuse_on_thin:
             thin_retrieval = retrieval_empty
             if not thin_retrieval:
                 if len(docs) < min_docs:
@@ -871,7 +973,7 @@ def answer_with_rag(
                     thin_retrieval = True
 
         if thin_retrieval:
-            disabled_reason = "insufficient_evidence"
+            disabled_reason = temporal_refusal_reason or "insufficient_evidence"
             llm_enabled = False
             egress_decision = build_data_egress_decision(
                 remote_enabled=False,
@@ -886,11 +988,14 @@ def answer_with_rag(
             )
             _logger.info("llm.egress_decision", **egress_decision.to_dict())
 
-            refusal = make_unanswerable_payload(
-                hint="the relevant EAR section excerpt(s) for this scenario (for example: ECCN, destination, end user/end use)",
-                justification="Retrieval evidence was empty or too thin to ground a compliant answer.",
-                evidence_reasons=["thin_or_empty_retrieval"],
-            )
+            if temporal_should_refuse:
+                refusal = _temporal_refusal_payload(temporal_state)
+            else:
+                refusal = make_unanswerable_payload(
+                    hint="the relevant EAR section excerpt(s) for this scenario (for example: ECCN, destination, end user/end use)",
+                    justification="Retrieval evidence was empty or too thin to ground a compliant answer.",
+                    evidence_reasons=["thin_or_empty_retrieval"],
+                )
             rendered = json.dumps(refusal, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
             validated = validate_and_extract_strict_answer(
                 rendered,
@@ -1086,6 +1191,9 @@ def answer_with_rag(
         "retrieval_empty_reason": retrieval_empty_reason,
         "output_ok": output_ok,
         "output_error": output_error,
+        "temporal_requested": temporal_requested,
+        "effective_date": temporal_effective_date,
+        "temporal_decision": temporal_state or None,
         "timings": {
             "t_total_ms": t_total_ms,
             "t_retrieve_ms": t_retrieve_ms,

@@ -112,6 +112,7 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
         llm_provider,
         llm_model,
         top_k,
+        retrieval_mode,
         max_items,
         out_json,
         out_md,
@@ -129,6 +130,7 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
                 "provider": llm_provider,
                 "model": llm_model,
                 "top_k": top_k,
+                "retrieval_mode": retrieval_mode,
                 "semantic": semantic,
                 "max_items": max_items,
                 "answer_score_mode": answer_score_mode,
@@ -165,12 +167,89 @@ def test_run_rag_cli_invokes_evaluator(monkeypatch, tmp_path: Path) -> None:
     assert calls
     assert calls[0]["dataset_id"] == "ds1"
     assert calls[0]["top_k"] == 2
+    assert calls[0]["retrieval_mode"] is None
     assert calls[0]["semantic"] is True
     assert calls[0]["answer_score_mode"] == "semantic"
     assert calls[0]["semantic_threshold"] == 0.6
     assert calls[0]["manifest"] == manifest_path
     assert calls[0]["fallback_max_uses"] == 0
     assert (out_dir / "ds1.rag.groq.llama-3.3-70b-versatile.json").exists()
+
+
+def test_run_rag_cli_can_compare_retrieval_modes(monkeypatch, tmp_path: Path) -> None:
+    dataset_path = tmp_path / "dataset.jsonl"
+    _write_jsonl(
+        dataset_path,
+        [
+            _valid_eval_item(
+                item_id="q1",
+                question="?",
+            )
+        ],
+    )
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(
+        json.dumps({"datasets": [{"id": "ds1", "file": str(dataset_path)}]}), encoding="utf-8"
+    )
+
+    calls: list[dict] = []
+    from scripts.eval import eval_rag_llm
+
+    def fake_compare(
+        dataset_id,
+        *,
+        manifest_path,
+        llm_provider,
+        llm_model,
+        top_k,
+        max_items,
+        answer_score_mode,
+        semantic_threshold,
+        semantic,
+        ablation,
+        kg_expansion,
+        multihop_only,
+        emit_hitl_template,
+        trace_pack_required_threshold,
+        fallback_max_uses,
+        out_root,
+        run_id,
+    ):
+        calls.append(
+            {
+                "dataset_id": dataset_id,
+                "top_k": top_k,
+                "out_root": Path(out_root),
+                "run_id": run_id,
+            }
+        )
+        path = Path(out_root) / run_id / "retrieval_compare.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{}", encoding="utf-8")
+        return path
+
+    monkeypatch.setattr(eval_rag_llm, "compare_retrieval_modes", fake_compare)
+
+    runner = CliRunner()
+    out_dir = tmp_path / "out"
+    result = runner.invoke(
+        cli,
+        [
+            "eval",
+            "run-rag",
+            "--manifest",
+            str(manifest_path),
+            "--compare-retrieval-modes",
+            "--out-dir",
+            str(out_dir),
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert calls
+    assert calls[0]["dataset_id"] == "ds1"
+    assert calls[0]["out_root"] == out_dir / "retrieval_compare"
+    assert "retrieval_compare.json" in result.output
 
 
 def test_run_rag_cli_fails_on_dataset_schema_error(tmp_path: Path) -> None:

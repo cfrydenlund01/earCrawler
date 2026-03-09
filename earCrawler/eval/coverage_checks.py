@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+from contextlib import contextmanager
 from pathlib import Path
 from statistics import median
 from typing import Callable, Iterable, Mapping, Sequence
@@ -252,6 +254,25 @@ def render_fr_coverage_blocker_note(
     return "\n".join(lines)
 
 
+@contextmanager
+def _temporary_env(overrides: Mapping[str, str | None]):
+    previous: dict[str, str | None] = {}
+    for key, value in overrides.items():
+        previous[key] = os.environ.get(key)
+        if value is None:
+            os.environ.pop(key, None)
+        else:
+            os.environ[key] = str(value)
+    try:
+        yield
+    finally:
+        for key, prior in previous.items():
+            if prior is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = prior
+
+
 def build_fr_coverage_report(
     *,
     manifest: Path,
@@ -260,16 +281,17 @@ def build_fr_coverage_report(
     only_v2: bool = False,
     dataset_id_pattern: str | None = None,
     retrieval_k: int = 10,
+    retrieval_mode: str | None = None,
     max_items: int | None = None,
     retrieve_context: Callable[[str, int], Sequence[Mapping[str, object]]] | None = None,
     top_missing_sections: int = 10,
 ) -> dict[str, object]:
-    """Build a report that checks FR section coverage + FAISS retrievability.
+    """Build a report that checks FR section coverage + retrievability.
 
     Intended behavior
     - Enumerate expected EAR sections from each dataset item (ear_sections + evidence.doc_spans).
     - Verify each expected section exists in the FR corpus (data/fr_sections.jsonl).
-    - Query the FAISS retriever with the question and record the rank (1-based) of each expected section.
+        - Query the configured retriever with the question and record the rank (1-based) of each expected section.
     """
 
     manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
@@ -297,10 +319,14 @@ def build_fr_coverage_report(
         from earCrawler.rag.retriever import describe_retriever_config
 
         try:
-            retriever_obj = _ensure_retriever()
+            if retrieval_mode is None:
+                retriever_obj = _ensure_retriever()
+            else:
+                with _temporary_env({"EARCRAWLER_RETRIEVAL_MODE": retrieval_mode}):
+                    retriever_obj = _ensure_retriever()
         except Exception as exc:
             raise RuntimeError(
-                "FAISS retriever unavailable (failed to initialize). Fix by building an offline index and/or "
+                "Retriever unavailable (failed to initialize). Fix by building an offline index and/or "
                 "setting env vars:\n"
                 "- Build corpus: `python -m earCrawler.cli rag_index build-corpus --snapshot <ecfr_snapshot.jsonl> --out data/faiss/retrieval_corpus.jsonl`\n"
                 "- Build index: `python -m earCrawler.cli rag_index build --input data/faiss/retrieval_corpus.jsonl --index-path data/faiss/index.faiss`\n"
@@ -310,7 +336,7 @@ def build_fr_coverage_report(
             ) from exc
         if retriever_obj is None:
             raise RuntimeError(
-                "FAISS retriever unavailable. Fix by building an offline index and/or setting env vars:\n"
+                "Retriever unavailable. Fix by building an offline index and/or setting env vars:\n"
                 "- Build corpus: `python -m earCrawler.cli rag_index build-corpus --snapshot <ecfr_snapshot.jsonl> --out data/faiss/retrieval_corpus.jsonl`\n"
                 "- Build index: `python -m earCrawler.cli rag_index build --input data/faiss/retrieval_corpus.jsonl --index-path data/faiss/index.faiss`\n"
                 "- Optional overrides: EARCRAWLER_FAISS_INDEX, EARCRAWLER_FAISS_MODEL"

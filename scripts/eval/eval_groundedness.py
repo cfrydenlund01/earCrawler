@@ -59,6 +59,8 @@ def evaluate_groundedness(
         question = item.get("question", "")
         task = str(item.get("task") or "").strip() or None
         ear_sections = item.get("ear_sections") or []
+        temporal = item.get("temporal") if isinstance(item.get("temporal"), dict) else {}
+        effective_date = str(temporal.get("effective_date") or "").strip() or None
         try:
             rag_result = answer_with_rag(
                 question,
@@ -67,6 +69,7 @@ def evaluate_groundedness(
                 model=llm_model,
                 top_k=5,
                 strict_retrieval=False,
+                effective_date=effective_date,
             )
             used_sections = rag_result.get("used_sections") or []
             grounded = bool(set(ear_sections) & set(used_sections))

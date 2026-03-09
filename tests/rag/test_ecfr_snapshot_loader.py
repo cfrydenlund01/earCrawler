@@ -19,6 +19,31 @@ def test_snapshot_loader_returns_valid_sorted_docs() -> None:
     require_valid_corpus(docs)  # should not raise
 
 
+def test_snapshot_loader_preserves_temporal_fields(tmp_path: Path) -> None:
+    snapshot_path = tmp_path / "temporal.jsonl"
+    snapshot_path.write_text(
+        (
+            '{"doc_id":"EAR-736.2#v2024-01-01",'
+            '"section_id":"736.2",'
+            '"heading":"General prohibitions",'
+            '"text":"Temporal text.",'
+            '"source_ref":"ecfr:2024-01-01:title15",'
+            '"effective_from":"2024-01-01",'
+            '"effective_to":"2024-12-31"}\n'
+        ),
+        encoding="utf-8",
+    )
+
+    docs = load_ecfr_snapshot(snapshot_path)
+
+    assert docs[0]["doc_id"] == "EAR-736.2#v2024-01-01"
+    assert docs[0]["section_id"] == "EAR-736.2"
+    assert docs[0]["snapshot_date"] == "2024-01-01"
+    assert docs[0]["effective_from"] == "2024-01-01"
+    assert docs[0]["effective_to"] == "2024-12-31"
+    require_valid_corpus(docs)
+
+
 def test_chunking_emits_section_and_subsections() -> None:
     docs = load_ecfr_snapshot(FIXTURE)
     section = docs[0]

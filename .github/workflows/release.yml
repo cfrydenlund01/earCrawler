@@ -20,6 +20,16 @@ jobs:
       - name: Build wheel
         shell: pwsh
         run: scripts/build-wheel.ps1
+      - name: Clean-room wheel smoke
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem dist -Filter "*.whl" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $wheel) {
+            throw "No wheel built under dist/."
+          }
+          scripts/package-wheel-smoke.ps1 -WheelPath $wheel.FullName
       - name: Build exe
         shell: pwsh
         run: scripts/build-exe.ps1

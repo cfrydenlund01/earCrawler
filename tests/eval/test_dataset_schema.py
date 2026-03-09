@@ -119,3 +119,91 @@ def test_validate_datasets_reports_schema_error_with_record_context(tmp_path: Pa
     assert issue.line == 1
     assert issue.instance_path == ""
     assert "'ground_truth' is a required property" in issue.message
+
+
+def test_validate_datasets_accepts_temporal_effective_date(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    dataset_path = tmp_path / "temporal.jsonl"
+    schema_path = Path("eval") / "schema.json"
+    manifest = {
+        "kg_state": {"manifest_path": "kg/.kgstate/manifest.json", "digest": "abc"},
+        "datasets": [
+            {
+                "id": "temporal.v1",
+                "task": "test_task",
+                "file": str(dataset_path),
+                "version": 1,
+                "description": "",
+                "num_items": 1,
+            }
+        ],
+        "references": {
+            "sections": {},
+            "kg_nodes": [],
+            "kg_paths": [],
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    dataset_item = {
+        "id": "item1",
+        "task": "test_task",
+        "question": "Q?",
+        "ground_truth": {"answer_text": "A", "label": "label"},
+        "ear_sections": [],
+        "kg_entities": [],
+        "evidence": {"doc_spans": [], "kg_nodes": []},
+        "temporal": {"effective_date": "2024-01-01"},
+    }
+    dataset_path.write_text(json.dumps(dataset_item) + "\n", encoding="utf-8")
+
+    issues = validate_datasets(
+        manifest_path=manifest_path,
+        schema_path=schema_path,
+        dataset_ids=None,
+    )
+
+    assert issues == []
+
+
+def test_validate_datasets_flags_invalid_temporal_effective_date(tmp_path: Path) -> None:
+    manifest_path = tmp_path / "manifest.json"
+    dataset_path = tmp_path / "temporal_bad.jsonl"
+    schema_path = Path("eval") / "schema.json"
+    manifest = {
+        "kg_state": {"manifest_path": "kg/.kgstate/manifest.json", "digest": "abc"},
+        "datasets": [
+            {
+                "id": "temporal.bad.v1",
+                "task": "test_task",
+                "file": str(dataset_path),
+                "version": 1,
+                "description": "",
+                "num_items": 1,
+            }
+        ],
+        "references": {
+            "sections": {},
+            "kg_nodes": [],
+            "kg_paths": [],
+        },
+    }
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+    dataset_item = {
+        "id": "item1",
+        "task": "test_task",
+        "question": "Q?",
+        "ground_truth": {"answer_text": "A", "label": "label"},
+        "ear_sections": [],
+        "kg_entities": [],
+        "evidence": {"doc_spans": [], "kg_nodes": []},
+        "temporal": {"effective_date": "2024/01/01"},
+    }
+    dataset_path.write_text(json.dumps(dataset_item) + "\n", encoding="utf-8")
+
+    issues = validate_datasets(
+        manifest_path=manifest_path,
+        schema_path=schema_path,
+        dataset_ids=None,
+    )
+
+    assert any(issue.instance_path == "temporal/effective_date" for issue in issues)

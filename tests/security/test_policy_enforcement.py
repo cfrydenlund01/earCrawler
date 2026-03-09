@@ -58,3 +58,34 @@ def test_policy_path_env_override_requires_explicit_opt_in(monkeypatch, tmp_path
     monkeypatch.setenv("EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES", "1")
     unsafe = policy.load_policy()
     assert "sentinel" in unsafe.commands
+
+
+def test_load_policy_falls_back_to_packaged_default(monkeypatch, tmp_path: Path) -> None:
+    packaged_policy = tmp_path / "default_policy.yml"
+    packaged_policy.write_text(
+        "roles:\n"
+        "  reader: ['diagnose']\n"
+        "commands:\n"
+        "  diagnose: ['reader']\n"
+        "overrides:\n"
+        "  default:\n"
+        "    roles: ['reader']\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(policy, "REPO_POLICY_PATH", tmp_path / "missing-policy.yml")
+    monkeypatch.setattr(policy, "PACKAGED_POLICY_PATH", packaged_policy)
+    monkeypatch.delenv("EARCTL_POLICY_PATH", raising=False)
+    monkeypatch.delenv("EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES", raising=False)
+
+    loaded = policy.load_policy()
+    assert loaded.required_roles_for("diagnose") == ["reader"]
+
+
+def test_packaged_default_policy_matches_repo_policy() -> None:
+    repo_policy = Path(__file__).resolve().parents[2] / "security" / "policy.yml"
+    packaged_policy = Path(policy.__file__).resolve().with_name("default_policy.yml")
+
+    assert repo_policy.read_text(encoding="utf-8") == packaged_policy.read_text(
+        encoding="utf-8"
+    )
