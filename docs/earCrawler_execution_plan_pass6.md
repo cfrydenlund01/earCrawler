@@ -54,7 +54,7 @@ _Source basis:_ This plan is derived from the uploaded **Run Pass 6** analysis a
 
 ### Task 1.2 — Rename or relocate the sample TTL pipeline
 **Goal:** Stop the sample TTL generator from being mistaken for the real corpus→KG validation path.  
-**Why now:** The analysis marks this as the top technical risk because green CI can hide regression in the real supported path. fileciteturn1file0
+**Why now:** The analysis marks this as the top technical risk because green CI can hide regression in the real supported path.
 
 **Deliverables**
 - `build_ttl.py` is either:
@@ -102,7 +102,7 @@ _Source basis:_ This plan is derived from the uploaded **Run Pass 6** analysis a
 
 ### Task 2.1 — Build a KG unquarantine checklist from the analysis
 **Goal:** Convert the analysis into a concrete pre/post gate document for KG graduation.  
-**Why now:** Your note specifically asks for pre and post steps if it is time to unquarantine KG. The analysis says the repo currently lacks a single capability matrix and a canonical production gate, so those must come first. fileciteturn1file0
+**Why now:** Your note specifically asks for pre and post steps if it is time to unquarantine KG. The analysis says the repo currently lacks a single capability matrix and a canonical production gate, so those must come first. 
 
 **Deliverables**
 - `docs/kg_unquarantine_plan.md` or equivalent with:
@@ -122,13 +122,13 @@ _Source basis:_ This plan is derived from the uploaded **Run Pass 6** analysis a
 **Reasoning level:** High
 
 **Exit criteria**
-- You can answer “What must be true before KG is supported?” in one page.
+- Completed KG checklist to include pre and post conditions.
 
 ---
 
 ### Task 2.2 — Decide whether KG-backed search graduates now or stays quarantined
 **Goal:** Make one explicit product decision.  
-**Why now:** The analysis treats capability drift here as a P0 problem. You should not continue coding against an unresolved support boundary. fileciteturn1file0
+**Why now:** The analysis treats capability drift here as a P0 problem. You should not continue coding against an unresolved support boundary. 
 
 **Decision options**
 - **Option A: Keep KG-backed search quarantined**
@@ -191,7 +191,7 @@ _Source basis:_ This plan is derived from the uploaded **Run Pass 6** analysis a
 
 ### Task 3.1 — Break CLI monolith into domain registrars
 **Goal:** Reduce risk in `earCrawler/cli/__main__.py` by splitting command registration into domain modules.  
-**Why now:** The analysis flags CLI concentration as a medium-risk hotspot that increases onboarding cost and regression probability. fileciteturn1file0
+**Why now:** The analysis flags CLI concentration as a medium-risk hotspot that increases onboarding cost and regression probability. 
 
 **Deliverables**
 - Separate command registrars for:

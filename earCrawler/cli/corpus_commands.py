@@ -1,0 +1,179 @@
+from __future__ import annotations
+
+"""Corpus-facing CLI commands and registrar."""
+
+import importlib
+import json
+from pathlib import Path
+
+import click
+
+from earCrawler.analytics import reports as analytics_reports
+from earCrawler.cli.ear_fetch import fetch_entities, fetch_ear, warm_cache
+from earCrawler.core.nsf_case_parser import NSFCaseParser
+from earCrawler.security import policy
+
+
+@click.command(name="nsf-parse")
+@click.option(
+    "--fixtures",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+    help="Directory containing ORI HTML fixtures.",
+)
+@click.option(
+    "--out",
+    type=click.Path(file_okay=False, path_type=Path),
+    required=True,
+    help="Output directory for parsed cases.",
+)
+@click.option("--live", default=False, show_default=True, type=bool)
+def nsf_parse(fixtures: Path, out: Path, live: bool) -> None:
+    """Parse NSF/ORI case files to JSON."""
+
+    parser = NSFCaseParser()
+    cases = parser.run(fixtures, live=live)
+    out.mkdir(parents=True, exist_ok=True)
+    for case in cases:
+        case_id = case.get("case_number") or f"case_{cases.index(case)}"
+        with (out / f"{case_id}.json").open("w", encoding="utf-8") as fh:
+            json.dump(case, fh, ensure_ascii=False, indent=2)
+    click.echo(f"Parsed {len(cases)} cases")
+
+
+@click.command(name="crawl")
+@policy.require_role("operator")
+@policy.enforce
+@click.option(
+    "--sources",
+    "-s",
+    multiple=True,
+    metavar="[SOURCE1 [SOURCE2]...]",
+    required=True,
+    help="Which corpus loaders to run (ear, nsf, ...).",
+)
+@click.option(
+    "--out",
+    "-o",
+    type=str,
+    default="data",
+    show_default=True,
+    help="Output directory for JSONL/index files.",
+)
+@click.option(
+    "--fixtures",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=Path("tests/fixtures"),
+    show_default=True,
+    help="Fixture directory for NSF loader.",
+)
+@click.option(
+    "--live",
+    is_flag=True,
+    default=False,
+    help="Enable live HTTP fetching (disabled by default).",
+)
+def crawl(sources: tuple[str, ...], out: str, fixtures: Path, live: bool) -> None:
+    """Load paragraphs from selected sources and print counts."""
+
+    from api_clients.federalregister_client import FederalRegisterClient
+    from earCrawler.core.ear_loader import EARLoader
+    from earCrawler.core.nsf_loader import NSFLoader
+
+    total = 0
+    if "ear" in sources:
+        client = FederalRegisterClient()
+        loader = EARLoader(client, query="export administration regulations")
+        count = len(loader.run(fixtures_dir=fixtures, live=live, output_dir=out))
+        click.echo(f"ear: {count} paragraphs")
+        total += count
+    if "nsf" in sources:
+        parser = NSFCaseParser()
+        loader = NSFLoader(parser, fixtures)
+        count = len(loader.run(fixtures_dir=fixtures, live=live, output_dir=out))
+        click.echo(f"nsf: {count} paragraphs")
+        total += count
+    click.echo(f"total: {total} paragraphs")
+
+
+@click.command(name="report")
+@policy.require_role("reader")
+@policy.enforce
+@click.option(
+    "--sources",
+    "-s",
+    multiple=True,
+    required=True,
+    help="Sources to analyze (ear, nsf, ...).",
+)
+@click.option(
+    "--type",
+    "report_type",
+    type=click.Choice(["top-entities", "term-frequency", "cooccurrence"]),
+    required=True,
+    help="Type of report to generate.",
+)
+@click.option(
+    "--entity",
+    "entity_type",
+    type=click.Choice(["ORG", "PERSON", "GRANT"]),
+    required=False,
+    help="Entity type (for top-entities and cooccurrence reports).",
+)
+@click.option("--n", default=10, show_default=True, help="Top n entries to return.")
+@click.option(
+    "--out",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Write JSON output to file instead of stdout.",
+)
+def report(
+    sources: tuple[str, ...],
+    report_type: str,
+    entity_type: str | None,
+    n: int,
+    out: Path | None,
+) -> None:
+    """Generate analytics reports over stored corpora."""
+
+    results: dict[str, object] = {}
+    for src in sources:
+        if report_type == "top-entities":
+            if entity_type is None:
+                raise click.UsageError("--entity required for top-entities")
+            results[src] = analytics_reports.top_entities(src, entity_type, n)
+        elif report_type == "term-frequency":
+            results[src] = analytics_reports.term_frequency(src, n)
+        elif report_type == "cooccurrence":
+            if entity_type is None:
+                raise click.UsageError("--entity required for cooccurrence")
+            mapping = analytics_reports.cooccurrence(src, entity_type)
+            results[src] = {k: sorted(v) for k, v in mapping.items()}
+
+    if out:
+        out.write_text(
+            json.dumps(results, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        return
+
+    for src, data in results.items():
+        click.echo(f"## {src}")
+        if report_type == "cooccurrence":
+            for name, others in data.items():
+                click.echo(f"{name}\t{', '.join(others)}")
+        else:
+            for name, count in data:
+                click.echo(f"{name}\t{count}")
+
+
+def register_corpus_commands(root: click.Group) -> None:
+    """Register corpus-oriented commands and groups on the root CLI."""
+
+    root.add_command(nsf_parse)
+    root.add_command(crawl)
+    root.add_command(report)
+    root.add_command(fetch_entities)
+    root.add_command(fetch_ear)
+    root.add_command(warm_cache)
+    corpus_cli = importlib.import_module("earCrawler.cli.corpus")
+    root.add_command(corpus_cli.corpus, name="corpus")

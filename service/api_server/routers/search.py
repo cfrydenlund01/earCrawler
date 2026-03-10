@@ -1,3 +1,11 @@
+"""Quarantined text-index search route.
+
+This route exists for local validation and research workflows, but it is not
+part of the supported production contract. The current Task 2.2 decision keeps
+KG-backed search quarantined; see docs/kg_search_status_decision_2026-03-10.md
+and docs/kg_quarantine_exit_gate.md.
+"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query

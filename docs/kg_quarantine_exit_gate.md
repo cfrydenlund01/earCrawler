@@ -2,7 +2,7 @@
 
 Status: normative for any change that claims KG-backed runtime behavior is part of the supported production CLI path.
 
-As of March 6, 2026, this gate is not passed. KG-related runtime behavior remains quarantined.
+As of March 10, 2026, this gate is not passed. KG-related runtime behavior remains quarantined. The current Task 2.2 decision record is `docs/kg_search_status_decision_2026-03-10.md`.
 
 ## Purpose
 
@@ -11,6 +11,7 @@ This document defines the go/no-go criteria for moving KG-backed runtime feature
 It complements:
 
 - `RUNBOOK.md`
+- `docs/kg_unquarantine_plan.md`
 - `docs/kg_boundary_and_iri_strategy.md`
 - `docs/identifier_policy.md`
 - `docs/done_done_checklist.md`
