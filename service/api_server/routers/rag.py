@@ -1,52 +1,23 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
-import math
 import time
-import os
 
+from api_clients.llm_client import generate_chat
+from earCrawler.rag import llm_runtime
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 
 from ..fuseki import FusekiGateway
-from api_clients.llm_client import LLMProviderError, generate_chat
-from earCrawler.config.llm_secrets import get_llm_config
-from earCrawler.rag import pipeline as rag_pipeline
-from earCrawler.rag.output_schema import (
-    DEFAULT_ALLOWED_LABELS,
-    OutputSchemaError,
-    make_unanswerable_payload,
-    validate_and_extract_strict_answer,
-)
-from earCrawler.rag.temporal import (
-    resolve_temporal_request,
-    select_temporal_documents,
-    temporal_candidate_count,
-)
-from earCrawler.security.data_egress import (
-    build_data_egress_decision,
-    redact_contexts,
-    redact_text_for_mode,
-    resolve_redaction_mode,
-)
-from ..schemas import (
-    CacheState,
-    LineageEdge,
-    ProblemDetails,
-    RagAnswer,
-    RagGeneratedResponse,
-    RagLineageReference,
-    RagQueryRequest,
-    RagResponse,
-    RetrievedDocument,
-    RagSource,
+from ..rag_service import (
+    build_query_answers,
+    execute_answer_generation,
+    retrieve_documents,
+    to_retrieved_document,
 )
 from ..rag_support import RagQueryCache, RetrieverProtocol
-from earCrawler.rag.retriever import RetrieverError
-
-logger = logging.getLogger(__name__)
+from ..schemas import CacheState, ProblemDetails, RagGeneratedResponse, RagQueryRequest, RagResponse
 from .dependencies import (
     get_gateway,
     get_rag_cache,
@@ -54,49 +25,9 @@ from .dependencies import (
     rate_limit,
 )
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1", tags=["rag"])
 
-def _env_truthy(name: str, *, default: bool = False) -> bool:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _env_int(name: str, *, default: int, min_value: int = 0) -> int:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        value = int(str(raw).strip())
-    except ValueError:
-        return default
-    return max(min_value, value)
-
-
-def _env_float(name: str, *, default: float, min_value: float = 0.0) -> float:
-    raw = os.getenv(name)
-    if raw is None:
-        return default
-    try:
-        value = float(str(raw).strip())
-    except ValueError:
-        return default
-    return max(min_value, value)
-
-
-def _max_score(documents: list[dict]) -> float:
-    best = 0.0
-    for doc in documents or []:
-        score = doc.get("score")
-        if isinstance(score, (int, float)):
-            best = max(best, float(score))
-        elif isinstance(score, str):
-            try:
-                best = max(best, float(score))
-            except ValueError:
-                continue
-    return best
 
 
 def _log_retrieval(request: Request, event: str, trace_id: str, **details) -> None:
@@ -107,20 +38,9 @@ def _log_retrieval(request: Request, event: str, trace_id: str, **details) -> No
         logger.info("%s %s", event, details)
 
 
+
 def _elapsed_ms(start: float) -> float:
     return round((time.perf_counter() - start) * 1000.0, 3)
-
-
-def _apply_temporal_selection(
-    *,
-    query: str,
-    effective_date: str | None,
-    documents: list[dict],
-    top_k: int,
-) -> tuple[list[dict], dict[str, object]]:
-    request = resolve_temporal_request(query, effective_date=effective_date)
-    selection = select_temporal_documents(documents, request=request, top_k=top_k)
-    return list(selection.selected_docs), selection.to_dict()
 
 
 async def _run_retriever_query(
@@ -130,7 +50,7 @@ async def _run_retriever_query(
 
 
 async def _run_generate_chat(
-    prompt: list[dict[str, str]] | list[dict], *, provider: str, model: str
+    prompt: list[dict[str, str]] | list[dict], provider: str, model: str
 ) -> str:
     return await asyncio.to_thread(
         generate_chat,
@@ -154,38 +74,23 @@ async def rag_query(
     _: None = Depends(rate_limit("rag")),
 ) -> RagResponse:
     start_total = time.perf_counter()
-    cache_key = payload.cache_key()
     trace_id = getattr(request.state, "trace_id", "")
-    rag_enabled = bool(getattr(retriever, "enabled", True))
-    retriever_ready = bool(getattr(retriever, "ready", True))
-    failure_type = getattr(retriever, "failure_type", None)
-    index_path = getattr(retriever, "index_path", None)
-    model_name = getattr(retriever, "model_name", None)
-    temporal_request = resolve_temporal_request(
-        payload.query, effective_date=payload.effective_date
+    retrieval = await retrieve_documents(
+        query=payload.query,
+        top_k=payload.top_k,
+        effective_date=payload.effective_date,
+        cache_key=payload.cache_key(),
+        retriever=retriever,
+        cache=cache,
+        run_query=_run_retriever_query,
     )
-    temporal_state = (
-        select_temporal_documents([], request=temporal_request, top_k=payload.top_k).to_dict()
-        if temporal_request.refusal_reason
-        else temporal_request.to_dict()
-    )
-    t_cache_ms = 0.0
-    t_retrieve_ms = 0.0
-    t_prompt_ms = 0.0
-    t_llm_ms = 0.0
-    t_parse_ms = 0.0
 
-    if not rag_enabled:
-        disabled_reason = getattr(
-            retriever,
-            "disabled_reason",
-            "RAG retriever disabled; set EARCRAWLER_API_ENABLE_RAG=1",
-        )
+    if not retrieval.rag_enabled:
         problem = ProblemDetails(
             type="https://earcrawler.gov/problems/retrieval",
             title="Retriever disabled",
             status=503,
-            detail=disabled_reason,
+            detail=retrieval.disabled_reason,
             instance=str(request.url),
             trace_id=trace_id,
         )
@@ -193,85 +98,39 @@ async def rag_query(
             request,
             "rag.query.disabled",
             trace_id,
-            rag_enabled=rag_enabled,
-            retriever_ready=retriever_ready,
+            rag_enabled=retrieval.rag_enabled,
+            retriever_ready=retrieval.retriever_ready,
             retrieval_doc_count=0,
             retrieval_empty=True,
-            retrieval_empty_reason=failure_type or "retriever_disabled",
-            failure_type=failure_type or "retriever_disabled",
-            index_path=index_path,
-            model_name=model_name,
+            retrieval_empty_reason=retrieval.retrieval_empty_reason,
+            failure_type=retrieval.failure_type,
+            index_path=retrieval.index_path,
+            model_name=retrieval.model_name,
         )
         _log_retrieval(
             request,
             "rag.query.latency",
             trace_id,
             t_total_ms=_elapsed_ms(start_total),
-            t_retrieve_ms=t_retrieve_ms,
-            t_cache_ms=t_cache_ms,
-            t_prompt_ms=t_prompt_ms,
-            t_llm_ms=t_llm_ms,
-            t_parse_ms=t_parse_ms,
-            rag_enabled=rag_enabled,
-            retriever_ready=retriever_ready,
+            t_retrieve_ms=retrieval.t_retrieve_ms,
+            t_cache_ms=retrieval.t_cache_ms,
+            t_prompt_ms=0.0,
+            t_llm_ms=0.0,
+            t_parse_ms=0.0,
+            rag_enabled=retrieval.rag_enabled,
+            retriever_ready=retrieval.retriever_ready,
             retrieved_count=0,
             retrieval_empty=True,
-            retrieval_empty_reason=failure_type or "retriever_disabled",
+            retrieval_empty_reason=retrieval.retrieval_empty_reason,
         )
-        return JSONResponse(
-            status_code=503, content=problem.model_dump(exclude_none=True)
-        )
+        return JSONResponse(status_code=503, content=problem.model_dump(exclude_none=True))
 
-    cache_start = time.perf_counter()
-    cached = cache.get(cache_key)
-    cache_hit = cached is not None
-    t_cache_ms += _elapsed_ms(cache_start)
-    documents: list[dict] = []
-    expires_at = None
-    retrieval_failure: Exception | None = None
-    if cache_hit:
-        cache_start = time.perf_counter()
-        documents = cached or []
-        expires_at = cache.expires_at(cache_key)
-        t_cache_ms += _elapsed_ms(cache_start)
-    elif temporal_request.refusal_reason:
-        documents = []
-    else:
-        retrieve_start = time.perf_counter()
-        try:
-            documents = await _run_retriever_query(
-                retriever,
-                payload.query,
-                temporal_candidate_count(payload.top_k)
-                if temporal_request.requested
-                else payload.top_k,
-            )
-            if temporal_request.requested:
-                selection = select_temporal_documents(
-                    documents, request=temporal_request, top_k=payload.top_k
-                )
-                temporal_state = selection.to_dict()
-                documents = list(selection.selected_docs)
-            t_retrieve_ms += _elapsed_ms(retrieve_start)
-            if (not temporal_request.requested) or documents:
-                cache_start = time.perf_counter()
-                expires_at = cache.put(cache_key, documents)
-                t_cache_ms += _elapsed_ms(cache_start)
-        except RetrieverError as exc:
-            t_retrieve_ms += _elapsed_ms(retrieve_start)
-            retrieval_failure = exc
-            failure_type = getattr(exc, "code", "retriever_error")
-        except Exception as exc:  # pragma: no cover - defensive
-            t_retrieve_ms += _elapsed_ms(retrieve_start)
-            retrieval_failure = exc
-            failure_type = failure_type or "retriever_error"
-
-    if retrieval_failure:
+    if retrieval.retrieval_failure is not None:
         problem = ProblemDetails(
             type="https://earcrawler.gov/problems/retrieval",
             title="Retriever unavailable",
             status=503,
-            detail=str(retrieval_failure),
+            detail=str(retrieval.retrieval_failure),
             instance=str(request.url),
             trace_id=trace_id,
         )
@@ -279,76 +138,69 @@ async def rag_query(
             request,
             "rag.query.failed",
             trace_id,
-            rag_enabled=rag_enabled,
-            retriever_ready=retriever_ready,
+            rag_enabled=retrieval.rag_enabled,
+            retriever_ready=retrieval.retriever_ready,
             retrieval_doc_count=0,
             retrieval_empty=True,
-            retrieval_empty_reason=failure_type,
-            failure_type=failure_type,
-            index_path=index_path,
-            model_name=model_name,
+            retrieval_empty_reason=retrieval.retrieval_empty_reason,
+            failure_type=retrieval.failure_type,
+            index_path=retrieval.index_path,
+            model_name=retrieval.model_name,
         )
         _log_retrieval(
             request,
             "rag.query.latency",
             trace_id,
             t_total_ms=_elapsed_ms(start_total),
-            t_retrieve_ms=t_retrieve_ms,
-            t_cache_ms=t_cache_ms,
-            t_prompt_ms=t_prompt_ms,
-            t_llm_ms=t_llm_ms,
-            t_parse_ms=t_parse_ms,
-            rag_enabled=rag_enabled,
-            retriever_ready=retriever_ready,
+            t_retrieve_ms=retrieval.t_retrieve_ms,
+            t_cache_ms=retrieval.t_cache_ms,
+            t_prompt_ms=0.0,
+            t_llm_ms=0.0,
+            t_parse_ms=0.0,
+            rag_enabled=retrieval.rag_enabled,
+            retriever_ready=retrieval.retriever_ready,
             retrieved_count=0,
             retrieval_empty=True,
-            retrieval_empty_reason=failure_type,
+            retrieval_empty_reason=retrieval.retrieval_empty_reason,
         )
-        return JSONResponse(
-            status_code=503, content=problem.model_dump(exclude_none=True)
-        )
+        return JSONResponse(status_code=503, content=problem.model_dump(exclude_none=True))
 
-    results = []
-    for doc in documents:
-        result = await _build_answer(doc, gateway, payload.include_lineage)
-        results.append(result)
+    results = await build_query_answers(
+        retrieval.documents,
+        gateway=gateway,
+        include_lineage=payload.include_lineage,
+    )
 
     latency_ms = _elapsed_ms(start_total)
-    cache_state = CacheState(hit=cache_hit, expires_at=expires_at)
-    retrieval_empty = len(documents) == 0
-    retrieval_empty_reason = (
-        (str(temporal_state.get("refusal_reason") or "").strip() or "no_temporally_applicable_evidence")
-        if retrieval_empty and temporal_request.requested
-        else ("no_hits" if retrieval_empty else None)
-    )
+    cache_state = CacheState(hit=retrieval.cache_hit, expires_at=retrieval.expires_at)
     _log_retrieval(
         request,
         "rag.query.success",
         trace_id,
-        rag_enabled=rag_enabled,
-        retriever_ready=retriever_ready,
-        retrieval_doc_count=len(documents),
-        retrieval_empty=retrieval_empty,
-        retrieval_empty_reason=retrieval_empty_reason,
-        failure_type=failure_type,
-        index_path=index_path,
-        model_name=model_name,
+        rag_enabled=retrieval.rag_enabled,
+        retriever_ready=retrieval.retriever_ready,
+        retrieval_doc_count=len(retrieval.documents),
+        retrieval_empty=retrieval.retrieval_empty,
+        retrieval_empty_reason=retrieval.retrieval_empty_reason,
+        failure_type=retrieval.failure_type,
+        index_path=retrieval.index_path,
+        model_name=retrieval.model_name,
     )
     _log_retrieval(
         request,
         "rag.query.latency",
         trace_id,
         t_total_ms=latency_ms,
-        t_retrieve_ms=t_retrieve_ms,
-        t_cache_ms=t_cache_ms,
-        t_prompt_ms=t_prompt_ms,
-        t_llm_ms=t_llm_ms,
-        t_parse_ms=t_parse_ms,
-        rag_enabled=rag_enabled,
-        retriever_ready=retriever_ready,
-        retrieved_count=len(documents),
-        retrieval_empty=retrieval_empty,
-        retrieval_empty_reason=retrieval_empty_reason,
+        t_retrieve_ms=retrieval.t_retrieve_ms,
+        t_cache_ms=retrieval.t_cache_ms,
+        t_prompt_ms=0.0,
+        t_llm_ms=0.0,
+        t_parse_ms=0.0,
+        rag_enabled=retrieval.rag_enabled,
+        retriever_ready=retrieval.retriever_ready,
+        retrieved_count=len(retrieval.documents),
+        retrieval_empty=retrieval.retrieval_empty,
+        retrieval_empty_reason=retrieval.retrieval_empty_reason,
     )
     return RagResponse(
         trace_id=trace_id,
@@ -356,96 +208,8 @@ async def rag_query(
         query=payload.query,
         cache=cache_state,
         results=results,
-        retrieval_empty=retrieval_empty,
-        retrieval_empty_reason=retrieval_empty_reason,
-    )
-
-
-async def _build_answer(
-    doc: dict, gateway: FusekiGateway, include_lineage: bool
-) -> RagAnswer:
-    content = str(
-        doc.get("text")
-        or doc.get("content")
-        or doc.get("paragraph")
-        or doc.get("body")
-        or doc.get("snippet")
-        or ""
-    ).strip()
-    score = _coerce_score(doc.get("score"))
-    source = RagSource(
-        id=_maybe_str(doc.get("id") or doc.get("entity_id") or doc.get("section")),
-        url=_maybe_str(doc.get("source_url") or doc.get("url")),
-        label=_maybe_str(doc.get("title") or doc.get("label")),
-        section=_maybe_str(doc.get("section")),
-        provider=_maybe_str(doc.get("provider")),
-    )
-    lineage: RagLineageReference | None = None
-    if include_lineage:
-        lineage_id = source.id or _maybe_str(doc.get("lineage_id"))
-        if lineage_id:
-            edges = await _lineage_edges(gateway, lineage_id)
-            if edges:
-                lineage = RagLineageReference(entity_id=lineage_id, edges=edges)
-    return RagAnswer(content=content, score=score, source=source, lineage=lineage)
-
-
-async def _lineage_edges(gateway: FusekiGateway, entity_id: str) -> list[LineageEdge]:
-    rows = await gateway.select("lineage_by_id", {"id": entity_id})
-    edges: list[LineageEdge] = []
-    for row in rows:
-        source = _maybe_str(row.get("source")) or entity_id
-        target = _maybe_str(row.get("target"))
-        relation = _maybe_str(row.get("relation"))
-        timestamp = row.get("timestamp")
-        if isinstance(timestamp, dict) and "value" in timestamp:
-            timestamp = timestamp["value"]
-        if not (target and relation):
-            continue
-        edges.append(
-            LineageEdge(
-                source=source,
-                relation=relation,
-                target=target,
-                timestamp=_maybe_str(timestamp),
-            )
-        )
-    return edges
-
-
-def _maybe_str(value: object) -> str | None:
-    if isinstance(value, str) and value:
-        return value
-    return None
-
-
-def _coerce_score(value: object) -> float:
-    if isinstance(value, (int, float)):
-        num = float(value)
-    elif isinstance(value, str):
-        try:
-            num = float(value)
-        except ValueError:
-            num = 0.0
-    else:
-        num = 0.0
-    if math.isnan(num) or math.isinf(num):
-        num = 0.0
-    if num > 1.0:
-        num = min(1.0, num / 100.0 if num > 10 else num)
-    if num < 0:
-        num = 0.0
-    return round(num, 4)
-
-
-def _to_retrieved_document(doc: dict) -> RetrievedDocument:
-    return RetrievedDocument(
-        id=_maybe_str(doc.get("id") or doc.get("entity_id") or doc.get("section")),
-        score=_coerce_score(doc.get("score")),
-        title=_maybe_str(doc.get("title") or doc.get("label")),
-        url=_maybe_str(doc.get("source_url") or doc.get("url")),
-        section=_maybe_str(doc.get("section")),
-        provider=_maybe_str(doc.get("provider")),
+        retrieval_empty=retrieval.retrieval_empty,
+        retrieval_empty_reason=retrieval.retrieval_empty_reason,
     )
 
 
@@ -471,482 +235,128 @@ async def rag_answer(
 ) -> JSONResponse:
     start_total = time.perf_counter()
     trace_id = getattr(request.state, "trace_id", "")
-    cache_key = payload.cache_key()
     generate_enabled = payload.generate if generate is None else bool(generate)
-    rag_enabled = bool(getattr(retriever, "enabled", True))
-    retriever_ready = bool(getattr(retriever, "ready", True))
-    failure_type = getattr(retriever, "failure_type", None)
-    index_path = getattr(retriever, "index_path", None)
-    model_name = getattr(retriever, "model_name", None)
-    temporal_request = resolve_temporal_request(
-        payload.query, effective_date=payload.effective_date
+    retrieval = await retrieve_documents(
+        query=payload.query,
+        top_k=payload.top_k,
+        effective_date=payload.effective_date,
+        cache_key=payload.cache_key(),
+        retriever=retriever,
+        cache=cache,
+        run_query=_run_retriever_query,
     )
-    temporal_state = (
-        select_temporal_documents([], request=temporal_request, top_k=payload.top_k).to_dict()
-        if temporal_request.refusal_reason
-        else temporal_request.to_dict()
-    )
-    redaction_mode = resolve_redaction_mode()
-    t_cache_ms = 0.0
-    t_retrieve_ms = 0.0
-    t_prompt_ms = 0.0
-    t_llm_ms = 0.0
-    t_parse_ms = 0.0
-
-    documents: list[dict] = []
-    cache_hit = False
-    expires_at = None
-    disabled_reason = None
-    retrieval_empty = False
-    retrieval_empty_reason: str | None = None
-    retrieval_failure: Exception | None = None
-
-    if rag_enabled and retriever_ready:
-        cache_start = time.perf_counter()
-        cached = cache.get(cache_key)
-        cache_hit = cached is not None
-        t_cache_ms += _elapsed_ms(cache_start)
-        if cache_hit:
-            cache_start = time.perf_counter()
-            documents = cached or []
-            expires_at = cache.expires_at(cache_key)
-            t_cache_ms += _elapsed_ms(cache_start)
-        elif temporal_request.refusal_reason:
-            documents = []
-        else:
-            retrieve_start = time.perf_counter()
-            try:
-                documents = await _run_retriever_query(
-                    retriever,
-                    payload.query,
-                    temporal_candidate_count(payload.top_k)
-                    if temporal_request.requested
-                    else payload.top_k,
-                )
-                if temporal_request.requested:
-                    selection = select_temporal_documents(
-                        documents, request=temporal_request, top_k=payload.top_k
-                    )
-                    temporal_state = selection.to_dict()
-                    documents = list(selection.selected_docs)
-                t_retrieve_ms += _elapsed_ms(retrieve_start)
-                if (not temporal_request.requested) or documents:
-                    cache_start = time.perf_counter()
-                    expires_at = cache.put(cache_key, documents)
-                    t_cache_ms += _elapsed_ms(cache_start)
-            except RetrieverError as exc:
-                t_retrieve_ms += _elapsed_ms(retrieve_start)
-                retrieval_failure = exc
-                failure_type = getattr(exc, "code", "retriever_error")
-            except Exception as exc:  # pragma: no cover - defensive
-                t_retrieve_ms += _elapsed_ms(retrieve_start)
-                retrieval_failure = exc
-                failure_type = failure_type or "retriever_error"
-    elif not rag_enabled:
-        disabled_reason = getattr(
-            retriever,
-            "disabled_reason",
-            "RAG retriever disabled; set EARCRAWLER_API_ENABLE_RAG=1",
-        )
-        retrieval_empty = True
-        retrieval_empty_reason = failure_type or "retriever_disabled"
-    else:
-        retrieval_failure = getattr(
-            retriever, "failure", RuntimeError("Retriever not ready")
-        )
-        failure_type = failure_type or "retriever_not_ready"
 
     contexts: list[str] = []
-    answer: str | None = None
-    status_code = 200
-    model_label = None
-    provider_label = None
-    llm_enabled = False
-    output_ok = False
-    output_error: dict | None = None
-    raw_answer: str | None = None
-    label: str | None = None
-    justification: str | None = None
-    citations: list[dict] = []
-    evidence_okay: dict | None = None
-    assumptions: list[str] = []
-    remote_attempted = False
-    redacted_question = redact_text_for_mode(payload.query, mode=redaction_mode)
-    egress_decision = build_data_egress_decision(
-        remote_enabled=False,
-        disabled_reason="generation not attempted",
-        provider=None,
-        model=None,
-        redaction_mode=redaction_mode,
-        question=redacted_question,
-        contexts=[],
-        messages=None,
-        trace_id=trace_id,
-    )
-
-    if retrieval_failure:
-        disabled_reason = str(retrieval_failure)
-        retrieval_empty = True
-        retrieval_empty_reason = failure_type or "retriever_error"
-        status_code = 503
-        output_error = {
-            "code": failure_type or "retriever_error",
-            "message": str(retrieval_failure),
-            "details": {},
-        }
-        egress_decision = build_data_egress_decision(
-            remote_enabled=False,
-            disabled_reason=disabled_reason,
-            provider=None,
-            model=None,
-            redaction_mode=redaction_mode,
-            question=redacted_question,
-            contexts=[],
-            messages=None,
+    if retrieval.retrieval_failure is not None:
+        generation = llm_runtime.build_generation_disabled_result(
+            question=payload.query,
+            disabled_reason=str(retrieval.retrieval_failure),
             trace_id=trace_id,
         )
-    elif not rag_enabled:
-        status_code = 503
-        output_error = {
-            "code": failure_type or "retriever_disabled",
-            "message": disabled_reason or "RAG retriever disabled",
+        generation.output_ok = False
+        generation.output_error = {
+            "code": retrieval.failure_type or "retriever_error",
+            "message": str(retrieval.retrieval_failure),
             "details": {},
         }
-        egress_decision = build_data_egress_decision(
-            remote_enabled=False,
-            disabled_reason=disabled_reason or "RAG retriever disabled",
-            provider=None,
-            model=None,
-            redaction_mode=redaction_mode,
-            question=redacted_question,
-            contexts=[],
-            messages=None,
+        status_code = 503
+    elif not retrieval.rag_enabled:
+        generation = llm_runtime.build_generation_disabled_result(
+            question=payload.query,
+            disabled_reason=retrieval.disabled_reason or "RAG retriever disabled",
             trace_id=trace_id,
         )
+        generation.output_ok = False
+        generation.output_error = {
+            "code": retrieval.failure_type or "retriever_disabled",
+            "message": retrieval.disabled_reason or "RAG retriever disabled",
+            "details": {},
+        }
+        status_code = 503
     else:
-        retrieval_empty = len(documents) == 0
-        retrieval_empty_reason = (
-            retrieval_empty_reason
-            or (
-                str(temporal_state.get("refusal_reason") or "").strip()
-                if retrieval_empty and temporal_request.requested
-                else ("no_hits" if retrieval_empty else None)
-            )
+        answer_execution = await execute_answer_generation(
+            query=payload.query,
+            documents=retrieval.documents,
+            temporal_state=retrieval.temporal_state,
+            generate_enabled=generate_enabled,
+            trace_id=trace_id,
+            run_generate=_run_generate_chat,
         )
-        prompt_contexts: list[str] = []
-        for doc in documents:
-            text = str(
-                doc.get("text")
-                or doc.get("content")
-                or doc.get("paragraph")
-                or doc.get("body")
-                or doc.get("snippet")
-                or ""
-            ).strip()
-            if not text:
-                continue
-            section = str(
-                doc.get("section")
-                or doc.get("span_id")
-                or doc.get("id")
-                or doc.get("entity_id")
-                or ""
-            ).strip()
-            temporal_parts: list[str] = []
-            if doc.get("snapshot_date"):
-                temporal_parts.append(f"snapshot={doc['snapshot_date']}")
-            if doc.get("effective_from"):
-                temporal_parts.append(f"from={doc['effective_from']}")
-            if doc.get("effective_to"):
-                temporal_parts.append(f"to={doc['effective_to']}")
-            if section and temporal_parts:
-                prefix = f"[{section} | {'; '.join(temporal_parts)}] "
-            else:
-                prefix = f"[{section}] " if section else ""
-            prompt_contexts.append(prefix + text)
-        contexts = prompt_contexts
-
-        if not generate_enabled:
-            llm_enabled = False
-            output_ok = True
-            disabled_reason = "generation_disabled_by_request"
-            egress_decision = build_data_egress_decision(
-                remote_enabled=False,
-                disabled_reason=disabled_reason,
-                provider=None,
-                model=None,
-                redaction_mode=redaction_mode,
-                question=redacted_question,
-                contexts=[],
-                messages=None,
-                trace_id=trace_id,
-            )
-        else:
-            refuse_on_thin = _env_truthy("EARCRAWLER_REFUSE_ON_THIN_RETRIEVAL", default=False)
-            min_docs = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_DOCS", default=1, min_value=1)
-            min_top_score = _env_float("EARCRAWLER_THIN_RETRIEVAL_MIN_TOP_SCORE", default=0.0, min_value=0.0)
-            min_total_chars = _env_int("EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS", default=0, min_value=0)
-
-            thin_retrieval = temporal_request.requested and bool(temporal_state.get("should_refuse"))
-            if not thin_retrieval:
-                thin_retrieval = retrieval_empty
-            if not thin_retrieval and refuse_on_thin:
-                if len(documents) < min_docs:
-                    thin_retrieval = True
-                elif _max_score(documents) < min_top_score:
-                    thin_retrieval = True
-                else:
-                    total_chars = sum(len(str(c or "")) for c in prompt_contexts)
-                    if total_chars < min_total_chars:
-                        thin_retrieval = True
-
-            if thin_retrieval:
-                disabled_reason = "insufficient_evidence"
-                llm_enabled = False
-                output_ok = True
-
-                prompt_start = time.perf_counter()
-                redacted_contexts = redact_contexts(prompt_contexts, mode=redaction_mode)
-                prompt = rag_pipeline._build_prompt(
-                    redacted_question,
-                    redacted_contexts,
-                    label_schema=None,
-                    effective_date=str(temporal_state.get("effective_date") or "").strip() or None,
-                )
-                t_prompt_ms += _elapsed_ms(prompt_start)
-                egress_decision = build_data_egress_decision(
-                    remote_enabled=False,
-                    disabled_reason=disabled_reason,
-                    provider=None,
-                    model=None,
-                    redaction_mode=redaction_mode,
-                    question=redacted_question,
-                    contexts=redacted_contexts,
-                    messages=prompt,
-                    trace_id=trace_id,
-                )
-
-                if temporal_request.requested and bool(temporal_state.get("should_refuse")):
-                    disabled_reason = str(
-                        temporal_state.get("refusal_reason") or "temporal_evidence_ambiguous"
-                    )
-                    refusal = rag_pipeline._temporal_refusal_payload(temporal_state)
-                else:
-                    refusal = make_unanswerable_payload(
-                        hint="the relevant EAR excerpt(s) for this scenario (for example: ECCN, destination, end user/end use)",
-                        justification="Retrieval evidence was empty or too thin to ground a compliant answer.",
-                        evidence_reasons=["thin_or_empty_retrieval"],
-                    )
-                rendered = json.dumps(refusal, ensure_ascii=True, sort_keys=True, separators=(",", ":"))
-                validated = validate_and_extract_strict_answer(
-                    rendered,
-                    allowed_labels=DEFAULT_ALLOWED_LABELS,
-                    context="\n\n".join(redacted_contexts),
-                )
-                answer = str(validated["answer_text"])
-                label = str(validated["label"])
-                citations = list(validated.get("citations") or [])
-                assumptions = list(validated.get("assumptions") or [])
-                evidence_okay = dict(validated.get("evidence_okay") or {})
-                justification = validated.get("justification")
-            else:
-                llm_start: float | None = None
-                parse_start: float | None = None
-                try:
-                    cfg = get_llm_config()
-                    provider_label = cfg.provider.provider
-                    model_label = cfg.provider.model
-                    prompt_start = time.perf_counter()
-                    redacted_contexts = redact_contexts(prompt_contexts, mode=redaction_mode)
-                    prompt = rag_pipeline._build_prompt(
-                        redacted_question,
-                        redacted_contexts,
-                        label_schema=None,
-                        effective_date=str(temporal_state.get("effective_date") or "").strip() or None,
-                    )
-                    t_prompt_ms += _elapsed_ms(prompt_start)
-                    if not cfg.enable_remote:
-                        disabled_reason = (
-                            cfg.remote_disabled_reason
-                            or "remote LLM policy denied egress"
-                        )
-                        llm_enabled = False
-                        status_code = 503
-                        output_error = {
-                            "code": "llm_disabled",
-                            "message": disabled_reason,
-                            "details": {},
-                        }
-                        egress_decision = build_data_egress_decision(
-                            remote_enabled=False,
-                            disabled_reason=disabled_reason,
-                            provider=provider_label,
-                            model=model_label,
-                            redaction_mode=redaction_mode,
-                            question=redacted_question,
-                            contexts=redacted_contexts,
-                            messages=prompt,
-                            trace_id=trace_id,
-                        )
-                    else:
-                        remote_attempted = True
-                        llm_start = time.perf_counter()
-                        raw_answer = await _run_generate_chat(
-                            prompt,
-                            provider=provider_label,
-                            model=model_label,
-                        )
-                        t_llm_ms += _elapsed_ms(llm_start)
-                        llm_enabled = True
-                        egress_decision = build_data_egress_decision(
-                            remote_enabled=True,
-                            disabled_reason=None,
-                            provider=provider_label,
-                            model=model_label,
-                            redaction_mode=redaction_mode,
-                            question=redacted_question,
-                            contexts=redacted_contexts,
-                            messages=prompt,
-                            trace_id=trace_id,
-                        )
-                        parse_start = time.perf_counter()
-                        validated = validate_and_extract_strict_answer(
-                            raw_answer,
-                        allowed_labels=DEFAULT_ALLOWED_LABELS,
-                        context="\n\n".join(redacted_contexts),
-                    )
-                    t_parse_ms += _elapsed_ms(parse_start)
-                    output_ok = True
-                    answer = str(validated["answer_text"])
-                    label = str(validated["label"])
-                    citations = list(validated.get("citations") or [])
-                    assumptions = list(validated.get("assumptions") or [])
-                    evidence_okay = dict(validated.get("evidence_okay") or {})
-                    justification = validated.get("justification")
-                except LLMProviderError as exc:
-                    if llm_start is not None:
-                        t_llm_ms += _elapsed_ms(llm_start)
-                    disabled_reason = str(exc)
-                    llm_enabled = False
-                    status_code = 503
-                    output_error = {
-                        "code": "llm_unavailable",
-                        "message": str(exc),
-                        "details": {},
-                    }
-                    egress_decision = build_data_egress_decision(
-                        remote_enabled=remote_attempted,
-                        disabled_reason=str(exc),
-                        provider=provider_label,
-                        model=model_label,
-                        redaction_mode=redaction_mode,
-                        question=redacted_question,
-                        contexts=redact_contexts(contexts, mode=redaction_mode),
-                        messages=None,
-                        trace_id=trace_id,
-                    )
-                except OutputSchemaError as exc:
-                    if parse_start is not None:
-                        t_parse_ms += _elapsed_ms(parse_start)
-                    output_ok = False
-                    output_error = exc.as_dict()
-                    failure_type = exc.code
-                    status_code = 422
-                    answer = None
-                    label = None
-                    justification = None
-                    citations = []
-                    assumptions = []
-                    evidence_okay = None
-                except Exception as exc:  # pragma: no cover - defensive
-                    disabled_reason = str(exc)
-                    llm_enabled = False
-                    status_code = 503
-                    output_error = {
-                        "code": "llm_unavailable",
-                        "message": str(exc),
-                        "details": {},
-                    }
-                    egress_decision = build_data_egress_decision(
-                        remote_enabled=remote_attempted,
-                        disabled_reason=str(exc),
-                        provider=provider_label,
-                        model=model_label,
-                        redaction_mode=redaction_mode,
-                        question=redacted_question,
-                        contexts=redact_contexts(contexts, mode=redaction_mode),
-                        messages=None,
-                        trace_id=trace_id,
-                    )
+        generation = answer_execution.generation
+        contexts = answer_execution.contexts
+        status_code = answer_execution.status_code
 
     latency_ms = _elapsed_ms(start_total)
     cache_state = CacheState(
-        hit=cache_hit if rag_enabled else False, expires_at=expires_at
+        hit=retrieval.cache_hit if retrieval.rag_enabled else False,
+        expires_at=retrieval.expires_at,
     )
-    retrieved = [_to_retrieved_document(doc) for doc in documents]
+    retrieved = [to_retrieved_document(doc) for doc in retrieval.documents]
+    retriever_ready = retrieval.retriever_ready and retrieval.retrieval_failure is None
     _log_retrieval(
         request,
         "rag.answer",
         trace_id,
-        rag_enabled=rag_enabled,
-        retriever_ready=retriever_ready and retrieval_failure is None,
-        retrieval_doc_count=len(documents),
-        failure_type=failure_type if status_code != 200 else None,
-        index_path=index_path,
-        model_name=model_name,
-        retrieval_empty=retrieval_empty,
-        retrieval_empty_reason=retrieval_empty_reason,
+        rag_enabled=retrieval.rag_enabled,
+        retriever_ready=retriever_ready,
+        retrieval_doc_count=len(retrieval.documents),
+        failure_type=retrieval.failure_type if status_code != 200 else None,
+        index_path=retrieval.index_path,
+        model_name=retrieval.model_name,
+        retrieval_empty=retrieval.retrieval_empty,
+        retrieval_empty_reason=retrieval.retrieval_empty_reason,
     )
     _log_retrieval(
         request,
         "llm.egress_decision",
         trace_id,
-        **{k: v for k, v in egress_decision.to_dict().items() if k != "trace_id"},
+        **{k: v for k, v in generation.egress_decision.to_dict().items() if k != "trace_id"},
     )
     latency_event = {
         "t_total_ms": latency_ms,
-        "t_retrieve_ms": t_retrieve_ms,
-        "t_cache_ms": t_cache_ms,
-        "t_prompt_ms": t_prompt_ms,
-        "t_llm_ms": t_llm_ms,
-        "t_parse_ms": t_parse_ms,
-        "rag_enabled": rag_enabled,
-        "retriever_ready": retriever_ready and retrieval_failure is None,
-        "retrieved_count": len(documents),
-        "retrieval_empty": retrieval_empty,
-        "retrieval_empty_reason": retrieval_empty_reason,
+        "t_retrieve_ms": retrieval.t_retrieve_ms,
+        "t_cache_ms": retrieval.t_cache_ms,
+        "t_prompt_ms": generation.t_prompt_ms,
+        "t_llm_ms": generation.t_llm_ms,
+        "t_parse_ms": generation.t_parse_ms,
+        "rag_enabled": retrieval.rag_enabled,
+        "retriever_ready": retriever_ready,
+        "retrieved_count": len(retrieval.documents),
+        "retrieval_empty": retrieval.retrieval_empty,
+        "retrieval_empty_reason": retrieval.retrieval_empty_reason,
     }
-    if remote_attempted:
-        latency_event["provider"] = provider_label
-        latency_event["model"] = model_label
+    if generation.llm_attempted:
+        latency_event["provider"] = generation.provider_label
+        latency_event["model"] = generation.model_label
     _log_retrieval(request, "rag.answer.latency", trace_id, **latency_event)
     response = RagGeneratedResponse(
         trace_id=trace_id,
         latency_ms=latency_ms,
         question=payload.query,
-        answer=answer,
+        answer=generation.answer_text,
         contexts=contexts,
         retrieved=retrieved,
-        model=model_label,
-        provider=provider_label,
-        rag_enabled=rag_enabled,
-        llm_enabled=llm_enabled,
-        disabled_reason=disabled_reason,
+        model=generation.model_label,
+        provider=generation.provider_label,
+        rag_enabled=retrieval.rag_enabled,
+        llm_enabled=generation.llm_enabled,
+        disabled_reason=generation.disabled_reason,
         cache=cache_state,
-        retrieval_empty=retrieval_empty,
-        retrieval_empty_reason=retrieval_empty_reason,
-        output_ok=output_ok,
-        output_error=output_error,
-        raw_answer=raw_answer,
-        label=label,
-        justification=justification,
-        citations=citations,
-        evidence_okay=evidence_okay,
-        assumptions=assumptions,
-        egress=egress_decision.to_dict(),
+        retrieval_empty=retrieval.retrieval_empty,
+        retrieval_empty_reason=retrieval.retrieval_empty_reason,
+        output_ok=generation.output_ok,
+        output_error=generation.output_error,
+        raw_answer=generation.raw_answer,
+        label=generation.label,
+        justification=generation.justification,
+        citations=generation.citations or [],
+        evidence_okay=generation.evidence_okay,
+        assumptions=generation.assumptions or [],
+        egress=generation.egress_decision.to_dict(),
     )
     return JSONResponse(
-        status_code=status_code, content=response.model_dump(mode="json")
+        status_code=status_code,
+        content=response.model_dump(mode="json"),
     )
 
 
