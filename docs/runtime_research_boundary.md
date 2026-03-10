@@ -51,10 +51,15 @@ they are called out separately:
 
 - `earCrawler.service.sparql_service`
 - `earCrawler.service.legacy.kg_service`
+- `earCrawler.ingestion.ingest` (legacy placeholder ingestion pipeline; only
+  enabled with `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`)
 - KG-backed runtime behavior before the gate in `docs/kg_quarantine_exit_gate.md`
   is explicitly passed and recorded
 - experimental retrieval modes or evaluation-only switches that the runbook
   still marks as opt-in
+
+For a quick onboarding map to supported entrypoints, see
+`docs/start_here_supported_paths.md`.
 
 ## Contributor rule of thumb
 

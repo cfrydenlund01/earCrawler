@@ -254,7 +254,7 @@ Because Extra High should be split, do this as four controlled substeps:
 
 ### Task 3.3 — Quarantine or archive visibly misleading experimental surfaces
 **Goal:** Stop placeholder or dead-end code from competing with the supported path.  
-**Why now:** The analysis names placeholder ingestion and legacy/quarantined services as ongoing sources of contributor confusion. fileciteturn1file0
+**Why now:** The analysis names placeholder ingestion and legacy/quarantined services as ongoing sources of contributor confusion. 
 
 **Deliverables**
 - Clear `experimental` or `quarantined` banners
@@ -267,13 +267,23 @@ Because Extra High should be split, do this as four controlled substeps:
 **Exit criteria**
 - A new developer is naturally guided toward corpus/KG emit, supported API, and current docs.
 
+**Implementation status (March 10, 2026)**
+- Completed.
+- Legacy placeholder ingestion was relocated behind a quarantined surface:
+  `earCrawler.experimental.legacy_ingest` with gated compatibility import at
+  `earCrawler.ingestion.ingest` (`EARCRAWLER_ENABLE_LEGACY_INGESTION=1`).
+- Added a developer onboarding map at `docs/start_here_supported_paths.md`.
+- Updated `README.md`, `RUNBOOK.md`, and
+  `docs/runtime_research_boundary.md` to mark and route away from misleading
+  legacy surfaces.
+
 ---
 
 ## Phase 4: Production hardening for the Windows-first single-host target
 
 ### Task 4.1 — Publish coverage and enforce a minimum threshold
 **Goal:** Turn strong test breadth into a visible, enforceable signal.  
-**Why now:** The analysis notes that coverage reporting exists in configuration but is not enforced in CI. fileciteturn1file0
+**Why now:** The analysis notes that coverage reporting exists in configuration but is not enforced in CI. 
 
 **Deliverables**
 - Coverage XML publication
@@ -290,7 +300,7 @@ Because Extra High should be split, do this as four controlled substeps:
 
 ### Task 4.2 — Define latency and failure budgets for the supported API
 **Goal:** Add practical release gates around `/v1/search` and `/v1/rag/query`.  
-**Why now:** The analysis says performance budgets are missing as release criteria. fileciteturn1file0
+**Why now:** The analysis says performance budgets are missing as release criteria. 
 
 **Deliverables**
 - Budget document
@@ -311,7 +321,7 @@ Because Extra High should be split, do this as four controlled substeps:
 
 ### Task 4.3 — Write one authoritative deployment, upgrade, backup, restore, and rollback story
 **Goal:** Produce a real operator handoff path for the Windows-first supported target.  
-**Why now:** The analysis says deployment automation is incomplete and scattered across scripts/runbooks. fileciteturn1file0
+**Why now:** The analysis says deployment automation is incomplete and scattered across scripts/runbooks. 
 
 **Deliverables**
 - One operator document covering:

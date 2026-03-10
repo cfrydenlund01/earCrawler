@@ -40,8 +40,10 @@ Windows notes
 - Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt`.
 - Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior.
 - Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
+- Do not use `earCrawler.ingestion.ingest` for operator deployments; it is a quarantined placeholder ingestion pipeline gated by `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`.
 - KG-backed runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded. Current Task 2.2 decision: `docs/kg_search_status_decision_2026-03-10.md` keeps KG-backed search quarantined.
 - For the repo-level boundary between supported runtime code and research/proposal material, see `docs/runtime_research_boundary.md`.
+- New contributors should start from `docs/start_here_supported_paths.md`.
 
 ## Rollback
 1. Locate previous stable tag.

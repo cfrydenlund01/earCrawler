@@ -13,7 +13,7 @@ root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root))
 
 
-def _import_ingestor():
+def _import_ingestor(monkeypatch):
     module = SimpleNamespace()
     module.CRED_TYPE_GENERIC = 1
 
@@ -22,6 +22,7 @@ def _import_ingestor():
 
     module.CredRead = cred_read
     sys.modules["win32cred"] = module
+    monkeypatch.setenv("EARCRAWLER_ENABLE_LEGACY_INGESTION", "1")
     ing = importlib.import_module("earCrawler.ingestion.ingest")
     importlib.reload(ing)
     return ing.Ingestor
@@ -34,7 +35,7 @@ class StubClient(SimpleNamespace):
 def setup_ingestor(
     monkeypatch, tmp_path, validate_return=(True, None, ""), loader_exc=None
 ):
-    Ingestor = _import_ingestor()
+    Ingestor = _import_ingestor(monkeypatch)
     tg = StubClient()
     fr = StubClient()
     tg.search_entities = lambda q: [{"id": "1"}]
@@ -46,7 +47,7 @@ def setup_ingestor(
     monkeypatch.setattr(ing, "map_entity_to_triples", lambda e: Graph())
     monkeypatch.setattr(ing, "map_document_to_triples", lambda d: Graph())
     monkeypatch.setattr(
-        "earCrawler.ingestion.ingest.validate", lambda **kw: validate_return
+        "earCrawler.experimental.legacy_ingest.validate", lambda **kw: validate_return
     )
 
     calls = []
@@ -56,8 +57,15 @@ def setup_ingestor(
         if loader_exc:
             raise loader_exc
 
-    monkeypatch.setattr("earCrawler.ingestion.ingest.subprocess.run", fake_run)
+    monkeypatch.setattr("earCrawler.experimental.legacy_ingest.subprocess.run", fake_run)
     return ing, calls
+
+
+def test_ingest_module_requires_explicit_enablement(monkeypatch):
+    monkeypatch.delenv("EARCRAWLER_ENABLE_LEGACY_INGESTION", raising=False)
+    sys.modules.pop("earCrawler.ingestion.ingest", None)
+    with pytest.raises(RuntimeError, match="Legacy ingestion module is quarantined"):
+        import earCrawler.ingestion.ingest  # noqa: F401
 
 
 def test_ingest_success(monkeypatch, tmp_path):

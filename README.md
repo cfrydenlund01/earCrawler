@@ -96,6 +96,7 @@ Quarantined or unsupported runtime surfaces in this repo are:
 
 - `earCrawler.service.sparql_service`
 - `earCrawler.service.legacy.kg_service`
+- `earCrawler.ingestion.ingest` (legacy placeholder pipeline; explicitly gated)
 - container runtimes and image-based deployments
 - legacy training or research scaffolding; see `docs/model_training_surface_adr.md`
 
@@ -123,6 +124,7 @@ If you are new to the repo, use this rule first:
 - If a feature is not described through a supported `earctl` or `service.api_server` path with tests and operator docs, treat it as research, experimental, or quarantined.
 
 The repo-level boundary is documented in `docs/runtime_research_boundary.md`.
+New contributors should begin with `docs/start_here_supported_paths.md`.
 
 The CLI enforces role-based access control defined in `security/policy.yml` for operational commands. Protected surfaces include `crawl`, `fetch-*`, `warm-cache`, `telemetry`, `kg-load`, `kg-serve`, `kg-query`, `eval`, API/admin helpers, and release/bundle workflows. Local helper commands such as `nsf-parse`, `kg-emit`, `kg-export`, `fr-fetch`, and `rag-index *` remain outside RBAC. For local testing you can opt into one of the built-in test identities:
 
