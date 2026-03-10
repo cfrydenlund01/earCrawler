@@ -174,10 +174,35 @@ def test_repo_freezes_capability_matrix_and_api_search_status() -> None:
     for status in ("Supported", "Optional", "Quarantined", "Proposal-only"):
         assert status in readme
     assert "Quarantined runtime features include `/v1/search`" in runbook
+    assert "kg_search_status_decision_2026-03-10.md" in readme
+    assert "kg_search_status_decision_2026-03-10.md" in runbook
     assert "| `/v1/search` | Quarantined |" in api_readme
     assert "Status: Quarantined" in openapi_yaml
     assert "quarantined" in openapi_json.lower()
     assert "quarantined /v1/search route" in postman
+
+
+def test_kg_search_quarantine_decision_is_recorded_in_docs_and_code() -> None:
+    decision_doc = (REPO_ROOT / "docs" / "kg_search_status_decision_2026-03-10.md").read_text(
+        encoding="utf-8"
+    )
+    search_router = (REPO_ROOT / "service" / "api_server" / "routers" / "search.py").read_text(
+        encoding="utf-8"
+    )
+    gate_doc = (REPO_ROOT / "docs" / "kg_quarantine_exit_gate.md").read_text(
+        encoding="utf-8"
+    )
+    unquarantine_plan = (REPO_ROOT / "docs" / "kg_unquarantine_plan.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert "Decision: keep KG-backed search `Quarantined`." in decision_doc
+    assert "No-Go for graduation" in decision_doc
+    assert "docs/kg_unquarantine_plan.md" in decision_doc
+    assert "kg_search_status_decision_2026-03-10.md" in search_router
+    assert "KG-backed search quarantined" in search_router
+    assert "kg_search_status_decision_2026-03-10.md" in gate_doc
+    assert "kg_search_status_decision_2026-03-10.md" in unquarantine_plan
 
 
 def test_sample_ttl_pipeline_is_named_as_synthetic_fixture() -> None:
@@ -212,3 +237,18 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     assert "/v1/entities/" in api_smoke
     assert "/v1/lineage/" in api_smoke
     assert "/v1/sparql" in api_smoke
+
+
+def test_cli_entrypoint_is_thin_and_uses_domain_registrars() -> None:
+    main_cli = (REPO_ROOT / "earCrawler" / "cli" / "__main__.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "register_corpus_commands(cli)" in main_cli
+    assert "register_kg_commands(cli)" in main_cli
+    assert "register_rag_commands(cli)" in main_cli
+    assert "register_eval_commands(cli)" in main_cli
+    assert "register_service_commands(cli)" in main_cli
+    assert "def _register_shared_commands(" in main_cli
+    assert main_cli.count("@click.command(") <= 2
+    assert len(main_cli.splitlines()) < 220
