@@ -45,8 +45,12 @@ jobs:
         run: scripts/package-wheel-smoke.ps1
       - name: Lint
         run: black --check . && flake8 .
-      - name: Tests
-        run: pytest -q --disable-warnings --maxfail=1
+      - name: Tests with coverage gate
+        run: |
+          python -m coverage erase
+          pytest -q --disable-warnings --maxfail=1 --cov --cov-report=xml:dist/coverage/coverage.xml --cov-report=term-missing:skip-covered
+      - name: API latency and failure budget gate
+        run: python scripts/api_perf_smoke.py --budgets perf/config/api_route_budgets.yml --report dist/perf/api_perf_smoke.json
 
       - name: Corpus determinism gate (offline fixtures)
         shell: pwsh
@@ -105,6 +109,20 @@ jobs:
           name: eval
           path: dist/eval
           if-no-files-found: ignore
+      - name: Upload coverage XML
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: dist/coverage/coverage.xml
+          if-no-files-found: error
+      - name: Upload perf smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-perf-smoke
+          path: dist/perf/api_perf_smoke.json
+          if-no-files-found: error
 
   gpu:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

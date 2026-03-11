@@ -17,6 +17,7 @@ lxml==5.2.2
 numpy==1.26.4
 pyshacl==0.25.0
 pytest==8.4.1
+pytest-cov==5.0.0
 pytest-socket==0.7.0
 python-dateutil==2.9.0.post0
 PyYAML==6.0.2

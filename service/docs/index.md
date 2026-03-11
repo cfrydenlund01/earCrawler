@@ -12,6 +12,11 @@ queries execute against allowlisted templates and are constrained by size,
 latency and rate-limit budgets. Use the `/openapi.yaml` document for schema
 details.
 
+Supported deployment semantics are single-host only. Current rate limits,
+concurrency controls, and the RAG cache are process-local, so this document
+does not claim multi-instance correctness. Deferred future-work note:
+`docs/ops/multi_instance_deferred.md`.
+
 ## Try it (PowerShell)
 
 ```powershell
@@ -32,6 +37,8 @@ curl.exe -s "http://localhost:9001/v1/entities/urn:example:entity:1"
 * Authenticated API keys: 120 requests/minute with bursts of 20.
 * Request body limit: 32 KB.
 * Upstream timeout: 5 seconds.
+* These budgets are enforced per process; this page does not claim aggregated
+  multi-instance budgets.
 
 ## Errors
 

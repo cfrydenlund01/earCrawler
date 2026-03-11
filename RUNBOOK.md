@@ -18,6 +18,10 @@
 8. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
 9. Create a GitHub release and upload the wheel, EXE, installer, checksum, and SBOM files.
 
+Release artifact note
+- The wheel is the authoritative deployment artifact for the supported Windows API service path described in `docs/ops/windows_single_host_operator.md`.
+- The EXE and installer remain convenience distribution artifacts; they are not the authoritative API hosting path.
+
 Windows notes
 - Inno Setup (iscc.exe): install via winget if not present.
   - `set PATH=%LOCALAPPDATA%\\Microsoft\\WindowsApps;%PATH%`
@@ -31,10 +35,11 @@ Windows notes
 - Container deployment is not a supported runtime surface right now.
 - CI and release do not build or publish Docker or Apptainer runtime artifacts.
 - Do not publish, pull, or depend on GHCR `api` or `rag` images; the repo does not ship maintained container entrypoints.
-- Use the Windows packaging and service flows in this runbook for release and rollback operations.
+- The authoritative Windows single-host deployment, upgrade, backup, restore, rollback, and secret-rotation flow lives in `docs/ops/windows_single_host_operator.md`. This runbook keeps release-engineering and source-checkout workflows only.
 
 ## Supported Runtime Surface
-- Supported operator/runtime entrypoints are `earctl` / `py -m earCrawler.cli ...` and the FastAPI facade at `service.api_server` (typically via `py -m earCrawler.cli api ...` or `py -m uvicorn service.api_server.server:app ...`).
+- Supported operator/runtime entrypoints are the installed `earctl` CLI and the FastAPI facade at `service.api_server`. For release-artifact deployments, use the wheel + NSSM flow in `docs/ops/windows_single_host_operator.md`. The `earctl api ...` and `scripts/api-*.ps1` paths are source-checkout helpers, not the authoritative operator handoff path.
+- Supported runtime semantics are single-host only. Rate limits, concurrency controls, and the RAG cache are process-local today, so this runbook does not claim multi-instance correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`.
 - Capability tags match the canonical matrix in `README.md`: `Supported`, `Optional`, `Quarantined`, and `Proposal-only`.
 - Supported API routes are `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`.
 - Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt`.
@@ -46,21 +51,16 @@ Windows notes
 - New contributors should start from `docs/start_here_supported_paths.md`.
 
 ## Rollback
-1. Locate previous stable tag.
-2. Reinstall or redeploy the prior signed Windows artifacts from that release.
-3. Restart the local service/process wrappers that host the API surface.
-4. Run `monitor.ps1` to verify `/health` endpoints report `ok`.
+- Use `docs/ops/windows_single_host_operator.md` as the single source of truth for deployed-host rollback.
+- This runbook does not define a separate rollback path.
 
 ## Secret Rotation
-- API keys and SPARQL URLs are stored in Windows Credential Manager or as environment variables.
-- Rotate a credential:
-  1. `cmdkey /delete:TRADEGOV_API_KEY`
-  2. `cmdkey /generic:TRADEGOV_API_KEY /user:ignored /pass:<NEW_VALUE>`
-- For environment variables, update deployment configuration and restart containers.
+- Use `docs/ops/windows_single_host_operator.md` as the single source of truth for deployed-host secret rotation.
+- This runbook does not define a separate secret-management path.
 
 ## Telemetry Operations
 - Enable or disable with `earctl telemetry enable|disable`.
-- Change the upload endpoint by editing `%APPDATA%\EarCrawler\telemetry.json`.
+- On deployed hosts configured per `docs/ops/windows_single_host_operator.md`, telemetry config should live at the `EAR_TELEMETRY_CONFIG` path, typically `%PROGRAMDATA%\EarCrawler\config\telemetry.json`.
 - Rotate the HTTP auth token stored in the Windows Credential Manager under the name specified by `auth_secret_name` in the config.
 - Force garbage collection of the spool by deleting old `events-*.jsonl.gz` files or running `scripts/telemetry-gc.ps1`.
 

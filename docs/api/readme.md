@@ -13,6 +13,11 @@ surface. Endpoints mirror the allowlisted SPARQL templates stored under
 `service/templates/`. All responses are validated against Pydantic schemas and
 must complete within the configured latency budget.
 
+Supported deployment semantics are single-host only. Current rate limits,
+concurrency controls, and the RAG cache are process-local, so this document
+does not claim multi-instance correctness. Deferred future-work note:
+`docs/ops/multi_instance_deferred.md`.
+
 ## Endpoints
 
 | Path | Status | Description |
@@ -21,9 +26,9 @@ must complete within the configured latency budget.
 | `/v1/entities/{entity_id}` | Supported | Curated entity projection (labels, provenance, sameAs). |
 | `/v1/lineage/{entity_id}` | Supported | PROV-O lineage graph. |
 | `/v1/sparql` | Supported | Proxy for allowlisted SPARQL templates only. |
-| `/v1/rag/query` | Supported | Retrieval surface with lineage metadata. |
+| `/v1/rag/query` | Supported | Retrieval surface with lineage metadata. Route-level release-smoke latency/failure budgets are defined in `docs/ops/api_latency_budgets.md`. |
 | `/v1/rag/answer` | Optional | Remote-LLM answer generation; requires explicit env enablement and provider credentials. |
-| `/v1/search` | Quarantined | Text-index-backed label search. Available for local validation, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. |
+| `/v1/search` | Quarantined | Text-index-backed label search. Available for local validation, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Its route budget remains a local validation guard only; see `docs/ops/api_latency_budgets.md`. |
 
 Refer to `service/openapi/openapi.yaml` for exhaustive schemas and examples.
 
@@ -109,6 +114,8 @@ denied with `400`.
 * `/v1/search` remains `Quarantined` and requires a text-enabled Fuseki dataset
   (Jena `text:TextDataset` over `rdfs:label`, as configured in
   `bundle/assembler/tdb2-readonly.ttl`).
+* Rate-limit and concurrency budgets are per process; this document does not
+  claim aggregated multi-instance budgets.
 
 Rate-limit state is surfaced via the `X-RateLimit-*` headers and `Retry-After`.
 
@@ -130,10 +137,15 @@ accepted.
 
 ## Windows Service
 
-Use the placeholder guides in `service/windows/` to install the API via NSSM.
-Scripts under `scripts/api-*.ps1` provide local orchestration and smoke tests.
-Run the CLI helper: `earctl api start|stop|smoke` (requires operator or
-maintainer role).
+Use `docs/ops/windows_single_host_operator.md` as the authoritative Windows
+service guide. That document defines the supported deployment artifact, NSSM
+configuration, health checks, upgrade path, backup/restore flow, rollback, and
+secret rotation.
+
+`service/windows/` is now only a pointer back to that guide. The
+`scripts/api-*.ps1` helpers and `earctl api start|stop|smoke` remain useful for
+source-checkout development, but they are not the authoritative release-artifact
+deployment path.
 
 ## Logs and Redaction
 

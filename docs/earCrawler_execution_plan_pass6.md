@@ -331,7 +331,7 @@ Because Extra High should be split, do this as four controlled substeps:
   - restore
   - rollback
   - secret rotation
-- Remove or de-emphasize conflicting operator instructions elsewhere
+- Remove conflicting operator instructions elsewhere
 
 **Recommended model:** GPT-5.4  
 **Reasoning level:** High
@@ -368,19 +368,19 @@ Do **not** start training until all of the following are true:
 4. Deployment/recovery story exists.
 5. KG status is explicit, whether still quarantined or graduated.
 
-This ordering follows the analysis emphasis on architectural ambiguity over obvious implementation failure. fileciteturn1file0
+This ordering follows the analysis emphasis on architectural ambiguity over obvious implementation failure.
 
 ---
 
 ### Task 5.1 — Select the production 7B model
 **Recommendation:** **Qwen2.5-7B-Instruct**  
-**Why this is a good fit:** It is an openly available 7B instruction model from the Qwen family, with official model and repository pages available. citeturn0search0turn0search1
+**Why this is a good fit:** It is an openly available 7B instruction model from the Qwen family, with official model and repository pages available.
 
 **Official model page**
-- Hugging Face: `Qwen/Qwen2.5-7B-Instruct` citeturn0search0
+- Hugging Face: `Qwen/Qwen2.5-7B-Instruct`
 
 **Official repository**
-- GitHub: `QwenLM/Qwen` citeturn0search1
+- GitHub: `QwenLM/Qwen` 
 
 **Recommended model:** GPT-5.4  
 **Reasoning level:** Medium  

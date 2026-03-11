@@ -1,0 +1,36 @@
+profile: windows_single_host
+request_timeout_ms: 5000
+routes:
+  search:
+    runtime_status: quarantined
+    method: GET
+    path: /v1/search
+    query:
+      q: example
+      limit: 1
+    expected_status: 200
+    iterations: 12
+    latency_p95_ms: 250
+    max_failure_rate: 0.0
+    timeout:
+      probe_delay_ms: 5500
+      expected_status: 504
+      min_latency_ms: 4500
+      max_latency_ms: 5500
+  rag_query:
+    runtime_status: supported
+    method: POST
+    path: /v1/rag/query
+    json:
+      query: export controls
+      include_lineage: true
+      top_k: 2
+    expected_status: 200
+    iterations: 12
+    latency_p95_ms: 400
+    max_failure_rate: 0.0
+    timeout:
+      probe_delay_ms: 5500
+      expected_status: 504
+      min_latency_ms: 4500
+      max_latency_ms: 5500

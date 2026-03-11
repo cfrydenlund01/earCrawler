@@ -22,6 +22,8 @@ Container runtimes are not part of the supported runtime or release flow at this
 
 ## Install the Tooling
 
+For Windows operator deployment from signed release artifacts, use `docs/ops/windows_single_host_operator.md`. The clone/editable-install flow below is for source-checkout development and local validation.
+
 > These instructions assume you are running commands from the repository root (the directory that contains `pyproject.toml`).
 
 1. **Clone the repository**
@@ -81,6 +83,8 @@ Container runtimes are not part of the supported runtime or release flow at this
 
 The console script is installed as `earctl`, and the published wheel bundles the `perf` helpers plus the `service.api_server` package and its runtime assets. That means the documented `uvicorn service.api_server.server:app` entrypoint works from an installed wheel, not just from a checkout. When developing from a checkout you can also drive the commands with `python -m` to avoid PATH issues:
 
+For deployed Windows hosts, the authoritative lifecycle guide is `docs/ops/windows_single_host_operator.md`. Use the signed wheel as the API deployment artifact. Do not treat the PyInstaller `earctl.exe`, the installer, or the repo-local `scripts/api-*.ps1` helpers as the authoritative API hosting path.
+
 ```powershell
 py -m earCrawler.cli --help
 py -m earCrawler.cli diagnose
@@ -88,8 +92,8 @@ py -m earCrawler.cli diagnose
 
 Supported entrypoints in this repo are:
 
-- `earctl` / `py -m earCrawler.cli ...` for operator workflows.
-- `py -m uvicorn service.api_server.server:app --host 127.0.0.1 --port 9001` for direct FastAPI hosting.
+- `earctl` / `py -m earCrawler.cli ...` for supported CLI workflows.
+- `py -m uvicorn service.api_server.server:app --host 127.0.0.1 --port 9001` for direct FastAPI hosting and the wheel-based Windows service path.
 - `py -m earCrawler.cli eval run-rag ...` for evaluation runs against datasets in `eval/`.
 
 Quarantined or unsupported runtime surfaces in this repo are:
@@ -109,8 +113,8 @@ document sounds broader, follow this table.
 
 | Surface | Status | Notes |
 | --- | --- | --- |
-| `earctl` / `py -m earCrawler.cli ...` and the documented Windows helper scripts | Supported | These are the supported operator entrypoints. Capability-level status still matters; use the rows below for feature-specific claims. |
-| `service.api_server`, `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, `/v1/rag/query` | Supported | These are the supported service/API surfaces for the Windows-first single-host runtime. |
+| `earctl` / `py -m earCrawler.cli ...` and the documented Windows single-host service path | Supported | These are the supported operator entrypoints. Capability-level status still matters; use the rows below for feature-specific claims. |
+| `service.api_server`, `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, `/v1/rag/query` | Supported | These are the supported service/API surfaces for the Windows-first single-host runtime. Rate limits, concurrency limits, and the RAG cache are process-local; multi-instance correctness is not claimed. |
 | `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Default installs and baseline operator flows do not require them. |
 | `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Current Task 2.2 decision: `docs/kg_search_status_decision_2026-03-10.md` keeps KG-backed search quarantined. |
 | `Research/`, `docs/proposal/`, benchmark planning, model-training/fine-tuning notes, and other future-work design docs | Proposal-only | Useful for planning and evaluation, not an operator/runtime commitment. |
@@ -125,6 +129,18 @@ If you are new to the repo, use this rule first:
 
 The repo-level boundary is documented in `docs/runtime_research_boundary.md`.
 New contributors should begin with `docs/start_here_supported_paths.md`.
+
+## Single-Host Support Statement
+
+The supported deployment contract is one Windows host running one EarCrawler API
+service instance. Current rate limiting, concurrency controls, and the RAG
+query cache are process-local constructs. Running multiple API instances behind
+a load balancer would therefore change behavior immediately, and this repo does
+not claim that such a deployment is correct today.
+
+Future multi-instance design is deferred until the project has shared limit
+state, cache semantics, rollout/rollback behavior, and tests that explicitly
+cover scale-out behavior. See `docs/ops/multi_instance_deferred.md`.
 
 The CLI enforces role-based access control defined in `security/policy.yml` for operational commands. Protected surfaces include `crawl`, `fetch-*`, `warm-cache`, `telemetry`, `kg-load`, `kg-serve`, `kg-query`, `eval`, API/admin helpers, and release/bundle workflows. Local helper commands such as `nsf-parse`, `kg-emit`, `kg-export`, `fr-fetch`, and `rag-index *` remain outside RBAC. For local testing you can opt into one of the built-in test identities:
 
@@ -151,7 +167,7 @@ Run `py -m earCrawler.cli policy --help` to see these identities and the explici
 
 ## Starting The API Facade
 
-The FastAPI facade in `service/api_server` is the only supported service runtime in this repository. It wraps Fuseki with curated SPARQL templates and health checks. The PowerShell helper scripts under `scripts/` handle process management and PID files.
+The FastAPI facade in `service/api_server` is the only supported service runtime in this repository. It wraps Fuseki with curated SPARQL templates and health checks. The steps below are for local source-checkout smoke and development. For deployed Windows hosts, use `docs/ops/windows_single_host_operator.md`.
 
 ```powershell
 # 1. ensure you have operator rights
@@ -185,7 +201,7 @@ Legacy / Future work: `earCrawler.service.sparql_service` and `earCrawler.servic
 Environment variables:
 
 - `EARCRAWLER_API_HOST` and `EARCRAWLER_API_PORT` control bind address and port.
-- `EARCRAWLER_FUSEKI_URL` points the facade at a remote Fuseki instance (defaults to `http://localhost:3030/ear`).
+- `EARCRAWLER_FUSEKI_URL` points the facade at the Fuseki SPARQL query endpoint, for example `http://localhost:3030/ear/query`.
 - `EARCTL_PYTHON` overrides the interpreter used by the PowerShell wrappers.
 
 ---
