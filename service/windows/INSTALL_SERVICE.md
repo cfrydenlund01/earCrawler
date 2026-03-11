@@ -5,6 +5,7 @@ single-host install path.
 
 That guide is the source of truth for:
 
+- the ASGI entrypoint `service.api_server.server:app`
 - the wheel-based runtime layout
 - machine-scoped environment variables
 - NSSM service installation

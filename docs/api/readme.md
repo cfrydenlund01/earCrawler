@@ -27,7 +27,7 @@ does not claim multi-instance correctness. Deferred future-work note:
 | `/v1/lineage/{entity_id}` | Supported | PROV-O lineage graph. |
 | `/v1/sparql` | Supported | Proxy for allowlisted SPARQL templates only. |
 | `/v1/rag/query` | Supported | Retrieval surface with lineage metadata. Route-level release-smoke latency/failure budgets are defined in `docs/ops/api_latency_budgets.md`. |
-| `/v1/rag/answer` | Optional | Remote-LLM answer generation; requires explicit env enablement and provider credentials. |
+| `/v1/rag/answer` | Optional | LLM answer generation through an explicitly enabled remote provider or the gated local Task 5.3 adapter runtime. |
 | `/v1/search` | Quarantined | Text-index-backed label search. Available for local validation, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Its route budget remains a local validation guard only; see `docs/ops/api_latency_budgets.md`. |
 
 Refer to `service/openapi/openapi.yaml` for exhaustive schemas and examples.

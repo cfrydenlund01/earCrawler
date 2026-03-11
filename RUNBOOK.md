@@ -42,7 +42,7 @@ Windows notes
 - Supported runtime semantics are single-host only. Rate limits, concurrency controls, and the RAG cache are process-local today, so this runbook does not claim multi-instance correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`.
 - Capability tags match the canonical matrix in `README.md`: `Supported`, `Optional`, `Quarantined`, and `Proposal-only`.
 - Supported API routes are `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`.
-- Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt`.
+- Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, the Task 5.4 local adapter runtime (`LLM_PROVIDER=local_adapter` plus explicit local-model env), and retrieval extras installed from `requirements-gpu.txt`.
 - Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior.
 - Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
 - Do not use `earCrawler.ingestion.ingest` for operator deployments; it is a quarantined placeholder ingestion pipeline gated by `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`.
@@ -100,7 +100,7 @@ Windows notes
 - The evaluation harness expects exactly this shape and treats unknown extra keys as opaque; keep the schema stable when adding new datasets and bump the dataset `id`/`version` when you need to change semantics.
 - CLI helpers:
   - Required before every eval run: `py -m eval.validate_datasets` (or `python eval/validate_datasets.py`).
-  - `py -m earCrawler.cli eval run-rag --dataset-id <id> --fallback-max-uses 0` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys.
+  - `py -m earCrawler.cli eval run-rag --dataset-id <id> --fallback-max-uses 0` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Eval currently targets remote-provider runs; the optional local adapter runtime is for the supported `/v1/rag/answer` path and separate smoke validation.
   - Add `--retrieval-mode hybrid` for experimental BM25+dense fusion runs, or `--compare-retrieval-modes` to emit dense-vs-hybrid comparison artifacts under the selected output directory.
   - Eval artifacts include strictness counters under `eval_strictness` (`fallbacks_used`, `fallback_counts`, `fallback_items`, threshold/breach flags). Runs fail when fallback count exceeds `fallback_max_uses`.
   - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.

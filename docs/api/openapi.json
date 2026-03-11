@@ -841,7 +841,7 @@
     },
     "/v1/rag/answer": {
       "post": {
-        "summary": "Generate an answer using a remote LLM provider",
+        "summary": "Generate an answer using an optional LLM runtime",
         "description": "Status: Optional. This route requires explicit RAG and remote-LLM enablement plus provider credentials.",
         "parameters": [
           {
@@ -892,7 +892,7 @@
             }
           },
           "503": {
-            "description": "RAG or remote LLM disabled",
+            "description": "RAG or configured LLM runtime disabled",
             "content": {
               "application/json": {
                 "schema": {

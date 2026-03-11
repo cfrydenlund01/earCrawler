@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from earCrawler.rag import llm_runtime
@@ -16,6 +18,9 @@ class _Config:
         self.provider = _Provider()
         self.enable_remote = enable_remote
         self.remote_disabled_reason = disabled_reason
+        self.enable_local = False
+        self.local_disabled_reason = None
+        self.execution_mode = "remote"
 
 
 
@@ -74,3 +79,117 @@ def test_validate_generated_answer_reports_schema_errors_without_provider_failur
     assert result.output_error["code"] == "invalid_json"
     assert result.answer_text is None
     assert result.provider_label == "groq"
+
+
+def test_resolve_llm_request_raises_when_local_adapter_disabled() -> None:
+    prompt = llm_runtime.build_prompt_artifacts(
+        "What applies?",
+        ["[EAR-740.1] License Exceptions intro."],
+    )
+
+    class _LocalConfig:
+        def __init__(self) -> None:
+            self.provider = type(
+                "_Provider",
+                (),
+                {
+                    "provider": "local_adapter",
+                    "model": "phase5-run",
+                    "base_model": "Qwen/Qwen2.5-7B-Instruct",
+                    "adapter_dir": "dist/training/phase5-run/adapter",
+                },
+            )()
+            self.enable_remote = False
+            self.remote_disabled_reason = "local adapter provider selected"
+            self.enable_local = False
+            self.local_disabled_reason = "local LLM flag is off; set EARCRAWLER_ENABLE_LOCAL_LLM=1"
+            self.execution_mode = "local"
+
+    with pytest.raises(llm_runtime.LLMExecutionError) as exc_info:
+        llm_runtime.resolve_llm_request(
+            prompt,
+            trace_id="trace-local-disabled",
+            get_llm_config_fn=lambda **_: _LocalConfig(),
+        )
+
+    exc = exc_info.value
+    assert exc.error_code == "llm_disabled"
+    assert exc.provider_label == "local_adapter"
+    assert exc.model_label == "phase5-run"
+    assert exc.egress_decision.remote_enabled is False
+    assert "EARCRAWLER_ENABLE_LOCAL_LLM=1" in exc.disabled_reason
+
+
+def test_execute_sync_generation_uses_local_adapter_without_remote_egress(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+) -> None:
+    run_dir = tmp_path / "phase5-run"
+    adapter_dir = run_dir / "adapter"
+    adapter_dir.mkdir(parents=True)
+    (adapter_dir / "adapter_config.json").write_text("{}", encoding="utf-8")
+    (adapter_dir / "tokenizer_config.json").write_text("{}", encoding="utf-8")
+    (run_dir / "run_metadata.json").write_text("{}", encoding="utf-8")
+    (run_dir / "inference_smoke.json").write_text(
+        json.dumps({"base_model": "Qwen/Qwen2.5-7B-Instruct"}),
+        encoding="utf-8",
+    )
+
+    prompt = llm_runtime.build_prompt_artifacts(
+        "Question?",
+        ["[EAR-740.1] License Exceptions intro"],
+    )
+
+    class _LocalConfig:
+        def __init__(self) -> None:
+            self.provider = type(
+                "_Provider",
+                (),
+                {
+                    "provider": "local_adapter",
+                    "model": "phase5-run",
+                    "base_model": "Qwen/Qwen2.5-7B-Instruct",
+                    "adapter_dir": str(adapter_dir),
+                },
+            )()
+            self.enable_remote = False
+            self.remote_disabled_reason = "local adapter provider selected"
+            self.enable_local = True
+            self.local_disabled_reason = None
+            self.execution_mode = "local"
+
+    called = {"remote": False}
+
+    def _fail_remote(*_args, **_kwargs):
+        called["remote"] = True
+        raise AssertionError("Remote generate_chat should not run for local adapter path")
+
+    monkeypatch.setattr(
+        llm_runtime,
+        "generate_local_chat",
+        lambda *_args, **_kwargs: (
+            '{'
+            '"label":"permitted",'
+            '"answer_text":"Yes",'
+            '"citations":[{"section_id":"EAR-740.1","quote":"License Exceptions intro","span_id":""}],'
+            '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+            '"assumptions":[]'
+            '}'
+        ),
+    )
+
+    result = llm_runtime.execute_sync_generation(
+        prompt,
+        strict_output=True,
+        trace_id="trace-local",
+        generate_chat_fn=_fail_remote,
+        get_llm_config_fn=lambda **_: _LocalConfig(),
+        empty_collections_on_error=False,
+    )
+
+    assert called["remote"] is False
+    assert result.output_ok is True
+    assert result.answer_text == "Yes"
+    assert result.provider_label == "local_adapter"
+    assert result.model_label == "phase5-run"
+    assert result.egress_decision.remote_enabled is False

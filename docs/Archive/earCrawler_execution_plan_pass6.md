@@ -389,6 +389,15 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 **Exit criteria**
 - One production-intended base model is chosen and written into docs/config.
 
+**Implementation status (March 11, 2026)**
+- Completed.
+- Recorded the production-intended base model as `Qwen/Qwen2.5-7B-Instruct`
+  in `docs/model_training_surface_adr.md`.
+- Added planning-only config record
+  `config/training_model_selection.example.env` so later training work has a
+  single explicit base-model reference without widening the current runtime
+  support boundary.
+
 ---
 
 ### Task 5.2 — Prepare training inputs and training contract
@@ -409,6 +418,19 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 **Exit criteria**
 - You can regenerate the training inputs deterministically.
 
+**Implementation status (March 11, 2026)**
+- Completed.
+- Added `docs/model_training_contract.md` as the canonical planning-only
+  training-input contract for the first production-oriented fine-tuning pass.
+- Added planning-only config record
+  `config/training_input_contract.example.json` defining the authoritative input
+  paths, excluded data classes, and required output artifacts.
+- Locked the first-pass contract to approved offline eCFR snapshot text plus
+  the derived `retrieval-corpus.v1` corpus, while keeping local KG state
+  optional metadata rather than a required preprocessing dependency.
+- Explicitly separated production training data from `eval/*.jsonl`,
+  `tests/golden/**`, and future benchmark artifacts.
+
 ---
 
 ### Task 5.3 — Run first production-oriented 7B fine-tuning pass
@@ -428,11 +450,27 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 **Exit criteria**
 - A named trained model artifact exists and can be loaded into the supported runtime path.
 
+**Implementation status (March 11, 2026)**
+- Completed.
+- Added a repeatable first-pass training runner:
+  `scripts/training/run_phase5_finetune.py` with Windows wrapper
+  `scripts/training/run_phase5_finetune.ps1`.
+- Added standalone adapter inference smoke command:
+  `scripts/training/inference_smoke.py`.
+- Added first-pass runbook:
+  `docs/model_training_first_pass.md`.
+- Added repeatable run-config template:
+  `config/training_first_pass.example.json`.
+- Standardized Task 5.3 artifact naming and run output contract under
+  `dist/training/<run_id>/` with required
+  `examples.jsonl`, `manifest.json`, `run_config.json`, `run_metadata.json`,
+  adapter artifacts, and `inference_smoke.json`.
+
 ---
 
 ### Task 5.4 — Integrate the production candidate model conservatively
 **Goal:** Introduce the production model without breaking the evidence-grounded posture.  
-**Why now:** The analysis praises the current conservative AI layer; keep that discipline. fileciteturn1file0
+**Why now:** The analysis praises the current conservative AI layer; keep that discipline.
 
 **Deliverables**
 - Feature-flagged or configuration-gated model integration
@@ -444,6 +482,29 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 
 **Exit criteria**
 - The trained model can serve through the supported path without relaxing evidence controls.
+
+**Implementation status (March 11, 2026)**
+- Completed.
+- Added configuration-gated local adapter runtime support with
+  `LLM_PROVIDER=local_adapter` plus explicit `EARCRAWLER_ENABLE_LOCAL_LLM=1`
+  enablement in `earCrawler/config/llm_secrets.py`.
+- Added conservative Task 5.3 artifact validation and local adapter execution in
+  `earCrawler/rag/local_adapter_runtime.py`, requiring the recorded adapter
+  directory plus sibling `run_metadata.json` and `inference_smoke.json` before
+  serving.
+- Wired the optional local adapter path through the supported `/v1/rag/answer`
+  generation flow via `earCrawler/rag/llm_runtime.py` and
+  `service/api_server/rag_service.py` while leaving refusal policy, strict JSON
+  schema validation, and grounded citation checks unchanged.
+- Updated runtime docs/config guidance in `README.md`,
+  `config/llm_secrets.example.env`, `docs/model_training_surface_adr.md`, and
+  `docs/model_training_first_pass.md`.
+- Added runtime smoke coverage in `tests/rag/test_llm_runtime.py` and
+  `tests/service/test_rag_endpoint.py`.
+- Added operator-facing smoke helper `scripts/local_adapter_smoke.ps1`, but a
+  real end-to-end local-adapter smoke still requires a concrete
+  `dist/training/<run_id>/` artifact and remains a documented prerequisite when
+  that artifact is absent from the current checkout.
 
 ---
 
@@ -458,6 +519,22 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 
 **Exit criteria**
 - Benchmarks are defined against the production candidate and supported path.
+
+**Implementation status (March 11, 2026)**
+- Completed as a planning task.
+- Added `docs/production_candidate_benchmark_plan.md` as the Phase 6 benchmark
+  plan for the production candidate adapter produced by Task 5.3 and served
+  through the Task 5.4 local-adapter runtime path.
+- Defined entry criteria requiring a concrete `dist/training/<run_id>/`
+  artifact, a passing `scripts/local_adapter_smoke.ps1` run, aligned supported
+  retrieval/API runtime, and a valid eval manifest before benchmark execution.
+- Defined the initial primary benchmark suite against the supported path using
+  `ear_compliance.v2`, `entity_obligations.v2`, and `unanswerable.v2`, with
+  `golden_phase2.v1` and `golden_phase2.failure_modes.v1` treated as secondary
+  characterization suites.
+- Recorded the current execution gap explicitly: benchmark execution still needs
+  a runner that targets the supported `local_adapter` runtime path instead of
+  the current remote-provider-oriented eval workflow.
 
 ---
 

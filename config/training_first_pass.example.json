@@ -1,0 +1,32 @@
+{
+  "schema_version": "training-run-config.v1",
+  "status": "planning_only_until_executed",
+  "base_model": "Qwen/Qwen2.5-7B-Instruct",
+  "snapshot_manifest": "snapshots/offline/<snapshot_id>/manifest.json",
+  "snapshot_id": "<snapshot_id>",
+  "snapshot_sha256": "<payload_sha256>",
+  "retrieval_corpus": "data/retrieval_corpus.jsonl",
+  "output_root": "dist/training",
+  "package_version": 1,
+  "max_examples": 256,
+  "refusal_every": 4,
+  "prepare_only": false,
+  "max_seq_len": 1024,
+  "epochs": 1.0,
+  "learning_rate": 0.0002,
+  "batch_size": 1,
+  "grad_accum": 8,
+  "lora_r": 16,
+  "lora_alpha": 32,
+  "lora_dropout": 0.05,
+  "lora_target_modules": "q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj",
+  "use_4bit": false,
+  "allow_pt_bin": false,
+  "smoke_prompt": "When is a license required under EAR section 736.2(b)?",
+  "smoke_max_new_tokens": 96,
+  "notes": [
+    "Copy this file to a local, non-committed path before running a real pass.",
+    "Set snapshot_id and snapshot_sha256 from the approved offline snapshot manifest.",
+    "The generated adapter and metadata are written under dist/training/<run_id>/."
+  ]
+}

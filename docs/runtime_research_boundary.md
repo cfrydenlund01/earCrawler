@@ -35,6 +35,8 @@ or proposal work but is not a supported runtime commitment:
 
 - `Research/` notes, logs, quizzes, and proposal support material
 - `docs/proposal/` architecture/security/observability proposal narratives
+- phase-gated model-training scripts under `scripts/training/` and associated
+  docs/config records (`docs/model_training_*.md`, `config/training_*.json`)
 - design notes and ADRs for gated, experimental, or future work unless the root
   `README.md` or `RUNBOOK.md` explicitly promotes them into a supported command
   or service path

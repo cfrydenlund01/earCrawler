@@ -23,7 +23,7 @@ class RagQueryRequest(BaseModel):
     )
     generate: bool = Field(
         True,
-        description="When false, run retrieval only and skip any remote LLM generation",
+        description="When false, run retrieval only and skip any configured LLM generation",
     )
 
     @field_validator("effective_date")
@@ -160,7 +160,7 @@ class RagGeneratedResponse(BaseModel):
     latency_ms: float = Field(..., description="Measured latency for the request")
     question: str = Field(..., description="Original user query")
     answer: Optional[str] = Field(
-        default=None, description="Generated answer from the configured remote LLM provider"
+        default=None, description="Generated answer from the configured LLM runtime"
     )
     contexts: List[str] = Field(
         default_factory=list,
@@ -174,7 +174,7 @@ class RagGeneratedResponse(BaseModel):
         default=None, description="Model identifier used for generation"
     )
     provider: Optional[str] = Field(
-        default=None, description="Remote LLM provider used for generation"
+        default=None, description="Resolved LLM runtime/provider used for generation"
     )
     rag_enabled: bool = Field(
         ...,
@@ -182,7 +182,7 @@ class RagGeneratedResponse(BaseModel):
     )
     llm_enabled: bool = Field(
         ...,
-        description="True when remote LLM generation is enabled and configured",
+        description="True when the configured LLM runtime is enabled and configured",
     )
     disabled_reason: Optional[str] = Field(
         default=None,

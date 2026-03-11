@@ -50,7 +50,7 @@ For Windows operator deployment from signed release artifacts, use `docs/ops/win
    This path keeps the dependencies and console scripts inside `.venv\Scripts\`. `requirements.in` is the single dependency source of truth; `requirements.txt` is a compatibility wrapper that points at it. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
    > Tip: Pip may leave a temporary folder (for example `~aml`) behind or warn that script shims such as `uvicorn.exe` are not on `PATH`. The folder can be deleted safely, and you can either add the scripts directory to `PATH` or continue using `python -m earCrawler.cli ...` to invoke commands.
 
-   > **RAG extras (optional):** Base install intentionally excludes `sentence-transformers`, `torch`, and `transformers`. Install these extras only for local embedding/indexing and retrieval experiments. They do not provide a supported model-training, fine-tuning, agent, or quantization stack, and this project does not ship local checkpoint workflows for generation.
+   > **RAG extras (optional):** Base install intentionally excludes `sentence-transformers`, `torch`, `transformers`, and `peft`. Install these extras only when you need local embedding/indexing or the optional Task 5.4 local-adapter RAG path. They do not provide a supported model-training, fine-tuning, agent, or quantization stack.
    > ```powershell
    > python -m pip install --requirement requirements-gpu.txt
    > # or, equivalently:
@@ -115,9 +115,9 @@ document sounds broader, follow this table.
 | --- | --- | --- |
 | `earctl` / `py -m earCrawler.cli ...` and the documented Windows single-host service path | Supported | These are the supported operator entrypoints. Capability-level status still matters; use the rows below for feature-specific claims. |
 | `service.api_server`, `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, `/v1/rag/query` | Supported | These are the supported service/API surfaces for the Windows-first single-host runtime. Rate limits, concurrency limits, and the RAG cache are process-local; multi-instance correctness is not claimed. |
-| `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Default installs and baseline operator flows do not require them. |
+| `/v1/rag/answer`, remote OpenAI-compatible providers, the optional local adapter runtime (`LLM_PROVIDER=local_adapter`), and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Default installs and baseline operator flows do not require them. |
 | `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Current Task 2.2 decision: `docs/kg_search_status_decision_2026-03-10.md` keeps KG-backed search quarantined. |
-| `Research/`, `docs/proposal/`, benchmark planning, model-training/fine-tuning notes, and other future-work design docs | Proposal-only | Useful for planning and evaluation, not an operator/runtime commitment. |
+| `Research/`, `docs/proposal/`, benchmark planning, model-training/fine-tuning notes, and other future-work design docs | Proposal-only | Useful for planning and evaluation, not an operator/runtime commitment. Phase 5 records include base-model selection (`docs/model_training_surface_adr.md`, `config/training_model_selection.example.env`), training-input contract (`docs/model_training_contract.md`, `config/training_input_contract.example.json`), first-pass run tooling (`docs/model_training_first_pass.md`, `config/training_first_pass.example.json`, `scripts/training/*`), and the Phase 6 benchmark plan (`docs/production_candidate_benchmark_plan.md`). |
 
 ## Runtime vs Research Boundary
 
@@ -126,6 +126,11 @@ If you are new to the repo, use this rule first:
 - `README.md`, `RUNBOOK.md`, `service/api_server`, `earctl`, and the code and scripts they directly rely on are the supported product/runtime surface.
 - `Research/`, `docs/proposal/`, and design notes for gated or future work are not production commitments by themselves.
 - If a feature is not described through a supported `earctl` or `service.api_server` path with tests and operator docs, treat it as research, experimental, or quarantined.
+- Phase 5 training records currently target `Qwen/Qwen2.5-7B-Instruct` as the production-intended 7B base model and include Task 5.3 first-pass tooling in `docs/model_training_first_pass.md` and `scripts/training/`.
+- The training-input contract for this model work is recorded in `docs/model_training_contract.md`; it uses approved eCFR snapshot text and the derived retrieval corpus, not eval fixtures or benchmark artifacts.
+- Training scripts and artifacts are still a phase-gated workflow, not a supported operator runtime path by themselves.
+- Task 5.4 adds a separate optional runtime path that can load a Task 5.3 adapter through `/v1/rag/answer` only when `LLM_PROVIDER=local_adapter`, `EARCRAWLER_ENABLE_LOCAL_LLM=1`, and the recorded adapter artifacts are present.
+- Phase 6 benchmark planning is now recorded in `docs/production_candidate_benchmark_plan.md`; benchmark execution still depends on a real Task 5.3 run artifact and a benchmark runner that targets the local-adapter runtime.
 
 The repo-level boundary is documented in `docs/runtime_research_boundary.md`.
 New contributors should begin with `docs/start_here_supported_paths.md`.
@@ -206,12 +211,18 @@ Environment variables:
 
 ---
 
-## RAG / Remote LLM Answering
+## RAG / Optional LLM Answering
 
-Status: `Optional`. This path requires explicit environment enablement and
-provider credentials; it is not part of the default baseline runtime.
+Status: `Optional`. This path requires explicit environment enablement and,
+depending on the mode, either provider credentials or a recorded local adapter
+artifact; it is not part of the default baseline runtime.
 
-The API can generate answers using remote OpenAI-compatible providers (Groq or NVIDIA NIM). Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys loaded from your environment, Windows Credential Store, or an optional local-only `config/llm_secrets.env` (copy from `config/llm_secrets.example.env` and do not commit it).
+The API can generate answers using:
+
+- remote OpenAI-compatible providers (Groq or NVIDIA NIM)
+- a local Task 5.3 adapter runtime loaded from `dist/training/<run_id>/adapter`
+
+Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys loaded from your environment, Windows Credential Store, or an optional local-only `config/llm_secrets.env` (copy from `config/llm_secrets.example.env` and do not commit it).
 
 ```powershell
 $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = '1'  # local test/dev only
@@ -220,6 +231,27 @@ $env:EARCRAWLER_API_ENABLE_RAG = '1'
 $env:EARCRAWLER_ENABLE_REMOTE_LLM = '1'
 # Provide keys via env or Windows Credential Store (recommended), or via config/llm_secrets.env
 py -m earCrawler.cli api start
+```
+
+For the local adapter path, point the runtime at a completed Task 5.3 artifact
+and keep the same evidence/schema guardrails:
+
+```powershell
+$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = '1'  # local test/dev only
+$env:EARCTL_USER = 'test_operator'
+$env:EARCRAWLER_API_ENABLE_RAG = '1'
+$env:LLM_PROVIDER = 'local_adapter'
+$env:EARCRAWLER_ENABLE_LOCAL_LLM = '1'
+$env:EARCRAWLER_LOCAL_LLM_BASE_MODEL = 'Qwen/Qwen2.5-7B-Instruct'
+$env:EARCRAWLER_LOCAL_LLM_ADAPTER_DIR = 'dist/training/<run_id>/adapter'
+$env:EARCRAWLER_LOCAL_LLM_MODEL_ID = '<run_id>'
+py -m earCrawler.cli api start
+```
+
+Then run the operator smoke helper against the same run artifact:
+
+```powershell
+pwsh .\scripts\local_adapter_smoke.ps1 -RunDir dist/training/<run_id>
 ```
 
 Call the generated-answer endpoint:
@@ -233,7 +265,7 @@ Invoke-WebRequest `
   Select-Object -ExpandProperty Content
 ```
 
-The response includes `question`, `answer`, `contexts` (the passages passed to the LLM), `retrieved` (document metadata), `provider`, `model`, and flags `rag_enabled` / `llm_enabled` indicating whether the stack is active.
+The response includes `question`, `answer`, `contexts` (the passages passed to the LLM), `retrieved` (document metadata), `provider`, `model`, and flags `rag_enabled` / `llm_enabled` indicating whether the stack is active. Local adapter runs continue to use the same refusal policy, strict JSON schema validation, and citation grounding checks as remote runs.
 
 Retrieval mode selection is controlled by `EARCRAWLER_RETRIEVAL_MODE`:
 
