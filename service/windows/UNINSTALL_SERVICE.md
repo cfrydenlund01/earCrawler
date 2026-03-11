@@ -1,3 +1,6 @@
+This file is supplemental only. Use `docs/ops/windows_single_host_operator.md`
+for the supported deployment lifecycle and rollback path.
+
 To remove the `EarCrawler-API` Windows service created with NSSM:
 
 1. Stop the service if it is running:

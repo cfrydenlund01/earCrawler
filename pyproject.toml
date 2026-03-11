@@ -47,3 +47,11 @@ namespaces = true
 
 [tool.setuptools.data-files]
 "docs/privacy" = ["docs/privacy/telemetry_policy.md", "docs/privacy/redaction_rules.md"]
+
+[tool.coverage.run]
+source = ["earCrawler", "api_clients", "service", "cli"]
+
+[tool.coverage.report]
+fail_under = 75
+show_missing = true
+skip_covered = true
