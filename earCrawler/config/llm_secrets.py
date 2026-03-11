@@ -10,7 +10,7 @@ from typing import Dict, Tuple
 from earCrawler.utils.secure_store import get_secret
 
 
-_SUPPORTED_PROVIDERS = frozenset({"groq", "nvidia_nim"})
+_SUPPORTED_PROVIDERS = frozenset({"groq", "nvidia_nim", "local_adapter"})
 
 _DEFAULTS = {
     "nvidia_nim": {
@@ -24,6 +24,10 @@ _DEFAULTS = {
         "model": "llama-3.3-70b-versatile",
         "base_url": "https://api.groq.com/openai/v1",
     },
+    "local_adapter": {
+        "model": "",
+        "base_url": "",
+    },
 }
 
 
@@ -34,6 +38,9 @@ class ProviderConfig:
     model: str
     base_url: str
     request_limit: int | None = None
+    base_model: str = ""
+    adapter_dir: str = ""
+    execution_mode: str = "remote"
 
 
 @dataclass
@@ -43,6 +50,9 @@ class LLMConfig:
     remote_policy: str = "deny"
     enable_remote_flag: bool = False
     remote_disabled_reason: str | None = None
+    enable_local: bool = False
+    local_disabled_reason: str | None = None
+    execution_mode: str = "remote"
 
 
 def _parse_env_file(path: Path) -> Dict[str, str]:
@@ -123,6 +133,40 @@ def _resolve_provider_model(
     return provider, resolved_model
 
 
+def _resolve_local_adapter_config(model_override: str | None) -> tuple[ProviderConfig, bool, str | None]:
+    adapter_dir = str(os.getenv("EARCRAWLER_LOCAL_LLM_ADAPTER_DIR") or "").strip()
+    base_model = str(os.getenv("EARCRAWLER_LOCAL_LLM_BASE_MODEL") or "").strip()
+    model_label = (
+        str(model_override or os.getenv("EARCRAWLER_LOCAL_LLM_MODEL_ID") or "").strip()
+        or (Path(adapter_dir).parent.name if adapter_dir else "")
+        or "local-adapter"
+    )
+    enable_local = os.getenv("EARCRAWLER_ENABLE_LOCAL_LLM", "0") == "1"
+    local_disabled_reason = None
+    if not enable_local:
+        local_disabled_reason = "local LLM flag is off; set EARCRAWLER_ENABLE_LOCAL_LLM=1"
+    elif not adapter_dir:
+        local_disabled_reason = (
+            "local adapter dir is not configured; set EARCRAWLER_LOCAL_LLM_ADAPTER_DIR"
+        )
+    elif not base_model:
+        local_disabled_reason = (
+            "local base model is not configured; set EARCRAWLER_LOCAL_LLM_BASE_MODEL"
+        )
+
+    provider_cfg = ProviderConfig(
+        provider="local_adapter",
+        api_key="",
+        model=model_label,
+        base_url="",
+        request_limit=None,
+        base_model=base_model,
+        adapter_dir=adapter_dir,
+        execution_mode="local",
+    )
+    return provider_cfg, enable_local, local_disabled_reason
+
+
 def get_llm_config(
     *, provider_override: str | None = None, model_override: str | None = None
 ) -> LLMConfig:
@@ -138,6 +182,21 @@ def get_llm_config(
         raise ValueError(
             f"Unsupported LLM_PROVIDER={provider!r}. Supported providers: {supported}."
         )
+    if provider == "local_adapter":
+        provider_cfg, enable_local, local_disabled_reason = _resolve_local_adapter_config(
+            model_override
+        )
+        return LLMConfig(
+            provider=provider_cfg,
+            enable_remote=False,
+            remote_policy="deny",
+            enable_remote_flag=False,
+            remote_disabled_reason="local adapter provider selected",
+            enable_local=enable_local,
+            local_disabled_reason=local_disabled_reason,
+            execution_mode="local",
+        )
+
     provider, model = _resolve_provider_model(provider, model_override)
 
     defaults = _DEFAULTS.get(provider, {})
@@ -173,6 +232,7 @@ def get_llm_config(
         model=model,
         base_url=base_url or "",
         request_limit=request_limit,
+        execution_mode="remote",
     )
     return LLMConfig(
         provider=provider_cfg,
@@ -180,6 +240,9 @@ def get_llm_config(
         remote_policy=remote_policy,
         enable_remote_flag=enable_remote_flag,
         remote_disabled_reason=remote_disabled_reason,
+        enable_local=False,
+        local_disabled_reason="local adapter provider not selected",
+        execution_mode="remote",
     )
 
 

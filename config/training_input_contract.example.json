@@ -1,0 +1,31 @@
+{
+  "status": "planning_only",
+  "schema_version": "training-input-contract.v1",
+  "base_model": "Qwen/Qwen2.5-7B-Instruct",
+  "authoritative_sources": {
+    "offline_snapshot_manifest": "snapshots/offline/<snapshot_id>/manifest.json",
+    "offline_snapshot_payload": "snapshots/offline/<snapshot_id>/snapshot.jsonl",
+    "retrieval_corpus_jsonl": "data/faiss/retrieval_corpus.jsonl"
+  },
+  "optional_metadata": {
+    "kg_state_manifest": "kg/.kgstate/manifest.json"
+  },
+  "output_contract": {
+    "manifest": "dist/training/<run_id>/manifest.json",
+    "examples": "dist/training/<run_id>/examples.jsonl",
+    "example_schema_version": "instruction-tuning.v1"
+  },
+  "exclude_globs": [
+    "eval/*.jsonl",
+    "dist/eval/**",
+    "tests/fixtures/**",
+    "tests/golden/**",
+    "Research/**",
+    "docs/proposal/**"
+  ],
+  "notes": [
+    "This file is planning-only and is not consumed by the current runtime.",
+    "The first-pass training package must not require a local KG.",
+    "Benchmark data is deferred until Phase 6."
+  ]
+}

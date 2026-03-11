@@ -42,7 +42,9 @@ def _grep_files(pattern: str) -> set[Path]:
             check=False,
         )
         if proc.returncode not in (0, 1):
-            raise RuntimeError(proc.stderr.strip() or f"rg failed with exit {proc.returncode}")
+            raise RuntimeError(
+                proc.stderr.strip() or f"rg failed with exit {proc.returncode}"
+            )
         return {Path(line.strip()) for line in proc.stdout.splitlines() if line.strip()}
 
     matches: set[Path] = set()
@@ -88,7 +90,9 @@ def test_runtime_service_entrypoints_use_api_server() -> None:
 
 
 def test_wheel_packaging_includes_service_runtime_surface() -> None:
-    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    pyproject = tomllib.loads(
+        (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    )
     includes = pyproject["tool"]["setuptools"]["packages"]["find"]["include"]
     package_data = pyproject["tool"]["setuptools"]["package-data"]
     dependencies = pyproject["project"]["dependencies"]
@@ -103,14 +107,15 @@ def test_wheel_packaging_includes_service_runtime_surface() -> None:
     ]
     for requirement in ("httpx", "keyring", "tenacity", "uvicorn"):
         assert any(
-            str(dep).lower().startswith(requirement)
-            for dep in dependencies
+            str(dep).lower().startswith(requirement) for dep in dependencies
         ), f"Missing runtime dependency for packaged service import: {requirement}"
 
 
 def test_repo_does_not_ship_container_runtime_artifacts() -> None:
     ci_workflow = (REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    release_workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    release_workflow = (REPO_ROOT / ".github/workflows/release.yml").read_text(
+        encoding="utf-8"
+    )
 
     assert not (REPO_ROOT / "docker/api.Dockerfile").exists()
     assert not (REPO_ROOT / "docker/rag.Dockerfile").exists()
@@ -135,8 +140,150 @@ def test_repo_does_not_ship_placeholder_training_surface() -> None:
     assert not (REPO_ROOT / "agent").exists()
     assert not (REPO_ROOT / "models" / "legalbert").exists()
     assert not (REPO_ROOT / "earCrawler" / "quant" / "__init__.py").exists()
-    assert "supported model-training, fine-tuning, agent, or quantization stack" in readme
+    assert (
+        "supported model-training, fine-tuning, agent, or quantization stack" in readme
+    )
     assert "docs/model_training_surface_adr.md" in readme
+
+
+def test_phase5_base_model_selection_is_recorded_as_planning_only() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    adr = (REPO_ROOT / "docs" / "model_training_surface_adr.md").read_text(
+        encoding="utf-8"
+    )
+    execution_plan = (
+        REPO_ROOT / "docs" / "Archive" / "earCrawler_execution_plan_pass6.md"
+    ).read_text(encoding="utf-8")
+    config_record = (
+        REPO_ROOT / "config" / "training_model_selection.example.env"
+    ).read_text(encoding="utf-8")
+
+    assert "Qwen/Qwen2.5-7B-Instruct" in readme
+    assert "Qwen/Qwen2.5-7B-Instruct" in adr
+    assert "planning-only" in adr
+    assert "Task 5.1" in execution_plan
+    assert "Qwen/Qwen2.5-7B-Instruct" in config_record
+    assert "TRAINING_MODEL_STATUS=planning_only" in config_record
+    assert "This file is not consumed by the current runtime" in config_record
+
+
+def test_phase5_training_contract_is_recorded_and_separated() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    adr = (REPO_ROOT / "docs" / "model_training_surface_adr.md").read_text(
+        encoding="utf-8"
+    )
+    contract = (REPO_ROOT / "docs" / "model_training_contract.md").read_text(
+        encoding="utf-8"
+    )
+    execution_plan = (
+        REPO_ROOT / "docs" / "Archive" / "earCrawler_execution_plan_pass6.md"
+    ).read_text(encoding="utf-8")
+    config_record = (
+        REPO_ROOT / "config" / "training_input_contract.example.json"
+    ).read_text(encoding="utf-8")
+
+    assert "docs/model_training_contract.md" in readme
+    assert "docs/model_training_contract.md" in adr
+    assert "approved offline snapshot manifest and payload" in contract
+    assert "retrieval-corpus.v1" in contract
+    assert "A local KG is NOT required" in contract
+    assert "eval/*.jsonl" in contract
+    assert "future benchmark data remains deferred" in adr
+    assert "Task 5.2" in execution_plan
+    assert '"schema_version": "training-input-contract.v1"' in config_record
+    assert '"eval/*.jsonl"' in config_record
+    assert "not require a local KG" in config_record
+
+
+def test_phase5_first_finetune_pass_is_recorded_with_repeatable_commands() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    adr = (REPO_ROOT / "docs" / "model_training_surface_adr.md").read_text(
+        encoding="utf-8"
+    )
+    contract = (REPO_ROOT / "docs" / "model_training_contract.md").read_text(
+        encoding="utf-8"
+    )
+    runbook = (REPO_ROOT / "docs" / "model_training_first_pass.md").read_text(
+        encoding="utf-8"
+    )
+    execution_plan = (
+        REPO_ROOT / "docs" / "Archive" / "earCrawler_execution_plan_pass6.md"
+    ).read_text(encoding="utf-8")
+    config_record = (
+        REPO_ROOT / "config" / "training_first_pass.example.json"
+    ).read_text(encoding="utf-8")
+
+    assert "docs/model_training_first_pass.md" in readme
+    assert "Phase 5.3" in adr
+    assert "scripts/training/run_phase5_finetune.py" in contract
+    assert "Task 5.3" in execution_plan
+    assert "Implementation status (March 11, 2026)" in execution_plan
+    assert "dist/training/<run_id>/run_metadata.json" in runbook
+    assert "scripts/training/inference_smoke.py" in runbook
+    assert '"schema_version": "training-run-config.v1"' in config_record
+    assert '"base_model": "Qwen/Qwen2.5-7B-Instruct"' in config_record
+    assert (REPO_ROOT / "scripts" / "training" / "run_phase5_finetune.py").exists()
+    assert (REPO_ROOT / "scripts" / "training" / "inference_smoke.py").exists()
+    assert (REPO_ROOT / "scripts" / "training" / "run_phase5_finetune.ps1").exists()
+
+
+def test_phase5_local_adapter_runtime_is_gated_and_documented() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
+    adr = (REPO_ROOT / "docs" / "model_training_surface_adr.md").read_text(
+        encoding="utf-8"
+    )
+    runbook_task = (REPO_ROOT / "docs" / "model_training_first_pass.md").read_text(
+        encoding="utf-8"
+    )
+    execution_plan = (
+        REPO_ROOT / "docs" / "Archive" / "earCrawler_execution_plan_pass6.md"
+    ).read_text(encoding="utf-8")
+    llm_env = (REPO_ROOT / "config" / "llm_secrets.example.env").read_text(
+        encoding="utf-8"
+    )
+    requirements_gpu = (REPO_ROOT / "requirements-gpu.txt").read_text(
+        encoding="utf-8"
+    )
+    pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+
+    assert "LLM_PROVIDER=local_adapter" in readme
+    assert "EARCRAWLER_ENABLE_LOCAL_LLM=1" in readme
+    assert "scripts\\local_adapter_smoke.ps1" in readme or "scripts/local_adapter_smoke.ps1" in readme
+    assert "Task 5.4" in adr
+    assert "run_metadata.json" in adr
+    assert "inference_smoke.json" in adr
+    assert "Task 5.4" in runbook_task
+    assert "Implementation status (March 11, 2026)" in execution_plan
+    assert "local_adapter" in execution_plan
+    assert "EARCRAWLER_LOCAL_LLM_ADAPTER_DIR" in llm_env
+    assert "EARCRAWLER_LOCAL_LLM_BASE_MODEL" in llm_env
+    assert "peft==0.11.1" in requirements_gpu
+    assert "peft==0.11.1" in pyproject
+    assert (
+        REPO_ROOT / "earCrawler" / "rag" / "local_adapter_runtime.py"
+    ).exists()
+    assert (REPO_ROOT / "scripts" / "local_adapter_smoke.ps1").exists()
+
+
+def test_phase6_benchmark_plan_targets_the_production_candidate() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    execution_plan = (
+        REPO_ROOT / "docs" / "Archive" / "earCrawler_execution_plan_pass6.md"
+    ).read_text(encoding="utf-8")
+    benchmark_plan = (
+        REPO_ROOT / "docs" / "production_candidate_benchmark_plan.md"
+    ).read_text(encoding="utf-8")
+
+    assert "docs/production_candidate_benchmark_plan.md" in readme
+    assert "Task 6.1" in execution_plan
+    assert "Implementation status (March 11, 2026)" in execution_plan
+    assert "ear_compliance.v2" in benchmark_plan
+    assert "entity_obligations.v2" in benchmark_plan
+    assert "unanswerable.v2" in benchmark_plan
+    assert "local_adapter" in benchmark_plan
+    assert "dist/training/<run_id>/" in benchmark_plan
+    assert "eval_rag_llm.py" in benchmark_plan
 
 
 def test_repo_documents_runtime_vs_research_boundary() -> None:
@@ -157,9 +304,7 @@ def test_repo_documents_runtime_vs_research_boundary() -> None:
 def test_repo_freezes_capability_matrix_and_api_search_status() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
-    api_readme = (REPO_ROOT / "docs" / "api" / "readme.md").read_text(
-        encoding="utf-8"
-    )
+    api_readme = (REPO_ROOT / "docs" / "api" / "readme.md").read_text(encoding="utf-8")
     openapi_yaml = (REPO_ROOT / "service" / "openapi" / "openapi.yaml").read_text(
         encoding="utf-8"
     )
@@ -183,12 +328,12 @@ def test_repo_freezes_capability_matrix_and_api_search_status() -> None:
 
 
 def test_kg_search_quarantine_decision_is_recorded_in_docs_and_code() -> None:
-    decision_doc = (REPO_ROOT / "docs" / "kg_search_status_decision_2026-03-10.md").read_text(
-        encoding="utf-8"
-    )
-    search_router = (REPO_ROOT / "service" / "api_server" / "routers" / "search.py").read_text(
-        encoding="utf-8"
-    )
+    decision_doc = (
+        REPO_ROOT / "docs" / "kg_search_status_decision_2026-03-10.md"
+    ).read_text(encoding="utf-8")
+    search_router = (
+        REPO_ROOT / "service" / "api_server" / "routers" / "search.py"
+    ).read_text(encoding="utf-8")
     gate_doc = (REPO_ROOT / "docs" / "kg_quarantine_exit_gate.md").read_text(
         encoding="utf-8"
     )

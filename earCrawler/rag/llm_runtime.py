@@ -9,6 +9,7 @@ from typing import Callable, Sequence
 
 from api_clients.llm_client import LLMProviderError, generate_chat
 from earCrawler.config.llm_secrets import get_llm_config
+from earCrawler.rag.local_adapter_runtime import generate_local_chat
 from earCrawler.rag.output_schema import (
     DEFAULT_ALLOWED_LABELS,
     TRUTHINESS_LABELS,
@@ -39,6 +40,8 @@ class ResolvedLLMRequest:
     provider_label: str
     model_label: str
     prompt_artifacts: PromptArtifacts
+    execution_mode: str = "remote"
+    provider_config: object | None = None
 
     def build_egress_decision(
         self,
@@ -388,7 +391,30 @@ def resolve_llm_request(
         provider_label=provider_label,
         model_label=model_label,
         prompt_artifacts=prompt_artifacts,
+        execution_mode=getattr(config, "execution_mode", "remote"),
+        provider_config=getattr(config, "provider", None),
     )
+    if request.execution_mode == "local":
+        if getattr(config, "enable_local", False):
+            return request
+        disabled_reason = getattr(config, "local_disabled_reason", None) or (
+            "local adapter runtime is disabled"
+        )
+        raise LLMExecutionError(
+            (
+                f"Local adapter generation is disabled ({disabled_reason}). "
+                "Set LLM_PROVIDER=local_adapter and EARCRAWLER_ENABLE_LOCAL_LLM=1."
+            ),
+            egress_decision=request.build_egress_decision(
+                remote_enabled=False,
+                disabled_reason=disabled_reason,
+                trace_id=trace_id,
+            ),
+            error_code="llm_disabled",
+            provider_label=provider_label,
+            model_label=model_label,
+            disabled_reason=disabled_reason,
+        )
     if not config.enable_remote:
         disabled_reason = config.remote_disabled_reason or "remote LLM policy denied egress"
         raise LLMExecutionError(
@@ -515,17 +541,24 @@ def execute_sync_generation(
         get_llm_config_fn=get_llm_config_fn,
     )
     llm_start = time.perf_counter()
+    remote_enabled = request.execution_mode == "remote"
     try:
-        raw_answer = generate_chat_fn(
-            prompt_artifacts.prompt,
-            provider=request.provider_label,
-            model=request.model_label,
-        )
+        if request.execution_mode == "local":
+            raw_answer = generate_local_chat(
+                prompt_artifacts.prompt,
+                provider_cfg=request.provider_config,
+            )
+        else:
+            raw_answer = generate_chat_fn(
+                prompt_artifacts.prompt,
+                provider=request.provider_label,
+                model=request.model_label,
+            )
     except LLMProviderError as exc:
         raise LLMExecutionError(
             str(exc),
             egress_decision=request.build_egress_decision(
-                remote_enabled=True,
+                remote_enabled=remote_enabled,
                 disabled_reason=str(exc),
                 trace_id=trace_id,
             ),
@@ -541,7 +574,7 @@ def execute_sync_generation(
         provider_label=request.provider_label,
         model_label=request.model_label,
         egress_decision=request.build_egress_decision(
-            remote_enabled=True,
+            remote_enabled=remote_enabled,
             disabled_reason=None,
             trace_id=trace_id,
         ),

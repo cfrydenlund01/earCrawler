@@ -5,6 +5,7 @@ single-host service configuration.
 
 That guide is the source of truth for:
 
+- the ASGI entrypoint `service.api_server.server:app`
 - the standard host directory layout
 - required environment variables
 - NSSM runtime configuration

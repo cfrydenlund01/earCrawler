@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """RAG route orchestration helpers."""
 
+import asyncio
 import math
 import time
 from dataclasses import dataclass
@@ -371,17 +372,24 @@ async def execute_answer_generation(
 
     llm_start = time.perf_counter()
     try:
-        raw_answer = await run_generate(
-            prompt_artifacts.prompt,
-            request.provider_label,
-            request.model_label,
-        )
+        if request.execution_mode == "local":
+            raw_answer = await asyncio.to_thread(
+                llm_runtime.generate_local_chat,
+                prompt_artifacts.prompt,
+                provider_cfg=request.provider_config,
+            )
+        else:
+            raw_answer = await run_generate(
+                prompt_artifacts.prompt,
+                request.provider_label,
+                request.model_label,
+            )
     except LLMProviderError as exc:
         generation = _provider_error_generation(
             code="llm_unavailable",
             message=str(exc),
             egress_decision=request.build_egress_decision(
-                remote_enabled=True,
+                remote_enabled=request.execution_mode == "remote",
                 disabled_reason=str(exc),
                 trace_id=trace_id,
             ),
@@ -399,7 +407,7 @@ async def execute_answer_generation(
         provider_label=request.provider_label,
         model_label=request.model_label,
         egress_decision=request.build_egress_decision(
-            remote_enabled=True,
+            remote_enabled=request.execution_mode == "remote",
             disabled_reason=None,
             trace_id=trace_id,
         ),

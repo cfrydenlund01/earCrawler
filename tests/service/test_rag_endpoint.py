@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 from fastapi.testclient import TestClient
 from pytest_socket import disable_socket, enable_socket, socket_allow_hosts
@@ -222,6 +224,66 @@ def test_llm_endpoint_returns_answer_and_contexts(monkeypatch):
     assert len(data["egress"]["context_hashes"][0]) == 64
     assert "export controls" not in str(data["egress"])
     assert "Example EAR passage text about exports." not in str(data["egress"])
+
+
+def test_llm_endpoint_supports_local_adapter_without_remote_egress(
+    monkeypatch,
+    tmp_path,
+):
+    retriever = _StubRetriever()
+    client = _app(retriever)
+
+    import service.api_server.routers.rag as rag_router
+    from earCrawler.rag import llm_runtime
+
+    run_dir = tmp_path / "phase5-run"
+    adapter_dir = run_dir / "adapter"
+    adapter_dir.mkdir(parents=True)
+    (adapter_dir / "adapter_config.json").write_text("{}", encoding="utf-8")
+    (adapter_dir / "tokenizer_config.json").write_text("{}", encoding="utf-8")
+    (run_dir / "run_metadata.json").write_text("{}", encoding="utf-8")
+    (run_dir / "inference_smoke.json").write_text(
+        json.dumps({"base_model": "Qwen/Qwen2.5-7B-Instruct"}),
+        encoding="utf-8",
+    )
+
+    called = {"remote": False}
+
+    def _fail_remote(_messages, *a, **k):
+        called["remote"] = True
+        raise AssertionError("generate_chat should not run for local adapter path")
+
+    monkeypatch.setattr(rag_router, "generate_chat", _fail_remote)
+    monkeypatch.setattr(
+        llm_runtime,
+        "generate_local_chat",
+        lambda *_args, **_kwargs: (
+            '{'
+            '"label":"permitted",'
+            '"answer_text":"local adapter answer",'
+            '"justification":"Example EAR passage text about exports.",'
+            '"citations":[{"section_id":"EAR-734.3","quote":"Example EAR passage text about exports.","span_id":""}],'
+            '"evidence_okay":{"ok":true,"reasons":["citation_quote_is_substring_of_context"]},'
+            '"assumptions":[]'
+            '}'
+        ),
+    )
+    monkeypatch.setenv("LLM_PROVIDER", "local_adapter")
+    monkeypatch.setenv("EARCRAWLER_ENABLE_LOCAL_LLM", "1")
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_ADAPTER_DIR", str(adapter_dir))
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_MODEL_ID", "phase5-run")
+    monkeypatch.setenv("EARCRAWLER_SKIP_LLM_SECRETS_FILE", "1")
+
+    resp = client.post("/v1/rag/answer", json={"query": "export controls", "top_k": 2})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert called["remote"] is False
+    assert data["answer"] == "local adapter answer"
+    assert data["provider"] == "local_adapter"
+    assert data["model"] == "phase5-run"
+    assert data["llm_enabled"] is True
+    assert data["egress"]["remote_enabled"] is False
 
 
 def test_llm_endpoint_retrieval_only_skips_generation(monkeypatch):
