@@ -4,7 +4,8 @@ param(
     [string]$ApiHost = '127.0.0.1',
     [int]$Port = 9001,
     [string]$ConfigPath = 'service/config/observability.yml',
-    [string]$ReportPath = 'kg/reports/health-api.txt'
+    [string]$ReportPath = 'kg/reports/health-api.txt',
+    [switch]$IncludeQuarantinedSearch
 )
 
 Set-StrictMode -Version Latest
@@ -67,23 +68,31 @@ $ready = $false
 if ($health.Body -and $health.Body.readiness) {
     $ready = ($health.Body.readiness.status -eq 'pass')
 }
+$healthBudgetOk = ($health.DurationMs -le $apiBudget)
+$report += "Health budget OK: $(if ($healthBudgetOk) { 'yes' } else { 'no' })"
 
-$searchUri = "$baseUrl/v1/search?q=health&limit=1"
-$search = Invoke-Probe -Uri $searchUri
-$report += "Search status: $($search.StatusCode) in $($search.DurationMs) ms"
-if ($search.Error) { $report += "Search error: $($search.Error)" }
-$rows = 0
-if ($search.Body -and $search.Body.results) {
-    $rows = ($search.Body.results | Measure-Object).Count
-}
-$headersOk = $false
-if ($search.Headers) {
-    $headersOk = $search.Headers['X-Request-Id'] -and $search.Headers['X-RateLimit-Limit']
+$overall = ($health.StatusCode -eq 200) -and $ready -and $healthBudgetOk
+
+if ($IncludeQuarantinedSearch) {
+    $searchUri = "$baseUrl/v1/search?q=health&limit=1"
+    $search = Invoke-Probe -Uri $searchUri
+    $report += "Search status: $($search.StatusCode) in $($search.DurationMs) ms"
+    if ($search.Error) { $report += "Search error: $($search.Error)" }
+    $rows = 0
+    if ($search.Body -and $search.Body.results) {
+        $rows = ($search.Body.results | Measure-Object).Count
+    }
+    $headersOk = $false
+    if ($search.Headers) {
+        $headersOk = $search.Headers['X-Request-Id'] -and $search.Headers['X-RateLimit-Limit']
+    }
+    $overall = $overall -and ($search.StatusCode -eq 200) -and ($search.DurationMs -le $apiBudget) -and $headersOk
+    $report += "Results returned: $rows"
+    $report += "Headers OK: $(if ($headersOk) { 'yes' } else { 'no' })"
+} else {
+    $report += "Quarantined search probe: skipped (use -IncludeQuarantinedSearch for local validation)"
 }
 
-$overall = ($health.StatusCode -eq 200) -and $ready -and ($search.StatusCode -eq 200) -and ($search.DurationMs -le $apiBudget) -and $headersOk
-$report += "Results returned: $rows"
-$report += "Headers OK: $(if ($headersOk) { 'yes' } else { 'no' })"
 $report += "Overall: $(if ($overall) { 'pass' } else { 'fail' })"
 
 $reportDir = Split-Path -Parent $ReportPath

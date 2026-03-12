@@ -44,6 +44,25 @@ Before touching the host, collect:
   - `TRADEGOV_API_KEY` for scheduled ingest jobs
   - `GROQ_API_KEY` or `NVIDIA_NIM_API_KEY` only if optional remote answering is enabled
 
+## Lifecycle automation scripts
+
+The supported single-host lifecycle now has dedicated PowerShell automation under
+`scripts/ops/`:
+
+- `scripts/ops/windows-single-host-service.ps1`
+  - actions: `install`, `uninstall`, `start`, `stop`, `restart`, `status`, `health`
+  - enforces loopback (`127.0.0.1`/`localhost`) by default so operators do not
+    accidentally claim unsupported multi-host deployment behavior
+- `scripts/ops/windows-single-host-backup.ps1`
+  - creates a timestamped snapshot under the backup root
+  - writes `snapshot_manifest.json` and `checksums.sha256` for integrity evidence
+- `scripts/ops/windows-single-host-restore-drill.ps1`
+  - runs a non-destructive restore drill from a snapshot
+  - verifies checksums and writes `restore_drill_report.json`
+
+These scripts are the preferred operational path over manually typing repeated
+NSSM and file-copy commands.
+
 ## Fresh install
 
 ### 1. Prepare directories
@@ -123,6 +142,19 @@ $venvPython = Join-Path $runtimeRoot '.venv\Scripts\python.exe'
 & $nssm set EarCrawler-API Start SERVICE_AUTO_START
 ```
 
+Equivalent automation command:
+
+```powershell
+pwsh scripts/ops/windows-single-host-service.ps1 `
+  -Action install `
+  -NssmPath C:\tools\nssm\nssm.exe `
+  -RuntimeRoot 'C:\Program Files\EarCrawler\runtime' `
+  -WorkspaceRoot 'C:\ProgramData\EarCrawler\workspace' `
+  -LogRoot 'C:\ProgramData\EarCrawler\logs' `
+  -ApiHost 127.0.0.1 `
+  -ApiPort 9001
+```
+
 Configure the service account and recovery policy in NSSM or Services:
 
 - run as the intended least-privilege service account
@@ -140,6 +172,14 @@ Invoke-WebRequest `
   -ContentType 'application/sparql-query' `
   -Body 'SELECT (1 AS ?ok) WHERE { } LIMIT 1' `
   -UseBasicParsing
+```
+
+Equivalent automation commands:
+
+```powershell
+pwsh scripts/ops/windows-single-host-service.ps1 -Action start
+pwsh scripts/ops/windows-single-host-service.ps1 -Action health -ApiHost 127.0.0.1 -ApiPort 9001
+pwsh scripts/ops/windows-single-host-service.ps1 -Action status
 ```
 
 Healthy install criteria:
@@ -189,6 +229,25 @@ If the Fuseki endpoint is local to the same host, back up its TDB2 data director
 
 ### Backup procedure
 
+Preferred automated path:
+
+```powershell
+pwsh scripts/ops/windows-single-host-backup.ps1 `
+  -ProgramDataRoot 'C:\ProgramData\EarCrawler' `
+  -RuntimeRoot 'C:\Program Files\EarCrawler\runtime' `
+  -BackupRoot 'C:\ProgramData\EarCrawler\backups' `
+  -RestartServiceAfterBackup
+```
+
+The command writes a snapshot directory with:
+
+- `snapshot_manifest.json` (`windows-single-host-backup.v1`)
+- `checksums.sha256`
+- copied runtime state (`config`, `logs`, `workspace`, `audit`, `spool`)
+- captured environment/service metadata where available
+
+Manual equivalent:
+
 ```powershell
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $backup = "C:\ProgramData\EarCrawler\backups\$stamp"
@@ -228,6 +287,18 @@ Restore is for rebuilding the same version and state after host loss or operator
 7. Start the service and run the health checks.
 
 If the original host used a local Fuseki instance, restore that dataset before you start EarCrawler.
+
+Before a maintenance window, run a non-destructive restore drill from the latest
+snapshot and archive the report:
+
+```powershell
+pwsh scripts/ops/windows-single-host-restore-drill.ps1 `
+  -SnapshotPath 'C:\ProgramData\EarCrawler\backups\<snapshot-id>' `
+  -DrillRoot 'C:\ProgramData\EarCrawler\backups\drills\<snapshot-id>'
+```
+
+Treat a failing drill report (`status: fail`) as a release blocker for host
+upgrade/rollback operations.
 
 ## Rollback
 

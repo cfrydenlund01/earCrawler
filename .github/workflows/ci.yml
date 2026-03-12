@@ -78,8 +78,8 @@ jobs:
           EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES: "1"
           EARCTL_USER: test_operator
         run: py -m earCrawler.cli kg-emit -s ear -s nsf -i dist\ci_supported_path\data -o dist\ci_supported_path\kg
-      - name: Supported KG SHACL gate
-        run: py -m cli.kg_validate --glob "dist\ci_supported_path\kg\*.ttl" --fail-on shacl-only
+      - name: Supported KG semantic gate
+        run: py -m cli.kg_validate --glob "dist\ci_supported_path\kg\*.ttl" --fail-on supported --blocking-check orphan_paragraphs --blocking-check entity_mentions_without_type
       - name: Start supported API smoke service
         shell: pwsh
         run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001

@@ -64,6 +64,9 @@ jobs:
       - name: Provenance attestation
         shell: pwsh
         run: scripts/provenance-attest.ps1
+      - name: Release integrity validation
+        shell: pwsh
+        run: scripts/verify-release.ps1 -RequireSignedExecutables -EvidenceOutPath dist/release_validation_evidence.json
       - name: Determinism check
         shell: pwsh
         run: scripts/rebuild-compare.ps1 -Version ${{ github.ref_name }}
@@ -78,6 +81,7 @@ jobs:
             dist/earctl-*-win64.exe
             dist/earcrawler-setup-*.exe
             dist/checksums.sha256
+            dist/release_validation_evidence.json
             dist/sbom.spdx.json
             kg/canonical/manifest.json
             kg/canonical/provenance.json

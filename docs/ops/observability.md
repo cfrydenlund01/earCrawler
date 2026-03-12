@@ -49,12 +49,14 @@ The budgets come from `service/config/observability.yml`.
 * `scripts/health/fuseki-probe.ps1` validates Fuseki `/$/ping` and a
   deterministic `SELECT` query. Report saved to
   `kg/reports/health-fuseki.txt`.
-* `scripts/health/api-probe.ps1` exercises `/health` and `/v1/search`, verifies
-  headers, budgets, and writes `kg/reports/health-api.txt`.
+* `scripts/health/api-probe.ps1` exercises supported `/health` readiness and
+  latency budgets by default, then writes `kg/reports/health-api.txt`.
+  For local validation only, pass `-IncludeQuarantinedSearch` to also probe
+  quarantined `/v1/search`.
 * `scripts/canary/run-canaries.ps1` loads `canary/config.yml`, executes the API
   and Fuseki checks, and writes JSON + text summaries to
   `kg/reports/canary-summary.json` and `.txt`. Non-zero exit signals budget
-  breaches.
+  breaches. The default canary config keeps API checks on supported routes.
 
 ## Watchdog
 

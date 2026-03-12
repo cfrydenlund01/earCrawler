@@ -2,7 +2,7 @@
 
 Status: normative for any change that claims KG-backed runtime behavior is part of the supported production CLI path.
 
-As of March 10, 2026, this gate is not passed. KG-related runtime behavior remains quarantined. The current Task 2.2 decision record is `docs/kg_search_status_decision_2026-03-10.md`.
+As of March 12, 2026, this gate is not passed. KG-related runtime behavior remains quarantined. Decision records: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral for `/v1/search` and KG-backed hybrid retrieval).
 
 ## Purpose
 

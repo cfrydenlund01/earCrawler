@@ -139,13 +139,16 @@ def emit_ear(
             if source_identifier:
                 g.add((para_iri, DCT.identifier, safe_literal(source_identifier)))
             sec_id = rec.get("section")
-            if sec_id:
-                sec_iri = iri_for_section(str(sec_id))
-                g.add((sec_iri, RDF.type, EAR_NS.Section))
-                g.add((reg_iri, EAR_NS.hasSection, sec_iri))
-                g.add((sec_iri, EAR_NS.hasParagraph, para_iri))
-            else:
-                g.add((reg_iri, EAR_NS.hasParagraph, para_iri))
+            if not sec_id and source_identifier:
+                # Keep paragraph lineage intact for records that do not carry
+                # explicit CFR section metadata in fixture/offline paths.
+                sec_id = str(source_identifier).split(":", 1)[0]
+            if not sec_id:
+                sec_id = rec.get("record_id") or rec.get("id")
+            sec_iri = iri_for_section(str(sec_id))
+            g.add((sec_iri, RDF.type, EAR_NS.Section))
+            g.add((reg_iri, EAR_NS.hasSection, sec_iri))
+            g.add((sec_iri, EAR_NS.hasParagraph, para_iri))
 
     _write_sorted_ttl(g, out_path)
     return out_path, len(g)

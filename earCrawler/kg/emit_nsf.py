@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 
 from rdflib import RDF, Graph, URIRef
 
+from earCrawler.corpus.entities import entity_names
 from earCrawler.corpus.identity import paragraph_identity_token, source_identifier_for_record
 from .ontology import (
     EAR_NS,
@@ -100,7 +101,7 @@ def emit_nsf(in_dir: Path, out_dir: Path) -> tuple[Path, int]:
             source_identifier = source_identifier_for_record(rec)
             if source_identifier:
                 g.add((para_iri, DCT.identifier, safe_literal(source_identifier)))
-            for ent in rec.get("entities", []) or []:
+            for ent in entity_names(rec.get("entities")):
                 ent_iri = _iri_for_entity(str(ent))
                 g.add((ent_iri, RDF.type, EAR_NS.Entity))
                 g.add((ent_iri, PROV.wasDerivedFrom, para_iri))
