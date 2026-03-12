@@ -4,11 +4,10 @@
 
 .DESCRIPTION
     Loads settings from a .env file and/or environment variables, then issues sample
-    requests (health, search, entity, lineage, SPARQL template, RAG) via curl.exe.
+    requests (health, entity, lineage, SPARQL template, RAG) via curl.exe.
     API keys default to EAR_API_KEY, falling back to TRADEGOV_API_KEY so operators
-    can reuse their Trade.gov credential. When no entity identifier is specified,
-    the script performs a search to discover one automatically, keeping the workflow
-    valid for both fixture-based tests and real deployments.
+    can reuse their Trade.gov credential. The quarantined /v1/search route is opt-in
+    through -IncludeQuarantinedSearch and is excluded from default supported-path calls.
 
 .PARAMETER EnvFile
     Optional dotenv-style file (KEY=VALUE) used to seed settings. Defaults to .env.
@@ -20,11 +19,15 @@
     API key for the X-Api-Key header. Defaults to EAR_API_KEY or TRADEGOV_API_KEY.
 
 .PARAMETER EntityId
-    Knowledge-graph entity identifier. When omitted the script uses the first
-    search hit; falls back to urn:ear:entity:demo when no results are returned.
+    Knowledge-graph entity identifier. When omitted the script falls back to
+    urn:ear:entity:demo.
 
 .PARAMETER SearchQuery
-    Query string used for the search + SPARQL examples. Defaults to "export controls".
+    Query string used only when -IncludeQuarantinedSearch is set.
+    Defaults to "export controls".
+
+.PARAMETER IncludeQuarantinedSearch
+    Include the quarantined /v1/search call for local validation workflows.
 
 .EXAMPLE
     pwsh scripts/api/curl_facade.ps1
@@ -38,7 +41,8 @@ param(
     [string]$BaseUrl,
     [string]$ApiKey,
     [string]$EntityId,
-    [string]$SearchQuery
+    [string]$SearchQuery,
+    [switch]$IncludeQuarantinedSearch
 )
 
 Set-StrictMode -Version Latest
@@ -136,41 +140,24 @@ function Invoke-Curl {
     }
 }
 
-function Discover-EntityId {
-    param(
-        [string]$Query,
-        [string]$ApiKeyValue
-    )
-    $encoded = [Uri]::EscapeDataString($Query)
-    $searchUrl = "$BaseUrl/v1/search?q=$encoded&limit=1"
-    $headers = @{}
-    if ($ApiKeyValue) {
-        $headers["X-Api-Key"] = $ApiKeyValue
-    }
-    try {
-        $response = Invoke-RestMethod -Uri $searchUrl -Headers $headers -Method Get -TimeoutSec 30
-        if ($response.results -and $response.results.Count -gt 0) {
-            return $response.results[0].id
-        }
-    } catch {
-        Write-Warning "Unable to auto-discover entity id: $_"
-    }
-    return "urn:ear:entity:demo"
-}
-
 if (-not $EntityId) {
-    $EntityId = Discover-EntityId -Query $SearchQuery -ApiKeyValue $ApiKey
+    $EntityId = "urn:ear:entity:demo"
 }
 
 Invoke-Curl -Method "GET" -Path "/health" -Description "Health probe"
-Invoke-Curl -Method "GET" -Path "/v1/search?q=$([Uri]::EscapeDataString($SearchQuery))&limit=5" -Description "Search entities"
+if ($IncludeQuarantinedSearch) {
+    Invoke-Curl -Method "GET" -Path "/v1/search?q=$([Uri]::EscapeDataString($SearchQuery))&limit=5" -Description "Quarantined search entities"
+} else {
+    Write-Host "== GET /v1/search (Quarantined search entities)"
+    Write-Host "Skipped by default. Use -IncludeQuarantinedSearch for local validation." -ForegroundColor DarkGray
+    Write-Host ""
+}
 Invoke-Curl -Method "GET" -Path "/v1/entities/$([Uri]::EscapeDataString($EntityId))" -Description "Entity projection"
 Invoke-Curl -Method "GET" -Path "/v1/lineage/$([Uri]::EscapeDataString($EntityId))" -Description "Lineage graph"
 Invoke-Curl -Method "POST" -Path "/v1/sparql" -Description "SPARQL template execution" -Body @{
-    template   = "search_entities"
+    template   = "entity_by_id"
     parameters = @{
-        q     = $SearchQuery
-        limit = 5
+        id = $EntityId
     }
 }
 Invoke-Curl -Method "POST" -Path "/v1/rag/query" -Description "RAG cache lookup" -Body @{

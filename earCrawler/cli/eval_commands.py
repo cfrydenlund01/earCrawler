@@ -7,6 +7,7 @@ from pathlib import Path
 
 import click
 
+from earCrawler.cli import eval_workflows
 from earCrawler.security import policy
 
 
@@ -262,90 +263,26 @@ def eval_run_rag(
         raise click.ClickException(
             "--compare-retrieval-modes cannot be combined with --retrieval-mode"
         )
-
     try:
-        from eval.validate_datasets import ensure_valid_datasets
-    except Exception as exc:  # pragma: no cover - import failures
-        raise click.ClickException(str(exc))
-
-    try:
-        manifest_obj = json.loads(manifest.read_text(encoding="utf-8"))
-    except Exception as exc:  # pragma: no cover - manifest parsing errors
-        raise click.ClickException(f"Failed to read manifest: {exc}")
-
-    dataset_entries = manifest_obj.get("datasets", []) or []
-    if dataset_id:
-        dataset_entries = [
-            entry for entry in dataset_entries if entry.get("id") == dataset_id
-        ]
-        if not dataset_entries:
-            raise click.ClickException(f"Dataset not found: {dataset_id}")
-        dataset_ids: list[str] | None = [dataset_id]
-    else:
-        dataset_ids = None
-
-    try:
-        ensure_valid_datasets(
-            manifest_path=manifest,
-            schema_path=Path("eval") / "schema.json",
-            dataset_ids=dataset_ids,
+        messages = eval_workflows.run_rag_evaluations(
+            manifest=manifest,
+            dataset_id=dataset_id,
+            provider=provider,
+            model=model,
+            top_k=top_k,
+            retrieval_mode=retrieval_mode,
+            compare_retrieval_modes=compare_retrieval_modes,
+            max_items=max_items,
+            answer_score_mode=answer_score_mode,
+            semantic_threshold=semantic_threshold,
+            semantic=semantic,
+            fallback_threshold=fallback_threshold,
+            out_dir=out_dir,
         )
-    except Exception as exc:
+    except Exception as exc:  # pragma: no cover - surfaced as CLI error
         raise click.ClickException(str(exc))
-
-    try:
-        from scripts.eval import eval_rag_llm
-    except Exception as exc:  # pragma: no cover - import failures
-        raise click.ClickException(str(exc))
-
-    for entry in dataset_entries:
-        ds_id = entry.get("id")
-        safe_model = eval_rag_llm._safe_name(model or "default")
-        suffix = f".{retrieval_mode}" if retrieval_mode else ""
-        out_json = Path(out_dir) / f"{ds_id}.rag.{provider}.{safe_model}{suffix}.json"
-        out_md = Path(out_dir) / f"{ds_id}.rag.{provider}.{safe_model}{suffix}.md"
-        try:
-            if compare_retrieval_modes:
-                summary_path = eval_rag_llm.compare_retrieval_modes(
-                    ds_id,
-                    manifest_path=manifest,
-                    llm_provider=provider,
-                    llm_model=model,
-                    top_k=top_k,
-                    max_items=max_items,
-                    answer_score_mode=answer_score_mode,
-                    semantic_threshold=semantic_threshold,
-                    semantic=semantic,
-                    ablation=None,
-                    kg_expansion=None,
-                    multihop_only=False,
-                    emit_hitl_template=None,
-                    trace_pack_required_threshold=None,
-                    fallback_max_uses=fallback_threshold,
-                    out_root=Path(out_dir) / "retrieval_compare",
-                    run_id=eval_rag_llm._safe_name(f"{ds_id}.retrieval"),
-                )
-                click.echo(f"{ds_id}: wrote {summary_path}")
-                continue
-
-            eval_rag_llm.evaluate_dataset(
-                ds_id,
-                manifest_path=manifest,
-                llm_provider=provider,
-                llm_model=model,
-                top_k=top_k,
-                retrieval_mode=retrieval_mode,
-                max_items=max_items,
-                out_json=out_json,
-                out_md=out_md,
-                answer_score_mode=answer_score_mode,
-                semantic_threshold=semantic_threshold,
-                semantic=semantic,
-                fallback_max_uses=fallback_threshold,
-            )
-        except Exception as exc:  # pragma: no cover - bubbled to CLI
-            raise click.ClickException(str(exc))
-        click.echo(f"{ds_id}: wrote {out_json}")
+    for message in messages:
+        click.echo(message)
 
 
 @eval_group.command(name="fr-coverage")
@@ -456,35 +393,13 @@ def eval_fr_coverage(
     fail: bool,
 ) -> None:
     """Check FR section coverage + retriever ranks for eval datasets."""
-
     try:
-        from eval.validate_datasets import ensure_valid_datasets
-    except Exception as exc:  # pragma: no cover - import failures
-        raise click.ClickException(str(exc))
-
-    selected_dataset_ids: list[str] | None = None
-    if dataset_id and dataset_id != "all":
-        selected_dataset_ids = [dataset_id]
-    try:
-        ensure_valid_datasets(
-            manifest_path=manifest,
-            schema_path=Path("eval") / "schema.json",
-            dataset_ids=selected_dataset_ids,
-        )
-    except Exception as exc:
-        raise click.ClickException(str(exc))
-
-    try:
-        from earCrawler.eval.coverage_checks import (
-            build_fr_coverage_report,
-            build_fr_coverage_summary,
-            render_fr_coverage_blocker_note,
-        )
+        from earCrawler.eval.coverage_checks import render_fr_coverage_blocker_note
     except Exception as exc:  # pragma: no cover - import failures
         raise click.ClickException(str(exc))
 
     try:
-        report = build_fr_coverage_report(
+        report, summary_obj = eval_workflows.compute_fr_coverage(
             manifest=manifest,
             corpus=corpus,
             dataset_id=dataset_id,
@@ -495,41 +410,24 @@ def eval_fr_coverage(
             max_items=max_items,
             top_missing_sections=top_missing_sections,
         )
-        summary_obj = build_fr_coverage_summary(
-            report, top_missing_sections=top_missing_sections
-        )
     except Exception as exc:
         # Still write deterministic artifacts so CI/users can debug quickly.
         out.parent.mkdir(parents=True, exist_ok=True)
         summary_out.parent.mkdir(parents=True, exist_ok=True)
-        failure_report = {
-            "manifest_path": str(manifest),
-            "corpus_path": str(corpus),
-            "dataset_selector": {
-                "dataset_id": dataset_id,
-                "only_v2": bool(only_v2),
-                "dataset_id_pattern": dataset_id_pattern,
-            },
-            "retrieval_k": retrieval_k,
-            "error": str(exc),
-        }
+        failure_report, failure_summary = eval_workflows.failure_coverage_artifacts(
+            manifest=manifest,
+            corpus=corpus,
+            dataset_id=dataset_id,
+            only_v2=only_v2,
+            dataset_id_pattern=dataset_id_pattern,
+            retrieval_k=retrieval_k,
+            error=exc,
+        )
         out.write_text(
             json.dumps(failure_report, indent=2, sort_keys=True), encoding="utf-8"
         )
         summary_out.write_text(
-            json.dumps(
-                {
-                    "manifest_path": str(manifest),
-                    "corpus_path": str(corpus),
-                    "dataset_selector": failure_report["dataset_selector"],
-                    "retrieval_k": retrieval_k,
-                    "error": str(exc),
-                    "datasets": [],
-                    "summary": {},
-                },
-                indent=2,
-                sort_keys=True,
-            ),
+            json.dumps(failure_summary, indent=2, sort_keys=True),
             encoding="utf-8",
         )
         if write_blocker_note is not None:
@@ -560,42 +458,17 @@ def eval_fr_coverage(
             encoding="utf-8",
         )
 
-    # Human-readable console summary (worst first).
-    ds_rows = summary_obj.get("datasets") or []
-    click.echo(
-        "dataset_id | items | expected | missing_retrieval | missing_rate | missing_corpus"
-    )
-    click.echo("-" * 88)
-    for row in ds_rows:
-        ds_id = str(row.get("dataset_id") or "")
-        items = int(row.get("num_items") or 0)
-        expected = int(row.get("expected_sections") or 0)
-        miss_r = int(row.get("num_missing_in_retrieval") or 0)
-        miss_c = int(row.get("num_missing_in_corpus") or 0)
-        try:
-            rate = float(row.get("missing_in_retrieval_rate") or 0.0)
-        except Exception:
-            rate = 0.0
-        click.echo(f"{ds_id} | {items} | {expected} | {miss_r} | {rate:.4f} | {miss_c}")
-
+    for line in eval_workflows.build_fr_coverage_summary_lines(
+        summary_obj, top_missing_sections=top_missing_sections
+    ):
+        click.echo(line)
     summary = summary_obj.get("summary") or {}
     missing_in_corpus = int(summary.get("num_missing_in_corpus") or 0)
     missing_in_retrieval = int(summary.get("num_missing_in_retrieval") or 0)
-    worst_ds = summary.get("worst_dataset_id") or "n/a"
     try:
         worst_rate = float(summary.get("worst_missing_in_retrieval_rate") or 0.0)
     except Exception:
         worst_rate = 0.0
-    click.echo(
-        f"overall: missing_in_corpus={missing_in_corpus}, missing_in_retrieval={missing_in_retrieval}, "
-        f"worst_dataset={worst_ds} worst_missing_rate={worst_rate:.4f}"
-    )
-    top_missing = summary.get("top_missing_sections") or []
-    if top_missing:
-        click.echo("top_missing_sections:")
-        for row in top_missing[:top_missing_sections]:
-            if isinstance(row, dict):
-                click.echo(f"  - {row.get('section_id')}: {row.get('count')}")
     click.echo(f"wrote: report={out} summary={summary_out}")
 
     if max_missing_rate is not None and worst_rate > float(max_missing_rate):

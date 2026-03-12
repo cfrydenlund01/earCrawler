@@ -10,13 +10,10 @@ import requests
 
 from api_clients.federalregister_client import FederalRegisterClient
 from api_clients.llm_client import LLMProviderError
-from earCrawler.rag.build_corpus import build_retrieval_corpus, write_corpus_jsonl
+from earCrawler.cli import rag_workflows
 from earCrawler.rag.ecfr_api_fetch import fetch_ecfr_snapshot
-from earCrawler.rag.index_builder import build_faiss_index_from_corpus
-from earCrawler.rag.offline_snapshot_manifest import validate_offline_snapshot
 from earCrawler.rag.pipeline import answer_with_rag
 from earCrawler.rag.retriever import RetrieverError
-from earCrawler.rag.snapshot_corpus import build_snapshot_corpus_bundle
 from earCrawler.rag.snapshot_index import build_snapshot_index_bundle
 from earCrawler.security import policy
 
@@ -279,31 +276,19 @@ def rag_index_build(
 ) -> None:
     """Build a FAISS index + metadata sidecar from a validated retrieval corpus."""
 
-    meta_path = meta_path or index_path.with_suffix(".meta.json")
-    if reset:
-        index_path.parent.mkdir(parents=True, exist_ok=True)
-        for path in (index_path, index_path.with_suffix(".pkl"), meta_path):
-            if path.exists():
-                path.unlink()
-
-    from earCrawler.rag.corpus_contract import load_corpus_jsonl, require_valid_corpus
-
     try:
-        docs = load_corpus_jsonl(input_path)
-        require_valid_corpus(docs)
+        count, out_index, out_meta = rag_workflows.build_index_from_corpus(
+            input_path=input_path,
+            index_path=index_path,
+            model_name=model_name,
+            reset=reset,
+            meta_path=meta_path,
+        )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
-
-    try:
-        build_faiss_index_from_corpus(
-            docs,
-            index_path=index_path,
-            meta_path=meta_path,
-            embedding_model=model_name,
-        )
     except Exception as exc:
         raise click.ClickException(str(exc)) from exc
-    click.echo(f"Indexed {len(docs)} documents -> {index_path} (meta {meta_path})")
+    click.echo(f"Indexed {count} documents -> {out_index} (meta {out_meta})")
 
 
 @rag_index.command(name="build-corpus")
@@ -356,17 +341,17 @@ def rag_index_build_corpus(
     """Build retrieval corpus from offline snapshot and write JSONL."""
 
     try:
-        docs = build_retrieval_corpus(
-            snapshot,
+        count, out_path = rag_workflows.build_corpus_from_snapshot(
+            snapshot=snapshot,
+            snapshot_manifest=snapshot_manifest,
+            out=out,
             source_ref=source_ref,
-            manifest_path=snapshot_manifest,
-            preflight_validate_snapshot=preflight,
             chunk_max_chars=chunk_max_chars,
+            preflight=preflight,
         )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
-    write_corpus_jsonl(out, docs)
-    click.echo(f"Wrote {len(docs)} corpus documents -> {out}")
+    click.echo(f"Wrote {count} corpus documents -> {out_path}")
 
 
 @rag_index.command(name="rebuild-corpus")
@@ -448,7 +433,7 @@ def rag_index_rebuild_corpus(
     """Deterministically rebuild corpus artifacts under dist/corpus/<snapshot_id>."""
 
     try:
-        bundle = build_snapshot_corpus_bundle(
+        bundle = rag_workflows.rebuild_snapshot_corpus(
             snapshot=snapshot,
             snapshot_manifest=snapshot_manifest,
             out_base=out_base,
@@ -458,7 +443,7 @@ def rag_index_rebuild_corpus(
             check_expected_sections=check_expected_sections,
             dataset_manifest=dataset_manifest,
             dataset_ids=list(dataset_ids) or None,
-            include_v2_only=v2_only,
+            v2_only=v2_only,
         )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
@@ -539,14 +524,15 @@ def rag_index_rebuild_index(
 
     index_builder = _resolve_snapshot_index_builder()
     try:
-        bundle = index_builder(
+        bundle = rag_workflows.rebuild_snapshot_index(
+            index_builder=index_builder,
             corpus_path=corpus_path,
             out_base=out_base,
             model_name=model_name,
-            verify_pipeline_env=verify_env,
+            verify_env=verify_env,
             smoke_query=smoke_query,
             smoke_top_k=smoke_top_k,
-            expected_sections=list(expected_sections) or None,
+            expected_sections=expected_sections,
         )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
@@ -591,7 +577,9 @@ def rag_index_validate_snapshot(snapshot: Path, snapshot_manifest: Path | None) 
     """Validate offline snapshot + manifest before any corpus/index work."""
 
     try:
-        summary = validate_offline_snapshot(snapshot, manifest_path=snapshot_manifest)
+        summary = rag_workflows.validate_snapshot(
+            snapshot=snapshot, snapshot_manifest=snapshot_manifest
+        )
     except ValueError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo(

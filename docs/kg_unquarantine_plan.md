@@ -35,8 +35,8 @@ All preconditions are mandatory.
 | ID | Preconditions before any unquarantine decision | Current repo evidence | Status to record |
 | --- | --- | --- | --- |
 | P1 | Supported capability matrix is unified across repo docs. | [README.md](../README.md), [RUNBOOK.md](../RUNBOOK.md), [docs/api/readme.md](api/readme.md), [service/docs/index.md](../service/docs/index.md), [service/openapi/openapi.yaml](../service/openapi/openapi.yaml) all mark `/v1/search` as `Quarantined`. | Implemented in repo; re-verify before decision |
-| P2 | The real supported corpus -> KG CI gate exists. | [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs `corpus build`, `corpus validate`, `kg-emit`, SHACL, API smoke, and no-network RAG smoke. [docs/ci.md](ci.md) documents the same order. | Implemented in repo; requires latest green run evidence |
-| P3 | SHACL validation is part of the supported path. | [.github/workflows/ci.yml](../.github/workflows/ci.yml) includes the `Supported KG SHACL gate`. [README.md](../README.md) documents SHACL in the supported CI evidence path. | Implemented in repo; requires latest green run evidence |
+| P2 | The real supported corpus -> KG CI gate exists. | [.github/workflows/ci.yml](../.github/workflows/ci.yml) runs `corpus build`, `corpus validate`, `kg-emit`, KG semantic gate (SHACL + selected SPARQL blocking checks), API smoke, and no-network RAG smoke. [docs/ci.md](ci.md) documents the same order. | Implemented in repo; requires latest green run evidence |
+| P3 | SHACL plus selected semantic validation are part of the supported path. | [.github/workflows/ci.yml](../.github/workflows/ci.yml) includes the `Supported KG semantic gate`. [docs/kg_semantic_blocking_checks.md](kg_semantic_blocking_checks.md) records the release-blocking SPARQL checks and rationale. | Implemented in repo; requires latest green run evidence |
 | P4 | Supported API smoke and no-network RAG smoke are stable. | [.github/workflows/ci.yml](../.github/workflows/ci.yml), [README.md](../README.md), [RUNBOOK.md](../RUNBOOK.md), and [tests/golden/test_phase2_golden_gate.py](../tests/golden/test_phase2_golden_gate.py). | Implemented in repo; stability must be demonstrated from recent CI history, not inferred from file presence |
 | P5 | Operator docs clearly distinguish supported vs optional KG behavior. | [README.md](../README.md), [RUNBOOK.md](../RUNBOOK.md), [docs/runtime_research_boundary.md](runtime_research_boundary.md), and [docs/kg_quarantine_exit_gate.md](kg_quarantine_exit_gate.md). | Implemented in repo; re-verify after any graduation edits |
 
@@ -51,7 +51,7 @@ The approver package for Task 2.2 should contain all of the following:
    - `corpus build`
    - `corpus validate`
    - `kg-emit`
-   - SHACL validation
+   - SHACL + supported blocking semantic checks
    - supported API smoke
    - no-network RAG smoke
 3. Evidence that the claimed KG-backed runtime behavior works through supported entrypoints only:
@@ -130,4 +130,4 @@ Use this minimal record when Task 2.2 is executed:
 
 ## Current conclusion
 
-Current conclusion for Phase 2 after Task 2.2: the repo has a concrete KG unquarantine checklist and an explicit no-go decision record. See `docs/kg_search_status_decision_2026-03-10.md`. KG-backed runtime behavior remains `Quarantined` unless a later decision is backed by a fresh evidence package.
+Current conclusion: the repo has a concrete KG unquarantine checklist and explicit no-go/reaffirmation records. See `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral for `/v1/search` and KG-backed hybrid retrieval). KG-backed runtime behavior remains `Quarantined` unless a later decision is backed by a fresh evidence package.

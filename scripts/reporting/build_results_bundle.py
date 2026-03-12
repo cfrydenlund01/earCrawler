@@ -293,6 +293,7 @@ def write_readme(
     scorecard: dict[str, Any],
     fr_summary: dict[str, Any] | None,
     eval_json: dict[str, Any] | None,
+    benchmark_summary: dict[str, Any] | None,
 ) -> None:
     lines: list[str] = []
     lines.append("# Results bundle")
@@ -308,6 +309,12 @@ def write_readme(
     lines.append(f"- Golden gate (phase2): **{_format_bool_pass(checks['golden_gate']['exit_code'])}**")
     eval_exit = int((checks.get('small_eval') or {}).get("exit_code") or 0)
     lines.append(f"- Small eval (citation/trace packs): **{_format_bool_pass(eval_exit)}**")
+    benchmark_check = checks.get("local_adapter_benchmark")
+    if isinstance(benchmark_check, dict):
+        present = bool(benchmark_check.get("present"))
+        lines.append(
+            f"- Local-adapter benchmark evidence: **{'PRESENT' if present else 'MISSING'}**"
+        )
     lines.append("")
     lines.append("## Key metrics")
     if fr_summary and isinstance(fr_summary.get("summary"), dict):
@@ -339,6 +346,16 @@ def write_readme(
     else:
         lines.append("- Grounded rate: `n/a` (small_eval.json missing or unreadable)")
         lines.append("- Citation micro P/R: `n/a` (small_eval.json missing or unreadable)")
+    if benchmark_summary and isinstance(benchmark_summary.get("conditions"), dict):
+        local = benchmark_summary["conditions"].get("local_adapter")
+        if isinstance(local, dict):
+            lines.append(
+                f"- Local-adapter answer accuracy: `{float(local.get('answer_accuracy') or 0.0):.4f}`"
+            )
+            lat = local.get("latency_ms") if isinstance(local.get("latency_ms"), dict) else {}
+            lines.append(
+                f"- Local-adapter p95 latency (ms): `{lat.get('p95')}`"
+            )
 
     lines.append("")
     lines.append("## Artifacts")
@@ -408,6 +425,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         help="Fail the bundle command if the small eval run fails.",
     )
+    parser.add_argument(
+        "--local-adapter-benchmark-summary",
+        type=Path,
+        default=None,
+        help="Optional benchmark summary JSON from scripts/eval/run_local_adapter_benchmark.py.",
+    )
     args = parser.parse_args(argv)
 
     created_at = _utc_now_iso()
@@ -461,6 +484,7 @@ def main(argv: list[str] | None = None) -> int:
     record(f"eval_dataset_id={args.eval_dataset_id}")
     record(f"eval_max_items={args.eval_max_items}")
     record(f"eval_mode={args.eval_mode}")
+    record(f"local_adapter_benchmark_summary={args.local_adapter_benchmark_summary or ''}")
     record(f"git_head={git_info.get('git_head') or ''}")
     record(f"git_dirty={git_info.get('git_dirty')}")
 
@@ -601,6 +625,7 @@ def main(argv: list[str] | None = None) -> int:
 
     fr_summary_obj = _maybe_load(fr_summary)
     eval_obj = _maybe_load(small_eval_json_path)
+    benchmark_summary_obj = _maybe_load(args.local_adapter_benchmark_summary) if args.local_adapter_benchmark_summary else None
 
     scorecard = {
         "bundle": {
@@ -626,6 +651,10 @@ def main(argv: list[str] | None = None) -> int:
                 "dataset_id": str(args.eval_dataset_id),
                 "eval_json_path": str(small_eval_json_path),
             },
+            "local_adapter_benchmark": {
+                "present": bool(benchmark_summary_obj),
+                "summary_path": str(args.local_adapter_benchmark_summary) if args.local_adapter_benchmark_summary else None,
+            },
         },
     }
 
@@ -641,9 +670,26 @@ def main(argv: list[str] | None = None) -> int:
         micro = ((eval_obj.get("citation_pr") or {}).get("micro") or {})
         scorecard["checks"]["small_eval"]["citation_micro_precision"] = micro.get("precision")
         scorecard["checks"]["small_eval"]["citation_micro_recall"] = micro.get("recall")
+    if benchmark_summary_obj and isinstance(benchmark_summary_obj.get("conditions"), dict):
+        local = benchmark_summary_obj["conditions"].get("local_adapter")
+        if isinstance(local, dict):
+            scorecard["checks"]["local_adapter_benchmark"]["answer_accuracy"] = local.get("answer_accuracy")
+            scorecard["checks"]["local_adapter_benchmark"]["strict_output_failure_rate"] = local.get(
+                "strict_output_failure_rate"
+            )
+            scorecard["checks"]["local_adapter_benchmark"]["request_422_rate"] = local.get("request_422_rate")
+            scorecard["checks"]["local_adapter_benchmark"]["request_503_rate"] = local.get("request_503_rate")
+            lat = local.get("latency_ms") if isinstance(local.get("latency_ms"), dict) else {}
+            scorecard["checks"]["local_adapter_benchmark"]["latency_p95_ms"] = lat.get("p95")
 
     _write_json(out_dir / "bundle_scorecard.json", scorecard)
-    write_readme(out_dir=out_dir, scorecard=scorecard, fr_summary=fr_summary_obj, eval_json=eval_obj)
+    write_readme(
+        out_dir=out_dir,
+        scorecard=scorecard,
+        fr_summary=fr_summary_obj,
+        eval_json=eval_obj,
+        benchmark_summary=benchmark_summary_obj,
+    )
 
     required_exit_codes = [
         int(pytest_unit.exit_code),

@@ -1,5 +1,6 @@
 import os
 import subprocess
+import hashlib
 from pathlib import Path
 import pytest
 
@@ -28,4 +29,39 @@ def test_verify_detects_tamper(tmp_path):
     # tamper
     target.write_text("evil", encoding="utf-8")
     res = run_ps("scripts/verify-release.ps1", env=env, check=False)
+    assert res.returncode != 0
+
+
+def test_verify_detects_dist_checksum_tamper(tmp_path):
+    env = dict(SOURCE_DATE_EPOCH="946684800")
+    run_ps("kg/scripts/canonical-freeze.ps1", env=env)
+    run_ps("scripts/make-manifest.ps1", env=env)
+
+    release_dir = tmp_path / "release"
+    release_dir.mkdir(parents=True, exist_ok=True)
+    artifact = release_dir / "artifact.txt"
+    artifact.write_text("release-ok", encoding="utf-8")
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    checksums = release_dir / "checksums.sha256"
+    checksums.write_text(f"{digest}  artifact.txt\n", encoding="utf-8")
+    evidence = tmp_path / "release_validation_evidence.json"
+
+    run_ps(
+        "scripts/verify-release.ps1",
+        "-ChecksumsPath",
+        str(checksums),
+        "-EvidenceOutPath",
+        str(evidence),
+        env=env,
+    )
+    artifact.write_text("tampered", encoding="utf-8")
+    res = run_ps(
+        "scripts/verify-release.ps1",
+        "-ChecksumsPath",
+        str(checksums),
+        "-EvidenceOutPath",
+        str(evidence),
+        env=env,
+        check=False,
+    )
     assert res.returncode != 0

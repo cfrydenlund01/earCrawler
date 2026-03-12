@@ -40,10 +40,20 @@ from earCrawler.kg.validate import validate_files
 )
 @click.option(
     "--fail-on",
-    type=click.Choice(["any", "shacl-only", "sparql-only"]),
+    type=click.Choice(["any", "shacl-only", "sparql-only", "supported"]),
     default="any",
     show_default=True,
     help="What violations trigger a non-zero exit code.",
+)
+@click.option(
+    "--blocking-check",
+    "blocking_checks",
+    multiple=True,
+    type=str,
+    help=(
+        "SPARQL check name to treat as release-blocking when --fail-on supported "
+        "(repeatable). Defaults to the supported built-in check set."
+    ),
 )
 def main(
     ctx: click.Context,
@@ -51,6 +61,7 @@ def main(
     glob_pattern: str | None,
     shapes: Path | None,
     fail_on: str,
+    blocking_checks: tuple[str, ...],
 ) -> None:
     """Entry point for ``kg-validate`` CLI."""
 
@@ -70,9 +81,19 @@ def main(
         with resources.as_file(
             resources.files("earCrawler.kg").joinpath("shapes.ttl")
         ) as default_shapes:
-            exit_code = validate_files(paths, default_shapes, fail_on=fail_on)
+            exit_code = validate_files(
+                paths,
+                default_shapes,
+                fail_on=fail_on,
+                blocking_checks=blocking_checks or None,
+            )
     else:
-        exit_code = validate_files(paths, shapes, fail_on=fail_on)
+        exit_code = validate_files(
+            paths,
+            shapes,
+            fail_on=fail_on,
+            blocking_checks=blocking_checks or None,
+        )
     raise SystemExit(exit_code)
 
 

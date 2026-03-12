@@ -17,6 +17,7 @@ from earCrawler.core.ear_crawler import EARCrawler
 from earCrawler.core.ear_loader import EARLoader
 from earCrawler.core.nsf_case_parser import NSFCaseParser
 from earCrawler.core.nsf_loader import NSFLoader
+from earCrawler.corpus.entities import merge_entity_maps
 from earCrawler.corpus.identity import (
     build_record_id,
     compute_content_sha256,
@@ -322,16 +323,10 @@ class CorpusBuilder:
             "section": meta.section,
             "identifiers": [identifier],
         }
-        entities = self._hint_entities_for_paragraph(paragraph)
-        if extra_entities:
-            for key, values in extra_entities.items():
-                if not values:
-                    continue
-                bucket = entities.setdefault(key, [])
-                for value in values:
-                    if value not in bucket:
-                        bucket.append(value)
-        record["entities"] = {k: sorted(v) for k, v in entities.items() if v}
+        record["entities"] = merge_entity_maps(
+            self._hint_entities_for_paragraph(paragraph),
+            extra_entities,
+        )
         return record
 
     def _hint_entities_for_paragraph(self, paragraph: str) -> dict[str, list[str]]:
@@ -524,11 +519,10 @@ def _merge_records(primary: dict, secondary: dict) -> dict:
     ):
         if not merged.get(field) and secondary_norm.get(field):
             merged[field] = secondary_norm[field]
-    entities: dict[str, set[str]] = {}
-    for payload in (primary_norm.get("entities") or {}, secondary_norm.get("entities") or {}):
-        for key, values in payload.items():
-            entities.setdefault(key, set()).update(values)
-    merged["entities"] = {k: sorted(v) for k, v in entities.items() if v}
+    merged["entities"] = merge_entity_maps(
+        primary_norm.get("entities"),
+        secondary_norm.get("entities"),
+    )
     return merged
 
 

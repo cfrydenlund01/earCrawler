@@ -37,6 +37,23 @@ def test_identity_env_override_requires_explicit_opt_in(monkeypatch) -> None:
     assert "admin" not in info["roles"]
 
 
+def test_auth_token_presence_does_not_grant_roles(monkeypatch) -> None:
+    monkeypatch.delenv("EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES", raising=False)
+    monkeypatch.delenv("EARCTL_USER", raising=False)
+    monkeypatch.setattr("earCrawler.security.identity.getpass.getuser", lambda: "localuser")
+
+    without_token = identity.whoami()
+
+    monkeypatch.setenv("EARCTL_AUTH_TOKEN", "present")
+    with_token = identity.whoami()
+
+    assert without_token["user"] == "localuser"
+    assert with_token["user"] == "localuser"
+    assert with_token["roles"] == without_token["roles"]
+    assert with_token["via_token"] is True
+    assert without_token["via_token"] is False
+
+
 def test_policy_path_env_override_requires_explicit_opt_in(monkeypatch, tmp_path: Path) -> None:
     custom_policy = tmp_path / "policy.yml"
     custom_policy.write_text(

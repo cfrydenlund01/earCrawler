@@ -55,6 +55,13 @@ SELECT ?n WHERE {
 """.strip(),
 }
 
+# Minimal SPARQL checks that block the supported release path.
+# Keep this set intentionally small and raise the bar only with evidence.
+SUPPORTED_BLOCKING_CHECKS: tuple[str, ...] = (
+    "orphan_paragraphs",
+    "entity_mentions_without_type",
+)
+
 
 def iter_queries() -> Iterable[tuple[str, str]]:
     """Yield ``(name, query)`` pairs in a deterministic order."""
@@ -63,4 +70,4 @@ def iter_queries() -> Iterable[tuple[str, str]]:
         yield name, QUERIES[name]
 
 
-__all__ = ["QUERIES", "iter_queries"]
+__all__ = ["QUERIES", "SUPPORTED_BLOCKING_CHECKS", "iter_queries"]

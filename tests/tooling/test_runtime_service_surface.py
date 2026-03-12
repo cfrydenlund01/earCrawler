@@ -372,7 +372,7 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     assert "Supported corpus build gate" in ci_workflow
     assert "Supported corpus validate gate" in ci_workflow
     assert "Supported KG emit gate" in ci_workflow
-    assert "Supported KG SHACL gate" in ci_workflow
+    assert "Supported KG semantic gate" in ci_workflow
     assert "Supported API smoke gate" in ci_workflow
     assert "No-network RAG smoke gate" in ci_workflow
     assert "tests/golden/test_phase2_golden_gate.py" in ci_workflow

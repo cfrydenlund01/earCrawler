@@ -62,3 +62,38 @@ def test_validate_orphan_entity(tmp_path: Path) -> None:
     assert "entity_mentions_without_type" in res.stdout
     res2 = _run(["--ttl", str(ttl), "--fail-on", "shacl-only"])
     assert res2.returncode == 0
+    res3 = _run(["--ttl", str(ttl), "--fail-on", "supported"])
+    assert res3.returncode == 1
+    assert "blocking_sparql_checks=orphan_paragraphs,entity_mentions_without_type" in res3.stdout
+    res4 = _run(
+        [
+            "--ttl",
+            str(ttl),
+            "--fail-on",
+            "supported",
+            "--blocking-check",
+            "orphan_paragraphs",
+        ]
+    )
+    assert res4.returncode == 0
+
+
+def test_validate_rejects_unknown_supported_blocking_check(tmp_path: Path) -> None:
+    in_dir = tmp_path / "in"
+    out_dir = tmp_path / "out"
+    in_dir.mkdir()
+    out_dir.mkdir()
+    _copy("ear_small.jsonl", in_dir / "ear_corpus.jsonl")
+    emit_ear(in_dir, out_dir)
+    res = _run(
+        [
+            "--ttl",
+            str(out_dir / "ear.ttl"),
+            "--fail-on",
+            "supported",
+            "--blocking-check",
+            "not_a_real_check",
+        ]
+    )
+    assert res.returncode == 2
+    assert "Unknown blocking checks: not_a_real_check" in res.stdout

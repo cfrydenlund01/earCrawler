@@ -144,24 +144,35 @@ output root such as `dist/benchmarks/<run_id>/` and include:
 
 Do not reuse training output files as benchmark outputs.
 
-## Execution gap to close before Phase 6 benchmark runs
+## Execution surface status
 
-Task 6.1 is planning-only. Actual benchmark execution still needs one explicit
-runtime-eval surface for `local_adapter`.
+The runtime benchmark surface for `local_adapter` is now implemented:
 
-Current gap:
+- `scripts/eval/run_local_adapter_benchmark.py`
+- `scripts/eval/eval_rag_llm.py` remains the remote-provider eval surface used
+  for optional baseline comparison, not the primary local-adapter run path
 
-- `scripts/eval/eval_rag_llm.py` is described and wired for remote-provider
-  evaluation, not for the local Task 5.4 adapter runtime
+This runner executes benchmark requests through the supported
+`/v1/rag/answer` API route (not direct pipeline calls), writes reproducible
+artifacts under `dist/benchmarks/<run_id>/`, and includes retrieval-only
+(`generate=0`) control metrics.
 
-Recommended next implementation task after this plan:
+Example command:
 
-- add a benchmark runner that can target the supported `/v1/rag/answer` path in
-  `local_adapter` mode, or extend the existing eval runner to resolve and run
-  the same local adapter config used by Task 5.4
+```powershell
+py -m scripts.eval.run_local_adapter_benchmark `
+  --run-dir dist/training/<run_id> `
+  --manifest eval/manifest.json `
+  --dataset-id ear_compliance.v2 `
+  --dataset-id entity_obligations.v2 `
+  --dataset-id unanswerable.v2 `
+  --smoke-report kg/reports/local-adapter-smoke.json
+```
 
-Until that exists, the benchmark plan is defined, but benchmark execution should
-not be represented as complete.
+Current operational note:
+
+- benchmark execution still depends on a real local adapter run directory and a
+  passing `scripts/local_adapter_smoke.ps1` precondition on the host.
 
 ## Exit criteria for Task 6.1
 
@@ -170,5 +181,5 @@ Task 6.1 is complete when:
 - the benchmark target is the real production candidate, not a placeholder
 - the dataset scope is explicit
 - the required metrics are explicit
-- the entry criteria and current execution gap are explicit
+- the entry criteria and benchmark runner command are explicit
 - the plan stays within the supported runtime boundary

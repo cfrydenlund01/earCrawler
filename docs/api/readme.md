@@ -46,7 +46,7 @@ Import the Postman collection, then edit the collection variables:
 | `base_url` | Target FastAPI facade (include scheme + port). | `http://localhost:9001` |
 | `api_key` | Optional X-Api-Key header. Leave blank for anonymous quotas. | _(blank)_ |
 | `entity_id` | Sample KG entity to drive `/entities` and `/lineage`. | `urn:ear:entity:demo` |
-| `search_query` | Default query string for the quarantined `/v1/search` route and SPARQL `search_entities` template. | `export controls` |
+| `search_query` | Default query string used only when running the quarantined `/v1/search` example flow (`-IncludeQuarantinedSearch`). | `export controls` |
 
 The collection attaches `X-Api-Key` automatically when the variable is populated.
 
@@ -80,9 +80,9 @@ Use the dotenv-driven helper when you want to verify the endpoints without insta
 
 1. Copy `.env.example` to `.env` and set values as needed. Leave `EAR_API_KEY` blank to reuse the existing `TRADEGOV_API_KEY` environment variable.
 2. Start the facade (`earctl api start`) so `http://localhost:9001` is reachable, or edit `EAR_BASE_URL` for remote hosts.
-3. Run `pwsh scripts/api/curl_facade.ps1 [-EnvFile .env.local] [-BaseUrl ...] [-EntityId ...]`.
+3. Run `pwsh scripts/api/curl_facade.ps1 [-EnvFile .env.local] [-BaseUrl ...] [-EntityId ...] [-IncludeQuarantinedSearch]`.
 
-The script issues curl calls for `/health`, `/v1/search`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`. Because `/v1/search` is quarantined, supported production checks should provide `EAR_ENTITY_ID` explicitly instead of relying on search-based auto-discovery. When `EAR_ENTITY_ID` is empty the helper still tries `/v1/search` first, then falls back to the deterministic fixture `urn:ear:entity:demo` for local validation workflows.
+By default, the script issues curl calls for supported routes only: `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`. The helper uses `EAR_ENTITY_ID` when provided and otherwise falls back to the deterministic fixture `urn:ear:entity:demo`. The quarantined `/v1/search` call is skipped unless `-IncludeQuarantinedSearch` is set for local validation workflows.
 
 ## SDK usage
 

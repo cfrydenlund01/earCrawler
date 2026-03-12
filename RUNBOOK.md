@@ -16,11 +16,14 @@
 6. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
 7. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
 8. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
-9. Create a GitHub release and upload the wheel, EXE, installer, checksum, and SBOM files.
+9. Run release integrity validation and write evidence:
+   - `pwsh scripts/verify-release.ps1 -RequireSignedExecutables -EvidenceOutPath dist\release_validation_evidence.json`
+10. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, and release validation evidence files.
 
 Release artifact note
 - The wheel is the authoritative deployment artifact for the supported Windows API service path described in `docs/ops/windows_single_host_operator.md`.
 - The EXE and installer remain convenience distribution artifacts; they are not the authoritative API hosting path.
+- Deployed-host lifecycle automation lives under `scripts/ops/windows-single-host-*.ps1`; use those scripts plus `docs/ops/windows_single_host_operator.md` for install/start/stop/backup/restore drill operations.
 
 Windows notes
 - Inno Setup (iscc.exe): install via winget if not present.
@@ -46,7 +49,7 @@ Windows notes
 - Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior.
 - Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
 - Do not use `earCrawler.ingestion.ingest` for operator deployments; it is a quarantined placeholder ingestion pipeline gated by `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`.
-- KG-backed runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded. Current Task 2.2 decision: `docs/kg_search_status_decision_2026-03-10.md` keeps KG-backed search quarantined.
+- KG-backed runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral).
 - For the repo-level boundary between supported runtime code and research/proposal material, see `docs/runtime_research_boundary.md`.
 - New contributors should start from `docs/start_here_supported_paths.md`.
 

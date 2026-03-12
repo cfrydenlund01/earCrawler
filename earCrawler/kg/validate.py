@@ -13,7 +13,7 @@ from typing import Iterable
 from rdflib import Graph
 from pyshacl import validate as shacl_validate
 
-from .queries import iter_queries
+from .queries import QUERIES, SUPPORTED_BLOCKING_CHECKS, iter_queries
 
 
 def run_sparql_checks(graph: Graph) -> list[tuple[str, int]]:
@@ -51,11 +51,30 @@ def _load_graph(path: Path) -> Graph:
     return g
 
 
+def _resolve_blocking_checks(
+    blocking_checks: Iterable[str] | None,
+) -> tuple[tuple[str, ...], list[str]]:
+    if blocking_checks is None:
+        selected = list(SUPPORTED_BLOCKING_CHECKS)
+    else:
+        selected = []
+        seen: set[str] = set()
+        for value in blocking_checks:
+            name = str(value or "").strip()
+            if not name or name in seen:
+                continue
+            seen.add(name)
+            selected.append(name)
+    unknown = sorted(name for name in selected if name not in QUERIES)
+    return tuple(selected), unknown
+
+
 def validate_files(
     paths: Iterable[str],
     shapes_path: str | Path,
     *,
     fail_on: str = "any",
+    blocking_checks: Iterable[str] | None = None,
 ) -> int:
     """Validate one or more Turtle files.
 
@@ -66,8 +85,10 @@ def validate_files(
     shapes_path:
         Path to a SHACL shapes graph.
     fail_on:
-        One of ``"any"``, ``"shacl-only"``, ``"sparql-only"`` controlling the
-        exit behaviour.
+        One of ``"any"``, ``"shacl-only"``, ``"sparql-only"``, ``"supported"``
+        controlling the exit behaviour.
+    blocking_checks:
+        Optional SPARQL check names used by ``fail_on="supported"``.
 
     Returns
     -------
@@ -85,9 +106,18 @@ def validate_files(
         print(f"Shapes file not found: {shapes}", flush=True)
         return 2
 
+    selected_blocking_checks, unknown_checks = _resolve_blocking_checks(blocking_checks)
+    if unknown_checks:
+        print(
+            "Unknown blocking checks: " + ", ".join(unknown_checks),
+            flush=True,
+        )
+        return 2
+
     headers = ["file", "shacl"] + [name for name, _ in iter_queries()]
     rows: list[list[str]] = []
     any_sparql = False
+    any_blocking_sparql = False
     any_shacl = False
 
     for file in files:
@@ -97,12 +127,15 @@ def validate_files(
             return 2
         g = _load_graph(fp)
         sparql_counts = run_sparql_checks(g)
+        sparql_by_name = {name: count for name, count in sparql_counts}
         conforms, _, _ = run_shacl(g, shapes)
         row = [file, str(conforms)]
         for name, count in sparql_counts:
             row.append(str(count))
             if count:
                 any_sparql = True
+        if any(sparql_by_name.get(name, 0) for name in selected_blocking_checks):
+            any_blocking_sparql = True
         if not conforms:
             any_shacl = True
         rows.append(row)
@@ -115,6 +148,12 @@ def validate_files(
     print(header_line)
     for r in rows:
         print(" ".join(r[i].ljust(col_widths[i]) for i in range(len(headers))))
+    if selected_blocking_checks:
+        print(
+            "blocking_sparql_checks="
+            + ",".join(selected_blocking_checks),
+            flush=True,
+        )
 
     if fail_on == "any":
         return 1 if any_sparql or any_shacl else 0
@@ -122,6 +161,8 @@ def validate_files(
         return 1 if any_shacl else 0
     if fail_on == "sparql-only":
         return 1 if any_sparql else 0
+    if fail_on == "supported":
+        return 1 if any_shacl or any_blocking_sparql else 0
     return 2
 
 
