@@ -15,6 +15,8 @@ from earCrawler.utils.log_json import JsonLogger
 
 logger = logging.getLogger(__name__)
 _warm_logger = JsonLogger("rag-support")
+RAG_QUERY_CACHE_STORAGE_SCOPE = "process_local"
+RETRIEVER_CACHE_STORAGE_SCOPE = "process_local"
 
 
 class RetrieverProtocol(Protocol):
@@ -236,6 +238,8 @@ class RagQueryCache:
 __all__ = [
     "RetrieverProtocol",
     "RagQueryCache",
+    "RAG_QUERY_CACHE_STORAGE_SCOPE",
+    "RETRIEVER_CACHE_STORAGE_SCOPE",
     "load_retriever",
     "warm_retriever_if_enabled",
     "NullRetriever",

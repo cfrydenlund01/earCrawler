@@ -6,6 +6,8 @@ from dataclasses import dataclass, field
 import os
 from typing import Optional
 
+SUPPORTED_RUNTIME_TOPOLOGY = "single_host"
+
 
 @dataclass(slots=True)
 class RateLimitConfig:
@@ -27,6 +29,9 @@ class ApiSettings:
     request_body_limit: int = 32 * 1024
     request_timeout_seconds: float = 5.0
     concurrency_limit: int = 16
+    enable_search: bool = False
+    declared_instance_count: int = 1
+    allow_unsupported_multi_instance: bool = False
     rate_limits: RateLimitConfig = field(default_factory=RateLimitConfig)
 
     @classmethod
@@ -37,6 +42,11 @@ class ApiSettings:
         request_body_limit = int(os.getenv("EARCRAWLER_API_BODY_LIMIT", str(32 * 1024)))
         request_timeout_seconds = float(os.getenv("EARCRAWLER_API_TIMEOUT", "5"))
         concurrency_limit = int(os.getenv("EARCRAWLER_API_CONCURRENCY", "16"))
+        enable_search = os.getenv("EARCRAWLER_API_ENABLE_SEARCH", "0") == "1"
+        declared_instance_count = int(os.getenv("EARCRAWLER_API_INSTANCE_COUNT", "1"))
+        allow_unsupported_multi_instance = (
+            os.getenv("EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE", "0") == "1"
+        )
         anonymous_limit = int(os.getenv("EARCRAWLER_API_ANON_PER_MIN", "30"))
         auth_limit = int(os.getenv("EARCRAWLER_API_AUTH_PER_MIN", "120"))
         anonymous_burst = int(os.getenv("EARCRAWLER_API_ANON_BURST", "10"))
@@ -54,5 +64,21 @@ class ApiSettings:
             request_body_limit=request_body_limit,
             request_timeout_seconds=request_timeout_seconds,
             concurrency_limit=concurrency_limit,
+            enable_search=enable_search,
+            declared_instance_count=declared_instance_count,
+            allow_unsupported_multi_instance=allow_unsupported_multi_instance,
             rate_limits=rate_limits,
         )
+
+    def validate_runtime_contract(self) -> None:
+        if self.declared_instance_count < 1:
+            raise ValueError("EARCRAWLER_API_INSTANCE_COUNT must be >= 1.")
+        if (
+            self.declared_instance_count != 1
+            and not self.allow_unsupported_multi_instance
+        ):
+            raise ValueError(
+                "EarCrawler supports one API service instance per host. "
+                "Rate limits and the RAG query cache are process-local. "
+                "Set EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE=1 only for local experiments."
+            )

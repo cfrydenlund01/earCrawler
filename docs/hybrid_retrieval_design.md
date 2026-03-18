@@ -1,8 +1,11 @@
 # Hybrid Retrieval Design
 
-Status: implemented as an experimental, off-by-default retrieval mode.
+Status: implemented as an optional, off-by-default retrieval mode.
 
-As of March 6, 2026, this does not change the KG quarantine status and is not a production commitment by itself. Operators should treat hybrid retrieval as an explicit opt-in until the runtime gate in `docs/kg_quarantine_exit_gate.md` is formally passed and recorded.
+As of March 17, 2026, dense+BM25 hybrid ranking is tracked separately from the
+KG-search/KG-expansion quarantine decision. It remains explicit opt-in and is
+not part of the default supported baseline by itself. Promotion/default-on
+criteria live in `docs/capability_graduation_boundaries.md`.
 
 ## Goal
 

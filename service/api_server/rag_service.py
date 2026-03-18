@@ -7,15 +7,9 @@ import math
 import time
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, Mapping
 
-from api_clients.llm_client import LLMProviderError
-from earCrawler.rag import llm_runtime, policy, retrieval_runtime
-from earCrawler.rag.temporal import (
-    resolve_temporal_request,
-    select_temporal_documents,
-    temporal_candidate_count,
-)
+from earCrawler.rag import llm_runtime, orchestrator, retrieval_runtime
 
 from .fuseki import FusekiGateway
 from .rag_support import RagQueryCache, RetrieverProtocol
@@ -29,7 +23,7 @@ from .schemas import (
 
 
 QueryRunner = Callable[[RetrieverProtocol, str, int], Awaitable[list[dict]]]
-GenerateRunner = Callable[[list[dict[str, str]] | list[dict], str, str], Awaitable[str]]
+GenerateRunner = orchestrator.GenerateRunner
 
 
 @dataclass
@@ -97,25 +91,26 @@ async def retrieve_documents(
     cache: RagQueryCache,
     run_query: QueryRunner,
 ) -> ApiRetrievalResult:
-    rag_enabled = bool(getattr(retriever, "enabled", True))
-    retriever_ready = bool(getattr(retriever, "ready", True))
-    failure_type = getattr(retriever, "failure_type", None)
-    index_path = getattr(retriever, "index_path", None)
-    model_name = getattr(retriever, "model_name", None)
-    temporal_request = resolve_temporal_request(query, effective_date=effective_date)
-    temporal_state = (
-        select_temporal_documents([], request=temporal_request, top_k=top_k).to_dict()
-        if temporal_request.refusal_reason
-        else temporal_request.to_dict()
-    )
+    temporal_state: dict[str, object] = {
+        "requested": bool(effective_date),
+        "effective_date": effective_date,
+    }
+    warnings: list[dict[str, object]] = []
 
     t_cache_ms = 0.0
     t_retrieve_ms = 0.0
     documents: list[dict] = []
     cache_hit = False
     expires_at = None
-    disabled_reason: str | None = None
     retrieval_failure: Exception | None = None
+
+    retriever_state = orchestrator.resolve_retriever_state(retriever=retriever)
+    rag_enabled = retriever_state.rag_enabled
+    retriever_ready = retriever_state.retriever_ready
+    failure_type = retriever_state.failure_type
+    disabled_reason = retriever_state.disabled_reason
+    index_path = retriever_state.index_path
+    model_name = retriever_state.model_name
 
     if rag_enabled and retriever_ready:
         cache_start = time.perf_counter()
@@ -127,56 +122,50 @@ async def retrieve_documents(
             documents = cached or []
             expires_at = cache.expires_at(cache_key)
             t_cache_ms += _elapsed_ms(cache_start)
-        elif temporal_request.refusal_reason:
-            documents = []
         else:
-            retrieve_start = time.perf_counter()
             try:
-                documents = await run_query(
-                    retriever,
-                    query,
-                    temporal_candidate_count(top_k) if temporal_request.requested else top_k,
+                retrieval_execution = await asyncio.to_thread(
+                    orchestrator.run_retrieval_sync,
+                    query=query,
+                    top_k=top_k,
+                    retriever=retriever,
+                    strict=True,
+                    effective_date=effective_date,
                 )
-                if temporal_request.requested:
-                    selection = select_temporal_documents(
-                        documents,
-                        request=temporal_request,
-                        top_k=top_k,
-                    )
-                    temporal_state = selection.to_dict()
-                    documents = list(selection.selected_docs)
-                t_retrieve_ms += _elapsed_ms(retrieve_start)
-                if (not temporal_request.requested) or documents:
+                documents = retrieval_execution.docs
+                warnings = retrieval_execution.warnings
+                temporal_state = retrieval_execution.temporal_state
+                t_retrieve_ms += retrieval_execution.t_retrieve_ms
+                if (not bool(temporal_state.get("requested"))) or documents:
                     cache_start = time.perf_counter()
                     expires_at = cache.put(cache_key, documents)
                     t_cache_ms += _elapsed_ms(cache_start)
             except Exception as exc:
-                t_retrieve_ms += _elapsed_ms(retrieve_start)
                 retrieval_failure = exc
                 failure_type = getattr(exc, "code", failure_type or "retriever_error")
-    elif not rag_enabled:
-        disabled_reason = getattr(
-            retriever,
-            "disabled_reason",
-            "RAG retriever disabled; set EARCRAWLER_API_ENABLE_RAG=1",
-        )
     else:
         retrieval_failure = getattr(retriever, "failure", RuntimeError("Retriever not ready"))
         failure_type = failure_type or "retriever_not_ready"
 
-    if not rag_enabled:
-        retrieval_empty = True
-        retrieval_empty_reason = failure_type or "retriever_disabled"
-    elif retrieval_failure is not None:
-        retrieval_empty = True
-        retrieval_empty_reason = failure_type or "retriever_error"
-    else:
-        retrieval_empty = len(documents) == 0
-        retrieval_empty_reason = (
-            (str(temporal_state.get("refusal_reason") or "").strip() or "no_temporally_applicable_evidence")
-            if retrieval_empty and temporal_request.requested
-            else ("no_hits" if retrieval_empty else None)
-        )
+    retriever_state = orchestrator.resolve_retriever_state(
+        retriever=retriever,
+        warnings=warnings,
+        retrieval_failure=retrieval_failure,
+    )
+    rag_enabled = retriever_state.rag_enabled
+    retriever_ready = retriever_state.retriever_ready
+    failure_type = retriever_state.failure_type
+    disabled_reason = retriever_state.disabled_reason
+    index_path = retriever_state.index_path
+    model_name = retriever_state.model_name
+    retrieval_empty, retrieval_empty_reason = orchestrator.resolve_retrieval_empty_state(
+        docs=documents,
+        temporal_state=temporal_state,
+        retriever_state=retriever_state,
+        retrieval_failure=retrieval_failure,
+        warnings=warnings,
+        prefer_warning_reason=False,
+    )
 
     return ApiRetrievalResult(
         documents=documents,
@@ -227,13 +216,16 @@ async def _build_query_answer(
     include_lineage: bool,
 ) -> RagAnswer:
     content = retrieval_runtime.extract_text(doc)
+    summary = retrieval_runtime.summarize_retrieved_doc(doc, source="retrieval")
+    raw = doc.get("raw") if isinstance(doc.get("raw"), Mapping) else {}
+    raw = raw or {}
     score = _coerce_score(doc.get("score"))
     source = RagSource(
-        id=_maybe_str(doc.get("id") or doc.get("entity_id") or doc.get("section")),
-        url=_maybe_str(doc.get("source_url") or doc.get("url")),
-        label=_maybe_str(doc.get("title") or doc.get("label")),
-        section=_maybe_str(doc.get("section")),
-        provider=_maybe_str(doc.get("provider")),
+        id=_maybe_str(summary.get("id")),
+        url=_maybe_str(summary.get("url")),
+        label=_maybe_str(summary.get("title")),
+        section=_maybe_str(raw.get("section")) or _maybe_str(summary.get("section")),
+        provider=_maybe_str(raw.get("provider")) or _maybe_str(doc.get("provider")),
     )
     lineage: RagLineageReference | None = None
     if include_lineage:
@@ -264,49 +256,41 @@ async def build_query_answers(
 
 
 def build_prompt_contexts(documents: list[dict]) -> list[str]:
-    return retrieval_runtime.build_context_lines(
-        documents,
-        normalize_section_headers=False,
-    )
+    contexts: list[str] = []
+    for doc in documents:
+        text = retrieval_runtime.extract_text(doc)
+        if not text:
+            continue
+        raw = doc.get("raw") if isinstance(doc.get("raw"), Mapping) else {}
+        raw = raw or {}
+        section = (
+            _maybe_str(raw.get("section"))
+            or _maybe_str(doc.get("section"))
+            or _maybe_str(doc.get("span_id"))
+            or _maybe_str(doc.get("doc_id"))
+            or _maybe_str(doc.get("id"))
+            or _maybe_str(doc.get("entity_id"))
+            or _maybe_str(doc.get("section_id"))
+        )
+        if section:
+            contexts.append(f"[{section}] {text}")
+        else:
+            contexts.append(text)
+    return contexts
 
 
 def to_retrieved_document(doc: dict) -> RetrievedDocument:
+    summary = retrieval_runtime.summarize_retrieved_doc(doc, source="retrieval")
+    raw = doc.get("raw") if isinstance(doc.get("raw"), Mapping) else {}
+    raw = raw or {}
     return RetrievedDocument(
-        id=_maybe_str(doc.get("id") or doc.get("entity_id") or doc.get("section")),
+        id=_maybe_str(summary.get("id")),
         score=_coerce_score(doc.get("score")),
-        title=_maybe_str(doc.get("title") or doc.get("label")),
-        url=_maybe_str(doc.get("source_url") or doc.get("url")),
-        section=_maybe_str(doc.get("section")),
-        provider=_maybe_str(doc.get("provider")),
+        title=_maybe_str(summary.get("title")),
+        url=_maybe_str(summary.get("url")),
+        section=_maybe_str(raw.get("section")) or _maybe_str(summary.get("section")),
+        provider=_maybe_str(raw.get("provider")) or _maybe_str(doc.get("provider")),
     )
-
-
-def _provider_error_generation(
-    *,
-    code: str,
-    message: str,
-    egress_decision,
-    provider_label: str | None,
-    model_label: str | None,
-    llm_attempted: bool,
-    t_prompt_ms: float,
-    t_llm_ms: float = 0.0,
-) -> llm_runtime.GenerationResult:
-    return llm_runtime.GenerationResult(
-        provider_label=provider_label,
-        model_label=model_label,
-        llm_enabled=False,
-        llm_attempted=llm_attempted,
-        raw_answer=None,
-        disabled_reason=message,
-        output_ok=False,
-        output_error={"code": code, "message": message, "details": {}},
-        egress_decision=egress_decision,
-        prompt=None,
-        t_prompt_ms=t_prompt_ms,
-        t_llm_ms=t_llm_ms,
-    )
-
 
 async def execute_answer_generation(
     *,
@@ -318,106 +302,23 @@ async def execute_answer_generation(
     run_generate: GenerateRunner,
 ) -> ApiAnswerExecution:
     contexts = build_prompt_contexts(documents)
-    if not generate_enabled:
-        return ApiAnswerExecution(
-            status_code=200,
-            contexts=contexts,
-            generation=llm_runtime.build_generation_disabled_result(
-                question=query,
-                disabled_reason="generation_disabled_by_request",
-                trace_id=trace_id,
-            ),
-        )
-
-    prompt_start = time.perf_counter()
-    prompt_artifacts = llm_runtime.build_prompt_artifacts(
-        query,
-        contexts,
-        effective_date=str(temporal_state.get("effective_date") or "").strip() or None,
-    )
-    t_prompt_ms = _elapsed_ms(prompt_start)
-
-    policy_decision = policy.evaluate_generation_policy(
-        docs=documents,
-        contexts=prompt_artifacts.redacted_contexts,
-        temporal_state=temporal_state,
-        refuse_on_empty=True,
-    )
-    if policy_decision.should_refuse:
-        generation = llm_runtime.build_refusal_result(
-            policy_decision.refusal_payload or {},
-            prompt_artifacts=prompt_artifacts,
-            disabled_reason=policy_decision.disabled_reason or "insufficient_evidence",
+    generation = await orchestrator.execute_generation_async(
+        request=orchestrator.RagRequest(
+            question=query,
+            generate=generate_enabled,
+            strict_output=True,
             trace_id=trace_id,
-        )
-        generation.t_prompt_ms = t_prompt_ms
-        return ApiAnswerExecution(status_code=200, contexts=contexts, generation=generation)
-
-    try:
-        request = llm_runtime.resolve_llm_request(
-            prompt_artifacts,
-            trace_id=trace_id,
-        )
-    except llm_runtime.LLMExecutionError as exc:
-        generation = _provider_error_generation(
-            code=exc.error_code,
-            message=exc.disabled_reason,
-            egress_decision=exc.egress_decision,
-            provider_label=exc.provider_label,
-            model_label=exc.model_label,
-            llm_attempted=False,
-            t_prompt_ms=t_prompt_ms,
-        )
-        return ApiAnswerExecution(status_code=503, contexts=contexts, generation=generation)
-
-    llm_start = time.perf_counter()
-    try:
-        if request.execution_mode == "local":
-            raw_answer = await asyncio.to_thread(
-                llm_runtime.generate_local_chat,
-                prompt_artifacts.prompt,
-                provider_cfg=request.provider_config,
-            )
-        else:
-            raw_answer = await run_generate(
-                prompt_artifacts.prompt,
-                request.provider_label,
-                request.model_label,
-            )
-    except LLMProviderError as exc:
-        generation = _provider_error_generation(
-            code="llm_unavailable",
-            message=str(exc),
-            egress_decision=request.build_egress_decision(
-                remote_enabled=request.execution_mode == "remote",
-                disabled_reason=str(exc),
-                trace_id=trace_id,
-            ),
-            provider_label=request.provider_label,
-            model_label=request.model_label,
-            llm_attempted=True,
-            t_prompt_ms=t_prompt_ms,
-            t_llm_ms=_elapsed_ms(llm_start),
-        )
-        return ApiAnswerExecution(status_code=503, contexts=contexts, generation=generation)
-
-    generation = llm_runtime.validate_generated_answer(
-        str(raw_answer),
-        prompt_artifacts=prompt_artifacts,
-        provider_label=request.provider_label,
-        model_label=request.model_label,
-        egress_decision=request.build_egress_decision(
-            remote_enabled=request.execution_mode == "remote",
-            disabled_reason=None,
-            trace_id=trace_id,
+            effective_date=str(temporal_state.get("effective_date") or "").strip() or None,
+            refuse_on_empty=True,
+            empty_collections_on_error=True,
         ),
-        strict_output=True,
-        empty_collections_on_error=True,
+        docs=documents,
+        contexts=contexts,
+        temporal_state=temporal_state,
+        run_generate=run_generate,
     )
-    generation.t_prompt_ms = t_prompt_ms
-    generation.t_llm_ms = _elapsed_ms(llm_start)
     return ApiAnswerExecution(
-        status_code=200 if generation.output_ok else 422,
+        status_code=orchestrator.generation_status_code(generation),
         contexts=contexts,
         generation=generation,
     )

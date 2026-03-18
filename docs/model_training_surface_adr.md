@@ -14,6 +14,11 @@ In the current checkout:
 - `models/legalbert/` is absent
 - the only concrete training-adjacent Python surface was `earCrawler.quant`, a
   placeholder dataclass used only by a unit test
+- historical placeholder paths under `earCrawler/agent`,
+  `earCrawler/models/legalbert`, and `earCrawler/quant` are not supported
+  runtime surfaces; if local empty directories appear from stale tooling
+  artifacts (for example `__pycache__`), they should be removed during hygiene
+  cleanup and must not be treated as capability signals
 
 The shipped operator surface is the CLI, corpus pipeline, evaluation harness,
 and `service.api_server`. The repository does not include a real training stack:

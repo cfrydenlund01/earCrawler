@@ -8,14 +8,10 @@ from typing import Mapping
 
 from api_clients.llm_client import generate_chat
 from earCrawler.audit import required_events as audit_required_events
-from earCrawler.rag import llm_runtime, policy, retrieval_runtime
+from earCrawler.rag import llm_runtime, orchestrator, retrieval_runtime
 from earCrawler.utils.log_json import JsonLogger
 
 _logger = JsonLogger("rag-pipeline")
-
-
-def _warn_from_exc(exc: BaseException) -> dict[str, object]:
-    return retrieval_runtime.warn_from_exc(exc)
 
 
 def _ensure_retriever(
@@ -90,27 +86,6 @@ def expand_with_kg(
 
 
 
-def _temporal_refusal_payload(decision: Mapping[str, object]) -> dict[str, object]:
-    return policy.temporal_refusal_payload(decision)
-
-
-
-def _build_prompt(
-    question: str,
-    contexts: list[str],
-    *,
-    label_schema: str | None = None,
-    effective_date: str | None = None,
-) -> list[dict[str, str]]:
-    return llm_runtime.build_prompt_messages(
-        question,
-        contexts,
-        label_schema=label_schema,
-        effective_date=effective_date,
-    )
-
-
-
 def answer_with_rag(
     question: str,
     *,
@@ -132,14 +107,7 @@ def answer_with_rag(
 
     t_total_start = time.perf_counter()
     audit_run_id = str(run_id or os.getenv("EARCTL_AUDIT_RUN_ID") or "").strip() or None
-    t_retrieve_ms = 0.0
     t_cache_ms = 0.0
-    t_prompt_ms = 0.0
-    t_llm_ms = 0.0
-    t_parse_ms = 0.0
-    rag_enabled = bool(getattr(retriever, "enabled", True)) if retriever is not None else True
-    retriever_ready = bool(getattr(retriever, "ready", True)) if retriever is not None else True
-
     retrieval_warnings: list[dict[str, object]] = []
     temporal_state: dict[str, object] = {}
     retrieve_start = time.perf_counter()
@@ -153,26 +121,22 @@ def answer_with_rag(
         temporal_state=temporal_state,
     )
     t_retrieve_ms = round((time.perf_counter() - retrieve_start) * 1000.0, 3)
-    if retrieval_warnings:
-        rag_enabled = rag_enabled and retrieval_warnings[-1].get("code") != "retriever_disabled"
-        retriever_ready = retriever_ready and retrieval_warnings[-1].get("code") not in {
-            "retriever_error",
-            "retriever_unavailable",
-            "index_missing",
-            "index_build_required",
-        }
 
-    retrieval_empty = len(docs) == 0
-    retrieval_empty_reason = (
-        (retrieval_warnings[-1]["code"] if retrieval_warnings else "no_hits")
-        if retrieval_empty
-        else None
+    retriever_state = orchestrator.resolve_retriever_state(
+        retriever=retriever,
+        warnings=retrieval_warnings,
+    )
+    rag_enabled = retriever_state.rag_enabled
+    retriever_ready = retriever_state.retriever_ready
+    retrieval_empty, retrieval_empty_reason = orchestrator.resolve_retrieval_empty_state(
+        docs=docs,
+        temporal_state=temporal_state,
+        retriever_state=retriever_state,
+        warnings=retrieval_warnings,
+        prefer_warning_reason=True,
     )
     temporal_requested = bool(temporal_state.get("requested"))
     temporal_effective_date = str(temporal_state.get("effective_date") or "").strip() or None
-    temporal_refusal_reason = str(temporal_state.get("refusal_reason") or "").strip() or None
-    if retrieval_empty and temporal_refusal_reason:
-        retrieval_empty_reason = temporal_refusal_reason
 
     section_ids = [str(doc["section_id"]) for doc in docs if doc.get("section_id")]
     kg_mode = _kg_expansion_mode()
@@ -190,54 +154,39 @@ def answer_with_rag(
         kg_expansion=kg_snippets,
     )
 
-    if generate:
-        prompt_start = time.perf_counter()
-        prompt_artifacts = llm_runtime.build_prompt_artifacts(
-            question,
-            context_bundle.contexts,
-            task=task,
-            label_schema=label_schema,
-            effective_date=temporal_effective_date,
-        )
-        t_prompt_ms = round((time.perf_counter() - prompt_start) * 1000.0, 3)
-        policy_decision = policy.evaluate_generation_policy(
+    request = orchestrator.RagRequest(
+        question=question,
+        top_k=top_k,
+        effective_date=effective_date,
+        task=task,
+        label_schema=label_schema,
+        provider=provider,
+        model=model,
+        generate=generate,
+        strict_output=strict_output,
+        trace_id=trace_id,
+        refuse_on_empty=False,
+        empty_collections_on_error=False,
+    )
+    try:
+        generation = orchestrator.execute_generation_sync(
+            request=request,
             docs=docs,
-            contexts=prompt_artifacts.redacted_contexts,
+            contexts=context_bundle.contexts,
             temporal_state=temporal_state,
-            refuse_on_empty=False,
+            raise_on_llm_error=True,
+            generate_chat_fn=generate_chat,
         )
-        if policy_decision.should_refuse:
-            generation = llm_runtime.build_refusal_result(
-                policy_decision.refusal_payload or {},
-                prompt_artifacts=prompt_artifacts,
-                disabled_reason=policy_decision.disabled_reason or "insufficient_evidence",
-                trace_id=trace_id,
-            )
-        else:
-            try:
-                generation = llm_runtime.execute_sync_generation(
-                    prompt_artifacts,
-                    provider_override=provider,
-                    model_override=model,
-                    strict_output=strict_output,
-                    trace_id=trace_id,
-                    generate_chat_fn=generate_chat,
-                    empty_collections_on_error=False,
-                )
-            except llm_runtime.LLMExecutionError as exc:
-                _logger.info("llm.egress_decision", **exc.egress_decision.to_dict())
-                _logger.error("rag.answer.failed", error=str(exc))
-                raise
-        t_llm_ms = generation.t_llm_ms
-        t_parse_ms = generation.t_parse_ms
+    except llm_runtime.LLMExecutionError as exc:
+        _logger.info("llm.egress_decision", **exc.egress_decision.to_dict())
+        _logger.error("rag.answer.failed", error=str(exc))
+        raise
+
+    t_prompt_ms = generation.t_prompt_ms
+    t_llm_ms = generation.t_llm_ms
+    t_parse_ms = generation.t_parse_ms
+    if generation.egress_decision:
         _logger.info("llm.egress_decision", **generation.egress_decision.to_dict())
-    else:
-        generation = llm_runtime.build_generation_disabled_result(
-            question=question,
-            task=task,
-            disabled_reason="generation_disabled_by_request",
-            trace_id=trace_id,
-        )
 
     t_total_ms = round((time.perf_counter() - t_total_start) * 1000.0, 3)
     latency_fields: dict[str, object] = {

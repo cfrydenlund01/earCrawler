@@ -54,7 +54,10 @@ def test_client_sets_x_api_key_and_query_params():
         ]
     )
     client = EarCrawlerApiClient(
-        "http://localhost:9001", api_key="dev-token", session=session
+        "http://localhost:9001",
+        api_key="dev-token",
+        session=session,
+        enable_quarantined_search=True,
     )
 
     client.health()
@@ -69,6 +72,14 @@ def test_client_sets_x_api_key_and_query_params():
         "offset": "2",
     }
     assert session.calls[2]["url"].endswith("/v1/lineage/urn:example:entity:1")
+
+
+def test_search_requires_explicit_opt_in() -> None:
+    session = _StubSession([_StubResponse(payload={"status": "pass"})])
+    client = EarCrawlerApiClient("http://localhost:9001", session=session)
+
+    with pytest.raises(EarApiError, match="enable_quarantined_search=True"):
+        client.search_entities("export controls")
 
 
 def test_sparql_and_rag_payloads():

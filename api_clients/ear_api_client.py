@@ -26,12 +26,16 @@ class EarCrawlerApiClient:
         Optional :class:`requests.Session` for connection pooling.
     timeout:
         Request timeout in seconds (defaults to 10).
+    enable_quarantined_search:
+        Enables the quarantined ``/v1/search`` helper. Disabled by default so
+        the default client surface matches the supported API contract.
     """
 
     base_url: str
     api_key: Optional[str] = None
     session: Optional[requests.Session] = None
     timeout: float = 10.0
+    enable_quarantined_search: bool = False
     _owns_session: bool = field(init=False, repr=False, default=False)
     _session: requests.Session = field(init=False, repr=False)
 
@@ -71,7 +75,12 @@ class EarCrawlerApiClient:
     def search_entities(
         self, query: str, *, limit: int = 10, offset: int = 0
     ) -> dict[str, Any]:
-        """Call ``/v1/search`` with query parameters."""
+        """Call quarantined ``/v1/search`` with query parameters."""
+        if not self.enable_quarantined_search:
+            raise EarApiError(
+                "Quarantined route disabled in client. "
+                "Set enable_quarantined_search=True to call /v1/search."
+            )
         params = {"q": query, "limit": str(limit), "offset": str(offset)}
         return self._request("GET", "/v1/search", params=params)
 

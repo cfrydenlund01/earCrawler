@@ -11,6 +11,8 @@ from fastapi import Request
 
 from .config import RateLimitConfig
 
+RATE_LIMITER_STORAGE_SCOPE = "process_local"
+
 
 @dataclass(slots=True)
 class BucketState:

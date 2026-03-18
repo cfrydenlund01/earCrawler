@@ -40,6 +40,7 @@ async def health(request: Request) -> Dict[str, Any]:
     return {
         "status": overall_status,
         "timestamp": datetime.now(timezone.utc).isoformat(),
+        "runtime_contract": getattr(request.app.state, "runtime_contract", {}),
         "liveness": {"status": "pass"},
         "readiness": {
             "status": readiness_status,

@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tomllib
 from pathlib import Path
+import json
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 LEGACY_KG_NAME = "kg" + "_service"
@@ -105,10 +106,21 @@ def test_wheel_packaging_includes_service_runtime_surface() -> None:
         "templates/*.json",
         "templates/*.rq",
     ]
+    assert set(package_data["earCrawler.sparql"]) == {"*.sparql", "*.rq"}
     for requirement in ("httpx", "keyring", "tenacity", "uvicorn"):
         assert any(
             str(dep).lower().startswith(requirement) for dep in dependencies
         ), f"Missing runtime dependency for packaged service import: {requirement}"
+
+
+def test_wheel_smoke_validates_kg_expansion_template_resource() -> None:
+    smoke_script = (REPO_ROOT / "scripts" / "package-wheel-smoke.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert '("earCrawler.sparql", "kg_expand_by_section_id.rq")' in smoke_script
+    assert "SPARQLTemplateGateway" in smoke_script
+    assert "kg_expand_by_section_id" in smoke_script
 
 
 def test_repo_does_not_ship_container_runtime_artifacts() -> None:
@@ -305,26 +317,43 @@ def test_repo_freezes_capability_matrix_and_api_search_status() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
     api_readme = (REPO_ROOT / "docs" / "api" / "readme.md").read_text(encoding="utf-8")
-    openapi_yaml = (REPO_ROOT / "service" / "openapi" / "openapi.yaml").read_text(
+    capability_doc = (
+        REPO_ROOT / "docs" / "capability_graduation_boundaries.md"
+    ).read_text(encoding="utf-8")
+    openapi_yaml_raw = (REPO_ROOT / "service" / "openapi" / "openapi.yaml").read_text(
         encoding="utf-8"
     )
-    openapi_json = (REPO_ROOT / "docs" / "api" / "openapi.json").read_text(
+    openapi_json_raw = (REPO_ROOT / "docs" / "api" / "openapi.json").read_text(
         encoding="utf-8"
     )
-    postman = (REPO_ROOT / "docs" / "api" / "postman_collection.json").read_text(
+    postman_raw = (REPO_ROOT / "docs" / "api" / "postman_collection.json").read_text(
         encoding="utf-8"
     )
+    openapi_json = json.loads(openapi_json_raw)
+    postman = json.loads(postman_raw)
 
     assert "## Capability Matrix" in readme
     for status in ("Supported", "Optional", "Quarantined", "Proposal-only"):
         assert status in readme
+    assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in readme
+    assert "LLM_PROVIDER=local_adapter" in readme
+    assert "docs/capability_graduation_boundaries.md" in readme
     assert "Quarantined runtime features include `/v1/search`" in runbook
+    assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in runbook
+    assert "docs/capability_graduation_boundaries.md" in runbook
     assert "kg_search_status_decision_2026-03-10.md" in readme
     assert "kg_search_status_decision_2026-03-10.md" in runbook
+    assert "## 1. Text search" in capability_doc
+    assert "## 2. Hybrid ranking" in capability_doc
+    assert "## 3. KG expansion" in capability_doc
+    assert "## 4. Local-adapter serving" in capability_doc
     assert "| `/v1/search` | Quarantined |" in api_readme
-    assert "Status: Quarantined" in openapi_yaml
-    assert "quarantined" in openapi_json.lower()
-    assert "quarantined /v1/search route" in postman
+    assert "/v1/search" not in openapi_yaml_raw.split("\npaths:\n", 1)[1]
+    assert "/v1/search" not in openapi_json.get("paths", {})
+    assert all(
+        "/v1/search" not in str(item.get("request", {}).get("url", {}).get("raw", ""))
+        for item in postman.get("item", [])
+    )
 
 
 def test_kg_search_quarantine_decision_is_recorded_in_docs_and_code() -> None:
@@ -347,7 +376,37 @@ def test_kg_search_quarantine_decision_is_recorded_in_docs_and_code() -> None:
     assert "kg_search_status_decision_2026-03-10.md" in search_router
     assert "KG-backed search quarantined" in search_router
     assert "kg_search_status_decision_2026-03-10.md" in gate_doc
+    assert "does not govern" in gate_doc
+    assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in gate_doc
     assert "kg_search_status_decision_2026-03-10.md" in unquarantine_plan
+    assert "does not govern" in unquarantine_plan
+    assert "LLM_PROVIDER=local_adapter" in unquarantine_plan
+
+
+def test_windows_operator_guide_records_optional_vs_quarantined_capability_controls() -> None:
+    operator_guide = (
+        REPO_ROOT / "docs" / "ops" / "windows_single_host_operator.md"
+    ).read_text(encoding="utf-8")
+    service_docs = (REPO_ROOT / "service" / "docs" / "index.md").read_text(
+        encoding="utf-8"
+    )
+    api_readme = (REPO_ROOT / "docs" / "api" / "readme.md").read_text(
+        encoding="utf-8"
+    )
+
+    assert (REPO_ROOT / "scripts" / "optional-runtime-smoke.ps1").exists()
+    assert "optional-runtime-smoke.ps1" in operator_guide
+    assert "EARCRAWLER_RETRIEVAL_MODE" in operator_guide
+    assert "LLM_PROVIDER" in operator_guide
+    assert "EARCRAWLER_API_ENABLE_SEARCH" in operator_guide
+    assert "EARCRAWLER_ENABLE_KG_EXPANSION" in operator_guide
+    assert "EARCRAWLER_API_INSTANCE_COUNT" in operator_guide
+    assert "EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE=1" in operator_guide
+    assert "docs/capability_graduation_boundaries.md" in operator_guide
+    assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in service_docs
+    assert "KG expansion remain `Quarantined`" in service_docs
+    assert "runtime_contract" in service_docs
+    assert "runtime_contract" in api_readme
 
 
 def test_sample_ttl_pipeline_is_named_as_synthetic_fixture() -> None:
@@ -364,9 +423,15 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     ci_workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
         encoding="utf-8"
     )
+    release_workflow = (
+        REPO_ROOT / ".github" / "workflows" / "release.yml"
+    ).read_text(encoding="utf-8")
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     ci_doc = (REPO_ROOT / "docs" / "ci.md").read_text(encoding="utf-8")
     api_smoke = (REPO_ROOT / "scripts" / "api-smoke.ps1").read_text(encoding="utf-8")
+    optional_smoke = (REPO_ROOT / "scripts" / "optional-runtime-smoke.ps1").read_text(
+        encoding="utf-8"
+    )
 
     assert "Build synthetic sample TTL fixture bundle" not in ci_workflow
     assert "Supported corpus build gate" in ci_workflow
@@ -374,14 +439,27 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     assert "Supported KG emit gate" in ci_workflow
     assert "Supported KG semantic gate" in ci_workflow
     assert "Supported API smoke gate" in ci_workflow
+    assert "Optional runtime smoke gate" in ci_workflow
     assert "No-network RAG smoke gate" in ci_workflow
+    assert "Supported API smoke parity" in release_workflow
+    assert "Optional runtime smoke (search/KG gate validation)" in release_workflow
+    assert "dist/api_smoke.json" in release_workflow
+    assert "dist/optional_runtime_smoke.json" in release_workflow
+    assert "-RequireCompleteEvidence" in release_workflow
+    assert "-ApiSmokeReportPath dist/api_smoke.json" in release_workflow
     assert "tests/golden/test_phase2_golden_gate.py" in ci_workflow
     assert "Supported CI Evidence Path" in readme
     assert "supported evidence path" in ci_doc
+    assert "optional runtime smoke" in ci_doc
+    assert "ReportPath dist/api_smoke.json" in release_workflow
     assert "/v1/search" not in api_smoke
     assert "/v1/entities/" in api_smoke
     assert "/v1/lineage/" in api_smoke
     assert "/v1/sparql" in api_smoke
+    assert "supported-api-smoke.v1" in api_smoke
+    assert "search_default_off" in optional_smoke
+    assert "search_opt_in_on" in optional_smoke
+    assert "search_rollback_off" in optional_smoke
 
 
 def test_cli_entrypoint_is_thin_and_uses_domain_registrars() -> None:

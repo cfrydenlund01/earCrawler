@@ -24,36 +24,6 @@
       }
     },
     {
-      "name": "Search",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/v1/search",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "v1",
-            "search"
-          ],
-          "query": [
-            {
-              "key": "q",
-              "value": "{{search_query}}",
-              "description": "Search term"
-            },
-            {
-              "key": "limit",
-              "value": "5",
-              "description": "Result cap"
-            }
-          ]
-        },
-        "description": "Quarantined text-index search surface; available for local validation but not part of the supported production contract until docs/kg_quarantine_exit_gate.md is passed."
-      }
-    },
-    {
       "name": "Get Entity",
       "request": {
         "method": "GET",
@@ -190,7 +160,7 @@
       "key": "search_query",
       "value": "export controls",
       "type": "string",
-      "description": "Default query for the quarantined /v1/search route"
+      "description": "Default query used by sample request bodies"
     }
   ]
 }
