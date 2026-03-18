@@ -1,0 +1,206 @@
+{
+  "schema_version": "capability-registry.v1",
+  "source_of_truth": "service/docs/capability_registry.json",
+  "published_artifact": "docs/api/capability_registry.json",
+  "capabilities": [
+    {
+      "id": "runtime.cli_and_windows_service",
+      "label": "Supported CLI and Windows single-host operator path",
+      "status": "supported",
+      "kind": "entrypoint",
+      "default_posture": "enabled",
+      "runtime_contract_visible": true,
+      "surfaces": [
+        "earctl",
+        "py -m earCrawler.cli ...",
+        "docs/ops/windows_single_host_operator.md"
+      ],
+      "gates": [],
+      "contract_artifacts": "documented_only",
+      "notes": "Supported operator entrypoints for the Windows-first single-host runtime."
+    },
+    {
+      "id": "api.default_surface",
+      "label": "Default read-only API surface",
+      "status": "supported",
+      "kind": "api_surface",
+      "default_posture": "enabled",
+      "runtime_contract_visible": true,
+      "surfaces": [
+        "/health",
+        "/v1/entities/{entity_id}",
+        "/v1/lineage/{entity_id}",
+        "/v1/sparql",
+        "/v1/rag/query"
+      ],
+      "gates": [],
+      "contract_artifacts": "included",
+      "notes": "These routes define the baseline supported API contract."
+    },
+    {
+      "id": "api.rag_answer",
+      "label": "Generated-answer API",
+      "status": "optional",
+      "kind": "api_route",
+      "default_posture": "disabled",
+      "runtime_contract_visible": true,
+      "surfaces": [
+        "/v1/rag/answer"
+      ],
+      "gates": [
+        "EARCRAWLER_ENABLE_REMOTE_LLM=1 with provider credentials, or LLM_PROVIDER=local_adapter with explicit local-model settings"
+      ],
+      "contract_artifacts": "included",
+      "notes": "Implemented in the API contract, but baseline operator flows do not require it."
+    },
+    {
+      "id": "retrieval.hybrid",
+      "label": "Hybrid dense plus BM25 retrieval",
+      "status": "optional",
+      "kind": "runtime_mode",
+      "default_posture": "disabled",
+      "runtime_contract_visible": true,
+      "surfaces": [
+        "EARCRAWLER_RETRIEVAL_MODE=hybrid",
+        "/v1/rag/query",
+        "/v1/rag/answer",
+        "eval flows"
+      ],
+      "gates": [
+        "EARCRAWLER_RETRIEVAL_MODE=hybrid"
+      ],
+      "contract_artifacts": "documented_only",
+      "notes": "Dense retrieval remains the baseline rollback-safe mode."
+    },
+    {
+      "id": "runtime.local_adapter_serving",
+      "label": "Local-adapter serving",
+      "status": "optional",
+      "kind": "runtime_mode",
+      "default_posture": "disabled",
+      "runtime_contract_visible": true,
+      "surfaces": [
+        "LLM_PROVIDER=local_adapter",
+        "EARCRAWLER_ENABLE_LOCAL_LLM=1",
+        "/v1/rag/answer"
+      ],
+      "gates": [
+        "LLM_PROVIDER=local_adapter",
+        "EARCRAWLER_ENABLE_LOCAL_LLM=1",
+        "EARCRAWLER_LOCAL_LLM_ADAPTER_DIR=<run-dir>/adapter"
+      ],
+      "contract_artifacts": "documented_only",
+      "notes": "Requires an explicit Task 5.3/5.4 adapter artifact and validation path."
+    },
+    {
+      "id": "api.search",
+      "label": "Text search API",
+      "status": "quarantined",
+      "kind": "api_route",
+      "default_posture": "disabled",
+      "runtime_contract_visible": true,
+      "surfaces": [
+        "/v1/search",
+        "text-index-backed Fuseki search"
+      ],
+      "gates": [
+        "EARCRAWLER_API_ENABLE_SEARCH=1"
+      ],
+      "contract_artifacts": "excluded_by_default",
+      "notes": "Kept for local validation and research; excluded from default OpenAPI and Postman artifacts."
+    },
+    {
+      "id": "kg.expansion",
+      "label": "KG expansion during RAG",
+      "status": "quarantined",
+      "kind": "runtime_mode",
+      "default_posture": "disabled",
+      "runtime_contract_visible": true,
+      "surfaces": [
+        "EARCRAWLER_ENABLE_KG_EXPANSION=1",
+        "RAG provider settings"
+      ],
+      "gates": [
+        "EARCRAWLER_ENABLE_KG_EXPANSION=1 plus provider-specific environment variables"
+      ],
+      "contract_artifacts": "documented_only",
+      "notes": "Search and KG-dependent runtime behavior remain quarantined pending explicit exit-gate evidence."
+    },
+    {
+      "id": "legacy.sparql_service",
+      "label": "Legacy SPARQL-only service module",
+      "status": "legacy",
+      "kind": "module",
+      "default_posture": "blocked",
+      "runtime_contract_visible": false,
+      "surfaces": [
+        "earCrawler.service.sparql_service"
+      ],
+      "gates": [],
+      "contract_artifacts": "excluded",
+      "notes": "Quarantined legacy module outside the supported runtime surface."
+    },
+    {
+      "id": "legacy.kg_service",
+      "label": "Legacy KG service module",
+      "status": "legacy",
+      "kind": "module",
+      "default_posture": "blocked",
+      "runtime_contract_visible": false,
+      "surfaces": [
+        "earCrawler.service.legacy.kg_service"
+      ],
+      "gates": [],
+      "contract_artifacts": "excluded",
+      "notes": "Legacy module retained only for explicit quarantine references."
+    },
+    {
+      "id": "legacy.ingestion_pipeline",
+      "label": "Legacy ingestion pipeline",
+      "status": "legacy",
+      "kind": "module",
+      "default_posture": "blocked",
+      "runtime_contract_visible": false,
+      "surfaces": [
+        "earCrawler.ingestion.ingest"
+      ],
+      "gates": [
+        "EARCRAWLER_ENABLE_LEGACY_INGESTION=1"
+      ],
+      "contract_artifacts": "excluded",
+      "notes": "Placeholder legacy ingestion path that is not part of the supported operator workflow."
+    },
+    {
+      "id": "repo.generated_outputs",
+      "label": "Generated runtime and build outputs",
+      "status": "generated",
+      "kind": "repository_surface",
+      "default_posture": "generated",
+      "runtime_contract_visible": false,
+      "surfaces": [
+        "build/",
+        "dist/",
+        "run/",
+        "runs/",
+        "earCrawler.egg-info/"
+      ],
+      "gates": [],
+      "contract_artifacts": "not_applicable",
+      "notes": "Generated outputs that should not be treated as authored runtime source."
+    },
+    {
+      "id": "docs.archive",
+      "label": "Archived historical docs",
+      "status": "archival",
+      "kind": "repository_surface",
+      "default_posture": "archival",
+      "runtime_contract_visible": false,
+      "surfaces": [
+        "docs/Archive/"
+      ],
+      "gates": [],
+      "contract_artifacts": "not_applicable",
+      "notes": "Historical planning and review material kept for reference, not current runtime commitments."
+    }
+  ]
+}

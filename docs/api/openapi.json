@@ -807,5 +807,9 @@
         }
       }
     }
+  },
+  "x-earcrawler-capability-registry": {
+    "schema_version": "capability-registry.v1",
+    "published_artifact": "capability_registry.json"
   }
 }

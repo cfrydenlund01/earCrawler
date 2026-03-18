@@ -2,7 +2,7 @@
   "info": {
     "name": "EarCrawler API",
     "_postman_id": "earcrawler-api-contract",
-    "description": "Collection derived from service/openapi/openapi.yaml",
+    "description": "Collection derived from service/openapi/openapi.yaml. Capability status is published separately in capability_registry.json.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [

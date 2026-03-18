@@ -21,15 +21,30 @@ SEARCH_ROOTS = (
 ALLOWED_KG_MATCHES = {
     Path("README.md"),
     Path("earCrawler/service/legacy") / (LEGACY_KG_NAME + ".py"),
+    Path("service/docs/capability_registry.json"),
     Path("service/docs/index.md"),
 }
 ALLOWED_SPARQL_MATCHES = {
     Path("README.md"),
     Path("earCrawler/service") / (LEGACY_SPARQL_NAME + ".py"),
+    Path("service/docs/capability_registry.json"),
     Path("service/docs/index.md"),
     Path("tests/service/test_sparql_service.py"),
     Path("tests/tooling/test_runtime_service_surface.py"),
 }
+
+
+def _load_capability_registry() -> dict:
+    return json.loads(
+        (REPO_ROOT / "service" / "docs" / "capability_registry.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+
+def _capability_index() -> dict[str, dict]:
+    registry = _load_capability_registry()
+    return {entry["id"]: entry for entry in registry["capabilities"]}
 
 
 def _grep_files(pattern: str) -> set[Path]:
@@ -102,6 +117,7 @@ def test_wheel_packaging_includes_service_runtime_surface() -> None:
     assert package_data["service"] == [
         "config/*.yml",
         "docs/*.md",
+        "docs/*.json",
         "openapi/*.yaml",
         "templates/*.json",
         "templates/*.rq",
@@ -349,6 +365,7 @@ def test_repo_publishes_repository_status_index_for_onboarding() -> None:
 
     assert "docs/repository_status_index.md" in readme
     assert "docs/repository_status_index.md" in start_here
+    assert "docs/ops/windows_single_host_operator.md" in start_here
     for status in ("Supported", "Optional", "Quarantined", "Generated", "Archival"):
         assert f"`{status}`" in status_index
     assert "| `earCrawler/` | Supported |" in status_index
@@ -365,6 +382,13 @@ def test_repo_freezes_capability_matrix_and_api_search_status() -> None:
     capability_doc = (
         REPO_ROOT / "docs" / "capability_graduation_boundaries.md"
     ).read_text(encoding="utf-8")
+    canonical_registry = _load_capability_registry()
+    published_registry = json.loads(
+        (REPO_ROOT / "docs" / "api" / "capability_registry.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    capability_index = _capability_index()
     openapi_yaml_raw = (REPO_ROOT / "service" / "openapi" / "openapi.yaml").read_text(
         encoding="utf-8"
     )
@@ -378,23 +402,40 @@ def test_repo_freezes_capability_matrix_and_api_search_status() -> None:
     postman = json.loads(postman_raw)
 
     assert "## Capability Matrix" in readme
+    assert "docs/api/capability_registry.json" in readme
     for status in ("Supported", "Optional", "Quarantined", "Proposal-only"):
         assert status in readme
     assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in readme
     assert "LLM_PROVIDER=local_adapter" in readme
     assert "docs/capability_graduation_boundaries.md" in readme
+    assert "docs/api/capability_registry.json" in runbook
     assert "Quarantined runtime features include `/v1/search`" in runbook
     assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in runbook
     assert "docs/capability_graduation_boundaries.md" in runbook
+    assert "docs/api/capability_registry.json" in api_readme
     assert "kg_search_status_decision_2026-03-10.md" in readme
     assert "kg_search_status_decision_2026-03-10.md" in runbook
     assert "## 1. Text search" in capability_doc
     assert "## 2. Hybrid ranking" in capability_doc
     assert "## 3. KG expansion" in capability_doc
     assert "## 4. Local-adapter serving" in capability_doc
+    assert canonical_registry == published_registry
+    assert canonical_registry["schema_version"] == "capability-registry.v1"
+    assert capability_index["api.default_surface"]["status"] == "supported"
+    assert capability_index["api.search"]["status"] == "quarantined"
+    assert capability_index["retrieval.hybrid"]["status"] == "optional"
+    assert capability_index["runtime.local_adapter_serving"]["status"] == "optional"
+    assert capability_index["legacy.sparql_service"]["status"] == "legacy"
+    assert capability_index["repo.generated_outputs"]["status"] == "generated"
+    assert capability_index["docs.archive"]["status"] == "archival"
     assert "| `/v1/search` | Quarantined |" in api_readme
     assert "/v1/search" not in openapi_yaml_raw.split("\npaths:\n", 1)[1]
     assert "/v1/search" not in openapi_json.get("paths", {})
+    assert (
+        openapi_json["x-earcrawler-capability-registry"]["published_artifact"]
+        == "capability_registry.json"
+    )
+    assert "capability_registry.json" in postman["info"]["description"]
     assert all(
         "/v1/search" not in str(item.get("request", {}).get("url", {}).get("raw", ""))
         for item in postman.get("item", [])
@@ -448,6 +489,13 @@ def test_windows_operator_guide_records_optional_vs_quarantined_capability_contr
     assert "EARCRAWLER_API_INSTANCE_COUNT" in operator_guide
     assert "EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE=1" in operator_guide
     assert "docs/capability_graduation_boundaries.md" in operator_guide
+    assert "## Baseline operator profile" in operator_guide
+    assert "runtime_contract.capability_registry_schema = capability-registry.v1" in operator_guide
+    assert "runtime_contract.capabilities.api.default_surface.status = supported" in operator_guide
+    assert "runtime_contract.capabilities.api.search.status = quarantined" in operator_guide
+    assert "dist\\release_validation_evidence.json" in operator_guide
+    assert "scripts/api-smoke.ps1" in operator_guide
+    assert "Still-missing deployment evidence" in operator_guide
     assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in service_docs
     assert "KG expansion remain `Quarantined`" in service_docs
     assert "runtime_contract" in service_docs

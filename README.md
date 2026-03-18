@@ -108,8 +108,11 @@ Use `service/api_server` and the CLI/operator paths above as the only supported 
 
 ## Capability Matrix
 
-This table is the canonical capability/status map for the repository. If another
-document sounds broader, follow this table.
+Machine-readable capability state now lives in
+`service/docs/capability_registry.json` and is published with the API contract
+artifacts at `docs/api/capability_registry.json`. The table below is the
+human-readable summary for the runtime and repo surfaces contributors ask about
+most often.
 
 | Surface | Status | Notes |
 | --- | --- | --- |

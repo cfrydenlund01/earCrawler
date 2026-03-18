@@ -3,6 +3,9 @@
 Status: active capability-state policy for Pass 8. This document replaces the
 older bundled "KG-backed hybrid retrieval" framing with four separately tracked
 capabilities. It does not promote or unquarantine any feature by itself.
+Machine-readable current-state data lives in
+`service/docs/capability_registry.json` and is published in
+`docs/api/capability_registry.json`.
 
 Use this document together with:
 
