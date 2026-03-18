@@ -3,6 +3,9 @@
 This module performs deterministic entity reconciliation between sources.  The
 normalisation pipeline applies case‐folding, Unicode NFC, punctuation stripping
 and stop‑word removal before generating blocking keys and similarity features.
+Candidate generation is block-based: pairs are produced from configured lexical
+blocks plus exact identifier and URL-host blocks, then deduplicated before
+scoring.
 
 Scores are computed from multiple features using weights defined in
 `kg/reconcile/rules.yml`.  Hard constraints such as country mismatch stop an
@@ -17,7 +20,7 @@ allow/deny pairs.  After a run the engine writes:
 
 * `kg/reconcile/idmap.csv` – canonical to source mappings
 * `kg/reconcile/decisions.jsonl.gz` – feature vectors and decisions
-* `kg/reports/reconcile-summary.json` – counts by decision
+* `kg/reports/reconcile-summary.json` – counts by decision plus pair statistics
 * `kg/reports/reconcile-conflicts.json` – near‑threshold cases
 * `kg/delta/reconcile-merged.ttl` – RDF `owl:sameAs` triples
 

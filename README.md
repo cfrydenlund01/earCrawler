@@ -93,6 +93,7 @@ py -m earCrawler.cli diagnose
 Supported entrypoints in this repo are:
 
 - `earctl` / `py -m earCrawler.cli ...` for supported CLI workflows.
+- KG workflows should use the grouped commands under `earctl kg ...` or `py -m earCrawler.cli kg ...`.
 - `py -m uvicorn service.api_server.server:app --host 127.0.0.1 --port 9001` for direct FastAPI hosting and the wheel-based Windows service path.
 - `py -m earCrawler.cli eval run-rag ...` for evaluation runs against datasets in `eval/`.
 
@@ -103,6 +104,7 @@ Quarantined or unsupported runtime surfaces in this repo are:
 - `earCrawler.ingestion.ingest` (legacy placeholder pipeline; explicitly gated)
 - container runtimes and image-based deployments
 - legacy training or research scaffolding; see `docs/model_training_surface_adr.md`
+- top-level `cli/` wrappers such as `python -m cli.kg_validate`; these are deprecated compatibility shims that now point back to `earctl kg ...`
 
 Use `service/api_server` and the CLI/operator paths above as the only supported runtime surface.
 
@@ -142,6 +144,8 @@ The repo-level boundary is documented in `docs/runtime_research_boundary.md`.
 New contributors should begin with `docs/start_here_supported_paths.md`.
 Use `docs/repository_status_index.md` for the top-level map of supported,
 optional, quarantined, generated, and archival surfaces.
+Use `docs/data_artifact_inventory.md` for the runtime/eval/training artifact
+truth model.
 
 ## Single-Host Support Statement
 

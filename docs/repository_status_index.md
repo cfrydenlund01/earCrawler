@@ -43,7 +43,7 @@ Status labels:
 | `packaging/` | Supported | Release packaging configuration for supported Windows artifacts. |
 | `installer/` | Supported | Windows installer definitions used in release engineering. |
 | `tools/` | Optional | Local tool dependencies such as Jena downloads; useful for local validation, not primary source. |
-| `cli/` | Quarantined | Legacy top-level CLI helpers retained for compatibility; authoritative CLI surface is `earCrawler.cli`. |
+| `cli/` | Quarantined | Deprecated top-level CLI compatibility wrappers retained only to redirect users to `earCrawler.cli` / `earctl`. |
 | `Research/` | Quarantined | Research notes and decision logs; informative but not runtime/operator contract. |
 | `demo/` | Quarantined | Demo-oriented assets, not the supported production baseline. |
 | `bundle/` | Optional | Offline/export bundle helpers used by specific packaging workflows. |
@@ -77,3 +77,6 @@ If you are new to the repo, start here:
 For day-to-day changes, treat `earCrawler/`, `service/`, `scripts/`,
 `config/`, `tests/`, and the active docs outside `docs/Archive/` as the default
 working set unless a task explicitly targets an optional or quarantined surface.
+
+For corpus, FAISS, eval, baseline, and training artifacts specifically, use
+`docs/data_artifact_inventory.md`.

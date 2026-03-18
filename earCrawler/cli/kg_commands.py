@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """KG CLI commands and registrar."""
 
+from importlib import resources
 import json
 from pathlib import Path
 from typing import Any
@@ -10,6 +11,7 @@ import click
 
 from earCrawler.kg import emit_ear, emit_nsf, fuseki
 from earCrawler.kg.sparql import SPARQLClient
+from earCrawler.kg.validate import validate_files
 from earCrawler.security import policy
 
 
@@ -25,6 +27,48 @@ def _resolve_sparql_client() -> type[SPARQLClient]:
     except Exception:
         pass
     return SPARQLClient
+
+
+def _validate_ttls(
+    ctx: click.Context,
+    ttls: tuple[Path, ...],
+    glob_pattern: str | None,
+    shapes: Path | None,
+    fail_on: str,
+    blocking_checks: tuple[str, ...],
+) -> None:
+    paths: list[str] = []
+    if glob_pattern:
+        if ctx.args:
+            paths.extend([glob_pattern, *ctx.args])
+        else:
+            pattern_path = Path(glob_pattern)
+            paths.extend(str(p) for p in pattern_path.parent.glob(pattern_path.name))
+    paths.extend(str(p) for p in ttls)
+
+    if shapes is None:
+        with resources.as_file(
+            resources.files("earCrawler.kg").joinpath("shapes.ttl")
+        ) as default_shapes:
+            exit_code = validate_files(
+                paths,
+                default_shapes,
+                fail_on=fail_on,
+                blocking_checks=blocking_checks or None,
+            )
+    else:
+        exit_code = validate_files(
+            paths,
+            shapes,
+            fail_on=fail_on,
+            blocking_checks=blocking_checks or None,
+        )
+    raise SystemExit(exit_code)
+
+
+@click.group(name="kg")
+def kg_group() -> None:
+    """Knowledge graph utilities."""
 
 
 @click.command(name="kg-export")
@@ -216,11 +260,73 @@ def kg_emit(sources: tuple[str, ...], in_dir: Path, out_dir: Path) -> None:
             raise click.ClickException(str(exc))
 
 
+@click.command(name="validate", context_settings={"allow_extra_args": True})
+@click.pass_context
+@click.option(
+    "--ttl",
+    "ttls",
+    multiple=True,
+    type=click.Path(path_type=Path),
+    help="Path to TTL file.",
+)
+@click.option(
+    "--glob",
+    "glob_pattern",
+    type=str,
+    help="Glob pattern for TTL files. On Windows the shell may expand"
+    " wildcards; extra paths are captured automatically.",
+)
+@click.option(
+    "--shapes",
+    type=click.Path(path_type=Path),
+    default=None,
+    show_default=False,
+    help="Path to SHACL shapes graph.",
+)
+@click.option(
+    "--fail-on",
+    type=click.Choice(["any", "shacl-only", "sparql-only", "supported"]),
+    default="any",
+    show_default=True,
+    help="What violations trigger a non-zero exit code.",
+)
+@click.option(
+    "--blocking-check",
+    "blocking_checks",
+    multiple=True,
+    type=str,
+    help=(
+        "SPARQL check name to treat as release-blocking when --fail-on supported "
+        "(repeatable). Defaults to the supported built-in check set."
+    ),
+)
+def kg_validate(
+    ctx: click.Context,
+    ttls: tuple[Path, ...],
+    glob_pattern: str | None,
+    shapes: Path | None,
+    fail_on: str,
+    blocking_checks: tuple[str, ...],
+) -> None:
+    """Validate emitted Turtle files using SPARQL checks and SHACL."""
+
+    _validate_ttls(ctx, ttls, glob_pattern, shapes, fail_on, blocking_checks)
+
+
 def register_kg_commands(root: click.Group) -> None:
     """Register KG-related commands on the root CLI."""
 
+    kg_group.add_command(kg_export, name="export")
+    kg_group.add_command(kg_load, name="load")
+    kg_group.add_command(kg_serve, name="serve")
+    kg_group.add_command(kg_query, name="query")
+    kg_group.add_command(kg_emit, name="emit")
+    kg_group.add_command(kg_validate, name="validate")
+
+    root.add_command(kg_group, name="kg")
     root.add_command(kg_export)
     root.add_command(kg_load)
     root.add_command(kg_serve)
     root.add_command(kg_query)
     root.add_command(kg_emit)
+    root.add_command(kg_validate, name="kg-validate")

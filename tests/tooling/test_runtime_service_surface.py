@@ -375,6 +375,31 @@ def test_repo_publishes_repository_status_index_for_onboarding() -> None:
     assert "Default contributor path" in status_index
 
 
+def test_repo_publishes_data_artifact_inventory() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    start_here = (
+        REPO_ROOT / "docs" / "start_here_supported_paths.md"
+    ).read_text(encoding="utf-8")
+    artifact_inventory = (
+        REPO_ROOT / "docs" / "data_artifact_inventory.md"
+    ).read_text(encoding="utf-8")
+
+    assert "docs/data_artifact_inventory.md" in readme
+    assert "docs/data_artifact_inventory.md" in start_here
+    for artifact_class in (
+        "Authoritative",
+        "Derived",
+        "Experimental",
+        "Generated",
+        "Archival",
+    ):
+        assert f"`{artifact_class}`" in artifact_inventory
+    assert "| `data/faiss/retrieval_corpus.jsonl` | Authoritative |" in artifact_inventory
+    assert "| `eval/manifest.json` | Authoritative |" in artifact_inventory
+    assert "| `dist/training/<run_id>/manifest.json` | Generated |" in artifact_inventory
+    assert "Practical rules" in artifact_inventory
+
+
 def test_repo_freezes_capability_matrix_and_api_search_status() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")

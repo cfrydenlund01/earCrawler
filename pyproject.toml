@@ -31,7 +31,7 @@ gpu = [
 
 [project.scripts]
 earctl = "earCrawler.cli:main"
-kg-validate = "cli.kg_validate:main"
+kg-validate = "earCrawler.cli.legacy_entrypoints:kg_validate_main"
 
 [tool.setuptools]
 include-package-data = true

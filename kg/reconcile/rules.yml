@@ -2,6 +2,14 @@ thresholds:
   high: 0.82
   low: 0.50
 
+blocking:
+  lexical_keys:
+    - country_name
+    - alnum
+    - country_soundex
+    - country_token0
+  max_lexical_block_size: 64
+
 weights:
   name_exact: 0.25
   token_jaccard: 0.2
