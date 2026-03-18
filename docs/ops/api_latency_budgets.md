@@ -19,7 +19,8 @@ The machine-readable source of truth is
 - Runtime profile: `windows_single_host`
 - Request timeout budget: `5000 ms`
 - Gate style: deterministic route smoke using fixture-backed API dependencies
-- Enforcement point: CI `cpu` job via `scripts/api_perf_smoke.py`
+- Enforcement point: CI `cpu` job via `scripts/api_perf_smoke.py` (supported
+  routes only by default)
 
 ## Route budgets
 
@@ -27,6 +28,14 @@ The machine-readable source of truth is
 |---|---|---:|---:|---|
 | `/v1/rag/query` | Supported | 400 ms | 0% | Must return `504` when work exceeds the 5 s request timeout; timeout response must arrive within 4.5-5.5 s |
 | `/v1/search` | Quarantined | 250 ms | 0% | Must return `504` when work exceeds the 5 s request timeout; timeout response must arrive within 4.5-5.5 s |
+
+Default gate routing is controlled in `perf/config/api_route_budgets.yml` using
+`include_in_default_gate`. Quarantined routes like `/v1/search` are excluded
+from the default release gate and can be run explicitly for local validation:
+
+```powershell
+py scripts/api_perf_smoke.py --include-quarantined
+```
 
 ## What this gate accomplishes
 

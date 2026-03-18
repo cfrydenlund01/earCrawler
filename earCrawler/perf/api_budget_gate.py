@@ -96,6 +96,7 @@ _FUSEKI_RESPONSES = {
 class RouteBudget:
     name: str
     runtime_status: str
+    include_in_default_gate: bool
     method: str
     path: str
     query: dict[str, Any]
@@ -119,6 +120,12 @@ def _load_budgets(path: Path) -> tuple[int, list[RouteBudget]]:
             RouteBudget(
                 name=name,
                 runtime_status=str(cfg["runtime_status"]),
+                include_in_default_gate=bool(
+                    cfg.get(
+                        "include_in_default_gate",
+                        str(cfg["runtime_status"]).lower() == "supported",
+                    )
+                ),
                 method=str(cfg["method"]).upper(),
                 path=str(cfg["path"]),
                 query=dict(cfg.get("query") or {}),
@@ -145,6 +152,7 @@ def _build_client(
     settings = ApiSettings(
         fuseki_url=None,
         request_timeout_seconds=request_timeout_ms / 1000.0,
+        enable_search=route_name == "search",
     )
     if route_name == "search":
         fuseki_client = (
@@ -182,12 +190,22 @@ def _invoke(client: TestClient, route: RouteBudget) -> tuple[int, float]:
     return response.status_code, _elapsed_ms(start)
 
 
-def run_budget_gate(budgets_path: Path) -> dict[str, Any]:
+def run_budget_gate(
+    budgets_path: Path, *, include_quarantined: bool = False
+) -> dict[str, Any]:
     request_timeout_ms, routes = _load_budgets(budgets_path)
     report_routes: dict[str, Any] = {}
+    skipped_routes: dict[str, Any] = {}
     overall_ok = True
 
     for route in routes:
+        if not include_quarantined and not route.include_in_default_gate:
+            skipped_routes[route.name] = {
+                "runtime_status": route.runtime_status,
+                "reason": "excluded_from_default_gate",
+            }
+            continue
+
         latencies: list[float] = []
         failures = 0
         with _build_client(
@@ -248,7 +266,9 @@ def run_budget_gate(budgets_path: Path) -> dict[str, Any]:
     return {
         "budgets_path": str(budgets_path),
         "request_timeout_ms": request_timeout_ms,
+        "include_quarantined": include_quarantined,
         "routes": report_routes,
+        "skipped_routes": skipped_routes,
         "pass": overall_ok,
     }
 
@@ -267,9 +287,16 @@ def main(argv: list[str] | None = None) -> int:
         default="dist/perf/api_perf_smoke.json",
         help="Report output path",
     )
+    parser.add_argument(
+        "--include-quarantined",
+        action="store_true",
+        help="Include quarantined route budgets (local validation only).",
+    )
     args = parser.parse_args(argv)
 
-    report = run_budget_gate(Path(args.budgets))
+    report = run_budget_gate(
+        Path(args.budgets), include_quarantined=args.include_quarantined
+    )
     report_path = Path(args.report)
     report_path.parent.mkdir(parents=True, exist_ok=True)
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")

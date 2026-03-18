@@ -58,6 +58,96 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _count_jsonl_records(path: Path) -> int:
+    count = 0
+    with path.open("r", encoding="utf-8") as handle:
+        for line_no, line in enumerate(handle, start=1):
+            stripped = line.strip()
+            if not stripped:
+                continue
+            try:
+                json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                raise ValueError(
+                    f"Retrieval corpus contains invalid JSON at line {line_no}: {path}"
+                ) from exc
+            count += 1
+    return count
+
+
+def _resolve_repo_relative(path_value: str) -> Path:
+    path = Path(path_value)
+    if path.is_absolute():
+        return path.resolve()
+    return (REPO_ROOT / path).resolve()
+
+
+def _validate_training_corpus_preflight(
+    *,
+    retrieval_corpus_path: Path,
+    training_input_contract_path: Path,
+    index_meta_path: Path,
+) -> tuple[str, int]:
+    if not training_input_contract_path.exists():
+        raise FileNotFoundError(
+            f"Training input contract not found: {training_input_contract_path}"
+        )
+    if not index_meta_path.exists():
+        raise FileNotFoundError(f"FAISS index metadata not found: {index_meta_path}")
+
+    contract = _load_json(training_input_contract_path)
+    authoritative = contract.get("authoritative_sources")
+    if not isinstance(authoritative, dict):
+        raise ValueError(
+            "Training input contract is missing authoritative_sources."
+        )
+    expected_corpus_raw = str(
+        authoritative.get("retrieval_corpus_jsonl") or ""
+    ).strip()
+    if not expected_corpus_raw:
+        raise ValueError(
+            "Training input contract is missing authoritative_sources.retrieval_corpus_jsonl."
+        )
+    expected_corpus_path = _resolve_repo_relative(expected_corpus_raw)
+    if retrieval_corpus_path != expected_corpus_path:
+        raise ValueError(
+            "Configured retrieval corpus path does not match training input contract. "
+            f"configured='{retrieval_corpus_path}' expected='{expected_corpus_path}'"
+        )
+    expected_index_meta_raw = str(authoritative.get("faiss_index_meta_json") or "").strip()
+    if expected_index_meta_raw:
+        expected_index_meta_path = _resolve_repo_relative(expected_index_meta_raw)
+        if index_meta_path != expected_index_meta_path:
+            raise ValueError(
+                "Configured FAISS index metadata path does not match training input contract. "
+                f"configured='{index_meta_path}' expected='{expected_index_meta_path}'"
+            )
+
+    index_meta = _load_json(index_meta_path)
+    expected_digest = str(index_meta.get("corpus_digest") or "").strip()
+    if not expected_digest:
+        raise ValueError(
+            "FAISS index metadata is missing corpus_digest."
+        )
+    if "doc_count" not in index_meta:
+        raise ValueError("FAISS index metadata is missing doc_count.")
+    expected_doc_count = int(index_meta["doc_count"])
+
+    actual_digest = _sha256_file(retrieval_corpus_path)
+    actual_doc_count = _count_jsonl_records(retrieval_corpus_path)
+    if actual_digest != expected_digest:
+        raise ValueError(
+            "Retrieval corpus digest mismatch vs FAISS metadata. "
+            f"corpus='{actual_digest}' index_meta='{expected_digest}'"
+        )
+    if actual_doc_count != expected_doc_count:
+        raise ValueError(
+            "Retrieval corpus document count mismatch vs FAISS metadata. "
+            f"corpus={actual_doc_count} index_meta={expected_doc_count}"
+        )
+    return actual_digest, actual_doc_count
+
+
 def _write_json(path: Path, payload: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2, ensure_ascii=True), encoding="utf-8")
@@ -602,7 +692,17 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--retrieval-corpus",
         type=Path,
-        default=Path("data") / "retrieval_corpus.jsonl",
+        default=Path("data") / "faiss" / "retrieval_corpus.jsonl",
+    )
+    parser.add_argument(
+        "--training-input-contract",
+        type=Path,
+        default=Path("config") / "training_input_contract.example.json",
+    )
+    parser.add_argument(
+        "--index-meta",
+        type=Path,
+        default=Path("data") / "faiss" / "index.meta.json",
     )
     parser.add_argument("--output-root", type=Path, default=Path("dist") / "training")
     parser.add_argument("--run-id", default=None)
@@ -648,6 +748,17 @@ def main(argv: list[str] | None = None) -> int:
     retrieval_corpus_path = Path(args.retrieval_corpus).resolve()
     if not retrieval_corpus_path.exists():
         raise FileNotFoundError(f"Retrieval corpus not found: {retrieval_corpus_path}")
+    training_input_contract_path = Path(args.training_input_contract).resolve()
+    index_meta_path = Path(args.index_meta).resolve()
+    try:
+        corpus_digest, corpus_doc_count = _validate_training_corpus_preflight(
+            retrieval_corpus_path=retrieval_corpus_path,
+            training_input_contract_path=training_input_contract_path,
+            index_meta_path=index_meta_path,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Training corpus preflight failed: {exc}", file=sys.stderr)
+        return 2
 
     snapshot_manifest = (
         Path(args.snapshot_manifest).resolve() if args.snapshot_manifest else None
@@ -667,7 +778,6 @@ def main(argv: list[str] | None = None) -> int:
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    corpus_digest = _sha256_file(retrieval_corpus_path)
     records = _read_retrieval_records(retrieval_corpus_path)
     examples = _build_examples(
         records=records,
@@ -692,6 +802,9 @@ def main(argv: list[str] | None = None) -> int:
         "snapshot_sha256": snapshot.snapshot_sha256,
         "retrieval_corpus_path": str(retrieval_corpus_path),
         "retrieval_corpus_digest": corpus_digest,
+        "retrieval_corpus_doc_count": corpus_doc_count,
+        "training_input_contract_path": str(training_input_contract_path),
+        "index_meta_path": str(index_meta_path),
         "example_schema_version": "instruction-tuning.v1",
         "example_count": len(examples),
         "examples_path": str(examples_path),
@@ -716,6 +829,8 @@ def main(argv: list[str] | None = None) -> int:
         "snapshot_id": snapshot.snapshot_id,
         "snapshot_sha256": snapshot.snapshot_sha256,
         "retrieval_corpus": str(retrieval_corpus_path),
+        "training_input_contract": str(training_input_contract_path),
+        "index_meta": str(index_meta_path),
         "max_examples": int(args.max_examples),
         "refusal_every": int(args.refusal_every),
         "training_hyperparams": {

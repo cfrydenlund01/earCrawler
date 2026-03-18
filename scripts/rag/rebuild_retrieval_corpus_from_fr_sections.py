@@ -122,8 +122,13 @@ def main() -> None:
     parser.add_argument(
         "--out",
         type=Path,
-        default=Path("data") / "retrieval_corpus.jsonl",
-        help="Output JSONL file (default: data/retrieval_corpus.jsonl).",
+        default=Path("data")
+        / "experimental"
+        / "retrieval_corpus_6_record_fr_sections.jsonl",
+        help=(
+            "Output JSONL file "
+            "(default: data/experimental/retrieval_corpus_6_record_fr_sections.jsonl)."
+        ),
     )
     args = parser.parse_args()
     docs = build_retrieval_corpus(input_path=args.input, output_path=args.out)
@@ -132,4 +137,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

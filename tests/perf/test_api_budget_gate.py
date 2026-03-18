@@ -29,6 +29,7 @@ def _write_budgets(path: Path, *, latency_budget_ms: int = 500) -> None:
                 "routes": {
                     "search": {
                         "runtime_status": "quarantined",
+                        "include_in_default_gate": False,
                         "method": "GET",
                         "path": "/v1/search",
                         "query": {"q": "example", "limit": 1},
@@ -45,6 +46,7 @@ def _write_budgets(path: Path, *, latency_budget_ms: int = 500) -> None:
                     },
                     "rag_query": {
                         "runtime_status": "supported",
+                        "include_in_default_gate": True,
                         "method": "POST",
                         "path": "/v1/rag/query",
                         "json": {
@@ -77,8 +79,9 @@ def test_api_budget_gate_passes(tmp_path: Path) -> None:
     report = run_budget_gate(budgets)
 
     assert report["pass"] is True
-    assert report["routes"]["search"]["pass"] is True
     assert report["routes"]["rag_query"]["pass"] is True
+    assert "search" not in report["routes"]
+    assert report["skipped_routes"]["search"]["reason"] == "excluded_from_default_gate"
 
 
 def test_api_budget_gate_fails_when_latency_budget_too_low(tmp_path: Path) -> None:
@@ -88,7 +91,16 @@ def test_api_budget_gate_fails_when_latency_budget_too_low(tmp_path: Path) -> No
     report = run_budget_gate(budgets)
 
     assert report["pass"] is False
-    assert (
-        report["routes"]["search"]["latency"]["pass"] is False
-        or report["routes"]["rag_query"]["latency"]["pass"] is False
-    )
+    assert report["routes"]["rag_query"]["latency"]["pass"] is False
+
+
+def test_api_budget_gate_can_include_quarantined_routes(tmp_path: Path) -> None:
+    budgets = tmp_path / "api_budgets.yml"
+    _write_budgets(budgets)
+
+    report = run_budget_gate(budgets, include_quarantined=True)
+
+    assert report["pass"] is True
+    assert report["routes"]["search"]["pass"] is True
+    assert report["routes"]["rag_query"]["pass"] is True
+    assert report["skipped_routes"] == {}

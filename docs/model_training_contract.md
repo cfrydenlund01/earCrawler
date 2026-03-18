@@ -39,6 +39,7 @@ All production training examples MUST be traceable to the following sources:
 2. A retrieval corpus built deterministically from that snapshot:
    - schema: `retrieval-corpus.v1`
    - typical output path: `data/faiss/retrieval_corpus.jsonl`
+   - paired FAISS metadata path: `data/faiss/index.meta.json`
    - contract reference: `retrieval_corpus_contract.md`
 3. A recorded base-model selection:
    - `Qwen/Qwen2.5-7B-Instruct`
@@ -48,6 +49,8 @@ All production training examples MUST be traceable to the following sources:
 
 The following are not training-authoritative for Task 5.2:
 
+- `data/experimental/retrieval_corpus_6_record_fr_sections.jsonl` (small
+  derivative scratch corpus for FR-section rebuild experiments)
 - `eval/*.jsonl`
 - `dist/eval/**`
 - `tests/fixtures/**`
@@ -202,6 +205,21 @@ Regeneration procedure for Tasks 5.2 and 5.3:
 6. Write a `manifest.json` that records all pinned inputs and output hashes.
 
 If any pinned input changes, the training package version MUST change.
+
+## Runner preflight enforcement
+
+`scripts/training/run_phase5_finetune.py` performs a contract preflight before
+writing artifacts or launching training:
+
+1. The configured `--retrieval-corpus` path must match
+   `authoritative_sources.retrieval_corpus_jsonl` from
+   `config/training_input_contract.example.json`.
+2. The configured `--index-meta` path must match
+   `authoritative_sources.faiss_index_meta_json` when that field is present.
+3. The retrieval corpus SHA-256 and non-empty JSONL record count must match
+   `corpus_digest` and `doc_count` from `data/faiss/index.meta.json`.
+
+If any check fails, the run exits before packaging or training.
 
 ## Data separation policy
 

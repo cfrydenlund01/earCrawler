@@ -5,7 +5,8 @@
   "authoritative_sources": {
     "offline_snapshot_manifest": "snapshots/offline/<snapshot_id>/manifest.json",
     "offline_snapshot_payload": "snapshots/offline/<snapshot_id>/snapshot.jsonl",
-    "retrieval_corpus_jsonl": "data/faiss/retrieval_corpus.jsonl"
+    "retrieval_corpus_jsonl": "data/faiss/retrieval_corpus.jsonl",
+    "faiss_index_meta_json": "data/faiss/index.meta.json"
   },
   "optional_metadata": {
     "kg_state_manifest": "kg/.kgstate/manifest.json"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -9,11 +10,8 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
-def test_phase5_training_runner_prepare_only_writes_manifest_and_metadata(
-    tmp_path: Path,
-) -> None:
-    corpus = tmp_path / "retrieval_corpus.jsonl"
-    corpus.write_text(
+def _write_corpus(path: Path) -> None:
+    path.write_text(
         "\n".join(
             [
                 json.dumps(
@@ -38,15 +36,62 @@ def test_phase5_training_runner_prepare_only_writes_manifest_and_metadata(
         encoding="utf-8",
     )
 
-    out_root = tmp_path / "dist_training"
-    run_id = "phase5-test-run"
-    proc = subprocess.run(
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _write_training_contract(path: Path, *, corpus: Path, index_meta: Path) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "training-input-contract.v1",
+                "authoritative_sources": {
+                    "retrieval_corpus_jsonl": str(corpus),
+                    "faiss_index_meta_json": str(index_meta),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_index_meta(path: Path, *, corpus_digest: str, doc_count: int) -> None:
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": "retriever-index-meta.v1",
+                "corpus_digest": corpus_digest,
+                "doc_count": doc_count,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _run_prepare_only(
+    *,
+    corpus: Path,
+    out_root: Path,
+    run_id: str,
+    contract: Path,
+    index_meta: Path,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
         [
             sys.executable,
             "scripts/training/run_phase5_finetune.py",
             "--prepare-only",
             "--retrieval-corpus",
             str(corpus),
+            "--training-input-contract",
+            str(contract),
+            "--index-meta",
+            str(index_meta),
             "--output-root",
             str(out_root),
             "--run-id",
@@ -64,6 +109,31 @@ def test_phase5_training_runner_prepare_only_writes_manifest_and_metadata(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         check=False,
+    )
+
+
+def test_phase5_training_runner_prepare_only_writes_manifest_and_metadata(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    index_meta = tmp_path / "index.meta.json"
+    _write_index_meta(
+        index_meta,
+        corpus_digest=_sha256_file(corpus),
+        doc_count=2,
+    )
+    contract = tmp_path / "training_input_contract.json"
+    _write_training_contract(contract, corpus=corpus, index_meta=index_meta)
+
+    out_root = tmp_path / "dist_training"
+    run_id = "phase5-test-run"
+    proc = _run_prepare_only(
+        corpus=corpus,
+        out_root=out_root,
+        run_id=run_id,
+        contract=contract,
+        index_meta=index_meta,
     )
     assert proc.returncode == 0, proc.stdout
 
@@ -85,3 +155,86 @@ def test_phase5_training_runner_prepare_only_writes_manifest_and_metadata(
     assert manifest["example_count"] == 4
     assert metadata["status"] == "prepare_only"
     assert metadata["prepare_only"] is True
+
+
+def test_phase5_training_runner_fails_when_contract_corpus_path_mismatches(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    index_meta = tmp_path / "index.meta.json"
+    _write_index_meta(
+        index_meta,
+        corpus_digest=_sha256_file(corpus),
+        doc_count=2,
+    )
+    wrong_corpus = tmp_path / "other_corpus.jsonl"
+    _write_corpus(wrong_corpus)
+    contract = tmp_path / "training_input_contract.json"
+    _write_training_contract(contract, corpus=wrong_corpus, index_meta=index_meta)
+
+    proc = _run_prepare_only(
+        corpus=corpus,
+        out_root=tmp_path / "dist_training",
+        run_id="phase5-bad-contract-path",
+        contract=contract,
+        index_meta=index_meta,
+    )
+
+    assert proc.returncode == 2
+    assert "Training corpus preflight failed:" in proc.stdout
+    assert "Configured retrieval corpus path does not match training input contract" in proc.stdout
+
+
+def test_phase5_training_runner_fails_when_index_meta_digest_mismatches(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    index_meta = tmp_path / "index.meta.json"
+    _write_index_meta(
+        index_meta,
+        corpus_digest="0" * 64,
+        doc_count=2,
+    )
+    contract = tmp_path / "training_input_contract.json"
+    _write_training_contract(contract, corpus=corpus, index_meta=index_meta)
+
+    proc = _run_prepare_only(
+        corpus=corpus,
+        out_root=tmp_path / "dist_training",
+        run_id="phase5-bad-digest",
+        contract=contract,
+        index_meta=index_meta,
+    )
+
+    assert proc.returncode == 2
+    assert "Training corpus preflight failed:" in proc.stdout
+    assert "Retrieval corpus digest mismatch vs FAISS metadata" in proc.stdout
+
+
+def test_phase5_training_runner_fails_when_index_meta_doc_count_mismatches(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    index_meta = tmp_path / "index.meta.json"
+    _write_index_meta(
+        index_meta,
+        corpus_digest=_sha256_file(corpus),
+        doc_count=3,
+    )
+    contract = tmp_path / "training_input_contract.json"
+    _write_training_contract(contract, corpus=corpus, index_meta=index_meta)
+
+    proc = _run_prepare_only(
+        corpus=corpus,
+        out_root=tmp_path / "dist_training",
+        run_id="phase5-bad-doc-count",
+        contract=contract,
+        index_meta=index_meta,
+    )
+
+    assert proc.returncode == 2
+    assert "Training corpus preflight failed:" in proc.stdout
+    assert "Retrieval corpus document count mismatch vs FAISS metadata" in proc.stdout

@@ -20,8 +20,11 @@ artifacts and run metadata in a deterministic layout.
   - `config/training_first_pass.example.json`
 - Approved offline snapshot manifest:
   - `snapshots/offline/<snapshot_id>/manifest.json` (local)
-- Derived retrieval corpus:
-  - `data/retrieval_corpus.jsonl`
+- Authoritative retrieval corpus + FAISS metadata:
+  - `data/faiss/retrieval_corpus.jsonl`
+  - `data/faiss/index.meta.json`
+- Experimental six-record derivative corpus (not authoritative for training):
+  - `data/experimental/retrieval_corpus_6_record_fr_sections.jsonl`
 
 ## Repeatable commands
 
@@ -38,7 +41,7 @@ Direct Python invocation:
 py scripts/training/run_phase5_finetune.py `
   --config config/training_first_pass.example.json `
   --snapshot-manifest snapshots/offline/<snapshot_id>/manifest.json `
-  --retrieval-corpus data/retrieval_corpus.jsonl
+  --retrieval-corpus data/faiss/retrieval_corpus.jsonl
 ```
 
 Prepare-only package generation (no training):
@@ -68,6 +71,9 @@ pwsh .\scripts\local_adapter_smoke.ps1 `
 ## Runtime expectations
 
 - `--prepare-only` is CPU-safe and only builds deterministic package artifacts.
+- The runner performs a preflight before packaging/training and fails when the
+  configured corpus path does not match the training input contract, or when
+  corpus digest/document count do not match `data/faiss/index.meta.json`.
 - Full fine-tuning for a 7B model is expected to run on a CUDA-capable host.
 - `--use-4bit` is optional and can reduce memory pressure when the environment
   supports bitsandbytes/quantized loading.
