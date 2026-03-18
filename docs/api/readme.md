@@ -1,7 +1,9 @@
 # Read-only API Surface
 
-This document follows the canonical capability matrix in `README.md`. Treat the
-status labels here as normative for the API surface:
+This document follows the machine-readable capability registry published at
+`docs/api/capability_registry.json` (generated from
+`service/docs/capability_registry.json`). Treat the status labels here as
+normative for the API surface:
 
 - `Supported`: part of the supported production API contract.
 - `Optional`: supported only when explicitly enabled/configured.
@@ -36,6 +38,7 @@ Refer to `service/openapi/openapi.yaml` for exhaustive schemas and examples.
 
 - Canonical spec: `service/openapi/openapi.yaml` (source of truth, reviewed in CI; excludes quarantined `/v1/search` by default).
 - Machine-readable docs: `docs/api/openapi.json` (generated from the YAML for easy import into tooling; excludes quarantined `/v1/search` by default).
+- Machine-readable capability registry: `docs/api/capability_registry.json` (published copy of the runtime capability source of truth).
 - Postman collection: `docs/api/postman_collection.json` (pre-wired requests for supported/optional endpoints; excludes quarantined `/v1/search` by default).
 - Release-ready bundle: run `pwsh scripts/api/package_contract.ps1` to zip the JSON + Postman artifacts with versioned release notes under `dist/api-contract-<version>.zip`.
 
@@ -59,11 +62,12 @@ Run the exporter whenever the canonical YAML changes so downstream consumers sta
 py scripts/api/export_contract.py `
   --openapi-yaml service/openapi/openapi.yaml `
   --json-out docs/api/openapi.json `
+  --capability-registry-out docs/api/capability_registry.json `
   --postman-out docs/api/postman_collection.json `
   --base-url http://localhost:9001
 ```
 
-The script validates that the YAML is loadable, writes the JSON artifact used by SDK consumers, and regenerates the Postman collection with the latest routes. Update the `--base-url` flag if you want the collection to default to a remote deployment.
+The script validates that the YAML is loadable, writes the JSON artifact used by SDK consumers, publishes the capability registry snapshot, and regenerates the Postman collection with the latest routes. Update the `--base-url` flag if you want the collection to default to a remote deployment.
 
 To share the artifacts externally, package them (plus release notes) before uploading with the installer/wheel:
 

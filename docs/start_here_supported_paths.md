@@ -24,6 +24,7 @@ entrypoints and flags commonly confused legacy surfaces.
 - Repository map and support-status labels: `docs/repository_status_index.md`
 - Product and capability boundary: `README.md`
 - Operator flow and lifecycle actions: `RUNBOOK.md`
+- Deployed Windows host lifecycle and baseline contract: `docs/ops/windows_single_host_operator.md`
 - API contract and route status: `docs/api/readme.md`
 - Runtime vs research boundary: `docs/runtime_research_boundary.md`
 

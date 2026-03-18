@@ -51,7 +51,7 @@ Windows notes
 ## Supported Runtime Surface
 - Supported operator/runtime entrypoints are the installed `earctl` CLI and the FastAPI facade at `service.api_server`. For release-artifact deployments, use the wheel + NSSM flow in `docs/ops/windows_single_host_operator.md`. The `earctl api ...` and `scripts/api-*.ps1` paths are source-checkout helpers, not the authoritative operator handoff path.
 - Supported runtime semantics are single-host only. Rate limits, concurrency controls, and the RAG cache are process-local today, so this runbook does not claim multi-instance correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`.
-- Capability tags match the canonical matrix in `README.md`: `Supported`, `Optional`, `Quarantined`, and `Proposal-only`.
+- Machine-readable capability state is published at `docs/api/capability_registry.json` (generated from `service/docs/capability_registry.json`). `README.md` remains the human-readable summary.
 - Supported API routes are `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`.
 - Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, retrieval extras installed from `requirements-gpu.txt`, `EARCRAWLER_RETRIEVAL_MODE=hybrid`, and the Task 5.4 local adapter runtime (`LLM_PROVIDER=local_adapter` plus explicit local-model env).
 - Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion.

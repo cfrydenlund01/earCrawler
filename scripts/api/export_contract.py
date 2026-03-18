@@ -5,9 +5,17 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
 from typing import Any, Dict, Iterable
 
 import yaml
+
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from service.api_server.capability_registry import load_capability_registry
 
 
 def _build_postman_collection(base_url: str) -> Dict[str, Any]:
@@ -118,7 +126,10 @@ def _build_postman_collection(base_url: str) -> Dict[str, Any]:
         "info": {
             "name": "EarCrawler API",
             "_postman_id": "earcrawler-api-contract",
-            "description": "Collection derived from service/openapi/openapi.yaml",
+            "description": (
+                "Collection derived from service/openapi/openapi.yaml. "
+                "Capability status is published separately in capability_registry.json."
+            ),
             "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
         },
         "item": items,
@@ -157,6 +168,12 @@ def main() -> None:
         help="Destination path for the Postman collection.",
     )
     parser.add_argument(
+        "--capability-registry-out",
+        type=Path,
+        default=Path("docs/api/capability_registry.json"),
+        help="Destination path for the published capability registry JSON.",
+    )
+    parser.add_argument(
         "--base-url",
         default="http://localhost:9001",
         help="Default base URL embedded in the Postman variables.",
@@ -164,13 +181,21 @@ def main() -> None:
     args = parser.parse_args()
 
     spec_data = yaml.safe_load(args.openapi_yaml.read_text(encoding="utf-8"))
+    spec_data["x-earcrawler-capability-registry"] = {
+        "schema_version": "capability-registry.v1",
+        "published_artifact": "capability_registry.json",
+    }
     args.json_out.write_text(json.dumps(spec_data, indent=2), encoding="utf-8")
 
     postman = _build_postman_collection(args.base_url)
     args.postman_out.write_text(json.dumps(postman, indent=2), encoding="utf-8")
+    args.capability_registry_out.write_text(
+        json.dumps(load_capability_registry(), indent=2), encoding="utf-8"
+    )
 
     print(f"Wrote {args.json_out}")
     print(f"Wrote {args.postman_out}")
+    print(f"Wrote {args.capability_registry_out}")
 
 
 if __name__ == "__main__":

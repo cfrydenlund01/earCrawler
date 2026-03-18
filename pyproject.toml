@@ -44,7 +44,7 @@ namespaces = true
 "earCrawler.kg" = ["shapes.ttl", "shapes_prov.ttl", "data/*.json"]
 "earCrawler.security" = ["default_policy.yml"]
 "earCrawler.sparql" = ["*.sparql", "*.rq"]
-"service" = ["config/*.yml", "docs/*.md", "openapi/*.yaml", "templates/*.json", "templates/*.rq"]
+"service" = ["config/*.yml", "docs/*.md", "docs/*.json", "openapi/*.yaml", "templates/*.json", "templates/*.rq"]
 
 [tool.setuptools.data-files]
 "docs/privacy" = ["docs/privacy/telemetry_policy.md", "docs/privacy/redaction_rules.md"]

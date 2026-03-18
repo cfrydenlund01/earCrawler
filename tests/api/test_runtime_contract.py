@@ -23,6 +23,16 @@ def test_health_reports_single_host_runtime_contract(app) -> None:
     assert runtime_contract["process_local_state"]["rate_limits"] == "process_local"
     assert runtime_contract["process_local_state"]["rag_query_cache"] == "process_local"
     assert runtime_contract["process_local_state"]["retriever_cache"] == "process_local"
+    assert runtime_contract["capability_registry_schema"] == "capability-registry.v1"
+    assert (
+        runtime_contract["capability_registry_source"]
+        == "service/docs/capability_registry.json"
+    )
+    capabilities = runtime_contract["capabilities"]
+    assert capabilities["api.default_surface"]["status"] == "supported"
+    assert capabilities["api.search"]["status"] == "quarantined"
+    assert capabilities["retrieval.hybrid"]["status"] == "optional"
+    assert capabilities["kg.expansion"]["default_posture"] == "disabled"
 
 
 def test_create_app_rejects_multi_instance_without_override() -> None:

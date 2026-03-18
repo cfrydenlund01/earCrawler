@@ -1,11 +1,12 @@
 <#
 .SYNOPSIS
-    Packages API contract artifacts (OpenAPI JSON + Postman collection + release notes) for external distribution.
+    Packages API contract artifacts (OpenAPI JSON, capability registry, Postman collection, and release notes) for external distribution.
 
 .DESCRIPTION
     Creates a staging directory under dist/ using the current project version (unless overridden),
-    copies docs/api/openapi.json and docs/api/postman_collection.json, adds release notes, and
-    compresses the directory into a zip archive ready to upload alongside installers/wheels.
+    copies docs/api/openapi.json, docs/api/capability_registry.json, and
+    docs/api/postman_collection.json, adds release notes, and compresses the
+    directory into a zip archive ready to upload alongside installers/wheels.
 
 .PARAMETER Version
     Semantic version label for the archive. Defaults to the version in pyproject.toml.
@@ -76,8 +77,9 @@ if (-not $Version) {
 }
 
 $openApiPath = "docs/api/openapi.json"
+$capabilityRegistryPath = "docs/api/capability_registry.json"
 $postmanPath = "docs/api/postman_collection.json"
-foreach ($path in @($openApiPath, $postmanPath)) {
+foreach ($path in @($openApiPath, $capabilityRegistryPath, $postmanPath)) {
     if (-not (Test-Path -LiteralPath $path)) {
         throw "Required artifact '$path' is missing. Run scripts/api/export_contract.py first."
     }
@@ -90,6 +92,7 @@ if (Test-Path -LiteralPath $stageDir) {
 New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
 
 Copy-Item -LiteralPath $openApiPath -Destination (Join-Path $stageDir "openapi.json") -Force
+Copy-Item -LiteralPath $capabilityRegistryPath -Destination (Join-Path $stageDir "capability_registry.json") -Force
 Copy-Item -LiteralPath $postmanPath -Destination (Join-Path $stageDir "postman_collection.json") -Force
 
 $notesDest = Join-Path $stageDir "release-notes.md"

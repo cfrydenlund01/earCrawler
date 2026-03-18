@@ -20,6 +20,7 @@ from earCrawler.telemetry.sink_http import AsyncHTTPSink
 from earCrawler.utils.log_json import JsonLogger
 
 from .auth import ApiKeyResolver
+from .capability_registry import build_runtime_capability_snapshot, load_capability_registry
 from .config import ApiSettings
 from .fuseki import FusekiClient, FusekiGateway, HttpFusekiClient, StubFusekiClient
 from .limits import RATE_LIMITER_STORAGE_SCOPE, RateLimiter
@@ -116,6 +117,7 @@ def create_app(
 
     app.state.request_log_queue = None
     app.state.request_log_task = None
+    capability_registry = load_capability_registry()
     app.state.runtime_contract = {
         "topology": "single_host",
         "declared_instance_count": settings.declared_instance_count,
@@ -133,6 +135,9 @@ def create_app(
             "One Windows host and one EarCrawler API service instance are supported. "
             "Multi-instance behavior is not supported."
         ),
+        "capability_registry_schema": capability_registry["schema_version"],
+        "capability_registry_source": capability_registry["source_of_truth"],
+        "capabilities": build_runtime_capability_snapshot(),
     }
     if app.state.runtime_contract["override_active"]:
         json_logger.warning(
@@ -218,6 +223,7 @@ def create_app(
     )
 
     app.state.registry = registry
+    app.state.capability_registry = capability_registry
     app.state.gateway = gateway
     app.state.rate_limiter = rate_limiter
     app.state.observability = observability
