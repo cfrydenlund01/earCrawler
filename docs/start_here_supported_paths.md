@@ -22,6 +22,7 @@ entrypoints and flags commonly confused legacy surfaces.
 ## Canonical docs
 
 - Repository map and support-status labels: `docs/repository_status_index.md`
+- Data artifact truth model: `docs/data_artifact_inventory.md`
 - Product and capability boundary: `README.md`
 - Operator flow and lifecycle actions: `RUNBOOK.md`
 - Deployed Windows host lifecycle and baseline contract: `docs/ops/windows_single_host_operator.md`
@@ -32,6 +33,8 @@ entrypoints and flags commonly confused legacy surfaces.
 
 Do not treat these as supported runtime entrypoints:
 
+- top-level `cli/` module wrappers such as `python -m cli.kg_emit` or
+  `python -m cli.kg_validate`; use `py -m earCrawler.cli kg ...` instead
 - `earCrawler.service.sparql_service`
 - `earCrawler.service.legacy.kg_service`
 - `earCrawler.ingestion.ingest` (legacy placeholder ingestion; gated by

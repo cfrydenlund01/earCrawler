@@ -23,7 +23,8 @@ def test_cli_kg_emit(tmp_path: Path) -> None:
         sys.executable,
         "-m",
         "earCrawler.cli",
-        "kg-emit",
+        "kg",
+        "emit",
         "-s",
         "ear",
         "-s",
@@ -43,7 +44,8 @@ def test_cli_kg_emit(tmp_path: Path) -> None:
             sys.executable,
             "-m",
             "earCrawler.cli",
-            "kg-emit",
+            "kg",
+            "emit",
             "-s",
             "bogus",
             "-i",
@@ -55,3 +57,14 @@ def test_cli_kg_emit(tmp_path: Path) -> None:
         text=True,
     )
     assert bad.returncode != 0
+
+
+def test_legacy_cli_kg_emit_warns() -> None:
+    res = run(
+        [sys.executable, "-m", "cli.kg_emit", "--help"],
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0
+    assert "Legacy top-level CLI wrapper" in res.stderr
+    assert "earctl kg emit" in res.stderr

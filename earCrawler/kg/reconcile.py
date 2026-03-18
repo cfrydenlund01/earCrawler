@@ -26,7 +26,7 @@ import unicodedata
 from dataclasses import dataclass
 from itertools import combinations
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, List, Tuple
 import os
 
 from rapidfuzz.distance import JaroWinkler
@@ -97,11 +97,14 @@ def _soundex(s: str) -> str:
 
 def blocking_keys(e: Entity) -> Dict[str, str]:
     name_norm = normalize(e.name)
+    tokens = name_norm.split()
     alnum = re.sub(r"[^0-9a-z]", "", name_norm)
     return {
         "soundex": _soundex(name_norm),
         "alnum": alnum,
         "country_name": f"{e.country}-{alnum}",
+        "country_soundex": f"{e.country}-{_soundex(name_norm)}",
+        "country_token0": f"{e.country}-{tokens[0]}" if tokens else "",
     }
 
 
@@ -214,23 +217,79 @@ def _apply_overrides(
     return None, None
 
 
-def reconcile(entities: List[Entity], rules: dict, out_dir: Path) -> dict:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    reports_dir = Path("kg/reports")
-    reports_dir.mkdir(parents=True, exist_ok=True)
-    delta_dir = Path("kg/delta")
-    delta_dir.mkdir(parents=True, exist_ok=True)
+def _candidate_pair_indices_all_pairs(entity_count: int) -> List[Tuple[int, int]]:
+    return list(combinations(range(entity_count), 2))
 
+
+def _candidate_pair_indices_blocked(
+    entities: List[Entity], rules: dict
+) -> List[Tuple[int, int]]:
+    blocking_cfg = rules.get("blocking", {})
+    lexical_keys = blocking_cfg.get(
+        "lexical_keys",
+        ["country_name", "alnum", "country_soundex", "country_token0"],
+    )
+    max_lexical_block_size = int(blocking_cfg.get("max_lexical_block_size", 64))
+
+    buckets: Dict[Tuple[str, str], List[int]] = {}
+
+    for idx, entity in enumerate(entities):
+        keys = blocking_keys(entity)
+        for key_name in lexical_keys:
+            value = keys.get(key_name, "")
+            if value:
+                buckets.setdefault((f"lexical:{key_name}", value), []).append(idx)
+
+        for attr in ("duns", "cage", "fr_doc"):
+            value = getattr(entity, attr)
+            if value:
+                buckets.setdefault((f"id:{attr}", value), []).append(idx)
+
+        host = _host(entity.url)
+        if host:
+            buckets.setdefault(("url_host", host), []).append(idx)
+
+    pairs: set[Tuple[int, int]] = set()
+    for (bucket_type, _bucket_value), members in buckets.items():
+        uniq_members = sorted(set(members))
+        if len(uniq_members) < 2:
+            continue
+        if bucket_type.startswith("lexical:") and len(uniq_members) > max_lexical_block_size:
+            continue
+        for left_idx, right_idx in combinations(uniq_members, 2):
+            pairs.add((left_idx, right_idx))
+
+    return sorted(
+        pairs,
+        key=lambda pair: (entities[pair[0]].id, entities[pair[1]].id),
+    )
+
+
+def candidate_pair_indices(
+    entities: List[Entity], rules: dict, *, candidate_mode: str = "blocked"
+) -> List[Tuple[int, int]]:
+    if candidate_mode == "all_pairs":
+        return _candidate_pair_indices_all_pairs(len(entities))
+    if candidate_mode == "blocked":
+        return _candidate_pair_indices_blocked(entities, rules)
+    raise ValueError(f"Unsupported candidate mode: {candidate_mode}")
+
+
+def reconcile_pairs(
+    entities: List[Entity], rules: dict, *, candidate_mode: str = "blocked"
+) -> dict:
     high = float(rules["thresholds"]["high"])
     low = float(rules["thresholds"]["low"])
 
     decisions: List[dict] = []
     counts = {"auto_merge": 0, "review": 0, "reject": 0}
     feature_totals: Dict[str, float] = {}
-
     canonical: Dict[str, str] = {e.id: e.id for e in entities}
 
-    for left, right in combinations(entities, 2):
+    pair_indices = candidate_pair_indices(entities, rules, candidate_mode=candidate_mode)
+    for left_idx, right_idx in pair_indices:
+        left = entities[left_idx]
+        right = entities[right_idx]
         decision, reason = _apply_overrides(left.id, right.id, rules)
         score, feats = score_pair(left, right, rules)
         if decision is None:
@@ -260,6 +319,54 @@ def reconcile(entities: List[Entity], rules: dict, out_dir: Path) -> dict:
             }
         )
 
+    feature_avgs = {
+        k: (feature_totals[k] / len(decisions) if decisions else 0.0)
+        for k in sorted(feature_totals)
+    }
+
+    all_pairs_total = len(entities) * (len(entities) - 1) // 2
+    evaluated_pairs = len(pair_indices)
+    pair_stats = {
+        "candidate_mode": candidate_mode,
+        "all_pairs_total": all_pairs_total,
+        "candidate_pairs_evaluated": evaluated_pairs,
+        "candidate_reduction_ratio": (
+            (all_pairs_total - evaluated_pairs) / all_pairs_total
+            if all_pairs_total
+            else 0.0
+        ),
+    }
+
+    summary = {
+        "counts": counts,
+        "thresholds": {"high": high, "low": low},
+        "feature_avgs": feature_avgs,
+        "pair_stats": pair_stats,
+    }
+    return {
+        "summary": summary,
+        "decisions": decisions,
+        "canonical": canonical,
+    }
+
+
+def reconcile(
+    entities: List[Entity],
+    rules: dict,
+    out_dir: Path,
+    *,
+    candidate_mode: str = "blocked",
+) -> dict:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    reports_dir = Path("kg/reports")
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    Path("kg/delta").mkdir(parents=True, exist_ok=True)
+
+    result = reconcile_pairs(entities, rules, candidate_mode=candidate_mode)
+    summary = result["summary"]
+    decisions = result["decisions"]
+    canonical = result["canonical"]
+
     # Emit audit artefacts -------------------------------------------------
     with gzip.open(out_dir / "decisions.jsonl.gz", "wt", encoding="utf-8") as fh:
         for d in decisions:
@@ -285,16 +392,6 @@ def reconcile(entities: List[Entity], rules: dict, out_dir: Path) -> dict:
             if sid != cid:
                 fh.write(f"<urn:entity:{cid}> owl:sameAs <urn:entity:{sid}> .\n")
 
-    feature_avgs = {
-        k: (feature_totals[k] / len(decisions) if decisions else 0.0)
-        for k in sorted(feature_totals)
-    }
-
-    summary = {
-        "counts": counts,
-        "thresholds": {"high": high, "low": low},
-        "feature_avgs": feature_avgs,
-    }
     (reports_dir / "reconcile-summary.json").write_text(
         json.dumps(summary, indent=2, sort_keys=True), encoding="utf-8"
     )
@@ -308,4 +405,5 @@ def reconcile(entities: List[Entity], rules: dict, out_dir: Path) -> dict:
 
 
 # The module exposes functions used by the CLI and tests: normalize,
-# blocking_keys, load_rules, load_corpus, score_pair and reconcile.
+# blocking_keys, load_rules, load_corpus, score_pair, candidate_pair_indices,
+# reconcile_pairs and reconcile.

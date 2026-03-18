@@ -16,7 +16,9 @@ def _copy(src: str, dst: Path) -> None:
 
 def _run(args: list[str]):
     return run(
-        [sys.executable, "-m", "cli.kg_validate", *args], capture_output=True, text=True
+        [sys.executable, "-m", "earCrawler.cli", "kg", "validate", *args],
+        capture_output=True,
+        text=True,
     )
 
 
@@ -97,3 +99,14 @@ def test_validate_rejects_unknown_supported_blocking_check(tmp_path: Path) -> No
     )
     assert res.returncode == 2
     assert "Unknown blocking checks: not_a_real_check" in res.stdout
+
+
+def test_legacy_kg_validate_wrapper_warns() -> None:
+    res = run(
+        [sys.executable, "-m", "cli.kg_validate", "--help"],
+        capture_output=True,
+        text=True,
+    )
+    assert res.returncode == 0
+    assert "Legacy top-level CLI wrapper" in res.stderr
+    assert "earctl kg validate" in res.stderr
