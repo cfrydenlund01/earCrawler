@@ -3,6 +3,7 @@ request_timeout_ms: 5000
 routes:
   search:
     runtime_status: quarantined
+    include_in_default_gate: false
     method: GET
     path: /v1/search
     query:
@@ -19,6 +20,7 @@ routes:
       max_latency_ms: 5500
   rag_query:
     runtime_status: supported
+    include_in_default_gate: true
     method: POST
     path: /v1/rag/query
     json:

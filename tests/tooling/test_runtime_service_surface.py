@@ -239,6 +239,31 @@ def test_phase5_first_finetune_pass_is_recorded_with_repeatable_commands() -> No
     assert (REPO_ROOT / "scripts" / "training" / "run_phase5_finetune.ps1").exists()
 
 
+def test_six_record_derivative_corpus_is_experimental_only() -> None:
+    training_contract = (REPO_ROOT / "docs" / "model_training_contract.md").read_text(
+        encoding="utf-8"
+    )
+    first_pass = (REPO_ROOT / "docs" / "model_training_first_pass.md").read_text(
+        encoding="utf-8"
+    )
+    rebuild_script = (
+        REPO_ROOT / "scripts" / "rag" / "rebuild_retrieval_corpus_from_fr_sections.py"
+    ).read_text(encoding="utf-8")
+
+    assert not (REPO_ROOT / "data" / "retrieval_corpus.jsonl").exists()
+    assert (
+        REPO_ROOT
+        / "data"
+        / "experimental"
+        / "retrieval_corpus_6_record_fr_sections.jsonl"
+    ).exists()
+    assert "data/retrieval_corpus.jsonl" not in first_pass
+    assert "data/faiss/retrieval_corpus.jsonl" in first_pass
+    assert "data/experimental/retrieval_corpus_6_record_fr_sections.jsonl" in first_pass
+    assert "data/experimental/retrieval_corpus_6_record_fr_sections.jsonl" in training_contract
+    assert "data/experimental/retrieval_corpus_6_record_fr_sections.jsonl" in rebuild_script
+
+
 def test_phase5_local_adapter_runtime_is_gated_and_documented() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
@@ -311,6 +336,26 @@ def test_repo_documents_runtime_vs_research_boundary() -> None:
     assert "supported product/runtime surface" in boundary_doc
     assert "Research/" in boundary_doc
     assert "not a supported runtime surface" in gitignore
+
+
+def test_repo_publishes_repository_status_index_for_onboarding() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    start_here = (
+        REPO_ROOT / "docs" / "start_here_supported_paths.md"
+    ).read_text(encoding="utf-8")
+    status_index = (
+        REPO_ROOT / "docs" / "repository_status_index.md"
+    ).read_text(encoding="utf-8")
+
+    assert "docs/repository_status_index.md" in readme
+    assert "docs/repository_status_index.md" in start_here
+    for status in ("Supported", "Optional", "Quarantined", "Generated", "Archival"):
+        assert f"`{status}`" in status_index
+    assert "| `earCrawler/` | Supported |" in status_index
+    assert "| `service/` | Supported |" in status_index
+    assert "| `cli/` | Quarantined |" in status_index
+    assert "| `build/`, `dist/`, `run/`, `runs/`, `earCrawler.egg-info/` | Generated |" in status_index
+    assert "Default contributor path" in status_index
 
 
 def test_repo_freezes_capability_matrix_and_api_search_status() -> None:

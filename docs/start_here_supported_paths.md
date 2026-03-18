@@ -21,6 +21,7 @@ entrypoints and flags commonly confused legacy surfaces.
 
 ## Canonical docs
 
+- Repository map and support-status labels: `docs/repository_status_index.md`
 - Product and capability boundary: `README.md`
 - Operator flow and lifecycle actions: `RUNBOOK.md`
 - API contract and route status: `docs/api/readme.md`
@@ -36,4 +37,3 @@ Do not treat these as supported runtime entrypoints:
   `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`)
 - KG-backed runtime features before `docs/kg_quarantine_exit_gate.md` is passed
   and recorded
-

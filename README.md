@@ -137,6 +137,8 @@ If you are new to the repo, use this rule first:
 
 The repo-level boundary is documented in `docs/runtime_research_boundary.md`.
 New contributors should begin with `docs/start_here_supported_paths.md`.
+Use `docs/repository_status_index.md` for the top-level map of supported,
+optional, quarantined, generated, and archival surfaces.
 
 ## Single-Host Support Statement
 
