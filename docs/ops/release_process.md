@@ -12,9 +12,19 @@ This document describes reproducible KG release steps.
 7. Verify determinism: `scripts/rebuild-compare.ps1`.
 8. Generate release checksums for distributable artifacts:
    - `scripts/checksums.ps1`
-9. Use `scripts/verify-release.ps1` to validate canonical + distributable artifacts and emit evidence:
-   - `scripts/verify-release.ps1 -RequireSignedExecutables -EvidenceOutPath dist/release_validation_evidence.json`
-10. Archive `dist/release_validation_evidence.json` with the release bundle.
+9. Run supported-path API smoke in the same release workspace shape:
+   - `scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001`
+   - `scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/api_smoke.json`
+   - `scripts/api-stop.ps1`
+10. Run release-shaped optional-mode smoke coverage:
+   - `scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json`
+11. If a real Task 5.3 run artifact is available, run the same smoke with local-adapter validation:
+   - `scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist/training/<run_id> -ReportPath dist/optional_runtime_smoke.json`
+12. Use `scripts/verify-release.ps1` to validate canonical + distributable artifacts and emit evidence:
+   - `scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -EvidenceOutPath dist/release_validation_evidence.json`
+   - validation now fails if any distributable output still includes files with `PLACEHOLDER` in the filename (for example `manifest.sig.PLACEHOLDER.txt` in `dist/offline_bundle/`)
+   - publication now also fails if the canonical manifest signature, release checksums signature, supported API smoke report, or optional-runtime smoke report are missing or non-passing
+13. Archive `dist/api_smoke.json`, `dist/release_validation_evidence.json`, and `dist/optional_runtime_smoke.json` with the release bundle.
 
 Single-host support note:
 - Release evidence should always map to the supported deployment contract: one

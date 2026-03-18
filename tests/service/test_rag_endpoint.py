@@ -113,7 +113,10 @@ def test_rag_query_offloads_retriever_to_thread(monkeypatch):
 
     resp = client.post("/v1/rag/query", json={"query": "export controls", "top_k": 2})
     assert resp.status_code == 200
-    assert any(getattr(func, "__name__", "") == "query" for func, _, _ in offload_calls)
+    assert any(
+        getattr(func, "__name__", "") in {"query", "run_retrieval_sync"}
+        for func, _, _ in offload_calls
+    )
 
 
 def test_llm_endpoint_disabled_returns_stub(monkeypatch):
@@ -174,7 +177,10 @@ def test_llm_endpoint_offloads_generate_to_thread(monkeypatch):
 
     resp = client.post("/v1/rag/answer", json={"query": "export controls", "top_k": 2})
     assert resp.status_code == 200
-    assert any(getattr(func, "__name__", "") == "query" for func, _, _ in offload_calls)
+    assert any(
+        getattr(func, "__name__", "") in {"query", "run_retrieval_sync"}
+        for func, _, _ in offload_calls
+    )
     assert any(func is _stub_generate for func, _, _ in offload_calls)
 
 

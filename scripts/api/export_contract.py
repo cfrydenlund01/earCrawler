@@ -73,26 +73,12 @@ def _build_postman_collection(base_url: str) -> Dict[str, Any]:
             "key": "search_query",
             "value": "export controls",
             "type": "string",
-            "description": "Default query for the quarantined /v1/search route",
+            "description": "Default query used by sample request bodies",
         },
     )
 
     items = [
         _request("Health", "GET", "/health", description="Liveness/readiness probe"),
-        _request(
-            "Search",
-            "GET",
-            "/v1/search",
-            description=(
-                "Quarantined text-index search surface; available for local "
-                "validation but not part of the supported production contract "
-                "until docs/kg_quarantine_exit_gate.md is passed."
-            ),
-            query={
-                "q": ("{{search_query}}", "Search term"),
-                "limit": ("5", "Result cap"),
-            },
-        ),
         _request(
             "Get Entity",
             "GET",

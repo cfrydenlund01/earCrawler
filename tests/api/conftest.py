@@ -71,6 +71,7 @@ def app() -> TestClient:
         request_body_limit=32 * 1024,
         request_timeout_seconds=5.0,
         concurrency_limit=4,
+        enable_search=True,
         rate_limits=RateLimitConfig(
             anonymous_per_minute=5,
             authenticated_per_minute=10,

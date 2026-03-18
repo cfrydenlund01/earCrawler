@@ -22,21 +22,21 @@ does not claim multi-instance correctness. Deferred future-work note:
 
 | Path | Status | Description |
 | ---- | ------ | ----------- |
-| `/health` | Supported | Liveness and readiness probe. |
+| `/health` | Supported | Liveness/readiness probe plus machine-readable `runtime_contract` metadata for the supported single-host deployment shape. |
 | `/v1/entities/{entity_id}` | Supported | Curated entity projection (labels, provenance, sameAs). |
 | `/v1/lineage/{entity_id}` | Supported | PROV-O lineage graph. |
 | `/v1/sparql` | Supported | Proxy for allowlisted SPARQL templates only. |
 | `/v1/rag/query` | Supported | Retrieval surface with lineage metadata. Route-level release-smoke latency/failure budgets are defined in `docs/ops/api_latency_budgets.md`. |
 | `/v1/rag/answer` | Optional | LLM answer generation through an explicitly enabled remote provider or the gated local Task 5.3 adapter runtime. |
-| `/v1/search` | Quarantined | Text-index-backed label search. Available for local validation, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Its route budget remains a local validation guard only; see `docs/ops/api_latency_budgets.md`. |
+| `/v1/search` | Quarantined | Text-index-backed label search. Disabled by default, excluded from default OpenAPI/Postman artifacts, and available only for local validation when runtime/client opt-in gates are set. |
 
 Refer to `service/openapi/openapi.yaml` for exhaustive schemas and examples.
 
 ## Contract Artifacts
 
-- Canonical spec: `service/openapi/openapi.yaml` (source of truth, reviewed in CI).
-- Machine-readable docs: `docs/api/openapi.json` (generated from the YAML for easy import into tooling).
-- Postman collection: `docs/api/postman_collection.json` (pre-wired requests for each public endpoint).
+- Canonical spec: `service/openapi/openapi.yaml` (source of truth, reviewed in CI; excludes quarantined `/v1/search` by default).
+- Machine-readable docs: `docs/api/openapi.json` (generated from the YAML for easy import into tooling; excludes quarantined `/v1/search` by default).
+- Postman collection: `docs/api/postman_collection.json` (pre-wired requests for supported/optional endpoints; excludes quarantined `/v1/search` by default).
 - Release-ready bundle: run `pwsh scripts/api/package_contract.ps1` to zip the JSON + Postman artifacts with versioned release notes under `dist/api-contract-<version>.zip`.
 
 Import the Postman collection, then edit the collection variables:
@@ -46,7 +46,7 @@ Import the Postman collection, then edit the collection variables:
 | `base_url` | Target FastAPI facade (include scheme + port). | `http://localhost:9001` |
 | `api_key` | Optional X-Api-Key header. Leave blank for anonymous quotas. | _(blank)_ |
 | `entity_id` | Sample KG entity to drive `/entities` and `/lineage`. | `urn:ear:entity:demo` |
-| `search_query` | Default query string used only when running the quarantined `/v1/search` example flow (`-IncludeQuarantinedSearch`). | `export controls` |
+| `search_query` | Default query string used by sample request bodies. | `export controls` |
 
 The collection attaches `X-Api-Key` automatically when the variable is populated.
 
@@ -91,8 +91,7 @@ from api_clients.ear_api_client import EarCrawlerApiClient
 
 with EarCrawlerApiClient("http://localhost:9001", api_key="dev-token") as client:
     print(client.health())
-    search = client.search_entities("export controls", limit=5)
-    entity = client.get_entity(search["results"][0]["id"])
+    entity = client.get_entity("urn:ear:entity:demo")
     lineage = client.get_lineage(entity["id"])
     sparql = client.run_template("search_entities", parameters={"q": "example"})
     rag = client.rag_query("What changed in part 734?", include_lineage=True)
@@ -100,6 +99,17 @@ with EarCrawlerApiClient("http://localhost:9001", api_key="dev-token") as client
 
 `EarCrawlerApiClient` automatically sets the `X-Api-Key` header when a token is
 provided and returns parsed JSON dictionaries for each call.
+
+For local validation only, call quarantined search explicitly:
+
+```python
+with EarCrawlerApiClient(
+    "http://localhost:9001",
+    api_key="dev-token",
+    enable_quarantined_search=True,
+) as client:
+    search = client.search_entities("export controls", limit=5)
+```
 
 ## Budgets and Limits
 
@@ -111,7 +121,8 @@ provided and returns parsed JSON dictionaries for each call.
   * Authenticated (`X-Api-Key`): **120 requests/min**, burst 20
 * Fuseki endpoint must be read-only. Queries outside of `registry.json` are
 denied with `400`.
-* `/v1/search` remains `Quarantined` and requires a text-enabled Fuseki dataset
+* `/v1/search` remains `Quarantined`, is disabled by default, and requires
+  `EARCRAWLER_API_ENABLE_SEARCH=1` plus a text-enabled Fuseki dataset
   (Jena `text:TextDataset` over `rdfs:label`, as configured in
   `bundle/assembler/tdb2-readonly.ttl`).
 * Rate-limit and concurrency budgets are per process; this document does not

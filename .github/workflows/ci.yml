@@ -90,6 +90,9 @@ jobs:
         if: always()
         shell: pwsh
         run: scripts/api-stop.ps1
+      - name: Optional runtime smoke gate (release-shaped, no local adapter artifact)
+        shell: pwsh
+        run: scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json
       - name: No-network RAG smoke gate
         run: py -m pytest -q tests/golden/test_phase2_golden_gate.py
       - name: Phase B baseline drift gate
@@ -123,6 +126,13 @@ jobs:
           name: api-perf-smoke
           path: dist/perf/api_perf_smoke.json
           if-no-files-found: error
+      - name: Upload optional runtime smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: optional-runtime-smoke
+          path: dist/optional_runtime_smoke.json
+          if-no-files-found: ignore
 
   gpu:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

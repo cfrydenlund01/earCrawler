@@ -43,7 +43,7 @@ namespaces = true
 [tool.setuptools.package-data]
 "earCrawler.kg" = ["shapes.ttl", "shapes_prov.ttl", "data/*.json"]
 "earCrawler.security" = ["default_policy.yml"]
-"earCrawler.sparql" = ["*.sparql"]
+"earCrawler.sparql" = ["*.sparql", "*.rq"]
 "service" = ["config/*.yml", "docs/*.md", "openapi/*.yaml", "templates/*.json", "templates/*.rq"]
 
 [tool.setuptools.data-files]

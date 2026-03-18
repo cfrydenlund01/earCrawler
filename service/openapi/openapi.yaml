@@ -7,8 +7,8 @@ info:
     and immutable query templates. Supported endpoints are /health,
     /v1/entities/{entity_id}, /v1/lineage/{entity_id}, /v1/sparql, and
     /v1/rag/query. /v1/rag/answer is optional and requires explicit remote-LLM
-    enablement. /v1/search remains quarantined until
-    docs/kg_quarantine_exit_gate.md is passed and recorded.
+    enablement. Quarantined routes such as /v1/search are excluded from default
+    OpenAPI contract artifacts.
 servers:
   - url: http://localhost:9001
     description: Local development
@@ -72,31 +72,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/EntityAttribute'
-    SearchHit:
-      type: object
-      required: [id, score]
-      properties:
-        id:
-          type: string
-          format: uri
-        label:
-          type: string
-          nullable: true
-        score:
-          type: number
-        snippet:
-          type: string
-          nullable: true
-    SearchResponse:
-      type: object
-      required: [total, results]
-      properties:
-        total:
-          type: integer
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/SearchHit'
     LineageEdge:
       type: object
       required: [source, relation, target]
@@ -399,51 +374,6 @@ paths:
                 $ref: '#/components/schemas/EntityView'
         '404':
           description: Entity not found
-          content:
-            application/problem+json:
-              schema:
-                $ref: '#/components/schemas/ProblemDetails'
-  /v1/search:
-    get:
-      summary: Search entity labels
-      description: >-
-        Status: Quarantined. This text-index-backed route is available for local
-        validation and research workflows, but it is not part of the supported
-        production contract until docs/kg_quarantine_exit_gate.md is passed and
-        recorded.
-      parameters:
-        - name: q
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: limit
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 1
-            maximum: 50
-            default: 10
-        - name: offset
-          in: query
-          required: false
-          schema:
-            type: integer
-            minimum: 0
-            default: 0
-      security:
-        - ApiKey: []
-        - {}
-      responses:
-        '200':
-          description: Search results
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/SearchResponse'
-        '429':
-          description: Rate limit exceeded
           content:
             application/problem+json:
               schema:

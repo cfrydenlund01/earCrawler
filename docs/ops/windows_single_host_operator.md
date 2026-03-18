@@ -39,6 +39,8 @@ Before touching the host, collect:
 - Python 3.11 on the host
 - NSSM installed on the host
 - the Fuseki SPARQL query endpoint URL, for example `http://127.0.0.1:3030/ear/query`
+- a recorded Task 5.3 adapter artifact only if optional local-adapter serving
+  will be enabled
 - any required secrets:
   - `EARCRAWLER_API_KEYS` for inbound API auth if you are not running anonymously
   - `TRADEGOV_API_KEY` for scheduled ingest jobs
@@ -105,6 +107,8 @@ The supported operator path uses machine environment variables so the service ca
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_FUSEKI_URL', 'http://127.0.0.1:3030/ear/query', 'Machine')
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_REMOTE_LLM_POLICY', 'deny', 'Machine')
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_ENABLE_REMOTE_LLM', '0', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_RETRIEVAL_MODE', 'dense', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_API_INSTANCE_COUNT', '1', 'Machine')
 ```
 
 Only set these when you need them:
@@ -122,6 +126,32 @@ If you enable optional remote answering, also set:
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_REMOTE_LLM_POLICY', 'allow', 'Machine')
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_ENABLE_REMOTE_LLM', '1', 'Machine')
 ```
+
+If you enable optional hybrid ranking, also set:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_RETRIEVAL_MODE', 'hybrid', 'Machine')
+```
+
+If you enable optional local-adapter serving, also set:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable('LLM_PROVIDER', 'local_adapter', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_ENABLE_LOCAL_LLM', '1', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_LOCAL_LLM_BASE_MODEL', 'Qwen/Qwen2.5-7B-Instruct', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_LOCAL_LLM_ADAPTER_DIR', 'C:\ProgramData\EarCrawler\models\<run_id>\adapter', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_LOCAL_LLM_MODEL_ID', '<run_id>', 'Machine')
+```
+
+Do not enable `EARCRAWLER_API_ENABLE_SEARCH` or `EARCRAWLER_ENABLE_KG_EXPANSION`
+on deployed hosts. Those capabilities remain quarantined and are governed by
+`docs/kg_quarantine_exit_gate.md` plus
+`docs/capability_graduation_boundaries.md`.
+
+Do not set `EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE=1` on deployed hosts.
+That override exists only for local experiments. The supported contract remains
+one API service instance per host, and `/health` now reports that contract
+explicitly.
 
 ### 4. Install the Windows service with NSSM
 
@@ -186,6 +216,7 @@ Healthy install criteria:
 
 - the service is running in `Get-Service EarCrawler-API`
 - `/health` returns HTTP 200
+- `/health` reports `runtime_contract.topology = single_host` and `runtime_contract.declared_instance_count = 1`
 - the configured Fuseki query endpoint returns HTTP 200 to the trivial `SELECT`
 
 ## Upgrade
@@ -300,6 +331,50 @@ pwsh scripts/ops/windows-single-host-restore-drill.ps1 `
 Treat a failing drill report (`status: fail`) as a release blocker for host
 upgrade/rollback operations.
 
+## Optional capability playbook
+
+Use this section only for explicit operator-owned validation windows. It does
+not change capability status by itself.
+
+Release-shaped smoke command:
+
+```powershell
+pwsh scripts/optional-runtime-smoke.ps1 `
+  -Host 127.0.0.1 `
+  -Port 9001 `
+  -SkipLocalAdapter `
+  -ReportPath C:\ProgramData\EarCrawler\workspace\kg\reports\optional-runtime-smoke.json
+```
+
+What this proves:
+
+- search gate default-off behavior (`/v1/search` returns 404)
+- search local-validation opt-in behavior (`EARCRAWLER_API_ENABLE_SEARCH=1`)
+- search rollback behavior (disabled again)
+- KG expansion failure-policy behavior (`disable` and `error`) with deterministic checks
+
+If you have a real Task 5.3 adapter artifact and explicitly need local-adapter
+proof, run:
+
+```powershell
+pwsh scripts/optional-runtime-smoke.ps1 `
+  -Host 127.0.0.1 `
+  -Port 9001 `
+  -LocalAdapterRunDir C:\ProgramData\EarCrawler\models\<run_id> `
+  -ReportPath C:\ProgramData\EarCrawler\workspace\kg\reports\optional-runtime-smoke.json
+```
+
+Rollback for optional/quarantined local validation modes:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_API_ENABLE_SEARCH', '0', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_ENABLE_KG_EXPANSION', '0', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_RETRIEVAL_MODE', 'dense', 'Machine')
+[System.Environment]::SetEnvironmentVariable('LLM_PROVIDER', $null, 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_ENABLE_LOCAL_LLM', '0', 'Machine')
+C:\tools\nssm\nssm.exe restart EarCrawler-API
+```
+
 ## Rollback
 
 Rollback is the fast path for a bad release when the prior host state is still available.
@@ -373,5 +448,7 @@ C:\tools\nssm\nssm.exe restart EarCrawler-API
 - Keep at least the current and prior signed wheels plus their checksum files on the host or in the release vault.
 - Record the exact wheel filename and backup snapshot id used for every upgrade and rollback.
 - Treat `C:\ProgramData\EarCrawler\config\telemetry.json` as part of the deployment state if telemetry is enabled.
+- For feature-only rollback, reset `EARCRAWLER_RETRIEVAL_MODE` to `dense` and
+  clear any `local_adapter` env vars before rolling back the wheel.
 - Do not use this guide to claim container or multi-instance support. The supported target remains one Windows host.
 - If scale-out becomes in scope later, start from `docs/ops/multi_instance_deferred.md` instead of inferring support from this guide.

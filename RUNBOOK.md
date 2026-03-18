@@ -16,9 +16,17 @@
 6. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
 7. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
 8. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
-9. Run release integrity validation and write evidence:
-   - `pwsh scripts/verify-release.ps1 -RequireSignedExecutables -EvidenceOutPath dist\release_validation_evidence.json`
-10. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, and release validation evidence files.
+9. Run supported-path API smoke parity in the release workspace:
+   - `pwsh scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001`
+   - `pwsh scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist\api_smoke.json`
+   - `pwsh scripts/api-stop.ps1`
+10. Run release-shaped optional-mode smoke coverage:
+   - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist\optional_runtime_smoke.json`
+11. Run release integrity validation and write evidence:
+   - `pwsh scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist\api_smoke.json -OptionalRuntimeSmokeReportPath dist\optional_runtime_smoke.json -EvidenceOutPath dist\release_validation_evidence.json`
+12. If a real Task 5.3 run artifact is available, run:
+   - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist\training\<run_id> -ReportPath dist\optional_runtime_smoke.json`
+13. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, `dist\api_smoke.json`, release validation evidence, and optional runtime smoke evidence files.
 
 Release artifact note
 - The wheel is the authoritative deployment artifact for the supported Windows API service path described in `docs/ops/windows_single_host_operator.md`.
@@ -45,17 +53,22 @@ Windows notes
 - Supported runtime semantics are single-host only. Rate limits, concurrency controls, and the RAG cache are process-local today, so this runbook does not claim multi-instance correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`.
 - Capability tags match the canonical matrix in `README.md`: `Supported`, `Optional`, `Quarantined`, and `Proposal-only`.
 - Supported API routes are `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`.
-- Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, the Task 5.4 local adapter runtime (`LLM_PROVIDER=local_adapter` plus explicit local-model env), and retrieval extras installed from `requirements-gpu.txt`.
-- Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior.
+- Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, retrieval extras installed from `requirements-gpu.txt`, `EARCRAWLER_RETRIEVAL_MODE=hybrid`, and the Task 5.4 local adapter runtime (`LLM_PROVIDER=local_adapter` plus explicit local-model env).
+- Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion.
+- `/v1/search` is disabled by default at runtime; enable only for local validation with `EARCRAWLER_API_ENABLE_SEARCH=1`.
+- Hybrid ranking and local-adapter serving are tracked separately from KG quarantine in `docs/capability_graduation_boundaries.md`.
+- Release-shaped smoke coverage for optional/quarantined mode controls is available at `scripts/optional-runtime-smoke.ps1`.
+- `scripts/optional-runtime-smoke.ps1` always checks search gate default/off->on->off and KG expansion failure-policy behavior; local-adapter checks run only when `-LocalAdapterRunDir` is provided.
 - Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
 - Do not use `earCrawler.ingestion.ingest` for operator deployments; it is a quarantined placeholder ingestion pipeline gated by `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`.
-- KG-backed runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral).
+- Search- and KG-dependent runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral). Capability-specific state boundaries live in `docs/capability_graduation_boundaries.md`.
 - For the repo-level boundary between supported runtime code and research/proposal material, see `docs/runtime_research_boundary.md`.
 - New contributors should start from `docs/start_here_supported_paths.md`.
 
 ## Rollback
 - Use `docs/ops/windows_single_host_operator.md` as the single source of truth for deployed-host rollback.
 - This runbook does not define a separate rollback path.
+- For local validation rollback of optional/quarantined modes, set `EARCRAWLER_API_ENABLE_SEARCH=0` and `EARCRAWLER_ENABLE_KG_EXPANSION=0`, then re-run `scripts/optional-runtime-smoke.ps1` to confirm the default-off posture.
 
 ## Secret Rotation
 - Use `docs/ops/windows_single_host_operator.md` as the single source of truth for deployed-host secret rotation.
@@ -104,15 +117,15 @@ Windows notes
 - CLI helpers:
   - Required before every eval run: `py -m eval.validate_datasets` (or `python eval/validate_datasets.py`).
   - `py -m earCrawler.cli eval run-rag --dataset-id <id> --fallback-max-uses 0` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Eval currently targets remote-provider runs; the optional local adapter runtime is for the supported `/v1/rag/answer` path and separate smoke validation.
-  - Add `--retrieval-mode hybrid` for experimental BM25+dense fusion runs, or `--compare-retrieval-modes` to emit dense-vs-hybrid comparison artifacts under the selected output directory.
+  - Add `--retrieval-mode hybrid` for optional BM25+dense fusion runs, or `--compare-retrieval-modes` to emit dense-vs-hybrid comparison artifacts under the selected output directory.
   - Eval artifacts include strictness counters under `eval_strictness` (`fallbacks_used`, `fallback_counts`, `fallback_items`, threshold/breach flags). Runs fail when fallback count exceeds `fallback_max_uses`.
   - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.
 
 ### Eval/retrieval switches (set explicitly for reproducible agent runs)
 - `EARCRAWLER_RETRIEVAL_MODE=dense|hybrid`
   - `dense` remains the default.
-  - `hybrid` enables experimental BM25+dense fusion over the existing retrieval metadata.
-  - Keep `hybrid` opt-in until the runtime gate in `docs/kg_quarantine_exit_gate.md` is explicitly passed and recorded.
+  - `hybrid` enables optional BM25+dense fusion over the existing retrieval metadata.
+  - Keep `hybrid` explicit opt-in. Promotion/default-on criteria are tracked in `docs/capability_graduation_boundaries.md`.
 - `EARCRAWLER_RETRIEVAL_BACKEND=faiss|bruteforce`
   - `faiss` uses the built index.
   - `bruteforce` uses deterministic cosine search over cached corpus embeddings.
@@ -372,7 +385,7 @@ pwsh kg/scripts/ci-inference-smoke.ps1 -Mode owlmini
 - Retriever warm-up is opt-in:
   - `EARCRAWLER_WARM_RETRIEVER=1` enables startup warm-up.
   - `EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS=5` bounds warm-up runtime.
-- KG expansion providers (deterministic/offline-safe testing via stubs):
+- KG expansion providers (quarantined; deterministic/offline-safe testing via stubs):
   - `EARCRAWLER_ENABLE_KG_EXPANSION=1` enables KG expansion in the RAG pipeline.
   - `EARCRAWLER_KG_EXPANSION_MODE=always_on|multihop_only|off` controls when expansion is applied when callers do not pass an explicit override.
     - Recommended production default: `multihop_only` (limits latency/cost to multi-hop workloads).

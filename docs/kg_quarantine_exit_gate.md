@@ -1,8 +1,25 @@
 # KG Quarantine Exit Gate
 
-Status: normative for any change that claims KG-backed runtime behavior is part of the supported production CLI path.
+Status: normative for any change that claims search- or KG-dependent runtime
+behavior is part of the supported production CLI path.
 
 As of March 12, 2026, this gate is not passed. KG-related runtime behavior remains quarantined. Decision records: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral for `/v1/search` and KG-backed hybrid retrieval).
+
+This gate governs:
+
+- `/v1/search`
+- text-index-backed Fuseki search
+- KG expansion used as a runtime dependency
+- any runtime feature that requires live KG-backed behavior to satisfy its
+  support claim
+
+This gate does not govern:
+
+- `EARCRAWLER_RETRIEVAL_MODE=hybrid` when it means dense + BM25 fusion only
+- local-adapter serving via `LLM_PROVIDER=local_adapter`
+
+Those capability tracks are documented in
+`docs/capability_graduation_boundaries.md`.
 
 ## Purpose
 
@@ -152,7 +169,8 @@ The following remain out of scope for the supported production path until the ga
 
 - Jena text-indexed entity search as a supported production feature
 - Default-on or production-committed KG expansion in RAG
-- Hybrid retrieval work that depends on a supported KG runtime
+- Any retrieval behavior that requires live KG expansion or text-backed Fuseki
+  as a required dependency
 - Temporal/effective-date reasoning that relies on KG-backed runtime behavior
 - Any documentation that portrays Fuseki-backed features as generally production-ready without the gate evidence above
 

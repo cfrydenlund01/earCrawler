@@ -115,8 +115,10 @@ document sounds broader, follow this table.
 | --- | --- | --- |
 | `earctl` / `py -m earCrawler.cli ...` and the documented Windows single-host service path | Supported | These are the supported operator entrypoints. Capability-level status still matters; use the rows below for feature-specific claims. |
 | `service.api_server`, `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, `/v1/rag/query` | Supported | These are the supported service/API surfaces for the Windows-first single-host runtime. Rate limits, concurrency limits, and the RAG cache are process-local; multi-instance correctness is not claimed. |
-| `/v1/rag/answer`, remote OpenAI-compatible providers, the optional local adapter runtime (`LLM_PROVIDER=local_adapter`), and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Default installs and baseline operator flows do not require them. |
-| `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, KG expansion, and hybrid retrieval modes that depend on KG runtime behavior | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral). |
+| `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Default installs and baseline operator flows do not require them. |
+| `EARCRAWLER_RETRIEVAL_MODE=hybrid` across `/v1/rag/query`, `/v1/rag/answer`, and eval flows | Optional | Off by default. Dense remains the baseline retrieval mode. Promotion/default-on criteria are tracked in `docs/capability_graduation_boundaries.md`. |
+| The optional local adapter runtime (`LLM_PROVIDER=local_adapter`) | Optional | Requires explicit local-model env plus a recorded Task 5.3 adapter artifact. Validation path: `scripts/local_adapter_smoke.ps1`. Promotion criteria are tracked in `docs/capability_graduation_boundaries.md`. |
+| `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral). Capability-specific promotion boundaries live in `docs/capability_graduation_boundaries.md`. |
 | `Research/`, `docs/proposal/`, benchmark planning, model-training/fine-tuning notes, and other future-work design docs | Proposal-only | Useful for planning and evaluation, not an operator/runtime commitment. Phase 5 records include base-model selection (`docs/model_training_surface_adr.md`, `config/training_model_selection.example.env`), training-input contract (`docs/model_training_contract.md`, `config/training_input_contract.example.json`), first-pass run tooling (`docs/model_training_first_pass.md`, `config/training_first_pass.example.json`, `scripts/training/*`), and the Phase 6 benchmark plan (`docs/production_candidate_benchmark_plan.md`). |
 
 ## Runtime vs Research Boundary
@@ -131,6 +133,7 @@ If you are new to the repo, use this rule first:
 - Training scripts and artifacts are still a phase-gated workflow, not a supported operator runtime path by themselves.
 - Task 5.4 adds a separate optional runtime path that can load a Task 5.3 adapter through `/v1/rag/answer` only when `LLM_PROVIDER=local_adapter`, `EARCRAWLER_ENABLE_LOCAL_LLM=1`, and the recorded adapter artifacts are present.
 - Phase 6 benchmark planning is now recorded in `docs/production_candidate_benchmark_plan.md`; benchmark execution still depends on a real Task 5.3 run artifact and a benchmark runner that targets the local-adapter runtime.
+- Capability-specific promotion and rollback boundaries for text search, hybrid ranking, KG expansion, and local-adapter serving are tracked in `docs/capability_graduation_boundaries.md`.
 
 The repo-level boundary is documented in `docs/runtime_research_boundary.md`.
 New contributors should begin with `docs/start_here_supported_paths.md`.
@@ -185,7 +188,7 @@ py -m earCrawler.cli api start
 # 3. check health
 Invoke-WebRequest http://127.0.0.1:9001/health -UseBasicParsing
 
-# 4. run the smoke test bundle (writes reports to kg/reports/api-smoke.txt)
+# 4. run the smoke test bundle (writes reports to kg/reports/api-smoke.json and kg/reports/api-smoke.txt)
 py -m earCrawler.cli api smoke
 
 # 5. stop the facade
@@ -207,6 +210,7 @@ Environment variables:
 
 - `EARCRAWLER_API_HOST` and `EARCRAWLER_API_PORT` control bind address and port.
 - `EARCRAWLER_FUSEKI_URL` points the facade at the Fuseki SPARQL query endpoint, for example `http://localhost:3030/ear/query`.
+- `EARCRAWLER_API_ENABLE_SEARCH=1` enables quarantined `/v1/search` for local validation; default is `0` (disabled).
 - `EARCTL_PYTHON` overrides the interpreter used by the PowerShell wrappers.
 
 ---
@@ -270,7 +274,7 @@ The response includes `question`, `answer`, `contexts` (the passages passed to t
 Retrieval mode selection is controlled by `EARCRAWLER_RETRIEVAL_MODE`:
 
 - `dense`: existing dense retrieval only; this remains the default.
-- `hybrid`: experimental BM25+dense fusion using reciprocal rank fusion over the existing retrieval metadata. Keep this opt-in until the gate in `docs/kg_quarantine_exit_gate.md` is formally passed.
+- `hybrid`: optional BM25+dense fusion using reciprocal rank fusion over the existing retrieval metadata. Dense remains the baseline. Promotion/default-on criteria are tracked in `docs/capability_graduation_boundaries.md`.
 
 Dense backend selection is still controlled by `EARCRAWLER_RETRIEVAL_BACKEND`:
 

@@ -22,7 +22,7 @@ from earCrawler.utils.log_json import JsonLogger
 from .auth import ApiKeyResolver
 from .config import ApiSettings
 from .fuseki import FusekiClient, FusekiGateway, HttpFusekiClient, StubFusekiClient
-from .limits import RateLimiter
+from .limits import RATE_LIMITER_STORAGE_SCOPE, RateLimiter
 from .logging_integration import ObservabilityMiddleware
 from .middleware import (
     BodyLimitMiddleware,
@@ -34,11 +34,12 @@ from .templates import TemplateRegistry
 from .routers import build_router
 from .rag_support import (
     RagQueryCache,
+    RAG_QUERY_CACHE_STORAGE_SCOPE,
+    RETRIEVER_CACHE_STORAGE_SCOPE,
     RetrieverProtocol,
     load_retriever,
     warm_retriever_if_enabled,
 )
-
 _DOCS_PATH = Path(__file__).resolve().parent.parent / "docs" / "index.md"
 _OPENAPI_PATH = Path(__file__).resolve().parent.parent / "openapi" / "openapi.yaml"
 _EMBEDDED_FIXTURE = {
@@ -81,6 +82,7 @@ def create_app(
     rag_cache: Optional[RagQueryCache] = None,
 ) -> FastAPI:
     settings = settings or ApiSettings.from_env()
+    settings.validate_runtime_contract()
     registry = registry or TemplateRegistry.load_default()
     resolver = ApiKeyResolver()
     if fuseki_client is None:
@@ -114,6 +116,30 @@ def create_app(
 
     app.state.request_log_queue = None
     app.state.request_log_task = None
+    app.state.runtime_contract = {
+        "topology": "single_host",
+        "declared_instance_count": settings.declared_instance_count,
+        "multi_instance_supported": False,
+        "override_active": (
+            settings.allow_unsupported_multi_instance
+            and settings.declared_instance_count != 1
+        ),
+        "process_local_state": {
+            "rate_limits": RATE_LIMITER_STORAGE_SCOPE,
+            "rag_query_cache": RAG_QUERY_CACHE_STORAGE_SCOPE,
+            "retriever_cache": RETRIEVER_CACHE_STORAGE_SCOPE,
+        },
+        "operator_note": (
+            "One Windows host and one EarCrawler API service instance are supported. "
+            "Multi-instance behavior is not supported."
+        ),
+    }
+    if app.state.runtime_contract["override_active"]:
+        json_logger.warning(
+            "runtime.contract.override_enabled",
+            declared_instance_count=settings.declared_instance_count,
+            supported_topology="single_host",
+        )
 
     http_sink_cfg = observability.request_http_sink
     if http_sink_cfg.enabled and http_sink_cfg.endpoint:
@@ -206,7 +232,7 @@ def create_app(
 
     app.add_event_handler("startup", _warm_retriever_on_startup)
 
-    router = build_router()
+    router = build_router(enable_search=settings.enable_search)
     app.include_router(router)
 
     # Ensure any pooled async HTTP clients are closed on shutdown.

@@ -62,6 +62,7 @@ New-Item -ItemType Directory -Force -Path $smokeRoot | Out-Null
 
 $savedUnsafeOverride = $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES
 $savedUser = $env:EARCTL_USER
+$savedWheelSmokeRepoRoot = $env:EARCRAWLER_WHEEL_SMOKE_REPO_ROOT
 
 try {
   Invoke-CheckedCommand $python -m venv (Join-Path $smokeRoot ".venv")
@@ -89,12 +90,14 @@ try {
   New-Item -ItemType Directory -Force -Path $workspace | Out-Null
   Push-Location $workspace
   try {
+    $env:EARCRAWLER_WHEEL_SMOKE_REPO_ROOT = $repoRoot
     $resourceCheck = @"
 import importlib.resources as resources
 from pathlib import Path
+import os
 import earCrawler
 
-repo_root = Path(r"$repoRoot").resolve()
+repo_root = Path(os.getenv("EARCRAWLER_WHEEL_SMOKE_REPO_ROOT", "")).resolve()
 module_path = Path(earCrawler.__file__).resolve()
 if str(module_path).lower().startswith(str(repo_root).lower()):
     raise SystemExit(f"clean-room smoke failed: imported earCrawler from source checkout ({module_path})")
@@ -103,6 +106,7 @@ required = [
     ("earCrawler.kg", "shapes.ttl"),
     ("earCrawler.kg", "shapes_prov.ttl"),
     ("earCrawler.sparql", "prefixes.sparql"),
+    ("earCrawler.sparql", "kg_expand_by_section_id.rq"),
     ("service", "openapi/openapi.yaml"),
     ("service", "templates/registry.json"),
     ("service", "config/observability.yml"),
@@ -113,8 +117,31 @@ for package, relative_path in required:
         raise SystemExit(f"packaged resource missing: {package}:{relative_path}")
     if not candidate.read_bytes():
         raise SystemExit(f"packaged resource is empty: {package}:{relative_path}")
+
+# Prove the installed KG expansion runtime can read and execute the packaged .rq template.
+from earCrawler.rag.kg_expansion_fuseki import SPARQLTemplateGateway
+
+class _StubClient:
+    def select(self, _query: str) -> dict[str, object]:
+        return {"results": {"bindings": []}}
+
+template_path = resources.files("earCrawler.sparql").joinpath("kg_expand_by_section_id.rq")
+with resources.as_file(template_path) as materialized_template:
+    gateway = SPARQLTemplateGateway(
+        endpoint="http://localhost:3030/ear/query",
+        template_path=materialized_template,
+        client=_StubClient(),
+    )
+    rows = gateway.select(
+        "kg_expand_by_section_id",
+        {"section_iri": "https://example.test/resource/ear/section/EAR-736.2%28b%29"},
+    )
+    if rows != []:
+        raise SystemExit("unexpected KG expansion smoke result")
 "@
-    Invoke-CheckedCommand $venvPython -c $resourceCheck
+    $resourceCheckPath = Join-Path $workspace "resource_check.py"
+    Set-Content -Path $resourceCheckPath -Value $resourceCheck -Encoding UTF8
+    Invoke-CheckedCommand $venvPython $resourceCheckPath
 
     $seedCorpus = @"
 from pathlib import Path
@@ -141,7 +168,9 @@ data_dir = Path("data")
 data_dir.mkdir(parents=True, exist_ok=True)
 (data_dir / "ear_corpus.jsonl").write_text(json.dumps(record, sort_keys=True) + "\n", encoding="utf-8")
 "@
-    Invoke-CheckedCommand $venvPython -c $seedCorpus
+    $seedCorpusPath = Join-Path $workspace "seed_corpus.py"
+    Set-Content -Path $seedCorpusPath -Value $seedCorpus -Encoding UTF8
+    Invoke-CheckedCommand $venvPython $seedCorpusPath
 
     $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = "1"
     $env:EARCTL_USER = "test_operator"
@@ -159,5 +188,6 @@ data_dir.mkdir(parents=True, exist_ok=True)
 finally {
   $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = $savedUnsafeOverride
   $env:EARCTL_USER = $savedUser
+  $env:EARCRAWLER_WHEEL_SMOKE_REPO_ROOT = $savedWheelSmokeRepoRoot
   Remove-Item -Recurse -Force $smokeRoot -ErrorAction SilentlyContinue
 }
