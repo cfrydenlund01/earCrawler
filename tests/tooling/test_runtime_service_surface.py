@@ -519,6 +519,7 @@ def test_windows_operator_guide_records_optional_vs_quarantined_capability_contr
     assert "runtime_contract.capabilities.api.default_surface.status = supported" in operator_guide
     assert "runtime_contract.capabilities.api.search.status = quarantined" in operator_guide
     assert "dist\\release_validation_evidence.json" in operator_guide
+    assert "dist\\installed_runtime_smoke.json" in operator_guide
     assert "scripts/api-smoke.ps1" in operator_guide
     assert "Still-missing deployment evidence" in operator_guide
     assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in service_docs
@@ -526,6 +527,35 @@ def test_windows_operator_guide_records_optional_vs_quarantined_capability_contr
     assert "runtime_contract" in service_docs
     assert "runtime_contract" in api_readme
 
+
+def test_repo_documents_external_auth_front_door_boundary() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
+    start_here = (
+        REPO_ROOT / "docs" / "start_here_supported_paths.md"
+    ).read_text(encoding="utf-8")
+    api_readme = (REPO_ROOT / "docs" / "api" / "readme.md").read_text(
+        encoding="utf-8"
+    )
+    operator_guide = (
+        REPO_ROOT / "docs" / "ops" / "windows_single_host_operator.md"
+    ).read_text(encoding="utf-8")
+    external_auth = (
+        REPO_ROOT / "docs" / "ops" / "external_auth_front_door.md"
+    ).read_text(encoding="utf-8")
+
+    assert (REPO_ROOT / "docs" / "ops" / "external_auth_front_door.md").exists()
+    assert "docs/ops/external_auth_front_door.md" in readme
+    assert "docs/ops/external_auth_front_door.md" in runbook
+    assert "docs/ops/external_auth_front_door.md" in start_here
+    assert "docs/ops/external_auth_front_door.md" in api_readme
+    assert "docs/ops/external_auth_front_door.md" in operator_guide
+    assert "Approved deployment shape" in external_auth
+    assert "Request attribution expectations" in external_auth
+    assert "When the current shared-secret model is no longer sufficient" in external_auth
+    assert "Keep EarCrawler listening only on `127.0.0.1`" in external_auth
+    assert "deployment-owned backend" in external_auth
+    assert "`X-Api-Key`" in external_auth
 
 def test_sample_ttl_pipeline_is_named_as_synthetic_fixture() -> None:
     ci_workflow = (REPO_ROOT / ".github" / "workflows" / "ci.yml").read_text(
@@ -561,10 +591,15 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     assert "No-network RAG smoke gate" in ci_workflow
     assert "Supported API smoke parity" in release_workflow
     assert "Optional runtime smoke (search/KG gate validation)" in release_workflow
+    assert "Installed runtime smoke (clean-room wheel + supported API contract)" in release_workflow
+    assert "scripts/installed-runtime-smoke.ps1" in release_workflow
+    assert (REPO_ROOT / "scripts" / "installed-runtime-smoke.ps1").exists()
     assert "dist/api_smoke.json" in release_workflow
     assert "dist/optional_runtime_smoke.json" in release_workflow
+    assert "dist/installed_runtime_smoke.json" in release_workflow
     assert "-RequireCompleteEvidence" in release_workflow
     assert "-ApiSmokeReportPath dist/api_smoke.json" in release_workflow
+    assert "-InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json" in release_workflow
     assert "tests/golden/test_phase2_golden_gate.py" in ci_workflow
     assert "Supported CI Evidence Path" in readme
     assert "supported evidence path" in ci_doc
@@ -579,7 +614,6 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     assert "search_opt_in_on" in optional_smoke
     assert "search_rollback_off" in optional_smoke
 
-
 def test_cli_entrypoint_is_thin_and_uses_domain_registrars() -> None:
     main_cli = (REPO_ROOT / "earCrawler" / "cli" / "__main__.py").read_text(
         encoding="utf-8"
@@ -593,3 +627,6 @@ def test_cli_entrypoint_is_thin_and_uses_domain_registrars() -> None:
     assert "def _register_shared_commands(" in main_cli
     assert main_cli.count("@click.command(") <= 2
     assert len(main_cli.splitlines()) < 220
+
+
+

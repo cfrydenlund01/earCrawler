@@ -18,7 +18,7 @@ The workflow in `.github/workflows/ci.yml` runs on:
   Runs only on pushes to `main`, on `windows-gpu-t4`, after `cpu`, with `continue-on-error: true`. It installs `requirements-gpu.txt`, runs `eval/collect_benchmark.sh`, and uploads `benchmark.md` as an artifact.
 
 - `release`
-  Runs only for tag refs after `cpu` passes, on `windows-latest`. It performs the staging monitor check via `monitor.ps1`.
+  Runs only for tag refs after `cpu` passes, on `windows-latest`. It builds release artifacts, runs clean-room wheel smoke, runs installed-runtime smoke from the built wheel (`scripts/installed-runtime-smoke.ps1`), runs supported API and optional runtime smoke reports, and gates publication with `scripts/verify-release.ps1` plus release evidence files under `dist/`.
 
 ## Secrets
 
@@ -35,3 +35,4 @@ Define them under GitHub repository **Secrets and variables -> Actions**.
 - The coverage floor is enforced from `pyproject.toml` via Coverage.py (`fail_under = 75`), keeping the CI gate aligned with the repo's `codecov.yml` target.
 - API route latency/failure budgets are defined in `perf/config/api_route_budgets.yml` and explained in `docs/ops/api_latency_budgets.md`.
 - The GPU and benchmark jobs are non-blocking because both are marked `continue-on-error: true`.
+

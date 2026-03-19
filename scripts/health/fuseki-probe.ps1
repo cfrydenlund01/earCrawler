@@ -19,6 +19,17 @@ if (-not (Test-Path $ConfigPath)) {
     throw "Observability config not found at $ConfigPath"
 }
 
+$endpointUri = [System.Uri]$FusekiUrl
+$baseBuilder = [System.UriBuilder]::new($endpointUri)
+$baseBuilder.Path = '/'
+$baseBuilder.Query = ''
+$baseUri = $baseBuilder.Uri
+
+$pingBuilder = [System.UriBuilder]::new($baseUri)
+$pingBuilder.Path = '$/ping'
+$pingBuilder.Query = ''
+$pingUri = $pingBuilder.Uri.AbsoluteUri
+
 $cfg = Import-YamlDocument -Path $ConfigPath
 $budgets = $cfg.health
 $pingBudget = [int]$budgets.fuseki_ping_ms
@@ -26,8 +37,8 @@ $selectBudget = [int]$budgets.fuseki_select_ms
 
 $reportLines = @()
 $reportLines += "Fuseki endpoint: $FusekiUrl"
+$reportLines += "Fuseki ping: $pingUri"
 
-$pingUri = ($FusekiUrl.TrimEnd('/') + '/$/ping')
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $pingOk = $false
 try {
@@ -39,7 +50,6 @@ try {
     $reportLines += "Ping status: $($pingResponse.StatusCode)"
 } catch {
     $sw.Stop()
-    $pingMs = [math]::Round($sw.Elapsed.TotalMilliseconds, 2)
     $reportLines += "Ping error: $($_.Exception.Message)"
 }
 
@@ -47,27 +57,28 @@ $query = 'SELECT (1 AS ?ok) WHERE { } LIMIT 1'
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $selectOk = $false
 try {
-$selectResponse = Invoke-WebRequest -Uri $FusekiUrl -UseBasicParsing -TimeoutSec ([Math]::Ceiling($selectBudget / 1000.0)) -Method Post -Body $query -ContentType 'application/sparql-query'
-$sw.Stop()
-$selectMs = [math]::Round($sw.Elapsed.TotalMilliseconds, 2)
-$reportLines += "Select latency: $selectMs ms (budget $selectBudget ms)"
-$selectOk = ($selectResponse.StatusCode -eq 200) -and ($selectMs -le $selectBudget)
-try {
-    $raw = $selectResponse.Content
-    if ($raw -is [byte[]]) {
-        $raw = [System.Text.Encoding]::UTF8.GetString($raw)
-    }
-    $json = $raw | ConvertFrom-Json
-    $rows = ($json.results.bindings | Measure-Object).Count
-    $reportLines += "Rows returned: $rows"
-    if ($rows -lt 0) { $selectOk = $false }
-} catch {
-    $reportLines += "Failed to parse select response: $($_.Exception.Message)"
+    $selectResponse = Invoke-WebRequest -Uri $endpointUri.AbsoluteUri -UseBasicParsing -TimeoutSec ([Math]::Ceiling($selectBudget / 1000.0)) -Method Post -Body $query -ContentType 'application/sparql-query'
+    $sw.Stop()
+    $selectMs = [math]::Round($sw.Elapsed.TotalMilliseconds, 2)
+    $reportLines += "Select latency: $selectMs ms (budget $selectBudget ms)"
+    $selectOk = ($selectResponse.StatusCode -eq 200) -and ($selectMs -le $selectBudget)
+    try {
+        $raw = $selectResponse.Content
+        if ($raw -is [byte[]]) {
+            $raw = [System.Text.Encoding]::UTF8.GetString($raw)
+        }
+        $json = $raw | ConvertFrom-Json
+        $rows = ($json.results.bindings | Measure-Object).Count
+        $reportLines += "Rows returned: $rows"
+        if ($rows -lt 0) {
+            $selectOk = $false
+        }
+    } catch {
+        $reportLines += "Failed to parse select response: $($_.Exception.Message)"
         $selectOk = $false
     }
 } catch {
     $sw.Stop()
-    $selectMs = [math]::Round($sw.Elapsed.TotalMilliseconds, 2)
     $reportLines += "Select error: $($_.Exception.Message)"
 }
 

@@ -30,6 +30,16 @@ jobs:
             throw "No wheel built under dist/."
           }
           scripts/package-wheel-smoke.ps1 -WheelPath $wheel.FullName
+      - name: Installed runtime smoke (clean-room wheel + supported API contract)
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem dist -Filter "*.whl" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $wheel) {
+            throw "No wheel built under dist/."
+          }
+          scripts/installed-runtime-smoke.ps1 -WheelPath $wheel.FullName -Host 127.0.0.1 -Port 9001 -ReportPath dist/installed_runtime_smoke.json
       - name: Start supported API smoke service
         shell: pwsh
         run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
@@ -79,7 +89,7 @@ jobs:
         run: scripts/provenance-attest.ps1
       - name: Release integrity validation
         shell: pwsh
-        run: scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -EvidenceOutPath dist/release_validation_evidence.json
+        run: scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json -EvidenceOutPath dist/release_validation_evidence.json
       - name: Determinism check
         shell: pwsh
         run: scripts/rebuild-compare.ps1 -Version ${{ github.ref_name }}
@@ -97,6 +107,7 @@ jobs:
             dist/release_validation_evidence.json
             dist/api_smoke.json
             dist/optional_runtime_smoke.json
+            dist/installed_runtime_smoke.json
             dist/sbom.spdx.json
             kg/canonical/manifest.json
             kg/canonical/provenance.json
@@ -106,7 +117,8 @@ jobs:
             dist/offline_bundle/**
             scripts/verify-release.ps1
           body: |
-            Release evidence covers the supported single-host API smoke path and the optional-runtime validation report.
+            Release evidence covers installed-runtime smoke, supported single-host API smoke parity, and optional-runtime validation.
             Publication is gated on signed artifacts, verified evidence, and placeholder-free distributable outputs.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -22,7 +22,7 @@ Container runtimes are not part of the supported runtime or release flow at this
 
 ## Install the Tooling
 
-For Windows operator deployment from signed release artifacts, use `docs/ops/windows_single_host_operator.md`. The clone/editable-install flow below is for source-checkout development and local validation.
+For Windows operator deployment from signed release artifacts, use `docs/ops/windows_fuseki_operator.md` for the pinned read-only Fuseki dependency and `docs/ops/windows_single_host_operator.md` for the API wheel/service lifecycle. The clone/editable-install flow below is for source-checkout development and local validation.
 
 > These instructions assume you are running commands from the repository root (the directory that contains `pyproject.toml`).
 
@@ -83,7 +83,8 @@ For Windows operator deployment from signed release artifacts, use `docs/ops/win
 
 The console script is installed as `earctl`, and the published wheel bundles the `perf` helpers plus the `service.api_server` package and its runtime assets. That means the documented `uvicorn service.api_server.server:app` entrypoint works from an installed wheel, not just from a checkout. When developing from a checkout you can also drive the commands with `python -m` to avoid PATH issues:
 
-For deployed Windows hosts, the authoritative lifecycle guide is `docs/ops/windows_single_host_operator.md`. Use the signed wheel as the API deployment artifact. Do not treat the PyInstaller `earctl.exe`, the installer, or the repo-local `scripts/api-*.ps1` helpers as the authoritative API hosting path.
+For deployed Windows hosts, the authoritative lifecycle guides are `docs/ops/windows_fuseki_operator.md` for the local read-only Fuseki service and `docs/ops/windows_single_host_operator.md` for the API wheel/service lifecycle. Use the signed wheel as the API deployment artifact. Do not treat the PyInstaller `earctl.exe`, the installer, or the repo-local `scripts/api-*.ps1` helpers as the authoritative API hosting path.
+If a deployment must accept traffic beyond the trusted local host boundary, keep EarCrawler on loopback and add the reverse-proxy pattern in `docs/ops/external_auth_front_door.md`; the built-in static shared-secret model is not the approved internet-facing front door by itself.
 
 ```powershell
 py -m earCrawler.cli --help
@@ -184,7 +185,7 @@ Run `py -m earCrawler.cli policy --help` to see these identities and the explici
 
 ## Starting The API Facade
 
-The FastAPI facade in `service/api_server` is the only supported service runtime in this repository. It wraps Fuseki with curated SPARQL templates and health checks. The steps below are for local source-checkout smoke and development. For deployed Windows hosts, use `docs/ops/windows_single_host_operator.md`.
+The FastAPI facade in `service/api_server` is the only supported service runtime in this repository. It wraps Fuseki with curated SPARQL templates and health checks. The steps below are for local source-checkout smoke and development. For deployed Windows hosts, provision Fuseki with `docs/ops/windows_fuseki_operator.md` and manage the API with `docs/ops/windows_single_host_operator.md`.
 
 ```powershell
 # 1. ensure you have operator rights
@@ -622,3 +623,4 @@ Keep using the Trade.gov Data API for entity lookup and the Federal Register API
   corpus build -> corpus validate -> kg-emit -> SHACL gate -> supported API smoke -> no-network RAG smoke.
 - The API smoke gate covers only supported routes: `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, and `/v1/sparql`.
 - The no-network RAG smoke gate runs `tests/golden/test_phase2_golden_gate.py` with stubbed retrieval and stubbed LLM outputs; it does not depend on provider keys, FAISS, or live network access.
+
