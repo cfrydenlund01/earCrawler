@@ -22,9 +22,29 @@ def _make_run_dir(tmp_path: Path) -> Path:
     adapter.mkdir(parents=True)
     _write_json(adapter / "adapter_config.json", {})
     _write_json(adapter / "tokenizer_config.json", {})
-    _write_json(run_dir / "manifest.json", {"manifest_version": "training-package.v1"})
-    _write_json(run_dir / "run_metadata.json", {"schema_version": "training-run-metadata.v1"})
-    _write_json(run_dir / "inference_smoke.json", {"base_model": "Qwen/Qwen2.5-7B-Instruct"})
+    _write_json(
+        run_dir / "manifest.json",
+        {
+            "manifest_version": "training-package.v1",
+            "run_id": "run-1",
+            "base_model": "Qwen/Qwen2.5-7B-Instruct",
+            "snapshot_id": "ecfr-title15-2026-02-28",
+            "retrieval_corpus_digest": "a" * 64,
+        },
+    )
+    _write_json(
+        run_dir / "run_metadata.json",
+        {
+            "schema_version": "training-run-metadata.v1",
+            "status": "completed",
+            "artifact_dir": str(adapter.resolve()),
+            "git_head": "deadbeef",
+        },
+    )
+    _write_json(
+        run_dir / "inference_smoke.json",
+        {"base_model": "Qwen/Qwen2.5-7B-Instruct", "pass": True},
+    )
     return run_dir
 
 
@@ -135,8 +155,20 @@ def test_runner_writes_bundle_and_summary(monkeypatch, tmp_path: Path) -> None:
 
     summary = json.loads((bundle_dir / "benchmark_summary.json").read_text(encoding="utf-8"))
     assert summary["schema_version"] == "local-adapter-benchmark.v1"
+    assert summary["smoke_precondition"]["required"] is True
+    assert summary["smoke_precondition"]["bundle_copy_path"] == str((bundle_dir / "preconditions" / "local_adapter_smoke.json").resolve())
     assert summary["conditions"]["local_adapter"]["num_items"] == 1
     assert summary["conditions"]["local_adapter"]["request_422_count"] == 0
+    assert summary["condition_artifact_paths"]["local_adapter"]["ds1"].endswith("conditions\\local_adapter\\ds1.json") or summary["condition_artifact_paths"]["local_adapter"]["ds1"].endswith("conditions/local_adapter/ds1.json")
+
+    manifest = json.loads((bundle_dir / "benchmark_manifest.json").read_text(encoding="utf-8"))
+    assert summary["benchmark_config"]["config_hash"] == manifest["config_hash"]
+    assert manifest["smoke_precondition"]["required"] is True
+    assert manifest["smoke_precondition"]["status"] == "passed"
+    assert manifest["smoke_precondition"]["bundle_copy_path"] == str((bundle_dir / "preconditions" / "local_adapter_smoke.json").resolve())
+    assert manifest["summary_json_sha256"]
+    assert manifest["artifacts_json_sha256"]
+    assert manifest["training_run"]["run_id"] == "run-1"
 
 
 def test_runner_records_422_failures(monkeypatch, tmp_path: Path) -> None:
@@ -196,3 +228,32 @@ def test_runner_records_422_failures(monkeypatch, tmp_path: Path) -> None:
     local = summary["conditions"]["local_adapter"]
     assert local["request_422_count"] == 1
     assert local["request_422_rate"] == 1.0
+
+
+def test_runner_blocks_incomplete_training_run_before_benchmarking(tmp_path: Path) -> None:
+    run_dir = _make_run_dir(tmp_path)
+    _write_json(
+        run_dir / "run_metadata.json",
+        {
+            "schema_version": "training-run-metadata.v1",
+            "status": "prepare_only",
+            "artifact_dir": str((run_dir / "adapter").resolve()),
+        },
+    )
+    manifest_path = tmp_path / "eval" / "manifest.json"
+    _write_json(manifest_path, {"datasets": [], "references": {"sections": {}}})
+    smoke_report = tmp_path / "kg" / "reports" / "local-adapter-smoke.json"
+    _write_json(smoke_report, {"status": "passed", "run_dir": str(run_dir), "provider": "local_adapter"})
+
+    rc = bench.main(
+        [
+            "--run-dir",
+            str(run_dir),
+            "--manifest",
+            str(manifest_path),
+            "--smoke-report",
+            str(smoke_report),
+        ]
+    )
+
+    assert rc == 1

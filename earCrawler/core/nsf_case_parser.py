@@ -24,6 +24,9 @@ class NSFCaseParser:
     )
     PERSON_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+")
 
+    def __init__(self) -> None:
+        self.last_upstream_status: dict[str, dict[str, object]] = {}
+
     @staticmethod
     def normalize(text: str) -> str:
         """Collapse whitespace and trim."""
@@ -85,15 +88,19 @@ class NSFCaseParser:
         in ``fixtures_dir`` are used.
         """
         cases: List[Dict[str, object]] = []
+        self.last_upstream_status = {}
         if live:
             client = ORIClient()
-            listing_html = client.get_listing_html()
-            listing = BeautifulSoup(listing_html, "html.parser")
-            links = [a["href"] for a in listing.select("a[href]")]
-            for link in links:
-                url = link if link.startswith("http") else f"{client.BASE_URL}{link}"
-                case_html = client.get_case_html(url)
-                cases.append(self.parse_from_html(case_html, url))
+            try:
+                listing_html = client.get_listing_html()
+                listing = BeautifulSoup(listing_html, "html.parser")
+                links = [a["href"] for a in listing.select("a[href]")]
+                for link in links:
+                    url = link if link.startswith("http") else f"{client.BASE_URL}{link}"
+                    case_html = client.get_case_html(url)
+                    cases.append(self.parse_from_html(case_html, url))
+            finally:
+                self.last_upstream_status = client.get_status_snapshot()
         else:
             fixtures_dir = Path(fixtures_dir)
             listing_html = (fixtures_dir / "ori_case_listing.html").read_text(

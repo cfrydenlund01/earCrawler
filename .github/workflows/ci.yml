@@ -45,6 +45,9 @@ jobs:
         run: scripts/package-wheel-smoke.ps1
       - name: Lint
         run: black --check . && flake8 .
+      - name: CI security baseline (dependency audit + SAST + secret scan)
+        shell: pwsh
+        run: scripts/security-baseline.ps1 -Python py -RequirementsLock requirements-win-lock.txt -PipAuditIgnoreFile security/pip_audit_ignore.txt -OutputDir dist/security
       - name: Tests with coverage gate
         run: |
           python -m coverage erase
@@ -125,6 +128,13 @@ jobs:
         with:
           name: api-perf-smoke
           path: dist/perf/api_perf_smoke.json
+          if-no-files-found: error
+      - name: Upload security baseline reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-baseline
+          path: dist/security/*.json
           if-no-files-found: error
       - name: Upload optional runtime smoke report
         if: always()

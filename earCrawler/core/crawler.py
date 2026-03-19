@@ -69,6 +69,7 @@ class Crawler:
 
         entities: List[Dict] = []
         documents: List[Dict] = []
+        self.last_upstream_status: dict[str, dict[str, object]] = {}
 
         try:
             entity_iter = self.tradegov_client.search_entities(query)
@@ -81,9 +82,14 @@ class Crawler:
                 entities.append(entity)
                 entity_id = entity.get("id")
                 try:
-                    for doc in self.federalregister_client.search_documents(
-                        str(entity_id)
-                    ):
+                    docs = self.federalregister_client.search_documents(str(entity_id))
+                    self._capture_status(
+                        "federalregister.search_documents",
+                        self.federalregister_client,
+                        "search_documents",
+                        context={"entity_id": entity_id},
+                    )
+                    for doc in docs:
                         documents.append(doc)
                 except FederalRegisterError as exc:
                     self.logger.warning(
@@ -97,4 +103,37 @@ class Crawler:
                 exc,
             )
 
+        self._capture_status(
+            "tradegov.search",
+            self.tradegov_client,
+            "search",
+            context={"query": query},
+        )
         return entities, documents
+
+    def _capture_status(
+        self,
+        key: str,
+        client: object,
+        operation: str,
+        *,
+        context: dict[str, object] | None = None,
+    ) -> None:
+        getter = getattr(client, "get_last_status", None)
+        if not callable(getter):
+            return
+        status = getter(operation)
+        if status is None:
+            return
+        payload = status.as_dict() if hasattr(status, "as_dict") else {"state": str(status)}
+        if context:
+            payload = {**payload, **context}
+        self.last_upstream_status[key] = payload
+        state = payload.get("state")
+        if state not in {"ok", "no_results"}:
+            self.logger.warning(
+                "Upstream degraded for %s (state=%s): %s",
+                key,
+                state,
+                payload,
+            )

@@ -126,6 +126,7 @@ def main(argv: list[str] | None = None) -> int:
     missing_rollback_docs = [doc for doc, path in rollback_path_map.items() if not Path(path).exists()]
 
     failures: list[str] = []
+    candidate_execution_failures: list[str] = []
     insufficient: list[str] = []
     if missing_run_files:
         insufficient.append("Missing required run artifacts: " + ", ".join(sorted(missing_run_files)))
@@ -169,6 +170,9 @@ def main(argv: list[str] | None = None) -> int:
     if parse_failures:
         insufficient.extend(parse_failures)
 
+    runtime_smoke_path = args.smoke_report.resolve()
+    runtime_smoke_sha256 = _sha256_file(runtime_smoke_path) if runtime_smoke_path.exists() else None
+
     manifest_checks: list[str] = []
     if manifest:
         if str(manifest.get("manifest_version") or "").strip() != "training-package.v1":
@@ -202,7 +206,7 @@ def main(argv: list[str] | None = None) -> int:
         if str(inference_smoke.get("base_model") or "").strip() != str(manifest.get("base_model") or "").strip():
             inference_checks.append("inference_smoke.json base_model must match manifest.json")
     if inference_checks:
-        insufficient.extend(inference_checks)
+        candidate_execution_failures.extend(inference_checks)
 
     runtime_checks: list[str] = []
     if runtime_smoke:
@@ -214,9 +218,10 @@ def main(argv: list[str] | None = None) -> int:
         if smoke_run_dir and Path(smoke_run_dir).resolve() != run_dir:
             runtime_checks.append("local-adapter-smoke.json run_dir does not match the candidate run_dir")
     if runtime_checks:
-        insufficient.extend(runtime_checks)
+        candidate_execution_failures.extend(runtime_checks)
 
     benchmark_checks: list[str] = []
+    benchmark_precondition_checks: list[str] = []
     if benchmark_summary:
         if str(benchmark_summary.get("schema_version") or "").strip() != "local-adapter-benchmark.v1":
             benchmark_checks.append("benchmark_summary.json schema_version must equal local-adapter-benchmark.v1")
@@ -233,11 +238,22 @@ def main(argv: list[str] | None = None) -> int:
             benchmark_checks.append(str(exc))
         try:
             smoke_precondition = _require_mapping(benchmark_summary.get("smoke_precondition"), "benchmark_summary.smoke_precondition")
+            if not bool(smoke_precondition.get("required")):
+                benchmark_precondition_checks.append("benchmark_summary.json smoke_precondition.required must equal true")
+            if not _looks_sha256(str(smoke_precondition.get("sha256") or "")):
+                benchmark_precondition_checks.append("benchmark_summary.json smoke_precondition.sha256 must be a valid SHA-256")
+            bundle_copy_path = str(smoke_precondition.get("bundle_copy_path") or "").strip()
+            if not bundle_copy_path:
+                benchmark_precondition_checks.append("benchmark_summary.json smoke_precondition.bundle_copy_path is missing")
             if str(smoke_precondition.get("status") or "").strip().lower() != "passed":
-                benchmark_checks.append("benchmark_summary.json smoke_precondition.status must equal passed")
+                candidate_execution_failures.append("benchmark_summary.json smoke_precondition.status must equal passed")
+            if runtime_smoke_sha256 and str(smoke_precondition.get("sha256") or "").strip().lower() not in {"", runtime_smoke_sha256.lower()}:
+                benchmark_precondition_checks.append("benchmark_summary.json smoke_precondition.sha256 does not match the reviewed runtime smoke report")
         except Exception as exc:
             benchmark_checks.append(str(exc))
     if benchmark_manifest:
+        if str(benchmark_manifest.get("manifest_version") or "").strip() != "local-adapter-benchmark.v1":
+            benchmark_checks.append("benchmark_manifest.json manifest_version must equal local-adapter-benchmark.v1")
         try:
             manifest_run = _require_mapping(benchmark_manifest.get("training_run"), "benchmark_manifest.training_run")
             manifest_run_dir = str(manifest_run.get("run_dir") or "").strip()
@@ -245,8 +261,30 @@ def main(argv: list[str] | None = None) -> int:
                 benchmark_checks.append("benchmark_manifest.json training_run.run_dir does not match the candidate run_dir")
         except Exception as exc:
             benchmark_checks.append(str(exc))
+        try:
+            manifest_smoke = _require_mapping(benchmark_manifest.get("smoke_precondition"), "benchmark_manifest.smoke_precondition")
+            if not bool(manifest_smoke.get("required")):
+                benchmark_precondition_checks.append("benchmark_manifest.json smoke_precondition.required must equal true")
+            if not _looks_sha256(str(manifest_smoke.get("source_sha256") or "")):
+                benchmark_precondition_checks.append("benchmark_manifest.json smoke_precondition.source_sha256 must be a valid SHA-256")
+            bundle_copy_path = str(manifest_smoke.get("bundle_copy_path") or "").strip()
+            if not bundle_copy_path:
+                benchmark_precondition_checks.append("benchmark_manifest.json smoke_precondition.bundle_copy_path is missing")
+            if str(manifest_smoke.get("status") or "").strip().lower() != "passed":
+                candidate_execution_failures.append("benchmark_manifest.json smoke_precondition.status must equal passed")
+            if runtime_smoke_sha256 and str(manifest_smoke.get("source_sha256") or "").strip().lower() not in {"", runtime_smoke_sha256.lower()}:
+                benchmark_precondition_checks.append("benchmark_manifest.json smoke_precondition.source_sha256 does not match the reviewed runtime smoke report")
+        except Exception as exc:
+            benchmark_checks.append(str(exc))
+    benchmark_smoke_copy_path = benchmark_root / "preconditions" / "local_adapter_smoke.json"
+    if benchmark_smoke_copy_path.exists() and runtime_smoke_sha256:
+        copy_sha256 = _sha256_file(benchmark_smoke_copy_path)
+        if copy_sha256.lower() != runtime_smoke_sha256.lower():
+            benchmark_precondition_checks.append("benchmark preconditions/local_adapter_smoke.json does not match the reviewed runtime smoke report")
     if benchmark_checks:
         insufficient.extend(benchmark_checks)
+    if benchmark_precondition_checks:
+        insufficient.extend(benchmark_precondition_checks)
 
     local_metrics: dict[str, Any] = {}
     retrieval_metrics: dict[str, Any] = {}
@@ -299,15 +337,28 @@ def main(argv: list[str] | None = None) -> int:
         if comparisons.get("overclaim_rate_lte_retrieval_only") and local_overclaim is not None and retrieval_overclaim is not None and local_overclaim > retrieval_overclaim:
             comparison_failures.append("local_adapter.overclaim_rate exceeds retrieval_only.overclaim_rate")
 
-    all_failures = insufficient + failures + comparison_failures
-    decision = "ready_for_formal_promotion_review" if not all_failures else "keep_optional"
-    evidence_status = "complete" if not all_failures else "insufficient"
+    failing_evidence = candidate_execution_failures + failures + comparison_failures
+    all_findings = insufficient + failing_evidence
+    if insufficient:
+        decision = "keep_optional"
+        candidate_review_status = "not_reviewable"
+        evidence_status = "incomplete"
+    elif failing_evidence:
+        decision = "reject_candidate"
+        candidate_review_status = "rejected"
+        evidence_status = "complete"
+    else:
+        decision = "ready_for_formal_promotion_review"
+        candidate_review_status = "ready_for_formal_promotion_review"
+        evidence_status = "complete"
 
     payload = {
         "schema_version": "local-adapter-release-evidence.v1",
         "created_at_utc": _utc_now_iso(),
         "contract_path": str(args.contract.resolve()),
         "capability_id": str(contract.get("capability_id") or ""),
+        "capability_state_after_validation": "optional",
+        "candidate_review_status": candidate_review_status,
         "training_run": {
             "run_dir": str(run_dir),
             "manifest_path": str((run_dir / "manifest.json").resolve()),
@@ -327,8 +378,8 @@ def main(argv: list[str] | None = None) -> int:
             }
         },
         "runtime_smoke": {
-            "path": str(args.smoke_report.resolve()),
-            "sha256": _sha256_file(args.smoke_report.resolve()) if args.smoke_report.resolve().exists() else None,
+            "path": str(runtime_smoke_path),
+            "sha256": runtime_smoke_sha256,
             "status": runtime_smoke.get("status"),
             "provider": runtime_smoke.get("provider"),
             "endpoint": runtime_smoke.get("endpoint"),
@@ -358,6 +409,8 @@ def main(argv: list[str] | None = None) -> int:
             "inference_smoke_checks": inference_checks,
             "runtime_smoke_checks": runtime_checks,
             "benchmark_checks": benchmark_checks,
+            "benchmark_precondition_checks": benchmark_precondition_checks,
+            "candidate_execution_failures": candidate_execution_failures,
             "threshold_failures": failures,
             "comparison_failures": comparison_failures
         },
@@ -365,7 +418,9 @@ def main(argv: list[str] | None = None) -> int:
         "decision_rule": decision_rule,
         "evidence_status": evidence_status,
         "decision": decision,
-        "insufficient_evidence": all_failures
+        "insufficient_evidence": insufficient,
+        "failing_evidence": failing_evidence,
+        "all_findings": all_findings
     }
     _write_json(out_path, payload)
 
@@ -373,7 +428,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Wrote passing release evidence manifest: {out_path}")
         return 0
 
-    print(f"Release evidence is insufficient. Wrote manifest: {out_path}")
+    if decision == "reject_candidate":
+        print(f"Release evidence reviewed the candidate and rejected it. Wrote manifest: {out_path}")
+        return 1
+
+    print(f"Release evidence is incomplete; capability stays optional. Wrote manifest: {out_path}")
     return 1
 
 

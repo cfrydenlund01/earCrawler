@@ -98,3 +98,60 @@ def test_backup_and_restore_drill_scripts(tmp_path):
     assert report["schema_version"] == "windows-single-host-restore-drill.v1"
     assert report["status"] == "pass"
     assert (drill_root / "restore_preview" / "config").exists()
+
+
+def test_recurring_dr_evidence_runner_produces_report_and_index(tmp_path):
+    program_data = tmp_path / "ProgramData" / "EarCrawler"
+    runtime_root = tmp_path / "runtime"
+    api_backup_root = program_data / "backups"
+    fuseki_program_data = program_data / "fuseki"
+    fuseki_backup_root = program_data / "backups" / "fuseki"
+    evidence_root = api_backup_root / "recurring-evidence"
+    fuseki_home = tmp_path / "Apache" / "Jena-Fuseki-5.3.0"
+
+    for rel in ("config", "logs", "workspace", "audit", "spool"):
+        target = program_data / rel
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "sample.txt").write_text(f"{rel}-data", encoding="utf-8")
+
+    for rel in ("config", "databases", "logs"):
+        target = fuseki_program_data / rel
+        target.mkdir(parents=True, exist_ok=True)
+        (target / "sample.txt").write_text(f"fuseki-{rel}-data", encoding="utf-8")
+
+    run_ps(
+        "scripts/ops/windows-recurring-dr-evidence.ps1",
+        "-RunId",
+        "recurring-test",
+        "-ProgramDataRoot",
+        str(program_data),
+        "-RuntimeRoot",
+        str(runtime_root),
+        "-ApiBackupRoot",
+        str(api_backup_root),
+        "-FusekiProgramDataRoot",
+        str(fuseki_program_data),
+        "-FusekiHome",
+        str(fuseki_home),
+        "-FusekiBackupRoot",
+        str(fuseki_backup_root),
+        "-EvidenceRoot",
+        str(evidence_root),
+        "-SkipServiceControl",
+    )
+
+    report_path = evidence_root / "dr-evidence-run-recurring-test.json"
+    index_path = evidence_root / "dr-evidence-index.json"
+    assert report_path.exists()
+    assert index_path.exists()
+
+    report = json.loads(report_path.read_text(encoding="utf-8"))
+    assert report["schema_version"] == "windows-recurring-dr-evidence.v1"
+    assert report["run_id"] == "recurring-test"
+    assert report["overall_status"] == "pass"
+    assert report["api"]["status"] == "pass"
+    assert report["fuseki"]["status"] == "pass"
+
+    index = json.loads(index_path.read_text(encoding="utf-8"))
+    assert index["schema_version"] == "windows-recurring-dr-evidence-index.v1"
+    assert index["runs"][0]["run_id"] == "recurring-test"

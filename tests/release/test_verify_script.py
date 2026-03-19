@@ -147,9 +147,12 @@ def test_verify_records_installed_runtime_smoke_status(tmp_path):
             {
                 "schema_version": "installed-runtime-smoke.v1",
                 "overall_status": "passed",
+                "install_mode": "hermetic_wheelhouse",
+                "install_source": "release_bundle",
                 "checks": [
                     {"name": "health_http_200", "passed": True},
                     {"name": "supported_api_smoke", "passed": True},
+                    {"name": "install_source", "passed": True},
                     {"name": "runtime_contract_topology", "passed": True},
                     {
                         "name": "runtime_contract_declared_instance_count",
@@ -187,3 +190,75 @@ def test_verify_records_installed_runtime_smoke_status(tmp_path):
     payload = json.loads(evidence.read_text(encoding="utf-8"))
     assert payload["installed_runtime_smoke"]["status"] == "passed"
     assert payload["installed_runtime_smoke"]["schema_version"] == "installed-runtime-smoke.v1"
+    assert payload["installed_runtime_smoke"]["install_mode"] == "hermetic_wheelhouse"
+    assert payload["installed_runtime_smoke"]["install_source"] == "release_bundle"
+    assert payload["installed_runtime_smoke"]["hermetic_install_status"] == "passed"
+    assert payload["installed_runtime_smoke"]["field_install_shape_status"] == "passed"
+
+
+def test_verify_records_security_and_observability_evidence_status(tmp_path):
+    env = dict(SOURCE_DATE_EPOCH="946684800")
+    run_ps("kg/scripts/canonical-freeze.ps1", env=env)
+    run_ps("scripts/make-manifest.ps1", env=env)
+
+    release_dir = tmp_path / "release"
+    release_dir.mkdir(parents=True, exist_ok=True)
+    artifact = release_dir / "artifact.txt"
+    artifact.write_text("release-ok", encoding="utf-8")
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    checksums = release_dir / "checksums.sha256"
+    checksums.write_text(f"{digest}  artifact.txt\n", encoding="utf-8")
+
+    security_summary = tmp_path / "security_scan_summary.json"
+    security_summary.write_text(
+        json.dumps(
+            {
+                "schema_version": "ci-security-baseline.v1",
+                "overall_status": "passed",
+                "reports": {
+                    "pip_audit": {"status": "passed", "path": "dist/security/pip_audit.json"},
+                    "bandit": {"status": "passed", "path": "dist/security/bandit.json"},
+                    "secret_scan": {"status": "passed", "path": "dist/security/secret_scan.json"},
+                },
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    observability_probe = tmp_path / "api_probe.json"
+    observability_probe.write_text(
+        json.dumps(
+            {
+                "schema_version": "api-probe-report.v1",
+                "overall_status": "passed",
+                "health": {
+                    "status_code": 200,
+                    "readiness_pass": True,
+                    "budget_ok": True,
+                },
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    evidence = tmp_path / "release_validation_evidence.json"
+    run_ps(
+        "scripts/verify-release.ps1",
+        "-ChecksumsPath",
+        str(checksums),
+        "-SecuritySummaryPath",
+        str(security_summary),
+        "-ObservabilityApiProbePath",
+        str(observability_probe),
+        "-EvidenceOutPath",
+        str(evidence),
+        env=env,
+    )
+
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["security_baseline"]["status"] == "passed"
+    assert payload["security_baseline"]["overall_status"] == "passed"
+    assert payload["observability_api_probe"]["status"] == "passed"
+    assert payload["observability_api_probe"]["health_status_code"] == 200

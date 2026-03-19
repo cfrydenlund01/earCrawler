@@ -19,6 +19,11 @@ from earCrawler.utils.secure_store import get_secret
 from earCrawler.utils.http_cache import HTTPCache
 from earCrawler.utils import budget
 from earCrawler.utils.log_json import JsonLogger
+from api_clients.upstream_status import (
+    UpstreamState,
+    UpstreamStatus,
+    UpstreamStatusTracker,
+)
 
 
 _VARY_HEADERS = ("Accept", "User-Agent")
@@ -48,6 +53,15 @@ def _log_retry(retry_state: RetryCallState) -> None:
 class TradeGovError(Exception):
     """Raised for Trade.gov client errors or invalid responses."""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        state: UpstreamState = "upstream_unavailable",
+    ) -> None:
+        super().__init__(message)
+        self.state = state
+
 
 class TradeGovClient:
     """Client for the Trade.gov Consolidated Screening List gateway."""
@@ -74,12 +88,57 @@ class TradeGovClient:
         )
         env_limit = os.getenv("TRADEGOV_MAX_CALLS")
         self.request_limit = int(env_limit) if env_limit else None
+        self._status = UpstreamStatusTracker("tradegov")
         _logger.info(
             "api.client.init",
             user_agent=self.user_agent,
             has_api_key=bool(self.api_key),
             request_limit=self.request_limit,
         )
+
+    def _record_status(
+        self,
+        operation: str,
+        state: UpstreamState,
+        *,
+        message: str | None = None,
+        status_code: int | None = None,
+        retry_attempts: int | None = None,
+        result_count: int | None = None,
+        cache_hit: bool | None = None,
+        cache_age_seconds: float | None = None,
+    ) -> UpstreamStatus:
+        status = self._status.set(
+            operation,
+            state,
+            message=message,
+            status_code=status_code,
+            retry_attempts=retry_attempts,
+            result_count=result_count,
+            cache_hit=cache_hit,
+            cache_age_seconds=cache_age_seconds,
+        )
+        log_fn = _logger.warning if status.degraded else _logger.info
+        log_fn(
+            "api.upstream_state",
+            operation=operation,
+            state=state,
+            status_code=status_code,
+            retry_attempts=retry_attempts,
+            result_count=result_count,
+            cache_hit=cache_hit,
+            cache_age_seconds=cache_age_seconds,
+            message=message,
+        )
+        return status
+
+    def get_last_status(self, operation: str | None = None) -> UpstreamStatus | None:
+        """Return the latest known upstream status for ``operation``."""
+        return self._status.get(operation)
+
+    def get_status_snapshot(self) -> dict[str, dict[str, object]]:
+        """Return the latest status payload for each tracked operation."""
+        return self._status.snapshot()
 
     @retry(
         reraise=True,
@@ -88,7 +147,7 @@ class TradeGovClient:
         retry=retry_if_exception_type(requests.RequestException),
         before_sleep=_log_retry,
     )
-    def _get(self, endpoint: str, params: dict[str, str]) -> dict:
+    def _get(self, endpoint: str, params: dict[str, str]) -> tuple[dict, bool, float | None]:
         url = f"{self.BASE_URL}{endpoint}"
         headers = {
             "User-Agent": self.user_agent,
@@ -96,12 +155,11 @@ class TradeGovClient:
             "Cache-Control": "no-cache",
         }
         if not self.api_key:
-            _logger.warning(
-                "api.request.skipped", reason="missing_api_key", endpoint=endpoint
+            raise TradeGovError(
+                "Trade.gov API key is not configured",
+                state="missing_credentials",
             )
-            return {"results": []}
-        else:
-            headers[self.SUBSCRIPTION_HEADER] = self.api_key
+        headers[self.SUBSCRIPTION_HEADER] = self.api_key
         _logger.info(
             "api.request", endpoint=endpoint, params=params, limit=self.request_limit
         )
@@ -126,7 +184,8 @@ class TradeGovClient:
                 "api.redirect", endpoint=endpoint, status=resp.status_code, url=resp.url
             )
             raise TradeGovError(
-                "Trade.gov redirected to developer portal. Confirm your CSL subscription and subscription-key header."
+                "Trade.gov redirected to developer portal. Confirm your CSL subscription and subscription-key header.",
+                state="invalid_response",
             )
         resp.raise_for_status()
         content_type = resp.headers.get("Content-Type", "")
@@ -139,23 +198,56 @@ class TradeGovClient:
                 preview=snippet,
             )
             raise TradeGovError(
-                f"Unexpected content type '{content_type}' from Trade.gov: {snippet}"
+                f"Unexpected content type '{content_type}' from Trade.gov: {snippet}",
+                state="invalid_response",
             )
         try:
             payload = resp.json()
         except ValueError as exc:  # pragma: no cover - invalid JSON
             _logger.error("api.invalid_json", endpoint=endpoint, error=str(exc))
-            raise TradeGovError("Invalid JSON response from Trade.gov") from exc
+            raise TradeGovError(
+                "Invalid JSON response from Trade.gov",
+                state="invalid_response",
+            ) from exc
         _logger.info(
             "api.response",
             endpoint=endpoint,
             status=resp.status_code,
             cache="hit" if getattr(resp, "from_cache", False) else "miss",
+            cache_age_seconds=getattr(resp, "cache_age_seconds", None),
             result_count=(
                 len(payload.get("results", [])) if isinstance(payload, dict) else None
             ),
         )
-        return payload
+        return (
+            payload,
+            bool(getattr(resp, "from_cache", False)),
+            (
+                float(getattr(resp, "cache_age_seconds"))
+                if getattr(resp, "cache_age_seconds", None) is not None
+                else None
+            ),
+        )
+
+    @staticmethod
+    def _classify_request_error(
+        exc: requests.RequestException,
+    ) -> tuple[UpstreamState, int | None]:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code is not None and 400 <= int(status_code) < 500:
+            return "upstream_unavailable", int(status_code)
+        return "retry_exhausted", int(status_code) if status_code is not None else None
+
+    @staticmethod
+    def _normalize_get_result(
+        payload: dict | tuple[dict, bool, float | None],
+    ) -> tuple[dict, bool, float | None]:
+        if isinstance(payload, tuple) and len(payload) == 3:
+            data, cache_hit, cache_age_seconds = payload
+            return dict(data), bool(cache_hit), (
+                float(cache_age_seconds) if cache_age_seconds is not None else None
+            )
+        return dict(payload), False, None
 
     def search(
         self,
@@ -165,16 +257,51 @@ class TradeGovClient:
         sources: Optional[Iterable[str]] = None,
     ) -> List[Dict[str, str]]:
         """Search for entities matching ``query`` and return normalized records."""
+        operation = "search"
         params: dict[str, str] = {"name": query, "size": str(max(1, min(limit, 50)))}
         if sources:
             params["sources"] = ",".join(sources)
+        if not self.api_key:
+            self._record_status(
+                operation,
+                "missing_credentials",
+                message="TRADEGOV_API_KEY is empty; request skipped",
+            )
+            _logger.warning(
+                "api.request.skipped",
+                reason="missing_api_key",
+                endpoint="/search",
+            )
+            return []
         try:
-            data = self._get("/search", params)
-        except requests.RequestException as exc:
+            data, cache_hit, cache_age_seconds = self._normalize_get_result(
+                self._get("/search", params)
+            )
+        except TradeGovError as exc:
+            self._record_status(operation, exc.state, message=str(exc))
             _logger.error(
                 "api.request_failed",
                 endpoint="/search",
                 query=query,
+                state=exc.state,
+                error=str(exc),
+            )
+            return []
+        except requests.RequestException as exc:
+            state, status_code = self._classify_request_error(exc)
+            self._record_status(
+                operation,
+                state,
+                message=str(exc),
+                status_code=status_code,
+                retry_attempts=3 if state == "retry_exhausted" else None,
+            )
+            _logger.error(
+                "api.request_failed",
+                endpoint="/search",
+                query=query,
+                state=state,
+                status_code=status_code,
                 error=str(exc),
             )
             return []
@@ -188,12 +315,50 @@ class TradeGovClient:
                     "source_url": item.get("url") or item.get("source_url") or "",
                 }
             )
+        if results:
+            self._record_status(
+                operation,
+                "ok",
+                result_count=len(results),
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
+        else:
+            self._record_status(
+                operation,
+                "no_results",
+                message=f"No entities matched query={query!r}",
+                result_count=0,
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
         return results
 
     def lookup_entity(self, query: str) -> Dict[str, str]:
         """Return the first entity result for ``query`` or an empty dict."""
+        operation = "lookup_entity"
         results = self.search(query, limit=1)
-        return results[0] if results else {}
+        if results:
+            self._record_status(operation, "ok", result_count=1)
+            return results[0]
+        search_status = self.get_last_status("search")
+        if search_status is not None:
+            self._record_status(
+                operation,
+                search_status.state,
+                message=search_status.message,
+                status_code=search_status.status_code,
+                retry_attempts=search_status.retry_attempts,
+                result_count=0,
+            )
+        else:
+            self._record_status(
+                operation,
+                "no_results",
+                message=f"No entity found for query={query!r}",
+                result_count=0,
+            )
+        return {}
 
     # Backwards compatibility aliases
     def search_entities(self, query: str, page_size: int = 100):

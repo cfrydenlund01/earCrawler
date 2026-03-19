@@ -4,9 +4,10 @@ import sys
 from pathlib import Path
 
 import pytest
+import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from api_clients.federalregister_client import FederalRegisterClient
+from api_clients.federalregister_client import FederalRegisterClient, FederalRegisterError
 from earCrawler.utils import budget
 
 
@@ -48,3 +49,41 @@ def test_federalregister_budget(monkeypatch):
     with pytest.raises(budget.BudgetExceededError):
         client._get_json("url", {})
     budget.reset("federalregister")
+
+
+def test_get_ear_articles_no_results_sets_status(monkeypatch):
+    client = FederalRegisterClient()
+    monkeypatch.setattr(client, "_get_json", lambda *args, **kwargs: {"results": []})
+    results = client.get_ear_articles("nothing", per_page=1)
+    assert results == []
+    status = client.get_last_status("get_ear_articles")
+    assert status is not None
+    assert status.state == "no_results"
+
+
+def test_get_ear_articles_invalid_response_sets_status(monkeypatch):
+    client = FederalRegisterClient()
+
+    def _boom(*args, **kwargs):
+        raise FederalRegisterError("invalid payload")
+
+    monkeypatch.setattr(client, "_get_json", _boom)
+    results = client.get_ear_articles("export", per_page=1)
+    assert results == []
+    status = client.get_last_status("get_ear_articles")
+    assert status is not None
+    assert status.state == "invalid_response"
+
+
+def test_get_ear_articles_retry_exhausted_sets_status(monkeypatch):
+    client = FederalRegisterClient()
+
+    def _boom(*args, **kwargs):
+        raise requests.ConnectionError("network down")
+
+    monkeypatch.setattr(client, "_get_json", _boom)
+    results = client.get_ear_articles("export", per_page=1)
+    assert results == []
+    status = client.get_last_status("get_ear_articles")
+    assert status is not None
+    assert status.state == "retry_exhausted"

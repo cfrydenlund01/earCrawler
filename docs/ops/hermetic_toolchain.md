@@ -34,6 +34,19 @@ verified filenames and hashes are written to `.wheelhouse/manifest.json`.
 Packages are installed without network access using
 `scripts/install-from-wheelhouse.ps1` which invokes
 `pip install --no-index --find-links .\.wheelhouse --require-hashes`.
+For release-grade host install, pass the release wheel and checksums file so the
+same script verifies the wheel digest before offline install:
+
+```powershell
+pwsh scripts/install-from-wheelhouse.ps1 `
+  -LockFile requirements-win-lock.txt `
+  -WheelhousePath .wheelhouse `
+  -WheelPath dist/earcrawler-<version>-py3-none-any.whl `
+  -ChecksumsPath dist/checksums.sha256
+```
+
+Release packaging publishes the same payload as `dist/hermetic-artifacts.zip`
+(`requirements-win-lock.txt`, `.wheelhouse/`, and `scripts/install-from-wheelhouse.ps1`).
 
 ## SBOM
 

@@ -346,16 +346,21 @@ def test_phase5_local_adapter_release_evidence_contract_is_recorded() -> None:
     assert "config/local_adapter_release_evidence.example.json" in readme
     assert "config/local_adapter_release_evidence.example.json" in runbook
     assert "validate_local_adapter_release_bundle" in first_pass
+    assert "build_local_adapter_candidate_bundle" in first_pass
     assert "docs/local_adapter_release_evidence.md" in capability_doc
     assert "Ready for formal promotion review" in release_doc
     assert "Keep Optional" in release_doc
     assert "release_evidence_manifest.json" in release_doc
+    assert "build_local_adapter_candidate_bundle" in release_doc
     assert "validate_local_adapter_release_bundle" in release_process
     assert "release_evidence_manifest.json" in operator_guide
-    assert '"schema_version": "local-adapter-release-evidence-contract.v1"' in config_record
+    assert '"schema_version": "local-adapter-release-evidence-contract.v2"' in config_record
     assert '"answer_accuracy_min": 0.65' in config_record
     assert (
         REPO_ROOT / "scripts" / "eval" / "validate_local_adapter_release_bundle.py"
+    ).exists()
+    assert (
+        REPO_ROOT / "scripts" / "eval" / "build_local_adapter_candidate_bundle.py"
     ).exists()
 
 
@@ -560,8 +565,15 @@ def test_windows_operator_guide_records_optional_vs_quarantined_capability_contr
     assert "runtime_contract.capabilities.api.search.status = quarantined" in operator_guide
     assert "dist\\release_validation_evidence.json" in operator_guide
     assert "dist\\installed_runtime_smoke.json" in operator_guide
+    assert "hermetic-artifacts.zip" in operator_guide
+    assert "install-from-wheelhouse.ps1" in operator_guide
+    assert "authoritative release-grade path" in operator_guide
+    assert "Quick install fallback (not release-grade)" in operator_guide
+    assert "windows-recurring-dr-evidence.ps1" in operator_guide
+    assert "dr-evidence-index.json" in operator_guide
     assert "scripts/api-smoke.ps1" in operator_guide
     assert "Still-missing deployment evidence" in operator_guide
+    assert (REPO_ROOT / "scripts" / "ops" / "windows-recurring-dr-evidence.ps1").exists()
     assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in service_docs
     assert "KG expansion remain `Quarantined`" in service_docs
     assert "runtime_contract" in service_docs
@@ -626,14 +638,25 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     assert "Supported corpus validate gate" in ci_workflow
     assert "Supported KG emit gate" in ci_workflow
     assert "Supported KG semantic gate" in ci_workflow
+    assert "CI security baseline (dependency audit + SAST + secret scan)" in ci_workflow
+    assert "scripts/security-baseline.ps1" in ci_workflow
+    assert "security/pip_audit_ignore.txt" in ci_workflow
+    assert "Upload security baseline reports" in ci_workflow
+    assert "dist/security/*.json" in ci_workflow
     assert "Supported API smoke gate" in ci_workflow
     assert "Optional runtime smoke gate" in ci_workflow
     assert "No-network RAG smoke gate" in ci_workflow
     assert "Supported API smoke parity" in release_workflow
     assert "Optional runtime smoke (search/KG gate validation)" in release_workflow
-    assert "Installed runtime smoke (clean-room wheel + supported API contract)" in release_workflow
+    assert "Installed runtime smoke (release bundle field-install shape)" in release_workflow
     assert "scripts/installed-runtime-smoke.ps1" in release_workflow
     assert (REPO_ROOT / "scripts" / "installed-runtime-smoke.ps1").exists()
+    assert "Build hermetic wheelhouse (pinned runtime dependencies)" in release_workflow
+    assert "-UseHermeticWheelhouse" in release_workflow
+    assert "-HermeticBundleZipPath dist/hermetic-artifacts.zip" in release_workflow
+    assert "-ReleaseChecksumsPath dist/checksums.sha256" in release_workflow
+    assert "Package hermetic install artifacts" in release_workflow
+    assert "hermetic-artifacts.zip" in release_workflow
     assert "dist/api_smoke.json" in release_workflow
     assert "dist/optional_runtime_smoke.json" in release_workflow
     assert "dist/installed_runtime_smoke.json" in release_workflow
@@ -643,8 +666,12 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     assert "tests/golden/test_phase2_golden_gate.py" in ci_workflow
     assert "Supported CI Evidence Path" in readme
     assert "supported evidence path" in ci_doc
+    assert "Local rerun of the CI security baseline" in ci_doc
     assert "optional runtime smoke" in ci_doc
     assert "ReportPath dist/api_smoke.json" in release_workflow
+    assert (REPO_ROOT / "scripts" / "security-baseline.ps1").exists()
+    assert (REPO_ROOT / "scripts" / "security_secret_scan.py").exists()
+    assert (REPO_ROOT / "security" / "pip_audit_ignore.txt").exists()
     assert "/v1/search" not in api_smoke
     assert "/v1/entities/" in api_smoke
     assert "/v1/lineage/" in api_smoke

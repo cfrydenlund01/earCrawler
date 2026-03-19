@@ -6,6 +6,7 @@ import json
 import math
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -30,6 +31,8 @@ PRIMARY_DATASETS: tuple[str, ...] = (
     "unanswerable.v2",
 )
 SUMMARY_VERSION = "local-adapter-benchmark.v1"
+TRAINING_MANIFEST_VERSION = "training-package.v1"
+RUN_METADATA_VERSION = "training-run-metadata.v1"
 
 
 def _utc_now_iso() -> str:
@@ -58,6 +61,12 @@ def _sha256_file(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _json_sha256(payload: Mapping[str, Any]) -> str:
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()
 
 
 def _copy_json(src: Path, dst: Path) -> None:
@@ -139,6 +148,10 @@ def _git_head_dirty() -> dict[str, Any]:
     return {"git_head": head if rc1 == 0 else "", "git_dirty": dirty}
 
 
+def _looks_sha256(value: Any) -> bool:
+    return bool(re.fullmatch(r"[0-9a-f]{64}", str(value or "").strip().lower()))
+
+
 def _assert_run_dir(run_dir: Path) -> dict[str, Any]:
     resolved = run_dir.resolve()
     adapter = resolved / "adapter"
@@ -153,12 +166,61 @@ def _assert_run_dir(run_dir: Path) -> dict[str, Any]:
     for path in required:
         if not path.exists():
             raise ValueError(f"Missing required run artifact: {path}")
+    manifest = _read_json(resolved / "manifest.json")
+    if str(manifest.get("manifest_version") or "").strip() != TRAINING_MANIFEST_VERSION:
+        raise ValueError(
+            "Run manifest is malformed: manifest_version must equal "
+            f"{TRAINING_MANIFEST_VERSION}."
+        )
+    run_id = str(manifest.get("run_id") or "").strip()
+    if not run_id:
+        raise ValueError("Run manifest is malformed: run_id is required.")
+    base_model = str(manifest.get("base_model") or "").strip()
+    if not base_model:
+        raise ValueError("Run manifest is malformed: base_model is required.")
+    snapshot_id = str(manifest.get("snapshot_id") or "").strip()
+    if not snapshot_id:
+        raise ValueError("Run manifest is malformed: snapshot_id is required.")
+    retrieval_corpus_digest = str(manifest.get("retrieval_corpus_digest") or "").strip()
+    if not _looks_sha256(retrieval_corpus_digest):
+        raise ValueError(
+            "Run manifest is malformed: retrieval_corpus_digest must be a SHA-256."
+        )
+
+    run_metadata = _read_json(resolved / "run_metadata.json")
+    if str(run_metadata.get("schema_version") or "").strip() != RUN_METADATA_VERSION:
+        raise ValueError(
+            "Run metadata is malformed: schema_version must equal "
+            f"{RUN_METADATA_VERSION}."
+        )
+    if str(run_metadata.get("status") or "").strip() != "completed":
+        raise ValueError(
+            "Run metadata is incomplete: status must equal completed before "
+            "benchmarking."
+        )
+    artifact_dir = str(run_metadata.get("artifact_dir") or "").strip()
+    if artifact_dir and Path(artifact_dir).resolve() != adapter:
+        raise ValueError("Run metadata artifact_dir does not match the adapter directory.")
+
+    inference_smoke = _read_json(resolved / "inference_smoke.json")
+    if not bool(inference_smoke.get("pass")):
+        raise ValueError("Inference smoke is incomplete: pass must equal true.")
+    if str(inference_smoke.get("base_model") or "").strip() != base_model:
+        raise ValueError("Inference smoke base_model does not match the run manifest.")
     return {
         "run_dir": str(resolved),
+        "run_id": run_id,
         "adapter_dir": str(adapter),
         "manifest_path": str(resolved / "manifest.json"),
+        "manifest_sha256": _sha256_file(resolved / "manifest.json"),
         "run_metadata_path": str(resolved / "run_metadata.json"),
+        "run_metadata_sha256": _sha256_file(resolved / "run_metadata.json"),
         "inference_smoke_path": str(resolved / "inference_smoke.json"),
+        "inference_smoke_sha256": _sha256_file(resolved / "inference_smoke.json"),
+        "base_model": base_model,
+        "snapshot_id": snapshot_id,
+        "retrieval_corpus_digest": retrieval_corpus_digest,
+        "git_head": str(run_metadata.get("git_head") or ""),
     }
 
 
@@ -419,6 +481,48 @@ def _render_summary_md(summary: Mapping[str, Any]) -> str:
     return "\n".join(lines).rstrip() + "\n"
 
 
+def _compute_benchmark_config(
+    *,
+    run_info: Mapping[str, Any],
+    dataset_ids: Sequence[str],
+    eval_manifest_path: Path,
+    eval_manifest_sha256: str,
+    top_k: int,
+    answer_score_mode: str,
+    semantic_threshold: float,
+    timeout_seconds: float,
+    require_smoke: bool,
+    include_retrieval_control: bool,
+    smoke_report_path: Path,
+    smoke_report_sha256: str | None,
+) -> dict[str, Any]:
+    payload = {
+        "run_dir": str(run_info.get("run_dir") or ""),
+        "training_run_manifest_sha256": str(run_info.get("manifest_sha256") or ""),
+        "training_run_metadata_sha256": str(run_info.get("run_metadata_sha256") or ""),
+        "training_inference_smoke_sha256": str(run_info.get("inference_smoke_sha256") or ""),
+        "dataset_ids": list(dataset_ids),
+        "eval_manifest_path": str(eval_manifest_path),
+        "eval_manifest_sha256": eval_manifest_sha256,
+        "top_k": int(top_k),
+        "answer_score_mode": str(answer_score_mode),
+        "semantic_threshold": float(semantic_threshold),
+        "timeout_seconds": float(timeout_seconds),
+        "require_smoke": bool(require_smoke),
+        "include_retrieval_control": bool(include_retrieval_control),
+        "smoke_report_path": str(smoke_report_path),
+        "smoke_report_sha256": smoke_report_sha256,
+    }
+    payload["config_hash"] = _json_sha256(payload)
+    return payload
+
+
+def _default_run_id(run_info: Mapping[str, Any], config_hash: str) -> str:
+    return _safe_name(
+        f"benchmark_{Path(str(run_info['run_dir'])).name}_{config_hash[:12]}"
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Benchmark local_adapter /v1/rag/answer and write release-evidence artifacts.")
     parser.add_argument("--run-dir", type=Path, required=True, help="Task 5.3 run directory (dist/training/<run_id>).")
@@ -445,13 +549,6 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Failed: {exc}")
         return 1
 
-    run_id = _safe_name(args.run_id or f"benchmark_{Path(run_info['run_dir']).name}_{datetime.now(timezone.utc).strftime('%Y%m%d')}")
-    out_dir = (args.out_root / run_id).resolve()
-    if out_dir.exists() and not args.overwrite:
-        print(f"Failed: output directory exists: {out_dir}. Use --overwrite.")
-        return 1
-    out_dir.mkdir(parents=True, exist_ok=True)
-
     manifest_path = args.manifest.resolve()
     try:
         manifest = _read_json(manifest_path)
@@ -466,13 +563,43 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
 
     smoke_payload: dict[str, Any] | None = None
+    smoke_copy_path: Path | None = None
+    smoke_report_path = args.smoke_report.resolve()
+    smoke_report_sha256: str | None = None
     if args.require_smoke:
         try:
-            smoke_payload = _load_smoke(args.smoke_report.resolve(), Path(run_info["run_dir"]))
-            _copy_json(args.smoke_report.resolve(), out_dir / "preconditions" / "local_adapter_smoke.json")
+            smoke_payload = _load_smoke(smoke_report_path, Path(run_info["run_dir"]))
+            smoke_report_sha256 = _sha256_file(smoke_report_path)
         except Exception as exc:
             print(f"Failed: {exc}")
             return 1
+
+    benchmark_config = _compute_benchmark_config(
+        run_info=run_info,
+        dataset_ids=dataset_ids,
+        eval_manifest_path=manifest_path,
+        eval_manifest_sha256=_sha256_file(manifest_path),
+        top_k=int(args.top_k),
+        answer_score_mode=str(args.answer_score_mode),
+        semantic_threshold=float(args.semantic_threshold),
+        timeout_seconds=float(args.timeout_seconds),
+        require_smoke=bool(args.require_smoke),
+        include_retrieval_control=bool(args.include_retrieval_control),
+        smoke_report_path=smoke_report_path,
+        smoke_report_sha256=smoke_report_sha256,
+    )
+
+    run_id = _safe_name(args.run_id or _default_run_id(run_info, benchmark_config["config_hash"]))
+    out_dir = (args.out_root / run_id).resolve()
+    if out_dir.exists() and not args.overwrite:
+        print(f"Failed: output directory exists: {out_dir}. Use --overwrite.")
+        return 1
+    if out_dir.exists() and args.overwrite:
+        shutil.rmtree(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if args.require_smoke:
+        smoke_copy_path = (out_dir / "preconditions" / "local_adapter_smoke.json").resolve()
+        _copy_json(smoke_report_path, smoke_copy_path)
 
     conditions: list[tuple[str, bool]] = [("local_adapter", True)]
     if args.include_retrieval_control:
@@ -481,8 +608,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     started = _utc_now_iso()
     session = requests.Session()
     condition_payloads: dict[str, Any] = {}
+    condition_artifact_paths: dict[str, dict[str, str]] = {}
     for condition_name, generate in conditions:
         dataset_metrics: dict[str, Any] = {}
+        dataset_paths: dict[str, str] = {}
         for dataset_id in dataset_ids:
             _, dataset_path = _resolve_dataset(manifest, dataset_id, manifest_path)
             rows = sorted(list(_iter_jsonl(dataset_path)), key=lambda item: str(item.get("id") or ""))
@@ -516,10 +645,17 @@ def main(argv: Sequence[str] | None = None) -> int:
                 semantic_threshold=float(args.semantic_threshold),
             )
             dataset_metrics[dataset_id] = metric
-            _write_json(out_dir / "conditions" / condition_name / f"{dataset_id}.json", metric)
+            metric_path = out_dir / "conditions" / condition_name / f"{dataset_id}.json"
+            _write_json(metric_path, metric)
+            dataset_paths[dataset_id] = str(metric_path)
         condition_payloads[condition_name] = {"datasets": dataset_metrics, "overall": _aggregate(list(dataset_metrics.values()))}
+        condition_artifact_paths[condition_name] = dataset_paths
 
     finished = _utc_now_iso()
+    benchmark_summary_path = out_dir / "benchmark_summary.json"
+    benchmark_summary_md_path = out_dir / "benchmark_summary.md"
+    benchmark_artifacts_path = out_dir / "benchmark_artifacts.json"
+    benchmark_manifest_path = out_dir / "benchmark_manifest.json"
     summary = {
         "schema_version": SUMMARY_VERSION,
         "run_id": run_id,
@@ -532,45 +668,67 @@ def main(argv: Sequence[str] | None = None) -> int:
         "semantic_threshold": float(args.semantic_threshold),
         "eval_manifest_path": str(manifest_path),
         "eval_manifest_sha256": _sha256_file(manifest_path),
+        "benchmark_config": benchmark_config,
         "training_run": run_info,
         "smoke_precondition": {
             "required": bool(args.require_smoke),
-            "path": str(args.smoke_report.resolve()),
-            "sha256": _sha256_file(args.smoke_report.resolve()) if args.smoke_report.exists() else None,
+            "path": str(smoke_report_path),
+            "bundle_copy_path": str(smoke_copy_path) if smoke_copy_path else None,
+            "sha256": smoke_report_sha256,
+            "bundle_copy_sha256": _sha256_file(smoke_copy_path) if smoke_copy_path and smoke_copy_path.exists() else None,
             "status": str((smoke_payload or {}).get("status") or ""),
         },
         "git": _git_head_dirty(),
+        "benchmark_artifacts_path": str(benchmark_artifacts_path),
+        "benchmark_manifest_path": str(benchmark_manifest_path),
+        "condition_artifact_paths": condition_artifact_paths,
         "conditions": {name: payload.get("overall") for name, payload in sorted(condition_payloads.items())},
     }
+    artifacts_payload = {
+        "schema_version": SUMMARY_VERSION,
+        "run_id": run_id,
+        "created_at_utc": started,
+        "bundle_root": str(out_dir),
+        "training_run": run_info,
+        "smoke_precondition": summary["smoke_precondition"],
+        "benchmark_config": benchmark_config,
+        "condition_artifact_paths": condition_artifact_paths,
+        "conditions": condition_payloads,
+    }
+    _write_json(benchmark_summary_path, summary)
+    benchmark_summary_md_path.write_text(_render_summary_md(summary), encoding="utf-8")
+    _write_json(benchmark_artifacts_path, artifacts_payload)
+
     manifest_payload = {
         "manifest_version": SUMMARY_VERSION,
         "run_id": run_id,
         "created_at_utc": started,
+        "finished_at_utc": finished,
         "bundle_root": str(out_dir),
-        "summary_json": str(out_dir / "benchmark_summary.json"),
-        "summary_md": str(out_dir / "benchmark_summary.md"),
+        "summary_json": str(benchmark_summary_path),
+        "summary_json_sha256": _sha256_file(benchmark_summary_path),
+        "summary_md": str(benchmark_summary_md_path),
+        "summary_md_sha256": _sha256_file(benchmark_summary_md_path),
+        "artifacts_json": str(benchmark_artifacts_path),
+        "artifacts_json_sha256": _sha256_file(benchmark_artifacts_path),
         "dataset_ids": dataset_ids,
         "conditions": [name for name, _ in conditions],
         "eval_manifest_path": str(manifest_path),
         "eval_manifest_sha256": _sha256_file(manifest_path),
         "training_run": run_info,
-        "config_hash": hashlib.sha256(
-            json.dumps(
-                {
-                    "dataset_ids": dataset_ids,
-                    "top_k": int(args.top_k),
-                    "answer_score_mode": str(args.answer_score_mode),
-                    "semantic_threshold": float(args.semantic_threshold),
-                    "include_retrieval_control": bool(args.include_retrieval_control),
-                },
-                sort_keys=True,
-            ).encode("utf-8")
-        ).hexdigest(),
+        "smoke_precondition": {
+            "required": bool(args.require_smoke),
+            "source_path": str(smoke_report_path),
+            "bundle_copy_path": str(smoke_copy_path) if smoke_copy_path else None,
+            "source_sha256": smoke_report_sha256,
+            "bundle_copy_sha256": _sha256_file(smoke_copy_path) if smoke_copy_path and smoke_copy_path.exists() else None,
+            "status": str((smoke_payload or {}).get("status") or ""),
+        },
+        "benchmark_config": benchmark_config,
+        "config_hash": benchmark_config["config_hash"],
+        "condition_artifact_paths": condition_artifact_paths,
     }
-    _write_json(out_dir / "benchmark_manifest.json", manifest_payload)
-    _write_json(out_dir / "benchmark_summary.json", summary)
-    (out_dir / "benchmark_summary.md").write_text(_render_summary_md(summary), encoding="utf-8")
-    _write_json(out_dir / "benchmark_artifacts.json", condition_payloads)
+    _write_json(benchmark_manifest_path, manifest_payload)
     print(f"Wrote benchmark bundle: {out_dir}")
     return 0
 

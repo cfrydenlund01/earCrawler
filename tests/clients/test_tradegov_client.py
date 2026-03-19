@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from api_clients.tradegov_client import TradeGovClient
+from api_clients.tradegov_client import TradeGovClient, TradeGovError
 from earCrawler.utils import budget
 
 
@@ -53,3 +53,28 @@ def test_budget_limit(monkeypatch):
     with pytest.raises(budget.BudgetExceededError):
         client._get("/search", {"name": "foo"})
     budget.reset("tradegov")
+
+
+def test_search_missing_credentials_sets_status(monkeypatch):
+    monkeypatch.setattr("api_clients.tradegov_client.get_secret", lambda *_, **__: "")
+    client = TradeGovClient()
+    results = client.search("ACME", limit=2)
+    assert results == []
+    status = client.get_last_status("search")
+    assert status is not None
+    assert status.state == "missing_credentials"
+
+
+def test_search_invalid_response_sets_status(monkeypatch):
+    monkeypatch.setenv("TRADEGOV_API_KEY", "DUMMY")
+    client = TradeGovClient()
+
+    def _boom(*args, **kwargs):
+        raise TradeGovError("bad payload", state="invalid_response")
+
+    monkeypatch.setattr(client, "_get", _boom)
+    results = client.search("ACME", limit=2)
+    assert results == []
+    status = client.get_last_status("search")
+    assert status is not None
+    assert status.state == "invalid_response"

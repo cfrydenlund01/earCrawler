@@ -20,6 +20,9 @@ jobs:
       - name: Build wheel
         shell: pwsh
         run: scripts/build-wheel.ps1
+      - name: Build hermetic wheelhouse (pinned runtime dependencies)
+        shell: pwsh
+        run: scripts/build-wheelhouse.ps1 -LockFile requirements-win-lock.txt
       - name: Clean-room wheel smoke
         shell: pwsh
         run: |
@@ -30,22 +33,18 @@ jobs:
             throw "No wheel built under dist/."
           }
           scripts/package-wheel-smoke.ps1 -WheelPath $wheel.FullName
-      - name: Installed runtime smoke (clean-room wheel + supported API contract)
+      - name: Release security baseline (dependency audit + SAST + secret scan)
         shell: pwsh
-        run: |
-          $wheel = Get-ChildItem dist -Filter "*.whl" |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          if (-not $wheel) {
-            throw "No wheel built under dist/."
-          }
-          scripts/installed-runtime-smoke.ps1 -WheelPath $wheel.FullName -Host 127.0.0.1 -Port 9001 -ReportPath dist/installed_runtime_smoke.json
+        run: scripts/security-baseline.ps1 -Python py -RequirementsLock requirements-win-lock.txt -PipAuditIgnoreFile security/pip_audit_ignore.txt -OutputDir dist/security
       - name: Start supported API smoke service
         shell: pwsh
         run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
       - name: Supported API smoke parity
         shell: pwsh
         run: scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/api_smoke.json
+      - name: Observability API probe
+        shell: pwsh
+        run: scripts/health/api-probe.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/observability/health-api.txt -JsonReportPath dist/observability/api_probe.json
       - name: Stop supported API smoke service
         if: always()
         shell: pwsh
@@ -59,6 +58,19 @@ jobs:
       - name: Make installer
         shell: pwsh
         run: scripts/make-installer.ps1
+      - name: Package hermetic install artifacts
+        shell: pwsh
+        run: |
+          $bundleRoot = Join-Path (Resolve-Path dist) "hermetic-artifacts"
+          if (Test-Path $bundleRoot) {
+            Remove-Item -Recurse -Force $bundleRoot
+          }
+          New-Item -ItemType Directory -Force -Path $bundleRoot | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $bundleRoot "scripts") | Out-Null
+          Copy-Item -Path requirements-win-lock.txt -Destination (Join-Path $bundleRoot "requirements-win-lock.txt") -Force
+          Copy-Item -Path scripts/install-from-wheelhouse.ps1 -Destination (Join-Path $bundleRoot "scripts/install-from-wheelhouse.ps1") -Force
+          Copy-Item -Path .wheelhouse -Destination (Join-Path $bundleRoot ".wheelhouse") -Recurse -Force
+          Compress-Archive -Path $bundleRoot -DestinationPath (Join-Path (Resolve-Path dist) "hermetic-artifacts.zip") -Force
       - name: Sign artifacts
         shell: pwsh
         run: scripts/sign-artifacts.ps1
@@ -69,6 +81,23 @@ jobs:
       - name: Checksums
         shell: pwsh
         run: scripts/checksums.ps1
+      - name: Installed runtime smoke (release bundle field-install shape)
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem dist -Filter "*.whl" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $wheel) {
+            throw "No wheel built under dist/."
+          }
+          scripts/installed-runtime-smoke.ps1 `
+            -WheelPath $wheel.FullName `
+            -UseHermeticWheelhouse `
+            -HermeticBundleZipPath dist/hermetic-artifacts.zip `
+            -ReleaseChecksumsPath dist/checksums.sha256 `
+            -Host 127.0.0.1 `
+            -Port 9001 `
+            -ReportPath dist/installed_runtime_smoke.json
       - name: SBOM
         shell: pwsh
         run: scripts/sbom.ps1
@@ -89,7 +118,7 @@ jobs:
         run: scripts/provenance-attest.ps1
       - name: Release integrity validation
         shell: pwsh
-        run: scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json -EvidenceOutPath dist/release_validation_evidence.json
+        run: scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json -SecuritySummaryPath dist/security/security_scan_summary.json -ObservabilityApiProbePath dist/observability/api_probe.json -EvidenceOutPath dist/release_validation_evidence.json
       - name: Determinism check
         shell: pwsh
         run: scripts/rebuild-compare.ps1 -Version ${{ github.ref_name }}
@@ -108,6 +137,9 @@ jobs:
             dist/api_smoke.json
             dist/optional_runtime_smoke.json
             dist/installed_runtime_smoke.json
+            dist/security/*.json
+            dist/observability/*.json
+            dist/observability/*.txt
             dist/sbom.spdx.json
             kg/canonical/manifest.json
             kg/canonical/provenance.json
@@ -117,8 +149,8 @@ jobs:
             dist/offline_bundle/**
             scripts/verify-release.ps1
           body: |
-            Release evidence covers installed-runtime smoke, supported single-host API smoke parity, and optional-runtime validation.
-            Publication is gated on signed artifacts, verified evidence, and placeholder-free distributable outputs.
+            Release evidence covers hermetic installed-runtime smoke, supported single-host API smoke parity, optional-runtime validation, CI security baseline reports, and observability API probe evidence.
+            Publication is gated on signed artifacts, verified evidence, required security/observability checks, and placeholder-free distributable outputs.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

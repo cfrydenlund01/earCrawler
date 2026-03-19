@@ -25,6 +25,10 @@ Supported deployment semantics are single-host only. Current rate limits,
 concurrency controls, and the RAG cache are process-local, so this document
 does not claim multi-instance correctness. Deferred future-work note:
 `docs/ops/multi_instance_deferred.md`.
+The API now routes rate-limit and RAG cache ownership through the
+`service/api_server/runtime_state.py` boundary so the supported single-host
+assumption is explicit in one place rather than being implied by scattered
+`app.state` wiring.
 The `/health` payload reports this contract under `runtime_contract`, including
 the capability snapshot consumed from the registry, so release and operator
 checks can validate the deployment shape directly.

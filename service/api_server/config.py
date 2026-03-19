@@ -79,6 +79,6 @@ class ApiSettings:
         ):
             raise ValueError(
                 "EarCrawler supports one API service instance per host. "
-                "Rate limits and the RAG query cache are process-local. "
+                "Runtime state for rate limits and the RAG query cache is process-local. "
                 "Set EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE=1 only for local experiments."
             )

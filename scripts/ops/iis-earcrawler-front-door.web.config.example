@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <!--
+    Reference front-door pattern for broader-than-loopback access.
+
+    Preconditions:
+    - EarCrawler stays bound to 127.0.0.1:9001.
+    - IIS is the only network-exposed listener.
+    - URL Rewrite and ARR are installed.
+    - Windows Authentication is enabled at the IIS site.
+    - Replace the placeholder X-Api-Key value before use.
+
+    This file is an example asset, not a claim that EarCrawler trusts IIS user
+    identity directly. IIS authenticates the external caller and injects one
+    deployment-owned backend credential for the loopback hop.
+  -->
+  <system.webServer>
+    <security>
+      <authentication>
+        <anonymousAuthentication enabled="false" />
+        <windowsAuthentication enabled="true" />
+      </authentication>
+      <requestFiltering>
+        <requestLimits maxAllowedContentLength="32768" />
+      </requestFiltering>
+    </security>
+    <rewrite>
+      <allowedServerVariables>
+        <add name="HTTP_X_API_KEY" />
+        <add name="HTTP_X_FORWARDED_PROTO" />
+        <add name="HTTP_X_FORWARDED_HOST" />
+      </allowedServerVariables>
+      <rules>
+        <rule name="EarCrawler Supported Routes" stopProcessing="true">
+          <match url="^(health|v1/entities/.*|v1/lineage/.*|v1/sparql|v1/rag/query|v1/rag/answer)$" />
+          <serverVariables>
+            <set name="HTTP_X_API_KEY" value="proxy:REPLACE_WITH_DEPLOYMENT_SECRET" />
+            <set name="HTTP_X_FORWARDED_PROTO" value="https" />
+            <set name="HTTP_X_FORWARDED_HOST" value="{HTTP_HOST}" />
+          </serverVariables>
+          <action type="Rewrite" url="http://127.0.0.1:9001/{R:1}" logRewrittenUrl="true" />
+        </rule>
+        <rule name="Deny Everything Else" stopProcessing="true">
+          <match url=".*" />
+          <action type="CustomResponse" statusCode="404" statusReason="Not Found" statusDescription="Route not published by IIS front door." />
+        </rule>
+      </rules>
+    </rewrite>
+    <proxy enabled="true" preserveHostHeader="true" reverseRewriteHostInResponseHeaders="false" />
+    <httpProtocol>
+      <customHeaders>
+        <add name="X-Frame-Options" value="DENY" />
+        <add name="X-Content-Type-Options" value="nosniff" />
+      </customHeaders>
+    </httpProtocol>
+  </system.webServer>
+</configuration>

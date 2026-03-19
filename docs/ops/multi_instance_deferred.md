@@ -7,13 +7,13 @@ Today the supported contract is:
 
 - one Windows host
 - one EarCrawler API service instance
-- one set of process-local limits and caches
+- one `runtime_state` owner for process-local limits and caches
 
 Why support stops there today:
 
-- API rate limiting is enforced in-process, not through shared distributed state.
+- API rate limiting is enforced by the process-local `runtime_state`, not through shared distributed state.
 - The API concurrency limiter is process-local.
-- The RAG query cache is an in-memory per-process cache.
+- The RAG query cache is an in-memory per-process cache owned by that same runtime state boundary.
 - Repo-local operational guidance, rollback steps, and health checks assume one
   host and one service instance under operator control.
 

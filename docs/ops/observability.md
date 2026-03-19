@@ -7,6 +7,8 @@ This document summarises the monitoring signals introduced in B.23.
 * `GET /health` returns liveness + readiness information.
 * Readiness aggregates Fuseki latency, template registry load, rate limiter
   state, and free disk space.
+* `live_sources` reports live upstream-source freshness and degradation based on
+  `data/manifest.json` (`upstream_status`) by default.
 * JSON structure:
 
 ```json
@@ -22,11 +24,19 @@ This document summarises the monitoring signals introduced in B.23.
       "rate_limiter": {"status": "pass", "details": {"limit": 120}},
       "disk": {"status": "pass", "details": {"free_mb": 1024}}
     }
+  },
+  "live_sources": {
+    "status": "healthy",
+    "manifest_path": "data/manifest.json",
+    "stale_after_seconds": 86400,
+    "summary": {"healthy": 2, "stale": 0, "degraded": 0, "unknown": 0}
   }
 }
 ```
 
 The budgets come from `service/config/observability.yml`.
+`live_sources` defaults to `unknown` when the manifest is missing or does not
+contain `upstream_status`.
 
 ## Structured Logs
 
@@ -51,6 +61,9 @@ The budgets come from `service/config/observability.yml`.
   `kg/reports/health-fuseki.txt`.
 * `scripts/health/api-probe.ps1` exercises supported `/health` readiness and
   latency budgets by default, then writes `kg/reports/health-api.txt`.
+  When `-JsonReportPath` is provided it also writes a machine-readable
+  `api-probe-report.v1` payload used by release validation (for example
+  `dist/observability/api_probe.json`).
   For local validation only, pass `-IncludeQuarantinedSearch` to also probe
   quarantined `/v1/search`.
 * `scripts/canary/run-canaries.ps1` loads `canary/config.yml`, executes the API

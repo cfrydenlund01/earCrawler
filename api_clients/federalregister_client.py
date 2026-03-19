@@ -21,6 +21,11 @@ from earCrawler.utils.secure_store import get_secret
 from earCrawler.utils.http_cache import HTTPCache
 from earCrawler.utils import budget
 from earCrawler.utils.log_json import JsonLogger
+from api_clients.upstream_status import (
+    UpstreamState,
+    UpstreamStatus,
+    UpstreamStatusTracker,
+)
 
 
 _VARY_HEADERS = ("Accept", "User-Agent")
@@ -81,11 +86,56 @@ class FederalRegisterClient:
         )
         env_limit = os.getenv("FR_MAX_CALLS")
         self.request_limit = int(env_limit) if env_limit else None
+        self._status = UpstreamStatusTracker("federalregister")
         _logger.info(
             "api.client.init",
             user_agent=self.user_agent,
             request_limit=self.request_limit,
         )
+
+    def _record_status(
+        self,
+        operation: str,
+        state: UpstreamState,
+        *,
+        message: str | None = None,
+        status_code: int | None = None,
+        retry_attempts: int | None = None,
+        result_count: int | None = None,
+        cache_hit: bool | None = None,
+        cache_age_seconds: float | None = None,
+    ) -> UpstreamStatus:
+        status = self._status.set(
+            operation,
+            state,
+            message=message,
+            status_code=status_code,
+            retry_attempts=retry_attempts,
+            result_count=result_count,
+            cache_hit=cache_hit,
+            cache_age_seconds=cache_age_seconds,
+        )
+        log_fn = _logger.warning if status.degraded else _logger.info
+        log_fn(
+            "api.upstream_state",
+            operation=operation,
+            state=state,
+            status_code=status_code,
+            retry_attempts=retry_attempts,
+            result_count=result_count,
+            cache_hit=cache_hit,
+            cache_age_seconds=cache_age_seconds,
+            message=message,
+        )
+        return status
+
+    def get_last_status(self, operation: str | None = None) -> UpstreamStatus | None:
+        """Return the latest known upstream status for ``operation``."""
+        return self._status.get(operation)
+
+    def get_status_snapshot(self) -> dict[str, dict[str, object]]:
+        """Return the latest status payload for each tracked operation."""
+        return self._status.snapshot()
 
     @retry(
         reraise=True,
@@ -94,7 +144,7 @@ class FederalRegisterClient:
         retry=retry_if_exception_type(requests.RequestException),
         before_sleep=_log_retry,
     )
-    def _get_json(self, url: str, params: dict[str, str]) -> dict:
+    def _get_json(self, url: str, params: dict[str, str]) -> tuple[dict, bool, float | None]:
         headers = {"User-Agent": self.user_agent, "Accept": "application/json"}
         _logger.info("api.request", url=url, params=params, limit=self.request_limit)
         try:
@@ -140,20 +190,75 @@ class FederalRegisterClient:
             url=url,
             status=resp.status_code,
             cache="hit" if getattr(resp, "from_cache", False) else "miss",
+            cache_age_seconds=getattr(resp, "cache_age_seconds", None),
             result_count=(
                 len(payload.get("results", [])) if isinstance(payload, dict) else None
             ),
         )
-        return payload
+        return (
+            payload,
+            bool(getattr(resp, "from_cache", False)),
+            (
+                float(getattr(resp, "cache_age_seconds"))
+                if getattr(resp, "cache_age_seconds", None) is not None
+                else None
+            ),
+        )
+
+    @staticmethod
+    def _classify_request_error(exc: requests.RequestException) -> tuple[UpstreamState, int | None]:
+        status_code = getattr(getattr(exc, "response", None), "status_code", None)
+        if status_code is not None and 400 <= int(status_code) < 500:
+            return "upstream_unavailable", int(status_code)
+        return "retry_exhausted", int(status_code) if status_code is not None else None
+
+    @staticmethod
+    def _normalize_json_result(
+        payload: dict | tuple[dict, bool, float | None],
+    ) -> tuple[dict, bool, float | None]:
+        if isinstance(payload, tuple) and len(payload) == 3:
+            data, cache_hit, cache_age_seconds = payload
+            return dict(data), bool(cache_hit), (
+                float(cache_age_seconds) if cache_age_seconds is not None else None
+            )
+        return dict(payload), False, None
 
     def get_ear_articles(self, term: str, *, per_page: int = 5) -> List[Dict[str, str]]:
         """Return normalized EAR article records for ``term``."""
+        operation = "get_ear_articles"
         url = f"{self.BASE_URL}/documents"
         params = {"per_page": str(per_page), "conditions[term]": term}
         try:
-            data = self._get_json(url, params)
+            data, cache_hit, cache_age_seconds = self._normalize_json_result(
+                self._get_json(url, params)
+            )
+        except FederalRegisterError as exc:
+            self._record_status(operation, "invalid_response", message=str(exc))
+            _logger.error(
+                "api.request_failed",
+                url=url,
+                term=term,
+                state="invalid_response",
+                error=str(exc),
+            )
+            return []
         except requests.RequestException as exc:
-            _logger.error("api.request_failed", url=url, term=term, error=str(exc))
+            state, status_code = self._classify_request_error(exc)
+            self._record_status(
+                operation,
+                state,
+                message=str(exc),
+                status_code=status_code,
+                retry_attempts=3 if state == "retry_exhausted" else None,
+            )
+            _logger.error(
+                "api.request_failed",
+                url=url,
+                term=term,
+                state=state,
+                status_code=status_code,
+                error=str(exc),
+            )
             return []
         results: List[Dict[str, str]] = []
         for doc in data.get("results", []):
@@ -175,19 +280,80 @@ class FederalRegisterClient:
                     "text": text,
                 }
             )
+        if results:
+            self._record_status(
+                operation,
+                "ok",
+                result_count=len(results),
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
+        else:
+            self._record_status(
+                operation,
+                "no_results",
+                message=f"No documents for term={term!r}",
+                result_count=0,
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
         return results
 
     def get_article_text(self, doc_id: str) -> str:
         """Return cleaned text for a Federal Register document."""
+        operation = "get_article_text"
         url = f"{self.BASE_URL}/documents/{doc_id}"
         try:
-            data = self._get_json(url, params={})
-        except requests.RequestException as exc:
+            data, cache_hit, cache_age_seconds = self._normalize_json_result(
+                self._get_json(url, params={})
+            )
+        except FederalRegisterError as exc:
+            self._record_status(operation, "invalid_response", message=str(exc))
             _logger.error(
-                "api.request_failed", url=url, document=doc_id, error=str(exc)
+                "api.request_failed",
+                url=url,
+                document=doc_id,
+                state="invalid_response",
+                error=str(exc),
             )
             return ""
-        return self._clean_text(data.get("body_html") or data.get("body_text") or "")
+        except requests.RequestException as exc:
+            state, status_code = self._classify_request_error(exc)
+            self._record_status(
+                operation,
+                state,
+                message=str(exc),
+                status_code=status_code,
+                retry_attempts=3 if state == "retry_exhausted" else None,
+            )
+            _logger.error(
+                "api.request_failed",
+                url=url,
+                document=doc_id,
+                state=state,
+                status_code=status_code,
+                error=str(exc),
+            )
+            return ""
+        text = self._clean_text(data.get("body_html") or data.get("body_text") or "")
+        if text:
+            self._record_status(
+                operation,
+                "ok",
+                result_count=1,
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
+        else:
+            self._record_status(
+                operation,
+                "no_results",
+                message=f"Document {doc_id!r} has no body text",
+                result_count=0,
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
+        return text
 
     # Backwards compatible wrappers
     def search_documents(
@@ -196,28 +362,118 @@ class FederalRegisterClient:
         per_page: int = 100,
         page: int | None = None,
     ) -> List[Dict]:
+        operation = "search_documents"
         url = f"{self.BASE_URL}/documents"
         params = {"conditions[any]": query, "per_page": str(per_page)}
         if page is not None:
             params["page"] = str(page)
         try:
-            data = self._get_json(url, params)
-        except requests.RequestException as exc:
+            data, cache_hit, cache_age_seconds = self._normalize_json_result(
+                self._get_json(url, params)
+            )
+        except FederalRegisterError as exc:
+            self._record_status(operation, "invalid_response", message=str(exc))
             _logger.error(
-                "api.request_failed", url=url, query=query, page=page, error=str(exc)
+                "api.request_failed",
+                url=url,
+                query=query,
+                page=page,
+                state="invalid_response",
+                error=str(exc),
             )
             return []
-        return data.get("results", [])
+        except requests.RequestException as exc:
+            state, status_code = self._classify_request_error(exc)
+            self._record_status(
+                operation,
+                state,
+                message=str(exc),
+                status_code=status_code,
+                retry_attempts=3 if state == "retry_exhausted" else None,
+            )
+            _logger.error(
+                "api.request_failed",
+                url=url,
+                query=query,
+                page=page,
+                state=state,
+                status_code=status_code,
+                error=str(exc),
+            )
+            return []
+        results = data.get("results", [])
+        if results:
+            self._record_status(
+                operation,
+                "ok",
+                result_count=len(results),
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
+        else:
+            self._record_status(
+                operation,
+                "no_results",
+                message=f"No documents for query={query!r}",
+                result_count=0,
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
+        return results
 
     def get_document(self, doc_number: str):
+        operation = "get_document"
         url = f"{self.BASE_URL}/documents/{doc_number}"
         try:
-            return self._get_json(url, params={})
-        except requests.RequestException as exc:
+            data, cache_hit, cache_age_seconds = self._normalize_json_result(
+                self._get_json(url, params={})
+            )
+        except FederalRegisterError as exc:
+            self._record_status(operation, "invalid_response", message=str(exc))
             _logger.error(
-                "api.request_failed", url=url, document=doc_number, error=str(exc)
+                "api.request_failed",
+                url=url,
+                document=doc_number,
+                state="invalid_response",
+                error=str(exc),
             )
             return {}
+        except requests.RequestException as exc:
+            state, status_code = self._classify_request_error(exc)
+            self._record_status(
+                operation,
+                state,
+                message=str(exc),
+                status_code=status_code,
+                retry_attempts=3 if state == "retry_exhausted" else None,
+            )
+            _logger.error(
+                "api.request_failed",
+                url=url,
+                document=doc_number,
+                state=state,
+                status_code=status_code,
+                error=str(exc),
+            )
+            return {}
+        if data:
+            self._record_status(
+                operation,
+                "ok",
+                result_count=1,
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
+        else:
+            self._record_status(
+                operation,
+                "no_results",
+                message=f"Document {doc_number!r} not found",
+                result_count=0,
+                cache_hit=cache_hit,
+                cache_age_seconds=cache_age_seconds,
+            )
+        return data
 
     def get_ear_text(self, citation: str) -> str:
         data = self.get_document(citation)

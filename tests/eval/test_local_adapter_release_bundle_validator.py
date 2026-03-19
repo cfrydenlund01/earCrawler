@@ -63,14 +63,33 @@ def _make_benchmark_bundle(
     run_dir: Path,
     *,
     answer_accuracy: float = 0.82,
+    include_precondition_copy: bool = True,
+    summary_requires_smoke: bool = True,
 ) -> Path:
     bench_dir = tmp_path / "benchmarks" / "bundle-1"
     bench_dir.mkdir(parents=True, exist_ok=True)
+    smoke_copy = bench_dir / "preconditions" / "local_adapter_smoke.json"
+    smoke_payload = {
+        "status": "passed",
+        "run_dir": str(run_dir),
+        "provider": "local_adapter",
+        "endpoint": "http://127.0.0.1:9001/v1/rag/answer",
+        "trace_id": "t-1",
+    }
+    if include_precondition_copy:
+        _write_json(smoke_copy, smoke_payload)
     _write_json(
         bench_dir / "benchmark_manifest.json",
         {
             "manifest_version": "local-adapter-benchmark.v1",
             "training_run": {"run_dir": str(run_dir)},
+            "smoke_precondition": {
+                "required": summary_requires_smoke,
+                "source_path": str(tmp_path / "kg" / "reports" / "local-adapter-smoke.json"),
+                "bundle_copy_path": str(smoke_copy.resolve()) if include_precondition_copy else None,
+                "source_sha256": validator._sha256_file(smoke_copy) if include_precondition_copy else None,
+                "status": "passed",
+            },
         },
     )
     summary = {
@@ -81,7 +100,13 @@ def _make_benchmark_bundle(
             "unanswerable.v2",
         ],
         "training_run": {"run_dir": str(run_dir)},
-        "smoke_precondition": {"status": "passed"},
+        "smoke_precondition": {
+            "required": summary_requires_smoke,
+            "path": str(tmp_path / "kg" / "reports" / "local-adapter-smoke.json"),
+            "bundle_copy_path": str(smoke_copy.resolve()) if include_precondition_copy else None,
+            "sha256": validator._sha256_file(smoke_copy) if include_precondition_copy else None,
+            "status": "passed",
+        },
         "conditions": {
             "local_adapter": {
                 "answer_accuracy": answer_accuracy,
@@ -155,11 +180,12 @@ def test_validator_writes_release_evidence_manifest_for_passing_bundle(
     payload = json.loads(out_path.read_text(encoding="utf-8"))
     assert payload["schema_version"] == "local-adapter-release-evidence.v1"
     assert payload["decision"] == "ready_for_formal_promotion_review"
+    assert payload["candidate_review_status"] == "ready_for_formal_promotion_review"
     assert payload["evidence_status"] == "complete"
     assert payload["training_run"]["retrieval_corpus_digest"] == "b" * 64
 
 
-def test_validator_keeps_capability_optional_when_thresholds_fail(
+def test_validator_rejects_candidate_when_thresholds_fail(
     tmp_path: Path,
 ) -> None:
     run_dir = _make_run_dir(tmp_path)
@@ -184,9 +210,47 @@ def test_validator_keeps_capability_optional_when_thresholds_fail(
 
     assert rc == 1
     payload = json.loads(out_path.read_text(encoding="utf-8"))
-    assert payload["decision"] == "keep_optional"
-    assert payload["evidence_status"] == "insufficient"
+    assert payload["decision"] == "reject_candidate"
+    assert payload["candidate_review_status"] == "rejected"
+    assert payload["evidence_status"] == "complete"
     assert any(
         "local_adapter.answer_accuracy" in item
+        for item in payload["failing_evidence"]
+    )
+
+
+def test_validator_keeps_capability_optional_when_benchmark_precondition_is_not_machine_checkable(
+    tmp_path: Path,
+) -> None:
+    run_dir = _make_run_dir(tmp_path)
+    benchmark_summary = _make_benchmark_bundle(
+        tmp_path,
+        run_dir,
+        include_precondition_copy=False,
+        summary_requires_smoke=False,
+    )
+    smoke_report = _make_smoke_report(tmp_path, run_dir)
+
+    out_path = run_dir / "release_evidence_manifest.json"
+    rc = validator.main(
+        [
+            "--run-dir",
+            str(run_dir),
+            "--benchmark-summary",
+            str(benchmark_summary),
+            "--smoke-report",
+            str(smoke_report),
+            "--out",
+            str(out_path),
+        ]
+    )
+
+    assert rc == 1
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["decision"] == "keep_optional"
+    assert payload["candidate_review_status"] == "not_reviewable"
+    assert payload["evidence_status"] == "incomplete"
+    assert any(
+        "smoke_precondition.required" in item or "preconditions/local_adapter_smoke.json" in item
         for item in payload["insufficient_evidence"]
     )

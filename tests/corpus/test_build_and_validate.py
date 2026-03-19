@@ -4,6 +4,7 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
+from api_clients.upstream_status import UpstreamStatus
 from earCrawler.corpus import build_corpus, validate_corpus, snapshot_corpus
 from earCrawler.corpus.identity import build_record_id
 
@@ -76,3 +77,56 @@ def test_snapshot_corpus(tmp_path: Path, monkeypatch) -> None:
     assert target.name == "20240101T120000Z"
     assert (target / "ear_corpus.jsonl").exists()
     assert (target / "manifest.json").exists()
+
+
+def test_live_manifest_includes_upstream_status(tmp_path: Path, monkeypatch) -> None:
+    class StubCrawler:
+        def __init__(self, _client, storage_dir: Path) -> None:
+            self.paragraphs_path = Path(storage_dir) / "ear_paragraphs.jsonl"
+
+        def run(self, _query: str) -> None:
+            self.paragraphs_path.parent.mkdir(parents=True, exist_ok=True)
+            self.paragraphs_path.write_text(
+                json.dumps(
+                    {
+                        "document_number": "DOC-1",
+                        "paragraph_index": 0,
+                        "text": "Paragraph from upstream source.",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+    class StubFederalRegisterClient:
+        def __init__(self, *args, **kwargs) -> None:
+            self._status = UpstreamStatus(
+                source="federalregister",
+                operation="get_document",
+                state="retry_exhausted",
+                message="network offline",
+                retry_attempts=3,
+            )
+
+        def get_document(self, _doc_number: str) -> dict:
+            return {}
+
+        def get_last_status(self, operation: str | None = None):
+            if operation in (None, "get_document"):
+                return self._status
+            return None
+
+    monkeypatch.setattr("earCrawler.corpus.builder.EARCrawler", StubCrawler)
+    monkeypatch.setattr(
+        "earCrawler.corpus.builder.FederalRegisterClient",
+        StubFederalRegisterClient,
+    )
+    data_dir = tmp_path / "data"
+    manifest = build_corpus(["ear"], data_dir, live=True, fixtures=None)
+    upstream_status = manifest.get("upstream_status") or []
+    assert upstream_status
+    assert upstream_status[0]["source"] == "federalregister"
+    assert upstream_status[0]["operation"] == "get_document"
+    assert upstream_status[0]["state"] == "retry_exhausted"
+    on_disk = json.loads((data_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert on_disk["upstream_status"][0]["state"] == "retry_exhausted"

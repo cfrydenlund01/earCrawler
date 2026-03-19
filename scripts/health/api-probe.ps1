@@ -5,6 +5,7 @@ param(
     [int]$Port = 9001,
     [string]$ConfigPath = 'service/config/observability.yml',
     [string]$ReportPath = 'kg/reports/health-api.txt',
+    [string]$JsonReportPath = '',
     [switch]$IncludeQuarantinedSearch
 )
 
@@ -98,6 +99,56 @@ $report += "Overall: $(if ($overall) { 'pass' } else { 'fail' })"
 $reportDir = Split-Path -Parent $ReportPath
 New-Item -ItemType Directory -Force -Path $reportDir | Out-Null
 $report | Out-File -FilePath $ReportPath -Encoding utf8
+
+if ($JsonReportPath) {
+    $searchDetails = $null
+    if ($IncludeQuarantinedSearch) {
+        $searchRows = 0
+        if ($search.Body -and $search.Body.results) {
+            $searchRows = ($search.Body.results | Measure-Object).Count
+        }
+        $searchDetails = [ordered]@{
+            included = $true
+            status_code = [int]$search.StatusCode
+            duration_ms = [double]$search.DurationMs
+            headers_ok = $headersOk
+            rows = $searchRows
+            error = if ($search.Error) { [string]$search.Error } else { "" }
+        }
+    }
+    else {
+        $searchDetails = [ordered]@{
+            included = $false
+            status_code = 0
+            duration_ms = 0.0
+            headers_ok = $false
+            rows = 0
+            error = ""
+        }
+    }
+
+    $jsonPayload = [ordered]@{
+        schema_version = 'api-probe-report.v1'
+        generated_utc = (Get-Date).ToUniversalTime().ToString("o")
+        base_url = $baseUrl
+        api_timeout_budget_ms = $apiBudget
+        health = [ordered]@{
+            status_code = [int]$health.StatusCode
+            duration_ms = [double]$health.DurationMs
+            readiness_pass = $ready
+            budget_ok = $healthBudgetOk
+            error = if ($health.Error) { [string]$health.Error } else { "" }
+        }
+        search = $searchDetails
+        overall_status = if ($overall) { 'passed' } else { 'failed' }
+    }
+
+    $jsonReportDir = Split-Path -Parent $JsonReportPath
+    if ($jsonReportDir) {
+        New-Item -ItemType Directory -Force -Path $jsonReportDir | Out-Null
+    }
+    $jsonPayload | ConvertTo-Json -Depth 8 | Set-Content -Path $JsonReportPath -Encoding utf8
+}
 
 if (-not $overall) {
     exit 1
