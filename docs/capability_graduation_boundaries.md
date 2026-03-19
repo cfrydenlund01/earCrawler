@@ -15,6 +15,7 @@ Use this document together with:
 - `docs/kg_unquarantine_plan.md`
 - `docs/hybrid_retrieval_design.md`
 - `docs/model_training_surface_adr.md`
+- `docs/local_adapter_release_evidence.md`
 - `docs/ops/windows_single_host_operator.md`
 
 ## State summary
@@ -156,8 +157,8 @@ Current operator control:
 
 Promotion from `Optional` to `Supported` requires all of the following:
 
-- a retained real-artifact or compact validation-pack contract that can be used
-  in release validation without reconstructing training output manually
+- a passing evidence bundle defined in `docs/local_adapter_release_evidence.md`
+  and validated against `config/local_adapter_release_evidence.example.json`
 - release-gated smoke for the installed-service runtime using that artifact
 - operator docs for artifact placement, health verification, rollback, and
   troubleshooting
@@ -165,6 +166,13 @@ Promotion from `Optional` to `Supported` requires all of the following:
   report archived with release evidence
 - a dated decision record stating whether support remains artifact-by-artifact
   optional or becomes part of the baseline supported deployment
+
+Exact evidence decision rule:
+
+- keep the capability `Optional` when any required artifact, smoke report,
+  benchmark dataset, threshold, or rollback document is missing or failing
+- treat the capability as `Ready for formal promotion review` only when the
+  full evidence bundle passes; this does not auto-promote the capability
 
 ## Governing split
 

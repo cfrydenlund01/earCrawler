@@ -437,6 +437,28 @@ pwsh scripts/optional-runtime-smoke.ps1 `
   -ReportPath C:\ProgramData\EarCrawler\workspace\kg\reports\optional-runtime-smoke.json
 ```
 
+For a release-candidate adapter, also retain the evidence bundle defined in
+`docs/local_adapter_release_evidence.md`:
+
+```powershell
+pwsh scripts\local_adapter_smoke.ps1 `
+  -RunDir C:\ProgramData\EarCrawler\models\<run_id>
+py -m scripts.eval.run_local_adapter_benchmark `
+  --run-dir C:\ProgramData\EarCrawler\models\<run_id> `
+  --manifest eval\manifest.json `
+  --dataset-id ear_compliance.v2 `
+  --dataset-id entity_obligations.v2 `
+  --dataset-id unanswerable.v2 `
+  --smoke-report kg\reports\local-adapter-smoke.json
+py -m scripts.eval.validate_local_adapter_release_bundle `
+  --run-dir C:\ProgramData\EarCrawler\models\<run_id> `
+  --benchmark-summary dist\benchmarks\<benchmark_run_id>\benchmark_summary.json `
+  --smoke-report kg\reports\local-adapter-smoke.json
+```
+
+Keep the resulting `release_evidence_manifest.json` with the host-local release
+evidence for that candidate.
+
 Rollback for optional/quarantined local validation modes:
 
 ```powershell

@@ -20,13 +20,23 @@ This document describes reproducible KG release steps.
    - `scripts/api-stop.ps1`
 11. Run release-shaped optional-mode smoke coverage:
    - `scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json`
-12. If a real Task 5.3 run artifact is available, run the same smoke with local-adapter validation:
+12. If a real Task 5.3 run artifact is available, produce the local-adapter evidence bundle:
+   - `scripts/local_adapter_smoke.ps1 -RunDir dist/training/<run_id>`
+   - `py -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/<run_id> --manifest eval/manifest.json --dataset-id ear_compliance.v2 --dataset-id entity_obligations.v2 --dataset-id unanswerable.v2 --smoke-report kg/reports/local-adapter-smoke.json`
+   - `py -m scripts.eval.validate_local_adapter_release_bundle --run-dir dist/training/<run_id> --benchmark-summary dist/benchmarks/<benchmark_run_id>/benchmark_summary.json --smoke-report kg/reports/local-adapter-smoke.json`
+13. If a real Task 5.3 run artifact is available, run the same optional-runtime smoke with local-adapter validation:
    - `scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist/training/<run_id> -ReportPath dist/optional_runtime_smoke.json`
-13. Use `scripts/verify-release.ps1` to validate canonical + distributable artifacts and emit evidence:
+14. Use `scripts/verify-release.ps1` to validate canonical + distributable artifacts and emit evidence:
    - `scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json -EvidenceOutPath dist/release_validation_evidence.json`
    - validation now fails if any distributable output still includes files with `PLACEHOLDER` in the filename (for example `manifest.sig.PLACEHOLDER.txt` in `dist/offline_bundle/`)
    - publication now also fails if the canonical manifest signature, release checksums signature, supported API smoke report, optional-runtime smoke report, or installed-runtime smoke report are missing or non-passing
-14. Archive `dist/api_smoke.json`, `dist/installed_runtime_smoke.json`, `dist/release_validation_evidence.json`, and `dist/optional_runtime_smoke.json` with the release bundle.
+15. Archive `dist/api_smoke.json`, `dist/installed_runtime_smoke.json`, `dist/release_validation_evidence.json`, and `dist/optional_runtime_smoke.json` with the release bundle.
+
+Optional local-adapter note:
+- A passing `release_evidence_manifest.json` keeps one named adapter candidate
+  evidence-backed and reviewable, but it does not auto-promote the capability
+  beyond `Optional`. Use `docs/local_adapter_release_evidence.md` for the exact
+  decision rule.
 
 Single-host support note:
 - Release evidence should always map to the supported deployment contract: one

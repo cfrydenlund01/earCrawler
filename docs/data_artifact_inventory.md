@@ -62,6 +62,7 @@ Artifact classes:
 | `dist/training/<run_id>/run_metadata.json` | Generated | Optional training-package review | Run outcome, metrics, and artifact metadata. |
 | `dist/training/<run_id>/adapter/` | Generated | Optional local-adapter runtime candidate | Candidate adapter artifact; optional until promoted by evidence. |
 | `dist/training/<run_id>/inference_smoke.json` | Generated | Optional training/runtime smoke evidence | Smoke-test result for the named adapter run. |
+| `dist/training/<run_id>/release_evidence_manifest.json` | Generated | Optional local-adapter release review | Decision manifest produced from the release-evidence contract; records hashes, thresholds, and review outcome for one adapter candidate. |
 | `dist/benchmarks/` | Generated | Optional benchmark evidence | Benchmark outputs and manifests; evidence only, never input truth. |
 
 ## Practical rules

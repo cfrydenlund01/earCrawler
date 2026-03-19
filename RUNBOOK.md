@@ -28,7 +28,11 @@
    - `pwsh scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist\api_smoke.json -OptionalRuntimeSmokeReportPath dist\optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist\installed_runtime_smoke.json -EvidenceOutPath dist\release_validation_evidence.json`
 13. If a real Task 5.3 run artifact is available, run:
    - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist\training\<run_id> -ReportPath dist\optional_runtime_smoke.json`
-14. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, `dist\api_smoke.json`, `dist\installed_runtime_smoke.json`, release validation evidence, and optional runtime smoke evidence files.
+14. If a real Task 5.3 run artifact is available, validate its release evidence bundle:
+   - `pwsh scripts/local_adapter_smoke.ps1 -RunDir dist\training\<run_id>`
+   - `py -m scripts.eval.run_local_adapter_benchmark --run-dir dist\training\<run_id> --manifest eval\manifest.json --dataset-id ear_compliance.v2 --dataset-id entity_obligations.v2 --dataset-id unanswerable.v2 --smoke-report kg\reports\local-adapter-smoke.json`
+   - `py -m scripts.eval.validate_local_adapter_release_bundle --run-dir dist\training\<run_id> --benchmark-summary dist\benchmarks\<benchmark_run_id>\benchmark_summary.json --smoke-report kg\reports\local-adapter-smoke.json`
+15. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, `dist\api_smoke.json`, `dist\installed_runtime_smoke.json`, release validation evidence, and optional runtime smoke evidence files.
 
 Release artifact note
 - The wheel is the authoritative deployment artifact for the supported Windows API service path described in `docs/ops/windows_single_host_operator.md`.
@@ -56,6 +60,7 @@ Windows notes
 - Machine-readable capability state is published at `docs/api/capability_registry.json` (generated from `service/docs/capability_registry.json`). `README.md` remains the human-readable summary.
 - Supported API routes are `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`.
 - Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, retrieval extras installed from `requirements-gpu.txt`, `EARCRAWLER_RETRIEVAL_MODE=hybrid`, and the Task 5.4 local adapter runtime (`LLM_PROVIDER=local_adapter` plus explicit local-model env).
+- The minimum optional local-adapter release bundle is defined in `docs/local_adapter_release_evidence.md` and `config/local_adapter_release_evidence.example.json`.
 - Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion.
 - `/v1/search` is disabled by default at runtime; enable only for local validation with `EARCRAWLER_API_ENABLE_SEARCH=1`.
 - Hybrid ranking and local-adapter serving are tracked separately from KG quarantine in `docs/capability_graduation_boundaries.md`.
