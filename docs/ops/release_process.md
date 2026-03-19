@@ -5,7 +5,7 @@ This document describes reproducible KG release steps.
 1. Run `kg/scripts/canonical-freeze.ps1` to produce canonical files under `kg/canonical/`.
 2. Create deterministic archive with `scripts/make-canonical-zip.ps1`.
 3. Generate `manifest.json` and `checksums.sha256` via `scripts/make-manifest.ps1`.
-4. Optionally sign the manifest using `scripts/sign-manifest.ps1` (requires secrets).
+4. Optionally sign the manifest using `scripts/sign-manifest.ps1` (supports env-provided PFX material or a cert already present in `Cert:\CurrentUser\My`).
 5. Validate wheel packaging from a clean-room venv outside the checkout:
    - `scripts/package-wheel-smoke.ps1 -WheelPath dist/earcrawler-*.whl`
 6. Build pinned Windows dependency wheelhouse:
@@ -17,7 +17,7 @@ This document describes reproducible KG release steps.
 9. Package hermetic install payload for operators:
    - include `requirements-win-lock.txt`, `.wheelhouse/`, and `scripts/install-from-wheelhouse.ps1` under `dist/hermetic-artifacts/`
    - zip as `dist/hermetic-artifacts.zip`
-10. Sign executable artifacts and verify signatures when signing secrets are configured:
+10. Sign executable artifacts and verify signatures when signing material is configured:
    - `scripts/sign-artifacts.ps1`
    - `signtool verify /pa dist/*.exe`
 11. Generate release checksums for distributable artifacts:
@@ -39,6 +39,7 @@ This document describes reproducible KG release steps.
    - `scripts/make-canonical-zip.ps1 -Version <tag>`
    - `scripts/make-manifest.ps1`
    - `scripts/sign-manifest.ps1`
+   - `scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256`
    - `scripts/provenance-attest.ps1`
    - `scripts/rebuild-compare.ps1 -Version <tag>`
 17. If a real Task 5.3 run artifact is available, produce the local-adapter evidence bundle:
@@ -68,4 +69,5 @@ Single-host support note:
 
 Environment variables:
 - `SOURCE_DATE_EPOCH` - Unix timestamp used for fixed file times.
-- `SIGNING_CERT_PFX_BASE64` and `SIGNING_CERT_PASSWORD` - optional signing material.
+- `SIGNING_CERT_PFX_BASE64` and `SIGNING_CERT_PASSWORD` - optional PFX signing material.
+- `SIGNING_THUMBPRINT` or `SIGNING_SUBJECT` - optional cert-store selector when signing with a certificate already installed in `Cert:\CurrentUser\My`.

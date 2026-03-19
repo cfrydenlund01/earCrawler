@@ -56,7 +56,7 @@ function Parse-Checksums {
 function Get-PlaceholderArtifacts {
     param([string[]]$Roots)
 
-    $matches = @()
+    $results = @()
     foreach ($root in $Roots) {
         if (-not $root) {
             continue
@@ -67,10 +67,10 @@ function Get-PlaceholderArtifacts {
         Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue |
             Where-Object { $_.Name -match "PLACEHOLDER" } |
             ForEach-Object {
-                $matches += $_.FullName
+                $results += $_.FullName
             }
     }
-    return $matches
+    return $results
 }
 
 function Read-JsonReport {
