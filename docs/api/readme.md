@@ -146,7 +146,9 @@ If the service must be exposed beyond that boundary, do not expose the
 EarCrawler process directly with only `EARCRAWLER_API_KEYS`. Keep the app on a
 loopback/local-only listener and place an authenticated reverse proxy or API
 gateway in front of it as described in `docs/ops/external_auth_front_door.md`.
-In that pattern, the proxy authenticates the external caller and presents a
+The reference Windows pattern is IIS + ARR + Windows Authentication with a
+deployment-owned backend `X-Api-Key` injected on the loopback hop. In that
+pattern, the proxy authenticates the external caller and presents one
 deployment-owned backend `X-Api-Key` to EarCrawler.
 
 Credential formats:

@@ -1,5 +1,5 @@
 {
-  "schema_version": "local-adapter-release-evidence-contract.v1",
+  "schema_version": "local-adapter-release-evidence-contract.v2",
   "status": "optional_until_bundle_passes",
   "capability_id": "runtime.local_adapter_serving",
   "bundle": {
@@ -16,7 +16,8 @@
       "benchmark_manifest.json",
       "benchmark_summary.json",
       "benchmark_summary.md",
-      "benchmark_artifacts.json"
+      "benchmark_artifacts.json",
+      "preconditions/local_adapter_smoke.json"
     ],
     "required_primary_datasets": [
       "ear_compliance.v2",
@@ -49,14 +50,19 @@
   },
   "decision_rule": {
     "keep_optional_when": [
-      "Any required artifact or rollback document is missing.",
-      "The Task 5.3 run manifest does not record snapshot id, snapshot hash, and retrieval corpus digest.",
-      "Either inference_smoke.json or scripts/local_adapter_smoke.ps1 evidence is missing or non-passing.",
-      "The benchmark bundle omits any required primary dataset or violates a threshold in this contract.",
+      "Any required artifact, archived benchmark precondition, or rollback document is missing.",
+      "The Task 5.3 provenance fields or benchmark precondition hashes are missing or inconsistent.",
+      "The benchmark bundle cannot be machine-checked against the reviewed runtime smoke report."
+    ],
+    "reject_candidate_when": [
+      "The evidence bundle is complete, but inference_smoke.json or scripts/local_adapter_smoke.ps1 is non-passing.",
+      "The benchmark smoke precondition is present but non-passing.",
+      "The benchmark bundle violates a threshold in this contract.",
       "The local_adapter condition performs worse than retrieval_only on a required comparison rule."
     ],
     "ready_for_formal_promotion_review_when": [
       "The evidence bundle is complete.",
+      "The archived benchmark precondition matches the reviewed runtime smoke report.",
       "All thresholds pass.",
       "The benchmark bundle includes retrieval_only control data and required primary datasets.",
       "A dated promotion decision can cite this manifest plus the named rollback docs without changing the baseline runtime."

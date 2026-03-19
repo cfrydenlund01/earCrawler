@@ -3,19 +3,42 @@
 from __future__ import annotations
 
 import logging
-import json
 import os
-import time
-import re
 import sys
-from collections import Counter
-from datetime import datetime, timezone
-from math import log
+import time
 from pathlib import Path
 from threading import RLock
 from typing import List, Mapping, MutableMapping, Optional
 
 from earCrawler.utils.import_guard import import_optional
+
+from api_clients.tradegov_client import TradeGovClient
+from api_clients.federalregister_client import FederalRegisterClient
+from earCrawler.rag.build_corpus import compute_corpus_digest
+from earCrawler.rag.retriever_backend import (
+    RETRIEVAL_BACKEND_ENV as _RETRIEVAL_BACKEND_ENV,
+    RETRIEVAL_MODE_ENV as _RETRIEVAL_MODE_ENV,
+    SUPPORTED_RETRIEVAL_BACKENDS as _SUPPORTED_RETRIEVAL_BACKENDS,
+    SUPPORTED_RETRIEVAL_MODES as _SUPPORTED_RETRIEVAL_MODES,
+    is_windows_platform as _is_windows_platform,
+    legacy_pickle_metadata_enabled as _legacy_pickle_metadata_enabled,
+    resolve_backend_name as _resolve_backend_name_internal,
+    resolve_retrieval_mode as _resolve_retrieval_mode_internal,
+)
+from earCrawler.rag.retriever_citation_policy import (
+    apply_citation_boost as _apply_citation_boost,
+    extract_ear_section_targets as _extract_ear_section_targets,
+)
+from earCrawler.rag.retriever_ranking import (
+    HYBRID_RRF_K as _HYBRID_RRF_K,
+    fuse_rankings as _fuse_rankings_internal,
+    hybrid_candidate_count as _hybrid_candidate_count_internal,
+    metadata_tie_break_key as _metadata_tie_break_key,
+    public_result_doc as _public_result_doc,
+    rank_bm25 as _rank_bm25,
+    score_bucket as _score_bucket,
+)
+from earCrawler.rag.retriever_store import RetrieverArtifactStore
 
 SentenceTransformer = None  # type: ignore[assignment]
 faiss = None  # type: ignore[assignment]
@@ -25,187 +48,6 @@ _META_CACHE: dict[str, tuple[int, int, list[dict]]] = {}
 _EMBEDDING_CACHE: dict[str, tuple[int, int, object]] = {}
 _BM25_CACHE: dict[str, tuple[int, int, dict[str, object]]] = {}
 _CACHE_LOCK = RLock()
-
-from api_clients.tradegov_client import TradeGovClient
-from api_clients.federalregister_client import FederalRegisterClient
-from earCrawler.rag.build_corpus import compute_corpus_digest
-from earCrawler.rag.index_builder import INDEX_META_VERSION
-from earCrawler.rag.retriever_citation_policy import (
-    apply_citation_boost as _apply_citation_boost,
-    canonical_section_id as _canonical_section_id,
-    extract_ear_section_targets as _extract_ear_section_targets,
-)
-
-
-def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-_RETRIEVAL_BACKEND_ENV = "EARCRAWLER_RETRIEVAL_BACKEND"
-_RETRIEVAL_MODE_ENV = "EARCRAWLER_RETRIEVAL_MODE"
-_LEGACY_PICKLE_METADATA_ENV = "EARCRAWLER_ENABLE_LEGACY_PICKLE_METADATA"
-_SUPPORTED_RETRIEVAL_BACKENDS = {"faiss", "bruteforce"}
-_SUPPORTED_RETRIEVAL_MODES = {"dense", "hybrid"}
-_SCORE_TIE_EPSILON = 1e-6
-_HYBRID_RRF_K = 60
-_HYBRID_MIN_CANDIDATES = 20
-_HYBRID_CANDIDATE_MULTIPLIER = 4
-_BM25_K1 = 1.5
-_BM25_B = 0.75
-_TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:\.[A-Za-z0-9]+)*(?:\([A-Za-z0-9]+\))*")
-
-
-def _is_windows_platform() -> bool:
-    return sys.platform.startswith("win")
-
-
-def _default_backend_name() -> str:
-    return "bruteforce" if _is_windows_platform() else "faiss"
-
-
-def _legacy_pickle_metadata_enabled() -> bool:
-    raw = os.getenv(_LEGACY_PICKLE_METADATA_ENV)
-    if raw is None:
-        return False
-    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _resolve_backend_name(explicit_backend: str | None = None) -> tuple[str, str]:
-    raw = explicit_backend
-    source = "default"
-    if raw is None:
-        raw = os.getenv(_RETRIEVAL_BACKEND_ENV)
-        if raw is not None:
-            source = f"env:{_RETRIEVAL_BACKEND_ENV}"
-    else:
-        source = "argument"
-
-    if raw is None:
-        return _default_backend_name(), source
-
-    backend = str(raw).strip().lower()
-    if backend not in _SUPPORTED_RETRIEVAL_BACKENDS:
-        raise RetrieverMisconfiguredError(
-            f"Unsupported retrieval backend '{raw}'",
-            metadata={
-                "backend": raw,
-                "supported_backends": sorted(_SUPPORTED_RETRIEVAL_BACKENDS),
-                "env_var": _RETRIEVAL_BACKEND_ENV,
-            },
-        )
-    return backend, source
-
-
-def _resolve_retrieval_mode(explicit_mode: str | None = None) -> tuple[str, str]:
-    raw = explicit_mode
-    source = "default"
-    if raw is None:
-        raw = os.getenv(_RETRIEVAL_MODE_ENV)
-        if raw is not None:
-            source = f"env:{_RETRIEVAL_MODE_ENV}"
-    else:
-        source = "argument"
-
-    if raw is None:
-        return "dense", source
-
-    mode = str(raw).strip().lower()
-    if mode not in _SUPPORTED_RETRIEVAL_MODES:
-        raise RetrieverMisconfiguredError(
-            f"Unsupported retrieval mode '{raw}'",
-            metadata={
-                "retrieval_mode": raw,
-                "supported_modes": sorted(_SUPPORTED_RETRIEVAL_MODES),
-                "env_var": _RETRIEVAL_MODE_ENV,
-            },
-        )
-    return mode, source
-
-
-def _metadata_row_order(row: Mapping[str, object], fallback_order: int) -> int:
-    raw = row.get("row_id")
-    try:
-        return int(raw) if raw is not None else fallback_order
-    except Exception:
-        return fallback_order
-
-
-def _metadata_tie_break_key(row: Mapping[str, object], fallback_order: int) -> tuple[str, str, int]:
-    section_id = _canonical_section_id(row) or ""
-    chunk_or_doc_id = str(row.get("chunk_id") or row.get("doc_id") or row.get("id") or "")
-    return (section_id, chunk_or_doc_id, _metadata_row_order(row, fallback_order))
-
-
-def _score_bucket(score: object) -> int:
-    try:
-        return int(round(float(score) / _SCORE_TIE_EPSILON))
-    except Exception:
-        return 0
-
-
-def _document_text_for_embedding(row: Mapping[str, object]) -> str:
-    for key in ("text", "body", "content", "paragraph", "summary", "snippet", "title"):
-        value = row.get(key)
-        if value is not None:
-            text = str(value).strip()
-            if text:
-                return text
-    return ""
-
-
-def _document_text_for_bm25(row: Mapping[str, object]) -> str:
-    parts: list[str] = []
-    for key in ("section_id", "doc_id", "title", "text", "body", "content", "paragraph", "summary", "snippet"):
-        value = row.get(key)
-        if value is None:
-            continue
-        text = str(value).strip()
-        if text:
-            parts.append(text)
-    return " ".join(parts)
-
-
-def _normalize_bm25_token(raw: str) -> str:
-    token = str(raw or "").strip().lower()
-    if not token:
-        return ""
-    if token.endswith("ies") and len(token) > 4:
-        token = token[:-3] + "y"
-    elif token.endswith("es") and len(token) > 4:
-        token = token[:-2]
-    elif token.endswith("s") and len(token) > 3:
-        token = token[:-1]
-    return token
-
-
-def _tokenize_for_bm25(text: str) -> list[str]:
-    tokens: list[str] = []
-    for raw in _TOKEN_RE.findall(str(text or "")):
-        token = _normalize_bm25_token(raw)
-        if token:
-            tokens.append(token)
-    return tokens
-
-
-def _materialize_metadata_rows(metadata: List[dict]) -> List[dict]:
-    rows: list[dict] = []
-    for idx, row in enumerate(metadata):
-        materialized = dict(row)
-        materialized.setdefault("row_id", idx)
-        rows.append(materialized)
-    return rows
-
-
-def _public_result_doc(row: Mapping[str, object]) -> dict:
-    doc = dict(row)
-    doc.pop("row_id", None)
-    if "section_id" not in doc and doc.get("doc_id"):
-        doc["section_id"] = str(doc.get("doc_id")).split("#", 1)[0]
-    return doc
-
-
-def _result_doc_id(row: Mapping[str, object]) -> str:
-    return str(row.get("doc_id") or row.get("id") or "").strip()
 
 
 class RetrieverError(RuntimeError):
@@ -272,25 +114,44 @@ class IndexBuildRequiredError(RetrieverError):
         )
 
 
+def _resolve_backend_name(explicit_backend: str | None = None) -> tuple[str, str]:
+    resolved, source = _resolve_backend_name_internal(explicit_backend)
+    if resolved is not None:
+        return resolved, source
+
+    raw = explicit_backend
+    if raw is None:
+        raw = os.getenv(_RETRIEVAL_BACKEND_ENV)
+    raise RetrieverMisconfiguredError(
+        f"Unsupported retrieval backend '{raw}'",
+        metadata={
+            "backend": raw,
+            "supported_backends": sorted(_SUPPORTED_RETRIEVAL_BACKENDS),
+            "env_var": _RETRIEVAL_BACKEND_ENV,
+        },
+    )
+
+
+def _resolve_retrieval_mode(explicit_mode: str | None = None) -> tuple[str, str]:
+    resolved, source = _resolve_retrieval_mode_internal(explicit_mode)
+    if resolved is not None:
+        return resolved, source
+
+    raw = explicit_mode
+    if raw is None:
+        raw = os.getenv(_RETRIEVAL_MODE_ENV)
+    raise RetrieverMisconfiguredError(
+        f"Unsupported retrieval mode '{raw}'",
+        metadata={
+            "retrieval_mode": raw,
+            "supported_modes": sorted(_SUPPORTED_RETRIEVAL_MODES),
+            "env_var": _RETRIEVAL_MODE_ENV,
+        },
+    )
+
+
 class Retriever:
-    """Vector search over EAR documents using FAISS.
-
-    Parameters
-    ----------
-    tradegov_client:
-        Instance of :class:`TradeGovClient` used for future expansions.
-    fedreg_client:
-        Instance of :class:`FederalRegisterClient` used for future expansions.
-    model_name:
-        SentenceTransformer model name.
-    index_path:
-        Location of the FAISS index file.
-
-    Notes
-    -----
-    Load API keys from Windows Credential Store—never hard-code.
-    Secure your FAISS index path and model files.
-    """
+    """Vector search over EAR documents using FAISS."""
 
     def __init__(
         self,
@@ -312,6 +173,7 @@ class Retriever:
         self.retrieval_mode_source = mode_source
         self.hybrid_rrf_k = _HYBRID_RRF_K
         self.faiss_threads = None
+
         global SentenceTransformer
         if SentenceTransformer is None:
             try:
@@ -323,6 +185,7 @@ class Retriever:
                     str(exc), metadata={"packages": ["sentence-transformers"]}
                 ) from exc
             SentenceTransformer = sentence_transformers.SentenceTransformer
+
         self.index_path = Path(index_path)
         self.meta_path = self.index_path.with_suffix(".meta.json")
         self.legacy_meta_path = self.index_path.with_suffix(".pkl")
@@ -335,6 +198,7 @@ class Retriever:
                 f"Failed to load SentenceTransformer model '{model_name}'",
                 metadata={"model_name": model_name},
             ) from exc
+
         self._faiss = None
         if self.backend == "faiss":
             global faiss
@@ -343,7 +207,8 @@ class Retriever:
                     faiss = import_optional("faiss", ["faiss-cpu"])
                 except RuntimeError as exc:
                     raise RetrieverUnavailableError(
-                        str(exc), metadata={"packages": ["faiss-cpu"], "backend": self.backend}
+                        str(exc),
+                        metadata={"packages": ["faiss-cpu"], "backend": self.backend},
                     ) from exc
             self._faiss = faiss
             self._configure_faiss_determinism()
@@ -353,29 +218,44 @@ class Retriever:
             raise RetrieverUnavailableError(
                 str(exc), metadata={"packages": ["numpy"]}
             ) from exc
+
+        self._artifact_store = RetrieverArtifactStore(
+            index_path=self.index_path,
+            model_name=self.model_name,
+            allow_legacy_pickle_metadata=self.allow_legacy_pickle_metadata,
+            logger=self.logger,
+            model=self.model,
+            retry_fn=self._retry,
+            np_mod=self._np,
+            faiss_mod=self._faiss,
+            cache_lock=_CACHE_LOCK,
+            index_cache=_INDEX_CACHE,
+            meta_cache=_META_CACHE,
+            embedding_cache=_EMBEDDING_CACHE,
+            bm25_cache=_BM25_CACHE,
+            retriever_error_cls=RetrieverError,
+            index_missing_error_cls=IndexMissingError,
+            index_build_required_error_cls=IndexBuildRequiredError,
+        )
+
         # Status flags for external introspection/logging.
         self.enabled = True
         self.ready = True
         self.failure_type: str | None = None
 
-    # ------------------------------------------------------------------
     def _configure_faiss_determinism(self) -> None:
-        faiss_mod = self._faiss
-        if faiss_mod is None:
+        if self._faiss is None:
             return
-        omp_set_num_threads = getattr(faiss_mod, "omp_set_num_threads", None)
+        omp_set_num_threads = getattr(self._faiss, "omp_set_num_threads", None)
         if callable(omp_set_num_threads):
             omp_set_num_threads(1)
             self.faiss_threads = 1
 
-    # ------------------------------------------------------------------
     def _load_model(self, model_name: str):
         with _CACHE_LOCK:
             cached = _MODEL_CACHE.get(model_name)
         if cached is not None:
-            self.logger.info(
-                "rag.retriever.model_cache_hit model_name=%s", model_name
-            )
+            self.logger.info("rag.retriever.model_cache_hit model_name=%s", model_name)
             return cached
 
         self.logger.info("rag.retriever.model_cache_miss model_name=%s", model_name)
@@ -384,34 +264,10 @@ class Retriever:
             _MODEL_CACHE[model_name] = model_obj
         return model_obj
 
-    # ------------------------------------------------------------------
     def _cache_token(self, path: Path) -> tuple[int, int]:
-        stat = path.stat()
-        return int(stat.st_mtime_ns), int(stat.st_size)
+        return self._artifact_store.cache_token(path)
 
-    # ------------------------------------------------------------------
     def _retry(self, func, *args, **kwargs):
-        """Execute ``func`` with retries and exponential backoff.
-
-        Parameters
-        ----------
-        func:
-            Callable to run.
-        *args:
-            Positional arguments forwarded to ``func``.
-        **kwargs:
-            Keyword arguments forwarded to ``func``.
-
-        Returns
-        -------
-        Any
-            The return value of ``func`` if it succeeds.
-
-        Notes
-        -----
-        The callable is attempted up to three times with delays of
-        1, 2 and 4 seconds between tries.
-        """
         attempts = 3
         delay = 1.0
         for attempt in range(attempts):
@@ -426,158 +282,29 @@ class Retriever:
                 self.logger.error("Operation failed after retries: %s", exc)
                 raise
 
-    # ------------------------------------------------------------------
     def _create_index(self, dim: int):
-        faiss_mod = self._faiss
-        base = faiss_mod.IndexFlatL2(dim)
-        return faiss_mod.IndexIDMap(base)
+        return self._artifact_store.create_index(dim)
 
     def _load_index(self, dim: int, *, allow_create: bool = False):
-        faiss_mod = self._faiss
-        if self.index_path.exists():
-            key = str(self.index_path)
-            token = self._cache_token(self.index_path)
-            with _CACHE_LOCK:
-                cached = _INDEX_CACHE.get(key)
-            if cached is not None and cached[:2] == token:
-                self.logger.info("rag.retriever.index_cache_hit index_path=%s", key)
-                return cached[2]
-            self.logger.info("rag.retriever.index_cache_miss index_path=%s", key)
-            try:
-                index = faiss_mod.read_index(str(self.index_path))
-            except Exception as exc:
-                raise IndexBuildRequiredError(
-                    self.index_path, reason=f"unable to read index: {exc}"
-                ) from exc
-            IndexIDMap = getattr(faiss_mod, "IndexIDMap", None)
-            if isinstance(IndexIDMap, type) and not isinstance(index, IndexIDMap):  # pragma: no cover
-                index = IndexIDMap(index)
-            with _CACHE_LOCK:
-                _INDEX_CACHE[key] = (token[0], token[1], index)
-            return index
-        if not allow_create:
-            raise IndexMissingError(self.index_path)
-        return self._create_index(dim)
+        return self._artifact_store.load_index(dim, allow_create=allow_create)
 
-    # ------------------------------------------------------------------
     def _load_metadata(self, *, allow_create: bool = False) -> List[dict]:
-        if self.meta_path.exists():
-            key = str(self.meta_path)
-            token = self._cache_token(self.meta_path)
-            with _CACHE_LOCK:
-                cached = _META_CACHE.get(key)
-            if cached is not None and cached[:2] == token:
-                return _materialize_metadata_rows(list(cached[2]))
-            try:
-                meta_obj = json.loads(self.meta_path.read_text(encoding="utf-8"))
-            except Exception as exc:
-                raise IndexBuildRequiredError(
-                    self.index_path, reason=f"failed to read metadata: {exc}"
-                ) from exc
-            rows: list[dict]
-            if isinstance(meta_obj, dict) and isinstance(meta_obj.get("rows"), list):
-                rows = _materialize_metadata_rows(list(meta_obj["rows"]))
-                with _CACHE_LOCK:
-                    _META_CACHE[key] = (token[0], token[1], list(rows))
-                return rows
-            if isinstance(meta_obj, list):
-                rows = _materialize_metadata_rows(list(meta_obj))
-                with _CACHE_LOCK:
-                    _META_CACHE[key] = (token[0], token[1], list(rows))
-                return rows
-            raise IndexBuildRequiredError(
-                self.index_path, reason="metadata rows missing or invalid"
-            )
-        if self.allow_legacy_pickle_metadata and self.legacy_meta_path.exists():
-            key = str(self.legacy_meta_path)
-            token = self._cache_token(self.legacy_meta_path)
-            with _CACHE_LOCK:
-                cached = _META_CACHE.get(key)
-            if cached is not None and cached[:2] == token:
-                return _materialize_metadata_rows(list(cached[2]))
-            try:
-                import pickle
+        return self._artifact_store.load_metadata(allow_create=allow_create)
 
-                self.logger.warning(
-                    "rag.retriever.legacy_pickle_metadata_enabled env_var=%s path=%s",
-                    _LEGACY_PICKLE_METADATA_ENV,
-                    self.legacy_meta_path,
-                )
-                with self.legacy_meta_path.open("rb") as fh:
-                    rows = pickle.load(fh)
-            except Exception as exc:
-                raise IndexBuildRequiredError(
-                    self.index_path, reason=f"failed to read metadata: {exc}"
-                ) from exc
-            rows = _materialize_metadata_rows(list(rows))
-            with _CACHE_LOCK:
-                _META_CACHE[key] = (token[0], token[1], list(rows))
-            return list(rows)
-        if allow_create:
-            return []
-        raise IndexBuildRequiredError(
-            self.index_path, reason="metadata file missing"
-        )
-
-    # ------------------------------------------------------------------
     def _save_index(
         self,
         index,
         metadata: List[dict],
         corpus_digest: str | None = None,
     ) -> None:
-        metadata = _materialize_metadata_rows(metadata)
-        faiss_mod = self._faiss
-        if faiss_mod is not None and index is not None:
-            faiss_mod.write_index(index, str(self.index_path))
-
-        meta_payload = {
-            "schema_version": INDEX_META_VERSION,
-            "build_timestamp_utc": _utc_now_iso(),
-            "corpus_schema_version": None,
-            "corpus_digest": corpus_digest,
-            "doc_count": len(metadata),
-            "embedding_model": self.model_name,
-            "rows": metadata,
-        }
-        try:
-            meta_payload["corpus_schema_version"] = metadata[0].get("schema_version")
-        except Exception:
-            meta_payload["corpus_schema_version"] = None
-
-        self.meta_path.write_text(
-            json.dumps(meta_payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        self._artifact_store.save_index(
+            index=index,
+            metadata=metadata,
+            corpus_digest=corpus_digest,
         )
-        with _CACHE_LOCK:
-            if self.index_path.exists() and index is not None:
-                _INDEX_CACHE[str(self.index_path)] = (
-                    *self._cache_token(self.index_path),
-                    index,
-                )
-            else:
-                _INDEX_CACHE.pop(str(self.index_path), None)
-            _META_CACHE[str(self.meta_path)] = (
-                *self._cache_token(self.meta_path),
-                list(metadata),
-            )
-            _EMBEDDING_CACHE.pop(
-                f"{self.model_name}::{self.meta_path.resolve()}",
-                None,
-            )
-            _BM25_CACHE.pop(f"bm25::{self.meta_path.resolve()}", None)
-            _BM25_CACHE.pop(f"bm25::{self.legacy_meta_path.resolve()}", None)
 
-    # ------------------------------------------------------------------
     def add_documents(self, docs: List[dict]) -> None:
-        """Add ``docs`` to the FAISS index.
-
-        Parameters
-        ----------
-        docs:
-            List of contract-compliant corpus documents. Text is taken from ``text``,
-            ``body``, ``summary`` or ``title`` fields.
-        """
+        """Add ``docs`` to the retrieval index."""
         if not docs:
             self.logger.info("No documents provided for indexing")
             return
@@ -591,21 +318,28 @@ class Retriever:
         combined = list(existing) + list(docs)
         require_valid_corpus(combined)
         combined = sorted(combined, key=lambda d: str(d.get("doc_id") or ""))
+        texts = [
+            str(
+                d.get("text")
+                or d.get("body")
+                or d.get("summary")
+                or d.get("title")
+                or ""
+            )
+            for d in combined
+        ]
 
-        texts = [str(d.get("text") or d.get("body") or d.get("summary") or d.get("title") or "") for d in combined]
-
-        np_mod = self._np
         vectors = self._retry(
             self.model.encode,
             texts,
             show_progress_bar=False,
         )
-        vectors = np_mod.asarray(vectors).astype("float32")
+        vectors = self._np.asarray(vectors).astype("float32")
         dim = vectors.shape[1]
 
         index = self._create_index(dim) if self.backend == "faiss" else None
-        ids = np_mod.arange(0, len(vectors))
         if index is not None:
+            ids = self._np.arange(0, len(vectors))
             index.add_with_ids(vectors, ids)
 
         digest = None
@@ -617,126 +351,45 @@ class Retriever:
         self._save_index(index, combined, corpus_digest=digest)
         self.logger.info("Indexed %d documents", len(combined))
 
-    # ------------------------------------------------------------------
     def _load_embedding_matrix(self, metadata: List[dict]):
-        if self.meta_path.exists():
-            cache_path = self.meta_path
-        elif self.allow_legacy_pickle_metadata and self.legacy_meta_path.exists():
-            cache_path = self.legacy_meta_path
-        else:
-            raise IndexBuildRequiredError(
-                self.index_path, reason="metadata file missing"
-            )
-        key = f"{self.model_name}::{cache_path.resolve()}"
-        token = self._cache_token(cache_path)
-        with _CACHE_LOCK:
-            cached = _EMBEDDING_CACHE.get(key)
-        if cached is not None and cached[:2] == token:
-            return cached[2]
+        return self._artifact_store.load_embedding_matrix(metadata)
 
-        texts = [_document_text_for_embedding(row) for row in metadata]
-        matrix = self._retry(
-            self.model.encode,
-            texts,
-            show_progress_bar=False,
-        )
-        np_mod = self._np
-        matrix = np_mod.asarray(matrix).astype("float32")
-        if matrix.ndim != 2 or matrix.shape[0] != len(metadata):
-            raise RetrieverError(
-                "Embedding model returned unexpected corpus matrix shape",
-                code="embedding_shape_invalid",
-                metadata={"row_count": len(metadata)},
-            )
-        norms = np_mod.linalg.norm(matrix, axis=1, keepdims=True)
-        zero_mask = norms == 0
-        if np_mod.any(zero_mask):
-            norms = norms.copy()
-            norms[zero_mask] = 1.0
-        matrix = matrix / norms
-        with _CACHE_LOCK:
-            _EMBEDDING_CACHE[key] = (token[0], token[1], matrix)
-        return matrix
-
-    # ------------------------------------------------------------------
     def _load_bm25_state(self, metadata: List[dict]) -> dict[str, object]:
-        if self.meta_path.exists():
-            cache_path = self.meta_path
-        elif self.allow_legacy_pickle_metadata and self.legacy_meta_path.exists():
-            cache_path = self.legacy_meta_path
-        else:
-            raise IndexBuildRequiredError(
-                self.index_path, reason="metadata file missing"
-            )
-        key = f"bm25::{cache_path.resolve()}"
-        token = self._cache_token(cache_path)
-        with _CACHE_LOCK:
-            cached = _BM25_CACHE.get(key)
-        if cached is not None and cached[:2] == token:
-            return dict(cached[2])
+        return self._artifact_store.load_bm25_state(metadata)
 
-        doc_terms: list[Counter[str]] = []
-        doc_lengths: list[int] = []
-        doc_freq: Counter[str] = Counter()
-        for row in metadata:
-            terms = Counter(_tokenize_for_bm25(_document_text_for_bm25(row)))
-            doc_terms.append(terms)
-            doc_lengths.append(int(sum(terms.values())))
-            doc_freq.update(terms.keys())
-
-        doc_count = max(1, len(metadata))
-        avg_doc_length = sum(doc_lengths) / doc_count if doc_lengths else 0.0
-        idf = {
-            term: float(log(1.0 + ((doc_count - freq + 0.5) / (freq + 0.5))))
-            for term, freq in doc_freq.items()
-        }
-        state: dict[str, object] = {
-            "doc_terms": doc_terms,
-            "doc_lengths": doc_lengths,
-            "avg_doc_length": avg_doc_length,
-            "idf": idf,
-        }
-        with _CACHE_LOCK:
-            _BM25_CACHE[key] = (token[0], token[1], dict(state))
-        return state
-
-    # ------------------------------------------------------------------
     def _hybrid_candidate_count(self, *, k: int, total_docs: int) -> int:
-        requested = max(1, int(k))
-        if total_docs <= 0:
-            return requested
-        return min(
-            total_docs,
-            max(_HYBRID_MIN_CANDIDATES, requested * _HYBRID_CANDIDATE_MULTIPLIER),
-        )
+        return _hybrid_candidate_count_internal(k=k, total_docs=total_docs)
 
-    # ------------------------------------------------------------------
     def _query_dense(self, vector, metadata: List[dict], *, k: int) -> List[dict]:
         if self.backend == "faiss":
             return self._query_faiss(vector, metadata, k=k)
         return self._query_bruteforce(vector, metadata, k=k)
 
-    # ------------------------------------------------------------------
     def _query_bruteforce(self, vector, metadata: List[dict], *, k: int) -> List[dict]:
-        np_mod = self._np
         matrix = self._load_embedding_matrix(metadata)
-        query = np_mod.asarray(vector).astype("float32")
+        query = self._np.asarray(vector).astype("float32")
         if query.ndim != 2 or query.shape[0] != 1:
             raise RetrieverError(
                 "Embedding model returned unexpected query vector shape",
                 code="embedding_shape_invalid",
             )
-        query_norms = np_mod.linalg.norm(query, axis=1, keepdims=True)
+        query_norms = self._np.linalg.norm(query, axis=1, keepdims=True)
         zero_mask = query_norms == 0
-        if np_mod.any(zero_mask):
+        if self._np.any(zero_mask):
             query_norms = query_norms.copy()
             query_norms[zero_mask] = 1.0
         query = query / query_norms
-        scores = np_mod.matmul(matrix, query[0]).astype("float32")
+        scores = self._np.matmul(matrix, query[0]).astype("float32")
 
         ranked: list[tuple[int, int, tuple[str, str, int]]] = []
         for idx, score in enumerate(scores.tolist()):
-            ranked.append((idx, _score_bucket(score), _metadata_tie_break_key(metadata[idx], idx)))
+            ranked.append(
+                (
+                    idx,
+                    _score_bucket(score),
+                    _metadata_tie_break_key(metadata[idx], idx),
+                )
+            )
 
         ranked.sort(key=lambda item: (-item[1], item[2]))
 
@@ -747,53 +400,10 @@ class Retriever:
             results.append(doc)
         return results
 
-    # ------------------------------------------------------------------
     def _query_bm25(self, prompt: str, metadata: List[dict], *, k: int) -> List[dict]:
         state = self._load_bm25_state(metadata)
-        query_terms = Counter(_tokenize_for_bm25(prompt))
-        if not query_terms:
-            return []
+        return _rank_bm25(prompt, metadata, state=state, k=k)
 
-        doc_terms = state.get("doc_terms") or []
-        doc_lengths = state.get("doc_lengths") or []
-        avg_doc_length = float(state.get("avg_doc_length") or 0.0)
-        idf_map = state.get("idf") or {}
-        denom_floor = avg_doc_length if avg_doc_length > 0 else 1.0
-
-        ranked: list[tuple[int, float, tuple[str, str, int]]] = []
-        for idx, terms in enumerate(doc_terms):
-            if not isinstance(terms, Counter):
-                continue
-            doc_length = int(doc_lengths[idx]) if idx < len(doc_lengths) else 0
-            norm = 1.0 - _BM25_B + (_BM25_B * (doc_length / denom_floor))
-            score = 0.0
-            for term, _qtf in query_terms.items():
-                tf = int(terms.get(term, 0))
-                if tf <= 0:
-                    continue
-                idf = float(idf_map.get(term) or 0.0)
-                if idf <= 0.0:
-                    continue
-                score += idf * (
-                    (tf * (_BM25_K1 + 1.0)) / (tf + (_BM25_K1 * norm))
-                )
-            if score <= 0.0:
-                continue
-            ranked.append(
-                (idx, float(score), _metadata_tie_break_key(metadata[idx], idx))
-            )
-
-        ranked.sort(key=lambda item: (-item[1], item[2]))
-
-        results: list[dict] = []
-        for idx, score, _tie_key in ranked[: max(1, int(k))]:
-            doc = _public_result_doc(metadata[idx])
-            doc["score"] = float(score)
-            doc["bm25_score"] = float(score)
-            results.append(doc)
-        return results
-
-    # ------------------------------------------------------------------
     def _query_faiss(self, vector, metadata: List[dict], *, k: int) -> List[dict]:
         index = self._load_index(vector.shape[1])
         index_size_raw = getattr(index, "ntotal", None)
@@ -832,7 +442,6 @@ class Retriever:
             results.append(doc)
         return results
 
-    # ------------------------------------------------------------------
     def _fuse_rankings(
         self,
         *,
@@ -841,63 +450,14 @@ class Retriever:
         bm25_results: List[dict],
         k: int,
     ) -> List[dict]:
-        metadata_lookup = {
-            _result_doc_id(row): (row, idx)
-            for idx, row in enumerate(metadata)
-            if _result_doc_id(row)
-        }
-        source_docs: dict[str, dict] = {}
-        for row in list(dense_results) + list(bm25_results):
-            doc_id = _result_doc_id(row)
-            if doc_id and doc_id not in source_docs:
-                source_docs[doc_id] = dict(row)
-
-        fused_scores: dict[str, float] = {}
-        details: dict[str, dict[str, float | int | str]] = {}
-        for signal_name, ranking in (("dense", dense_results), ("bm25", bm25_results)):
-            for rank, row in enumerate(ranking, start=1):
-                doc_id = _result_doc_id(row)
-                if not doc_id:
-                    continue
-                fused_scores[doc_id] = fused_scores.get(doc_id, 0.0) + (
-                    1.0 / (self.hybrid_rrf_k + rank)
-                )
-                info = details.setdefault(
-                    doc_id,
-                    {
-                        "retrieval_mode": "hybrid",
-                    },
-                )
-                info[f"{signal_name}_rank"] = rank
-                try:
-                    info[f"{signal_name}_score"] = float(row.get("score") or 0.0)
-                except Exception:
-                    pass
-
-        ranked_doc_ids = list(fused_scores.keys())
-        ranked_doc_ids.sort(
-            key=lambda doc_id: (
-                -fused_scores.get(doc_id, 0.0),
-                _metadata_tie_break_key(*metadata_lookup[doc_id])
-                if doc_id in metadata_lookup
-                else (doc_id, "", 0),
-            )
+        return _fuse_rankings_internal(
+            metadata=metadata,
+            dense_results=dense_results,
+            bm25_results=bm25_results,
+            k=k,
+            rrf_k=self.hybrid_rrf_k,
         )
 
-        fused: list[dict] = []
-        for doc_id in ranked_doc_ids[: max(1, int(k))]:
-            if doc_id in metadata_lookup:
-                base_doc = _public_result_doc(metadata_lookup[doc_id][0])
-            else:
-                base_doc = dict(source_docs.get(doc_id) or {})
-            base_doc["score"] = float(fused_scores[doc_id])
-            base_doc["fusion_score"] = float(fused_scores[doc_id])
-            for key, value in details.get(doc_id, {}).items():
-                base_doc[key] = value
-            fused.append(base_doc)
-        return fused
-
-    # ------------------------------------------------------------------
     def query(self, prompt: str, k: int = 5) -> List[dict]:
         """Return top ``k`` documents matching ``prompt``."""
         if self.backend == "faiss" and not self.index_path.exists():
@@ -908,13 +468,13 @@ class Retriever:
             raise IndexBuildRequiredError(
                 self.index_path, reason="metadata file missing"
             )
-        np_mod = self._np
+
         embedding = self._retry(
             self.model.encode,
             [prompt],
             show_progress_bar=False,
         )
-        vector = np_mod.asarray(embedding).astype("float32")
+        vector = self._np.asarray(embedding).astype("float32")
         metadata = self._load_metadata()
         if self.retrieval_mode == "hybrid":
             candidate_k = self._hybrid_candidate_count(k=k, total_docs=len(metadata))
@@ -931,17 +491,14 @@ class Retriever:
 
         return _apply_citation_boost(prompt, results=results, metadata=metadata, k=k)
 
-    # ------------------------------------------------------------------
     def warm(self) -> None:
         """Pre-load embeddings and index metadata for faster first query."""
-
-        np_mod = self._np
         embedding = self._retry(
             self.model.encode,
             ["earcrawler warmup"],
             show_progress_bar=False,
         )
-        vector = np_mod.asarray(embedding).astype("float32")
+        vector = self._np.asarray(embedding).astype("float32")
         dim = vector.shape[1]
         if self.backend == "faiss" and self.index_path.exists():
             self._load_index(dim)
@@ -984,6 +541,8 @@ __all__ = [
     "RetrieverError",
     "RetrieverMisconfiguredError",
     "RetrieverUnavailableError",
+    "_apply_citation_boost",
+    "_extract_ear_section_targets",
     "_resolve_backend_name",
     "_resolve_retrieval_mode",
     "describe_retriever_config",

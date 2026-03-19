@@ -3,11 +3,23 @@ param(
   [Alias('Host')]
   [string]$ApiHost = '127.0.0.1',
   [int]$Port = 9001,
-  [string]$ReportPath = 'dist/installed_runtime_smoke.json'
+  [string]$ReportPath = 'dist/installed_runtime_smoke.json',
+  [switch]$UseHermeticWheelhouse,
+  [string]$LockFilePath = 'requirements-win-lock.txt',
+  [string]$WheelhousePath = '',
+  [string]$HermeticBundleZipPath = '',
+  [string]$ReleaseChecksumsPath = ''
 )
 
 $ErrorActionPreference = "Stop"
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+
+if ($HermeticBundleZipPath -and -not $UseHermeticWheelhouse.IsPresent) {
+  throw "-HermeticBundleZipPath requires -UseHermeticWheelhouse."
+}
+if ($ReleaseChecksumsPath -and -not $UseHermeticWheelhouse.IsPresent) {
+  throw "-ReleaseChecksumsPath requires -UseHermeticWheelhouse."
+}
 
 function Invoke-CheckedCommand {
   param(
@@ -87,6 +99,9 @@ $report = [ordered]@{
   generated_utc = (Get-Date).ToUniversalTime().ToString("o")
   wheel_path = $wheel.FullName
   api_base_url = "http://{0}:{1}" -f $ApiHost, $Port
+  install_mode = if ($UseHermeticWheelhouse.IsPresent) { "hermetic_wheelhouse" } else { "direct_wheel" }
+  install_source = if ($UseHermeticWheelhouse.IsPresent) { "repo_wheelhouse" } else { "direct_wheel" }
+  install_details = [ordered]@{}
   checks = @()
   api_smoke = [ordered]@{}
   runtime_contract = [ordered]@{}
@@ -107,6 +122,7 @@ $savedEnv = @{
   EARCRAWLER_API_ENABLE_SEARCH = $env:EARCRAWLER_API_ENABLE_SEARCH
   EARCRAWLER_ENABLE_KG_EXPANSION = $env:EARCRAWLER_ENABLE_KG_EXPANSION
   EARCRAWLER_WHEEL_SMOKE_REPO_ROOT = $env:EARCRAWLER_WHEEL_SMOKE_REPO_ROOT
+  EARCTL_PYTHON = $env:EARCTL_PYTHON
 }
 
 try {
@@ -118,7 +134,130 @@ try {
   }
 
   Invoke-CheckedCommand $venvPython -m pip install --disable-pip-version-check --upgrade pip
-  Invoke-CheckedCommand $venvPython -m pip install --disable-pip-version-check $wheel.FullName
+  if ($UseHermeticWheelhouse.IsPresent) {
+    $resolvedLockFilePath = $null
+    $resolvedWheelhousePath = $null
+    $resolvedBundleZipPath = ""
+    $installScript = Join-Path $repoRoot "scripts\install-from-wheelhouse.ps1"
+
+    if ($HermeticBundleZipPath) {
+      $candidateBundlePath = $HermeticBundleZipPath
+      if (-not [IO.Path]::IsPathRooted($candidateBundlePath)) {
+        $candidateBundlePath = Join-Path $repoRoot $candidateBundlePath
+      }
+      if (-not (Test-Path $candidateBundlePath)) {
+        throw "Hermetic bundle zip not found: $candidateBundlePath"
+      }
+      $resolvedBundleZipPath = (Resolve-Path $candidateBundlePath).Path
+
+      $bundleExtractRoot = Join-Path $smokeRoot "hermetic-bundle"
+      New-Item -ItemType Directory -Force -Path $bundleExtractRoot | Out-Null
+      Expand-Archive -Path $resolvedBundleZipPath -DestinationPath $bundleExtractRoot -Force
+
+      $bundleRoot = Join-Path $bundleExtractRoot "hermetic-artifacts"
+      if (-not (Test-Path $bundleRoot)) {
+        $bundleRoot = $bundleExtractRoot
+      }
+
+      $bundleLockFilePath = Join-Path $bundleRoot "requirements-win-lock.txt"
+      $bundleWheelhousePath = Join-Path $bundleRoot ".wheelhouse"
+      $bundleInstallScript = Join-Path $bundleRoot "scripts\install-from-wheelhouse.ps1"
+      if (-not (Test-Path $bundleLockFilePath)) {
+        throw "Hermetic bundle missing requirements-win-lock.txt: $resolvedBundleZipPath"
+      }
+      if (-not (Test-Path $bundleWheelhousePath)) {
+        throw "Hermetic bundle missing .wheelhouse directory: $resolvedBundleZipPath"
+      }
+      if (-not (Test-Path $bundleInstallScript)) {
+        throw "Hermetic bundle missing scripts/install-from-wheelhouse.ps1: $resolvedBundleZipPath"
+      }
+
+      $resolvedLockFilePath = (Resolve-Path $bundleLockFilePath).Path
+      $resolvedWheelhousePath = (Resolve-Path $bundleWheelhousePath).Path
+      $installScript = (Resolve-Path $bundleInstallScript).Path
+      $report.install_source = "release_bundle"
+    }
+    else {
+      $resolvedLockFilePath = $LockFilePath
+      if (-not [IO.Path]::IsPathRooted($resolvedLockFilePath)) {
+        $resolvedLockFilePath = Join-Path $repoRoot $resolvedLockFilePath
+      }
+      if (-not (Test-Path $resolvedLockFilePath)) {
+        throw "Hermetic lockfile not found: $resolvedLockFilePath"
+      }
+      $resolvedLockFilePath = (Resolve-Path $resolvedLockFilePath).Path
+
+      if ($WheelhousePath) {
+        $candidateWheelhousePath = $WheelhousePath
+        if (-not [IO.Path]::IsPathRooted($candidateWheelhousePath)) {
+          $candidateWheelhousePath = Join-Path $repoRoot $candidateWheelhousePath
+        }
+        if (-not (Test-Path $candidateWheelhousePath)) {
+          throw "Hermetic wheelhouse path not found: $candidateWheelhousePath"
+        }
+        $resolvedWheelhousePath = (Resolve-Path $candidateWheelhousePath).Path
+      }
+      else {
+        $candidateWheelhousePaths = @(
+          (Join-Path $repoRoot ".wheelhouse"),
+          (Join-Path $repoRoot "hermetic-artifacts/.wheelhouse")
+        )
+        foreach ($candidatePath in $candidateWheelhousePaths) {
+          if (Test-Path $candidatePath) {
+            $resolvedWheelhousePath = (Resolve-Path $candidatePath).Path
+            break
+          }
+        }
+        if (-not $resolvedWheelhousePath) {
+          throw "Hermetic wheelhouse directory not found under .wheelhouse or hermetic-artifacts/.wheelhouse."
+        }
+      }
+    }
+
+    $resolvedChecksumsPath = ""
+    if ($ReleaseChecksumsPath) {
+      $candidateChecksumsPath = $ReleaseChecksumsPath
+      if (-not [IO.Path]::IsPathRooted($candidateChecksumsPath)) {
+        $candidateChecksumsPath = Join-Path $repoRoot $candidateChecksumsPath
+      }
+      if (-not (Test-Path $candidateChecksumsPath)) {
+        throw "Release checksums file not found: $candidateChecksumsPath"
+      }
+      $resolvedChecksumsPath = (Resolve-Path $candidateChecksumsPath).Path
+    }
+
+    $report.install_details = [ordered]@{
+      lock_file = $resolvedLockFilePath
+      wheelhouse_path = $resolvedWheelhousePath
+      wheel_install_mode = "offline_no_deps"
+      installer_script_path = $installScript
+      release_bundle_zip = $resolvedBundleZipPath
+      checksums_path = $resolvedChecksumsPath
+      wheel_checksum_verified = [bool]$resolvedChecksumsPath
+    }
+
+    $installArgs = @(
+      "-LockFile", $resolvedLockFilePath,
+      "-WheelhousePath", $resolvedWheelhousePath,
+      "-PythonExecutable", $venvPython,
+      "-WheelPath", $wheel.FullName
+    )
+    if ($resolvedChecksumsPath) {
+      $installArgs += @("-ChecksumsPath", $resolvedChecksumsPath)
+    }
+    & $installScript @installArgs
+    if ($LASTEXITCODE -ne 0) {
+      throw "Hermetic install script failed with exit code ${LASTEXITCODE}: $installScript"
+    }
+  }
+  else {
+    $report.install_details = [ordered]@{
+      lock_file = ""
+      wheelhouse_path = ""
+      wheel_install_mode = "default_pip_resolve"
+    }
+    Invoke-CheckedCommand $venvPython -m pip install --disable-pip-version-check $wheel.FullName
+  }
 
   $workspace = Join-Path $smokeRoot "workspace"
   New-Item -ItemType Directory -Force -Path $workspace | Out-Null
@@ -182,7 +321,15 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
   }
   $apiSmokePayload = Get-Content -Path $apiSmokeReportPath -Raw | ConvertFrom-Json
 
+  $expectedInstallMode = if ($UseHermeticWheelhouse.IsPresent) { "hermetic_wheelhouse" } else { "direct_wheel" }
+  $expectedInstallSource = if ($UseHermeticWheelhouse.IsPresent) {
+    if ($HermeticBundleZipPath) { "release_bundle" } else { "repo_wheelhouse" }
+  } else {
+    "direct_wheel"
+  }
   $checkList = @(
+    [ordered]@{ name = "install_mode"; passed = ($report.install_mode -eq $expectedInstallMode); expected = $expectedInstallMode; actual = [string]$report.install_mode },
+    [ordered]@{ name = "install_source"; passed = ([string]$report.install_source -eq $expectedInstallSource); expected = $expectedInstallSource; actual = [string]$report.install_source },
     [ordered]@{ name = "health_http_200"; passed = ([int]$healthResponse.StatusCode -eq 200); expected = "200"; actual = [string]$healthResponse.StatusCode },
     [ordered]@{ name = "supported_api_smoke"; passed = ([string]$apiSmokePayload.schema_version -eq "supported-api-smoke.v1" -and [string]$apiSmokePayload.overall_status -eq "passed"); expected = "supported-api-smoke.v1 + passed"; actual = ("{0} + {1}" -f [string]$apiSmokePayload.schema_version, [string]$apiSmokePayload.overall_status) },
     [ordered]@{ name = "runtime_contract_topology"; passed = ([string]$runtimeContract.topology -eq "single_host"); expected = "single_host"; actual = [string]$runtimeContract.topology },

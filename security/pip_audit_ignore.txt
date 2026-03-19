@@ -1,0 +1,11 @@
+# Temporary ignore list for known advisories tracked in Step 1.4 baseline hardening.
+# Each line is a vulnerability ID consumed by: scripts/security-baseline.ps1
+
+CVE-2026-32274
+CVE-2025-62727
+CVE-2024-47081
+CVE-2025-50182
+CVE-2025-50181
+CVE-2025-66418
+CVE-2025-66471
+CVE-2026-21441

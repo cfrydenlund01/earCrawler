@@ -11,6 +11,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root))
 
+from api_clients.upstream_status import UpstreamStatus
 from earCrawler.core.crawler import Crawler, TradeGovError, FederalRegisterError
 
 
@@ -27,6 +28,23 @@ class StubTradeGovClient:
         for ent in self._entities:
             yield ent
 
+    def get_last_status(self, operation: str | None = None):
+        if operation in (None, "search"):
+            if self.fail:
+                return UpstreamStatus(
+                    source="tradegov",
+                    operation="search",
+                    state="retry_exhausted",
+                    message="unavailable",
+                )
+            return UpstreamStatus(
+                source="tradegov",
+                operation="search",
+                state="ok",
+                result_count=len(self._entities),
+            )
+        return None
+
 
 class StubFederalRegisterClient:
     def __init__(
@@ -42,6 +60,16 @@ class StubFederalRegisterClient:
             raise FederalRegisterError("bad id")
         for doc in self.docs.get(entity_id, []):
             yield doc
+
+    def get_last_status(self, operation: str | None = None):
+        if operation in (None, "search_documents"):
+            return UpstreamStatus(
+                source="federalregister",
+                operation="search_documents",
+                state="ok",
+                result_count=1,
+            )
+        return None
 
 
 def test_run_success():
@@ -86,3 +114,20 @@ def test_federalregister_error_logged(caplog: pytest.LogCaptureFixture):
     assert entities == [{"id": "good"}, {"id": "bad"}, {"id": "ok"}]
     assert documents == [{"d": 1}, {"d": 2}]
     assert any("bad" in rec.message for rec in caplog.records)
+
+
+def test_crawler_captures_upstream_status():
+    tg = StubTradeGovClient([{"id": "1"}])
+    fr = StubFederalRegisterClient({"1": [{"d": 1}]})
+    crawler = Crawler(tg, fr)
+    crawler.run("foo")
+    assert "tradegov.search" in crawler.last_upstream_status
+    assert "federalregister.search_documents" in crawler.last_upstream_status
+    assert crawler.last_upstream_status["tradegov.search"]["state"] in {
+        "ok",
+        "no_results",
+        "retry_exhausted",
+        "upstream_unavailable",
+        "missing_credentials",
+        "invalid_response",
+    }

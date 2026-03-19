@@ -52,6 +52,63 @@ Examples of acceptable front doors include IIS with Windows auth, nginx,
 Apache httpd, or an enterprise API gateway, provided the controls below are
 implemented.
 
+## Approved reference deployment
+
+The approved reference pattern for this repository is:
+
+- IIS on the same Windows host as EarCrawler
+- IIS Application Request Routing (ARR) plus URL Rewrite
+- Windows Integrated Authentication at the IIS site or virtual directory
+- EarCrawler still bound only to `127.0.0.1`
+- one deployment-owned backend `X-Api-Key` injected by IIS on the loopback hop
+
+Reference shape:
+
+```text
+domain user -> HTTPS IIS site (Windows auth + allowlist) -> ARR reverse proxy -> http://127.0.0.1:9001 -> local Fuseki
+```
+
+Reference assets:
+
+- example IIS config: `scripts/ops/iis-earcrawler-front-door.web.config.example`
+- baseline app hosting guide: `docs/ops/windows_single_host_operator.md`
+
+This is the one concrete pattern operators should copy first when they need
+broader-than-loopback access without changing the app's internal auth model.
+
+### Why IIS is the reference
+
+This repository's supported operator story is Windows-first, already assumes a
+single-host service wrapper, and already uses machine-scoped secrets and local
+host layout conventions. IIS with ARR fits that story with the least new moving
+parts for a Windows operator team.
+
+Other reverse proxies can still be acceptable, but they are not the reference
+pattern this repo documents in detail.
+
+## IIS reference shape
+
+Use the IIS pattern as follows:
+
+1. Install and validate the supported EarCrawler service exactly as documented in
+   `docs/ops/windows_single_host_operator.md`.
+2. Keep the EarCrawler listener on `127.0.0.1:9001`.
+3. Install IIS, URL Rewrite, and ARR on the same host.
+4. Publish only the IIS listener to the routed network.
+5. Enable Windows Authentication at the IIS site and disable anonymous access
+   unless a separate edge system is intentionally handling authentication in
+   front of IIS.
+6. Restrict access to the approved AD users or groups at IIS.
+7. Configure ARR to proxy only the supported EarCrawler routes to
+   `http://127.0.0.1:9001`.
+8. Inject the deployment-owned backend `X-Api-Key` on the IIS to EarCrawler hop.
+9. Log the authenticated Windows principal, source IP, IIS request id or trace
+   fields, and the EarCrawler response `X-Request-Id`.
+
+Do not expose Uvicorn directly on a non-loopback address and then treat IIS as
+optional defense in depth. In this pattern IIS is the network edge and
+EarCrawler remains a loopback-only backend.
+
 ## Identity expectations
 
 The external front door, not the EarCrawler app, is responsible for authenticating:
@@ -76,6 +133,10 @@ authorization or persist end-user identity as the authoritative audit subject.
 The proxy authenticates the caller, then presents one deployment-owned backend
 credential to EarCrawler.
 
+For the IIS reference pattern, the expected external identity is an AD-backed
+Windows principal validated by IIS. Group-based authorization belongs at IIS,
+not in EarCrawler.
+
 ## Backend credential pattern
 
 Use a dedicated backend API key label for the proxy, for example:
@@ -92,6 +153,16 @@ Required rules:
 - inject that secret into the proxy and the EarCrawler host separately
 - keep EarCrawler bound to loopback so the backend secret is not a network-wide
   access token
+
+For the IIS reference pattern:
+
+- use one named key such as `proxy=<generated-secret>` only for IIS
+- store the clear secret outside source control
+- place the full `label:secret` value into the IIS server-variable rewrite rule
+  shown in `scripts/ops/iis-earcrawler-front-door.web.config.example`
+- keep the corresponding `EARCRAWLER_API_KEYS` value only on the EarCrawler host
+- rotate the IIS-held secret and the EarCrawler machine environment in the same
+  maintenance window
 
 This keeps the current app contract intact while allowing a stronger front door
 outside the process.
@@ -110,8 +181,8 @@ Required attribution behavior:
 - the proxy must create or preserve a correlation id and log it
 - the proxy must log the authenticated external principal
 - the proxy must log the source IP and upstream TLS/auth outcome
-- the proxy should forward the correlation id to EarCrawler as
-  `X-Request-Id` when possible
+- the proxy may forward its own correlation header, but operators must not
+  assume EarCrawler will reuse it as `X-Request-Id`
 - operators must retain both proxy logs and EarCrawler logs for the same
   retention window
 
@@ -124,6 +195,17 @@ EarCrawler already emits:
 In the front-door pattern, `X-Subject` will normally identify the proxy service
 credential, not the human end user. End-user attribution therefore depends on
 the proxy or gateway logs.
+
+For the IIS reference pattern, the minimum useful attribution record is:
+
+- authenticated Windows user or service principal from IIS logs
+- source IP as seen by IIS
+- IIS request correlation field or request id
+- EarCrawler response `X-Request-Id`
+- EarCrawler response `X-Subject`
+
+This gives operators a deterministic join key between edge logs and app logs
+even though EarCrawler generates its own request id.
 
 ## Secret rotation expectations
 
@@ -145,6 +227,15 @@ Minimum backend rotation rule:
 Do not treat a long-lived static proxy key as sufficient compensating control
 for internet-facing deployment.
 
+For the IIS reference pattern, rotation should be:
+
+1. create a new EarCrawler backend key value on the host
+2. update the IIS-injected `X-Api-Key` secret
+3. recycle IIS or reload the site configuration
+4. restart EarCrawler if its machine environment changed
+5. verify a proxied authenticated `/health` call and archive the resulting
+   `X-Request-Id`
+
 ## Minimum proxy controls
 
 Any approved front door must provide all of the following:
@@ -164,6 +255,15 @@ Recommended additional controls:
 - separate proxy credential per environment
 - explicit deny rules for unused methods and paths
 
+For the IIS reference pattern, also:
+
+- bind IIS with managed TLS certificates only
+- proxy only the documented supported routes
+- deny direct access to `/docs` unless the operator explicitly wants it exposed
+- keep ARR forwarding target fixed to `127.0.0.1:9001`
+- capture IIS logs in the same retention and incident-response workflow as the
+  EarCrawler service logs
+
 ## When the current shared-secret model is no longer sufficient
 
 Do not rely on the current app-only static secret model once any of the
@@ -180,6 +280,24 @@ At that point, the minimum acceptable posture is the reverse-proxy or gateway
 pattern in this document. If per-user authorization or end-user identity must
 be enforced by the EarCrawler application itself, that is new product scope and
 requires a separate implementation and review.
+
+## Exact unsupported line
+
+Direct app exposure is no longer acceptable the moment the EarCrawler listener
+is reachable from anything broader than the local host boundary.
+
+In practical terms, direct exposure with only `EARCRAWLER_API_KEYS` is
+unsupported if any of the following are true:
+
+- Uvicorn or the EarCrawler service binds to anything other than
+  `127.0.0.1` or `localhost`
+- a firewall rule, port proxy, load balancer, VPN, or routed subnet can reach
+  the EarCrawler listener directly
+- the deployment needs per-user identity, enterprise SSO, or edge policy
+  enforcement
+
+At that line, IIS plus ARR plus external identity is the minimum approved
+pattern for this Windows-first repo.
 
 ## Operator checklist
 

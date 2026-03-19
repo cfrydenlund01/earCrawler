@@ -6,6 +6,8 @@ param(
     [string]$ApiSmokeReportPath = "dist/api_smoke.json",
     [string]$OptionalRuntimeSmokeReportPath = "dist/optional_runtime_smoke.json",
     [string]$InstalledRuntimeSmokeReportPath = "dist/installed_runtime_smoke.json",
+    [string]$SecuritySummaryPath = "dist/security/security_scan_summary.json",
+    [string]$ObservabilityApiProbePath = "dist/observability/api_probe.json",
     [switch]$SkipDistChecks,
     [switch]$SkipAuthenticode,
     [switch]$RequireSignedExecutables,
@@ -182,12 +184,17 @@ function Test-InstalledRuntimeSmokeReport {
             overall_status = ""
             missing_checks = @()
             failed_checks = @()
+            install_mode = ""
+            install_source = ""
+            hermetic_install_status = "missing"
+            field_install_shape_status = "missing"
         }
     }
 
     $expectedChecks = @(
         "health_http_200",
         "supported_api_smoke",
+        "install_source",
         "runtime_contract_topology",
         "runtime_contract_declared_instance_count",
         "runtime_contract_capability_registry_schema",
@@ -218,6 +225,15 @@ function Test-InstalledRuntimeSmokeReport {
         "failed"
     }
 
+    $installMode = ""
+    if ($payload.PSObject.Properties.Name -contains "install_mode") {
+        $installMode = [string]$payload.install_mode
+    }
+    $installSource = ""
+    if ($payload.PSObject.Properties.Name -contains "install_source") {
+        $installSource = [string]$payload.install_source
+    }
+
     return [ordered]@{
         path = $Path
         present = $true
@@ -225,6 +241,140 @@ function Test-InstalledRuntimeSmokeReport {
         overall_status = [string]$payload.overall_status
         missing_checks = $missingChecks
         failed_checks = $failedChecks
+        status = $reportStatus
+        install_mode = $installMode
+        install_source = $installSource
+        hermetic_install_status = if ($installMode -eq "hermetic_wheelhouse") { "passed" } else { "failed" }
+        field_install_shape_status = if ($installSource -eq "release_bundle") { "passed" } else { "failed" }
+    }
+}
+
+function Test-SecurityBaselineReport {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $payload = Read-JsonReport -Path $Path -Label "Security baseline"
+    if ($null -eq $payload) {
+        return [ordered]@{
+            path = $Path
+            present = $false
+            schema_version = ""
+            overall_status = ""
+            required_checks = @("pip_audit", "bandit", "secret_scan")
+            check_statuses = [ordered]@{}
+            missing_checks = @("pip_audit", "bandit", "secret_scan")
+            failed_checks = @()
+            status = "missing"
+        }
+    }
+
+    $requiredChecks = @("pip_audit", "bandit", "secret_scan")
+    $checkStatuses = [ordered]@{}
+    $missingChecks = @()
+    $failedChecks = @()
+    $reports = $null
+    if ($payload.PSObject.Properties.Name -contains "reports") {
+        $reports = $payload.reports
+    }
+
+    foreach ($name in $requiredChecks) {
+        $statusValue = ""
+        if ($null -eq $reports -or -not ($reports.PSObject.Properties.Name -contains $name)) {
+            $missingChecks += $name
+        }
+        else {
+            $statusValue = [string]$reports.$name.status
+            if (-not $statusValue) {
+                $statusValue = "missing"
+            }
+            if ($statusValue -ne "passed") {
+                $failedChecks += $name
+            }
+        }
+        $checkStatuses[$name] = $statusValue
+    }
+
+    $reportStatus = if (
+        [string]$payload.schema_version -eq "ci-security-baseline.v1" -and
+        [string]$payload.overall_status -eq "passed" -and
+        $missingChecks.Count -eq 0 -and
+        $failedChecks.Count -eq 0
+    ) {
+        "passed"
+    }
+    else {
+        "failed"
+    }
+
+    return [ordered]@{
+        path = $Path
+        present = $true
+        schema_version = [string]$payload.schema_version
+        overall_status = [string]$payload.overall_status
+        required_checks = $requiredChecks
+        check_statuses = $checkStatuses
+        missing_checks = $missingChecks
+        failed_checks = $failedChecks
+        status = $reportStatus
+    }
+}
+
+function Test-ObservabilityApiProbeReport {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $payload = Read-JsonReport -Path $Path -Label "Observability API probe"
+    if ($null -eq $payload) {
+        return [ordered]@{
+            path = $Path
+            present = $false
+            schema_version = ""
+            overall_status = ""
+            health_status_code = 0
+            readiness_pass = $false
+            budget_ok = $false
+            status = "missing"
+        }
+    }
+
+    $health = $null
+    if ($payload.PSObject.Properties.Name -contains "health") {
+        $health = $payload.health
+    }
+    $healthStatusCode = 0
+    $readinessPass = $false
+    $budgetOk = $false
+    if ($null -ne $health) {
+        if ($health.PSObject.Properties.Name -contains "status_code") {
+            $healthStatusCode = [int]$health.status_code
+        }
+        if ($health.PSObject.Properties.Name -contains "readiness_pass") {
+            $readinessPass = [bool]$health.readiness_pass
+        }
+        if ($health.PSObject.Properties.Name -contains "budget_ok") {
+            $budgetOk = [bool]$health.budget_ok
+        }
+    }
+
+    $reportStatus = if (
+        [string]$payload.schema_version -eq "api-probe-report.v1" -and
+        [string]$payload.overall_status -eq "passed" -and
+        $healthStatusCode -eq 200 -and
+        $readinessPass -eq $true -and
+        $budgetOk -eq $true
+    ) {
+        "passed"
+    }
+    else {
+        "failed"
+    }
+
+    return [ordered]@{
+        path = $Path
+        present = $true
+        schema_version = [string]$payload.schema_version
+        overall_status = [string]$payload.overall_status
+        health_status_code = $healthStatusCode
+        readiness_pass = $readinessPass
+        budget_ok = $budgetOk
         status = $reportStatus
     }
 }
@@ -253,6 +403,8 @@ $manifestSignatureVerified = Test-CmsSignature -SignaturePath "$manifestResolved
 $supportedApiSmoke = Test-SupportedApiSmokeReport -Path $ApiSmokeReportPath
 $optionalRuntimeSmoke = Test-OptionalRuntimeSmokeReport -Path $OptionalRuntimeSmokeReportPath
 $installedRuntimeSmoke = Test-InstalledRuntimeSmokeReport -Path $InstalledRuntimeSmokeReportPath
+$securityBaseline = Test-SecurityBaselineReport -Path $SecuritySummaryPath
+$observabilityApiProbe = Test-ObservabilityApiProbeReport -Path $ObservabilityApiProbePath
 
 $distChecked = 0
 $distSignatureVerified = $false
@@ -343,6 +495,18 @@ if ($RequireCompleteEvidence) {
     if ([string]$installedRuntimeSmoke.status -ne "passed") {
         $evidenceFailures += "Installed runtime smoke evidence is required and must pass."
     }
+    if ([string]$installedRuntimeSmoke.hermetic_install_status -ne "passed") {
+        $evidenceFailures += "Installed runtime smoke must prove hermetic wheelhouse install mode."
+    }
+    if ([string]$installedRuntimeSmoke.field_install_shape_status -ne "passed") {
+        $evidenceFailures += "Installed runtime smoke must prove release-bundle field install shape."
+    }
+    if ([string]$securityBaseline.status -ne "passed") {
+        $evidenceFailures += "CI security baseline evidence is required and must pass."
+    }
+    if ([string]$observabilityApiProbe.status -ne "passed") {
+        $evidenceFailures += "Observability API probe evidence is required and must pass."
+    }
 }
 
 $evidence = [ordered]@{
@@ -363,6 +527,8 @@ $evidence = [ordered]@{
     supported_api_smoke = $supportedApiSmoke
     optional_runtime_smoke = $optionalRuntimeSmoke
     installed_runtime_smoke = $installedRuntimeSmoke
+    security_baseline = $securityBaseline
+    observability_api_probe = $observabilityApiProbe
     authenticode = [ordered]@{
         required = $RequireSignedExecutables.IsPresent
         files = $authenticode

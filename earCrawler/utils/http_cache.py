@@ -98,6 +98,12 @@ class HTTPCache:
         vary = tuple(vary_headers or ())
         path = self._key_path(url, params, request_headers, vary)
         cache_hit = path.exists()
+        cache_age_seconds: float | None = None
+        if cache_hit:
+            try:
+                cache_age_seconds = max(0.0, time.time() - path.stat().st_mtime)
+            except OSError:
+                cache_age_seconds = None
         # Treat expired entries as a miss and remove them.
         if cache_hit and self.ttl_seconds is not None:
             try:
@@ -127,6 +133,7 @@ class HTTPCache:
                 resp._content = cached.get("body", "").encode("utf-8")
                 resp.status_code = 200
                 setattr(resp, "from_cache", True)
+                setattr(resp, "cache_age_seconds", cache_age_seconds)
                 # Touch file to update mtime for LRU behaviour
                 try:
                     path.touch()
@@ -139,6 +146,7 @@ class HTTPCache:
 
         if resp.status_code == 200 and cache_hit:
             setattr(resp, "from_cache", True)
+            setattr(resp, "cache_age_seconds", cache_age_seconds)
 
         content_type = resp.headers.get("Content-Type", "")
         if content_type.startswith("application/json"):

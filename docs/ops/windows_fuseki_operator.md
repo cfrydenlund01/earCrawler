@@ -262,6 +262,19 @@ pwsh scripts/ops/windows-fuseki-restore-drill.ps1 `
 
 Treat a failing drill report as a deployment blocker.
 
+For recurring host-level DR evidence (API + Fuseki together), use:
+
+```powershell
+pwsh scripts/ops/windows-recurring-dr-evidence.ps1 `
+  -ProgramDataRoot 'C:\ProgramData\EarCrawler' `
+  -FusekiProgramDataRoot 'C:\ProgramData\EarCrawler\fuseki' `
+  -FusekiHome 'C:\Program Files\Apache\Jena-Fuseki-5.3.0' `
+  -FusekiBackupRoot 'C:\ProgramData\EarCrawler\backups\fuseki' `
+  -EvidenceRoot 'C:\ProgramData\EarCrawler\backups\recurring-evidence' `
+  -RetentionRuns 30 `
+  -SkipServiceControl
+```
+
 ## Upgrade
 
 The supported baseline is pinned to Fuseki `5.3.0`. Upgrades are controlled

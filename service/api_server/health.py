@@ -3,6 +3,8 @@ from __future__ import annotations
 """Health endpoint implementation with readiness subchecks."""
 
 import asyncio
+import json
+import os
 import shutil
 import time
 from datetime import datetime, timezone
@@ -12,9 +14,17 @@ from typing import Any, Dict
 from fastapi import APIRouter, Request
 
 from earCrawler.observability.config import HealthBudgets
-from .limits import RateLimitExceeded, RateLimiter
+from .limits import RateLimitExceeded
 
 router = APIRouter(tags=["health"])
+_HEALTHY_SOURCE_STATES = {"ok", "no_results"}
+_DEGRADED_SOURCE_STATES = {
+    "missing_credentials",
+    "upstream_unavailable",
+    "invalid_response",
+    "retry_exhausted",
+}
+_DEFAULT_STALE_AFTER_SECONDS = 24 * 60 * 60
 
 
 @router.get("/health", summary="Service health check")
@@ -29,6 +39,7 @@ async def health(request: Request) -> Dict[str, Any]:
     readiness_checks["templates"] = _check_templates(request)
     readiness_checks["rate_limiter"] = _check_rate_limiter(request, budgets)
     readiness_checks["disk"] = _check_disk(budgets)
+    live_sources = _check_live_sources()
 
     readiness_status = (
         "pass"
@@ -46,6 +57,7 @@ async def health(request: Request) -> Dict[str, Any]:
             "status": readiness_status,
             "checks": readiness_checks,
         },
+        "live_sources": live_sources,
     }
 
 
@@ -87,7 +99,7 @@ def _check_templates(request: Request) -> Dict[str, Any]:
 
 
 def _check_rate_limiter(request: Request, budgets: HealthBudgets) -> Dict[str, Any]:
-    limiter: RateLimiter = request.app.state.rate_limiter
+    limiter = request.app.state.runtime_state.rate_limiter
     try:
         capacity, retry_after, remaining = limiter.check(
             "health-probe", scope="health", authenticated=True
@@ -116,6 +128,224 @@ def _check_disk(budgets: HealthBudgets) -> Dict[str, Any]:
     if status == "fail":
         detail["reason"] = "insufficient free space"
     return {"status": status, "details": detail}
+
+
+def _parse_utc_timestamp(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    text = value.strip()
+    if not text:
+        return None
+    if text.endswith("Z"):
+        text = f"{text[:-1]}+00:00"
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
+
+
+def _resolve_source_manifest_path() -> Path:
+    configured = os.getenv("EARCRAWLER_SOURCE_MANIFEST_PATH", "").strip()
+    if configured:
+        return Path(configured)
+    return Path("data") / "manifest.json"
+
+
+def _check_live_sources() -> Dict[str, Any]:
+    now = datetime.now(timezone.utc)
+    manifest_path = _resolve_source_manifest_path()
+    stale_after_seconds = int(
+        os.getenv("EARCRAWLER_SOURCE_STALE_AFTER_SECONDS", _DEFAULT_STALE_AFTER_SECONDS)
+    )
+    payload: dict[str, Any] = {
+        "status": "unknown",
+        "manifest_path": str(manifest_path),
+        "stale_after_seconds": stale_after_seconds,
+        "sources": [],
+        "summary": {
+            "healthy": 0,
+            "stale": 0,
+            "degraded": 0,
+            "unknown": 0,
+            "partially_degraded": False,
+            "partially_stale": False,
+        },
+    }
+    if not manifest_path.exists():
+        payload["reason"] = "manifest_missing"
+        return payload
+
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except Exception as exc:  # pragma: no cover - defensive
+        payload["reason"] = "manifest_unreadable"
+        payload["error"] = repr(exc)
+        return payload
+
+    generated_at = _parse_utc_timestamp(manifest.get("generated_at"))
+    if generated_at is not None:
+        payload["generated_at"] = generated_at.isoformat().replace("+00:00", "Z")
+        payload["manifest_age_seconds"] = round(
+            max(0.0, (now - generated_at).total_seconds()), 3
+        )
+
+    raw_entries = manifest.get("upstream_status")
+    if not isinstance(raw_entries, list) or not raw_entries:
+        payload["reason"] = "no_upstream_status"
+        return payload
+
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    for item in raw_entries:
+        if not isinstance(item, dict):
+            continue
+        source = str(item.get("source") or "").strip()
+        operation = str(item.get("operation") or "").strip()
+        state = str(item.get("state") or "").strip()
+        observed_at = _parse_utc_timestamp(item.get("timestamp"))
+        if not source or not operation or not state or observed_at is None:
+            continue
+        normalized = {
+            "source": source,
+            "operation": operation,
+            "state": state,
+            "timestamp": observed_at,
+            "status_code": item.get("status_code"),
+            "retry_attempts": item.get("retry_attempts"),
+            "result_count": item.get("result_count"),
+            "message": item.get("message"),
+            "cache_hit": item.get("cache_hit"),
+            "cache_age_seconds": item.get("cache_age_seconds"),
+        }
+        grouped.setdefault(source, []).append(normalized)
+
+    if not grouped:
+        payload["reason"] = "upstream_status_unusable"
+        return payload
+
+    sources: list[dict[str, Any]] = []
+    for source in sorted(grouped):
+        entries = grouped[source]
+        latest_entry = max(entries, key=lambda entry: entry["timestamp"])
+        latest_state = str(latest_entry["state"])
+        last_checked = latest_entry["timestamp"]
+        successes = [
+            entry["timestamp"]
+            for entry in entries
+            if str(entry["state"]) in _HEALTHY_SOURCE_STATES
+        ]
+        last_success = max(successes) if successes else None
+        source_stale = False
+        source_degraded = False
+
+        if latest_state == "missing_credentials":
+            availability = "missing_credentials"
+            source_degraded = True
+        elif latest_state in _DEGRADED_SOURCE_STATES:
+            availability = "unavailable"
+            source_degraded = True
+        else:
+            availability = "available"
+
+        freshness = "unknown"
+        last_success_age_seconds: float | None = None
+        if last_success is not None:
+            last_success_age_seconds = max(0.0, (now - last_success).total_seconds())
+            source_stale = last_success_age_seconds > stale_after_seconds
+            freshness = "stale" if source_stale else "fresh"
+
+        if source_degraded:
+            source_status = "degraded"
+        elif source_stale:
+            source_status = "stale"
+        else:
+            source_status = "healthy"
+
+        operations: dict[str, dict[str, Any]] = {}
+        for entry in sorted(entries, key=lambda item: item["operation"]):
+            op = str(entry["operation"])
+            op_payload: dict[str, Any] = {
+                "state": entry["state"],
+                "timestamp": entry["timestamp"].isoformat().replace("+00:00", "Z"),
+            }
+            if entry.get("status_code") is not None:
+                op_payload["status_code"] = int(entry["status_code"])
+            if entry.get("retry_attempts") is not None:
+                op_payload["retry_attempts"] = int(entry["retry_attempts"])
+            if entry.get("result_count") is not None:
+                op_payload["result_count"] = int(entry["result_count"])
+            if entry.get("message") is not None:
+                op_payload["message"] = str(entry["message"])
+            if entry.get("cache_hit") is not None:
+                op_payload["cache_hit"] = bool(entry["cache_hit"])
+            if entry.get("cache_age_seconds") is not None:
+                op_payload["cache_age_seconds"] = round(
+                    float(entry["cache_age_seconds"]), 3
+                )
+            operations[op] = op_payload
+
+        source_payload: dict[str, Any] = {
+            "source": source,
+            "status": source_status,
+            "availability": availability,
+            "freshness": freshness,
+            "latest_state": latest_state,
+            "last_checked_at": last_checked.isoformat().replace("+00:00", "Z"),
+            "operations": operations,
+        }
+        if last_success is not None:
+            source_payload["last_success_at"] = last_success.isoformat().replace(
+                "+00:00", "Z"
+            )
+            source_payload["last_success_age_seconds"] = round(
+                float(last_success_age_seconds or 0.0), 3
+            )
+        latest_cache = next(
+            (
+                entry
+                for entry in sorted(entries, key=lambda item: item["timestamp"], reverse=True)
+                if entry.get("cache_age_seconds") is not None
+            ),
+            None,
+        )
+        if latest_cache is not None:
+            source_payload["latest_cache_age_seconds"] = round(
+                float(latest_cache["cache_age_seconds"]), 3
+            )
+            if latest_cache.get("cache_hit") is not None:
+                source_payload["latest_cache_hit"] = bool(latest_cache["cache_hit"])
+        sources.append(source_payload)
+
+    counts = {"healthy": 0, "stale": 0, "degraded": 0, "unknown": 0}
+    for source in sources:
+        counts[str(source.get("status") or "unknown")] = (
+            counts.get(str(source.get("status") or "unknown"), 0) + 1
+        )
+
+    partially_degraded = counts["degraded"] > 0 and (
+        counts["healthy"] > 0 or counts["stale"] > 0
+    )
+    partially_stale = counts["stale"] > 0 and counts["healthy"] > 0 and counts["degraded"] == 0
+
+    if counts["degraded"] > 0:
+        overall_status = "degraded"
+    elif counts["stale"] > 0:
+        overall_status = "stale"
+    elif counts["healthy"] > 0:
+        overall_status = "healthy"
+    else:
+        overall_status = "unknown"
+
+    payload["status"] = overall_status
+    payload["sources"] = sources
+    payload["summary"] = {
+        **counts,
+        "partially_degraded": partially_degraded,
+        "partially_stale": partially_stale,
+    }
+    return payload
 
 
 __all__ = ["router", "health"]

@@ -1,6 +1,6 @@
 # Local-Adapter Release Evidence Bundle
 
-Status: active Phase 5 evidence contract for the optional
+Status: active Phase 5 evidence contract (`local-adapter-release-evidence-contract.v2`) for the optional
 `LLM_PROVIDER=local_adapter` runtime path.
 
 This document defines the minimum evidence bundle required before a Task 5.3
@@ -53,6 +53,7 @@ For a candidate run directory `dist/training/<run_id>/`, the minimum bundle is:
    - `dist/benchmarks/<benchmark_run_id>/benchmark_summary.json`
    - `dist/benchmarks/<benchmark_run_id>/benchmark_summary.md`
    - `dist/benchmarks/<benchmark_run_id>/benchmark_artifacts.json`
+   - `dist/benchmarks/<benchmark_run_id>/preconditions/local_adapter_smoke.json`
 5. Rollback instructions
    - this document
    - `docs/capability_graduation_boundaries.md`
@@ -105,6 +106,12 @@ The benchmark bundle must include:
   - `ear_compliance.v2`
   - `entity_obligations.v2`
   - `unanswerable.v2`
+- an archived copy of the reviewed runtime smoke at
+  `preconditions/local_adapter_smoke.json`
+- `smoke_precondition.required=true` in both `benchmark_summary.json` and
+  `benchmark_manifest.json`
+- matching SHA-256 values linking the benchmark bundle back to the reviewed
+  runtime smoke report
 
 ## Minimum thresholds
 
@@ -182,25 +189,76 @@ Default behavior:
 
 - reads `config/local_adapter_release_evidence.example.json`
 - writes `dist/training/<run_id>/release_evidence_manifest.json`
-- exits non-zero when evidence is incomplete or thresholds fail
+- emits a machine-checkable three-way outcome:
+  - `keep_optional`
+  - `reject_candidate`
+  - `ready_for_formal_promotion_review`
+- exits non-zero unless the bundle is `ready_for_formal_promotion_review`
+
+## Reviewable candidate package
+
+Once `release_evidence_manifest.json` says the candidate is reviewable
+(`reject_candidate` or `ready_for_formal_promotion_review`), assemble the
+maintainer-facing package with:
+
+```powershell
+py -m scripts.eval.build_local_adapter_candidate_bundle `
+  --run-dir dist/training/<run_id> `
+  --benchmark-summary dist/benchmarks/<benchmark_run_id>/benchmark_summary.json `
+  --smoke-report kg/reports/local-adapter-smoke.json
+```
+
+Default output:
+
+- `dist/reviewable_candidates/<bundle_id>/training/`
+- `dist/reviewable_candidates/<bundle_id>/benchmark/`
+- `dist/reviewable_candidates/<bundle_id>/runtime/local-adapter-smoke.json`
+- `dist/reviewable_candidates/<bundle_id>/docs/rollback/`
+- `dist/reviewable_candidates/<bundle_id>/bundle_manifest.json`
+
+The package command blocks incomplete candidates. It only assembles a bundle
+when the release-evidence decision is reviewable. A rejected candidate can still
+produce a review bundle; it is reviewable evidence, not a promotion claim.
 
 ## Decision rule
 
-The decision rule is exact:
+The decision rule is exact and machine-checkable from
+`release_evidence_manifest.json`.
 
 - `Keep Optional`
   - if any required artifact is missing
-  - if any smoke report fails
-  - if any required dataset is missing from the benchmark bundle
+  - if rollback docs are missing
+  - if benchmark precondition metadata or hashes are missing or inconsistent
+  - if the archived benchmark smoke copy does not match the reviewed runtime
+    smoke report
+  - this means the candidate is not reviewable yet and the capability remains
+    `Optional`
+- `Reject candidate`
+  - only when the bundle is otherwise complete
+  - if `inference_smoke.json` fails
+  - if `local-adapter-smoke.json` fails
+  - if the benchmark smoke precondition is non-passing
   - if any threshold fails
   - if the candidate underperforms the retrieval-only control on a required
     comparison rule
+  - this still leaves the capability `Optional`, but it records that the named
+    candidate was actually reviewed and failed
 - `Ready for formal promotion review`
   - only when the full bundle exists and all checks pass
+  - this still does not auto-promote the capability
 
 Passing this contract does not directly change the capability state to
 `Supported`. Promotion still requires a dated decision record plus updates to
 the capability registry and operator docs.
+
+The validator manifest now records these fields explicitly:
+
+- `capability_state_after_validation`
+- `candidate_review_status`
+- `evidence_status`
+- `decision`
+- `insufficient_evidence`
+- `failing_evidence`
 
 ## What counts as insufficient evidence
 
@@ -208,10 +266,26 @@ Examples of insufficient evidence:
 
 - adapter files exist, but no benchmark bundle exists
 - benchmark bundle exists, but `retrieval_only` control data is missing
+- benchmark bundle exists, but the archived `preconditions/local_adapter_smoke.json`
+  copy is missing
+- benchmark bundle exists, but `smoke_precondition.required` is false or its
+  SHA-256 does not match the reviewed runtime smoke report
 - `manifest.json` is missing `retrieval_corpus_digest`
-- `local-adapter-smoke.json` is missing or non-passing
-- citation/support metrics pass, but overclaim exceeds the max threshold
+- `local-adapter-smoke.json` is missing
 - metrics are acceptable, but rollback docs are not named and archived
 
 Any of the above means the local-adapter path may remain implemented in source,
 but it is not ready to be promoted beyond the current `Optional` state.
+
+## What counts as a rejected candidate
+
+Examples of candidate rejection:
+
+- `local-adapter-smoke.json` is present, but status is not `passed`
+- the benchmark smoke precondition is archived, but status is not `passed`
+- accuracy or groundedness thresholds fail
+- strict-output failure rate is non-zero
+- `local_adapter` underperforms `retrieval_only` on a required comparison
+
+This is different from insufficient evidence. A rejected candidate had enough
+machine-checkable evidence to review, and that evidence failed.

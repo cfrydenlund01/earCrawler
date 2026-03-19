@@ -169,10 +169,12 @@ Promotion from `Optional` to `Supported` requires all of the following:
 
 Exact evidence decision rule:
 
-- keep the capability `Optional` when any required artifact, smoke report,
-  benchmark dataset, threshold, or rollback document is missing or failing
+- keep the capability `Optional` when the evidence bundle is incomplete or not
+  machine-checkable, including missing archived benchmark smoke preconditions
+- treat a candidate as `Rejected` when the bundle is complete but runtime smoke,
+  benchmark smoke, thresholds, or retrieval-only comparison rules fail
 - treat the capability as `Ready for formal promotion review` only when the
-  full evidence bundle passes; this does not auto-promote the capability
+  full evidence bundle passes; this still does not auto-promote the capability
 
 ## Governing split
 
