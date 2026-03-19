@@ -1,6 +1,7 @@
 import os
 import subprocess
 import hashlib
+import json
 from pathlib import Path
 import pytest
 
@@ -125,3 +126,64 @@ def test_verify_requires_complete_evidence_for_release_publication(tmp_path):
         check=False,
     )
     assert res.returncode != 0
+
+
+def test_verify_records_installed_runtime_smoke_status(tmp_path):
+    env = dict(SOURCE_DATE_EPOCH="946684800")
+    run_ps("kg/scripts/canonical-freeze.ps1", env=env)
+    run_ps("scripts/make-manifest.ps1", env=env)
+
+    release_dir = tmp_path / "release"
+    release_dir.mkdir(parents=True, exist_ok=True)
+    artifact = release_dir / "artifact.txt"
+    artifact.write_text("release-ok", encoding="utf-8")
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    checksums = release_dir / "checksums.sha256"
+    checksums.write_text(f"{digest}  artifact.txt\n", encoding="utf-8")
+
+    installed_runtime = tmp_path / "installed_runtime_smoke.json"
+    installed_runtime.write_text(
+        json.dumps(
+            {
+                "schema_version": "installed-runtime-smoke.v1",
+                "overall_status": "passed",
+                "checks": [
+                    {"name": "health_http_200", "passed": True},
+                    {"name": "supported_api_smoke", "passed": True},
+                    {"name": "runtime_contract_topology", "passed": True},
+                    {
+                        "name": "runtime_contract_declared_instance_count",
+                        "passed": True,
+                    },
+                    {
+                        "name": "runtime_contract_capability_registry_schema",
+                        "passed": True,
+                    },
+                    {
+                        "name": "runtime_contract_api_default_surface",
+                        "passed": True,
+                    },
+                    {"name": "runtime_contract_api_search", "passed": True},
+                    {"name": "runtime_contract_kg_expansion", "passed": True},
+                ],
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+
+    evidence = tmp_path / "release_validation_evidence.json"
+    run_ps(
+        "scripts/verify-release.ps1",
+        "-ChecksumsPath",
+        str(checksums),
+        "-InstalledRuntimeSmokeReportPath",
+        str(installed_runtime),
+        "-EvidenceOutPath",
+        str(evidence),
+        env=env,
+    )
+
+    payload = json.loads(evidence.read_text(encoding="utf-8"))
+    assert payload["installed_runtime_smoke"]["status"] == "passed"
+    assert payload["installed_runtime_smoke"]["schema_version"] == "installed-runtime-smoke.v1"

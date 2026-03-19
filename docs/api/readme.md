@@ -141,6 +141,14 @@ from the Windows Credential Manager (`EarCrawler-API` service name) or the
 `EARCRAWLER_API_KEYS` environment variable (semicolon-separated
 `label=value` pairs). Anonymous access is allowed with lower quotas.
 
+This auth model is sufficient for the supported trusted single-host baseline.
+If the service must be exposed beyond that boundary, do not expose the
+EarCrawler process directly with only `EARCRAWLER_API_KEYS`. Keep the app on a
+loopback/local-only listener and place an authenticated reverse proxy or API
+gateway in front of it as described in `docs/ops/external_auth_front_door.md`.
+In that pattern, the proxy authenticates the external caller and presents a
+deployment-owned backend `X-Api-Key` to EarCrawler.
+
 Credential formats:
 
 - Env-backed keys: `X-Api-Key: <secret>` or `X-Api-Key: <label>:<secret>`.

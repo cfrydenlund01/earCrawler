@@ -13,25 +13,27 @@
 4. Run `pwsh scripts/build-wheel.ps1`, `pwsh scripts/build-exe.ps1`, and `pwsh scripts/make-installer.ps1`.
 5. Run clean-room wheel validation from outside the source checkout:
    - `pwsh scripts/package-wheel-smoke.ps1 -WheelPath dist\earcrawler-*.whl`
-6. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
-7. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
-8. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
-9. Run supported-path API smoke parity in the release workspace:
+6. Run clean-room installed-runtime smoke against the built wheel:
+   - `pwsh scripts/installed-runtime-smoke.ps1 -WheelPath dist\earcrawler-*.whl -Host 127.0.0.1 -Port 9001 -ReportPath dist\installed_runtime_smoke.json`
+7. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
+8. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
+9. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
+10. Run supported-path API smoke parity in the release workspace:
    - `pwsh scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001`
    - `pwsh scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist\api_smoke.json`
    - `pwsh scripts/api-stop.ps1`
-10. Run release-shaped optional-mode smoke coverage:
+11. Run release-shaped optional-mode smoke coverage:
    - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist\optional_runtime_smoke.json`
-11. Run release integrity validation and write evidence:
-   - `pwsh scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist\api_smoke.json -OptionalRuntimeSmokeReportPath dist\optional_runtime_smoke.json -EvidenceOutPath dist\release_validation_evidence.json`
-12. If a real Task 5.3 run artifact is available, run:
+12. Run release integrity validation and write evidence:
+   - `pwsh scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist\api_smoke.json -OptionalRuntimeSmokeReportPath dist\optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist\installed_runtime_smoke.json -EvidenceOutPath dist\release_validation_evidence.json`
+13. If a real Task 5.3 run artifact is available, run:
    - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist\training\<run_id> -ReportPath dist\optional_runtime_smoke.json`
-13. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, `dist\api_smoke.json`, release validation evidence, and optional runtime smoke evidence files.
+14. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, `dist\api_smoke.json`, `dist\installed_runtime_smoke.json`, release validation evidence, and optional runtime smoke evidence files.
 
 Release artifact note
 - The wheel is the authoritative deployment artifact for the supported Windows API service path described in `docs/ops/windows_single_host_operator.md`.
 - The EXE and installer remain convenience distribution artifacts; they are not the authoritative API hosting path.
-- Deployed-host lifecycle automation lives under `scripts/ops/windows-single-host-*.ps1`; use those scripts plus `docs/ops/windows_single_host_operator.md` for install/start/stop/backup/restore drill operations.
+- Deployed-host lifecycle automation lives under `scripts/ops/windows-fuseki-*.ps1` and `scripts/ops/windows-single-host-*.ps1`; use `docs/ops/windows_fuseki_operator.md` for the pinned read-only Fuseki dependency and `docs/ops/windows_single_host_operator.md` for API install/start/stop/backup/restore drill operations.
 
 Windows notes
 - Inno Setup (iscc.exe): install via winget if not present.
@@ -46,10 +48,10 @@ Windows notes
 - Container deployment is not a supported runtime surface right now.
 - CI and release do not build or publish Docker or Apptainer runtime artifacts.
 - Do not publish, pull, or depend on GHCR `api` or `rag` images; the repo does not ship maintained container entrypoints.
-- The authoritative Windows single-host deployment, upgrade, backup, restore, rollback, and secret-rotation flow lives in `docs/ops/windows_single_host_operator.md`. This runbook keeps release-engineering and source-checkout workflows only.
+- The authoritative Windows single-host deployment flow now splits across `docs/ops/windows_fuseki_operator.md` for the pinned read-only Fuseki dependency and `docs/ops/windows_single_host_operator.md` for the API service. This runbook keeps release-engineering and source-checkout workflows only.
 
 ## Supported Runtime Surface
-- Supported operator/runtime entrypoints are the installed `earctl` CLI and the FastAPI facade at `service.api_server`. For release-artifact deployments, use the wheel + NSSM flow in `docs/ops/windows_single_host_operator.md`. The `earctl api ...` and `scripts/api-*.ps1` paths are source-checkout helpers, not the authoritative operator handoff path.
+- Supported operator/runtime entrypoints are the installed `earctl` CLI, the FastAPI facade at `service.api_server`, and the pinned local read-only Fuseki dependency documented in `docs/ops/windows_fuseki_operator.md`. For release-artifact deployments, use the wheel + NSSM flow in `docs/ops/windows_single_host_operator.md`. The `earctl api ...` and `scripts/api-*.ps1` paths are source-checkout helpers, not the authoritative operator handoff path.
 - Supported runtime semantics are single-host only. Rate limits, concurrency controls, and the RAG cache are process-local today, so this runbook does not claim multi-instance correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`.
 - Machine-readable capability state is published at `docs/api/capability_registry.json` (generated from `service/docs/capability_registry.json`). `README.md` remains the human-readable summary.
 - Supported API routes are `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`.
@@ -72,6 +74,7 @@ Windows notes
 
 ## Secret Rotation
 - Use `docs/ops/windows_single_host_operator.md` as the single source of truth for deployed-host secret rotation.
+- For any deployment broader than the trusted single-host baseline, pair that guide with `docs/ops/external_auth_front_door.md`. The reverse proxy or gateway owns end-user auth; EarCrawler keeps a deployment-owned backend shared secret.
 - This runbook does not define a separate secret-management path.
 
 ## Telemetry Operations
@@ -446,3 +449,6 @@ emitters with `new_prov_graph()` to regenerate provenance.
 - Adjust defaults in `earCrawler/telemetry/config.py` or override with CLI
   flags.
 - Inspect `kg/reports/gc-report.json` to review results.
+
+
+
