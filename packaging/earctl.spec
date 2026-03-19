@@ -36,7 +36,18 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=['tests'],
+    excludes=[
+        'tests',
+        # Optional ML stacks are not part of the supported Windows release bundle
+        # and can break PyInstaller analysis in local packaging environments.
+        'tensorflow',
+        'tensorflow_intel',
+        'tensorflow_cpu',
+        'keras',
+        'tensorboard',
+        'jax',
+        'jaxlib',
+    ],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
     cipher=block_cipher,

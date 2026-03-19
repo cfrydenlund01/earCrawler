@@ -108,7 +108,7 @@ function Resolve-ExpectedWheelHash {
             continue
         }
         if ($line -notmatch $pattern) {
-            throw "Malformed checksum line in $ChecksumsFile: $line"
+            throw "Malformed checksum line in ${ChecksumsFile}: $line"
         }
         $hash = $Matches[1].ToLowerInvariant()
         $entryPath = $Matches[2]

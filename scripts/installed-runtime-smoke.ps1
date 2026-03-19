@@ -236,16 +236,16 @@ try {
       wheel_checksum_verified = [bool]$resolvedChecksumsPath
     }
 
-    $installArgs = @(
-      "-LockFile", $resolvedLockFilePath,
-      "-WheelhousePath", $resolvedWheelhousePath,
-      "-PythonExecutable", $venvPython,
-      "-WheelPath", $wheel.FullName
-    )
-    if ($resolvedChecksumsPath) {
-      $installArgs += @("-ChecksumsPath", $resolvedChecksumsPath)
+    $installParams = @{
+      LockFile = $resolvedLockFilePath
+      WheelhousePath = $resolvedWheelhousePath
+      PythonExecutable = $venvPython
+      WheelPath = $wheel.FullName
     }
-    & $installScript @installArgs
+    if ($resolvedChecksumsPath) {
+      $installParams.ChecksumsPath = $resolvedChecksumsPath
+    }
+    & $installScript @installParams
     if ($LASTEXITCODE -ne 0) {
       throw "Hermetic install script failed with exit code ${LASTEXITCODE}: $installScript"
     }

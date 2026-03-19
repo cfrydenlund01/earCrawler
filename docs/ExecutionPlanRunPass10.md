@@ -36,8 +36,8 @@ OpenAI source links:
 - Phase 1: complete (2026-03-19)
 - Phase 2: complete (2026-03-19)
 - Phase 3: complete (2026-03-19)
-- Phase 4: in progress (Steps 4.2, 4.3, and 4.4 complete on 2026-03-19)
-- Phase 5: pending
+- Phase 4: complete (2026-03-19)
+- Phase 5: complete (Step 5.1 complete on 2026-03-19; review refreshed after the signed publication pass in `docs/production_beta_readiness_review_2026-03-19.md`)
 
 ## Global Guardrails
 
