@@ -1,0 +1,66 @@
+{
+  "schema_version": "local-adapter-release-evidence-contract.v1",
+  "status": "optional_until_bundle_passes",
+  "capability_id": "runtime.local_adapter_serving",
+  "bundle": {
+    "provenance_manifest": "dist/training/<run_id>/release_evidence_manifest.json",
+    "required_run_files": [
+      "manifest.json",
+      "run_config.json",
+      "run_metadata.json",
+      "inference_smoke.json",
+      "adapter/adapter_config.json",
+      "adapter/tokenizer_config.json"
+    ],
+    "required_benchmark_files": [
+      "benchmark_manifest.json",
+      "benchmark_summary.json",
+      "benchmark_summary.md",
+      "benchmark_artifacts.json"
+    ],
+    "required_primary_datasets": [
+      "ear_compliance.v2",
+      "entity_obligations.v2",
+      "unanswerable.v2"
+    ],
+    "rollback_docs": [
+      "docs/local_adapter_release_evidence.md",
+      "docs/capability_graduation_boundaries.md",
+      "docs/ops/windows_single_host_operator.md"
+    ]
+  },
+  "thresholds": {
+    "answer_accuracy_min": 0.65,
+    "label_accuracy_min": 0.8,
+    "unanswerable_accuracy_min": 0.9,
+    "valid_citation_rate_min": 0.95,
+    "supported_rate_min": 0.9,
+    "overclaim_rate_max": 0.05,
+    "strict_output_failure_rate_max": 0.0,
+    "request_422_rate_max": 0.0,
+    "request_503_rate_max": 0.0,
+    "latency_p95_ms_max": 15000
+  },
+  "comparison_rules": {
+    "require_retrieval_only_condition": true,
+    "answer_accuracy_gte_retrieval_only": true,
+    "supported_rate_gte_retrieval_only": true,
+    "overclaim_rate_lte_retrieval_only": true
+  },
+  "decision_rule": {
+    "keep_optional_when": [
+      "Any required artifact or rollback document is missing.",
+      "The Task 5.3 run manifest does not record snapshot id, snapshot hash, and retrieval corpus digest.",
+      "Either inference_smoke.json or scripts/local_adapter_smoke.ps1 evidence is missing or non-passing.",
+      "The benchmark bundle omits any required primary dataset or violates a threshold in this contract.",
+      "The local_adapter condition performs worse than retrieval_only on a required comparison rule."
+    ],
+    "ready_for_formal_promotion_review_when": [
+      "The evidence bundle is complete.",
+      "All thresholds pass.",
+      "The benchmark bundle includes retrieval_only control data and required primary datasets.",
+      "A dated promotion decision can cite this manifest plus the named rollback docs without changing the baseline runtime."
+    ],
+    "promotion_note": "A passing bundle does not auto-promote local_adapter to Supported. Promotion still requires a dated decision record and updates to the capability registry and operator docs."
+  }
+}

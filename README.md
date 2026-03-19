@@ -138,6 +138,7 @@ If you are new to the repo, use this rule first:
 - The training-input contract for this model work is recorded in `docs/model_training_contract.md`; it uses approved eCFR snapshot text and the derived retrieval corpus, not eval fixtures or benchmark artifacts.
 - Training scripts and artifacts are still a phase-gated workflow, not a supported operator runtime path by themselves.
 - Task 5.4 adds a separate optional runtime path that can load a Task 5.3 adapter through `/v1/rag/answer` only when `LLM_PROVIDER=local_adapter`, `EARCRAWLER_ENABLE_LOCAL_LLM=1`, and the recorded adapter artifacts are present.
+- The minimum release evidence bundle for a local-adapter candidate is defined in `docs/local_adapter_release_evidence.md` and `config/local_adapter_release_evidence.example.json`.
 - Phase 6 benchmark planning is now recorded in `docs/production_candidate_benchmark_plan.md`; benchmark execution still depends on a real Task 5.3 run artifact and a benchmark runner that targets the local-adapter runtime.
 - Capability-specific promotion and rollback boundaries for text search, hybrid ranking, KG expansion, and local-adapter serving are tracked in `docs/capability_graduation_boundaries.md`.
 
@@ -266,6 +267,15 @@ Then run the operator smoke helper against the same run artifact:
 
 ```powershell
 pwsh .\scripts\local_adapter_smoke.ps1 -RunDir dist/training/<run_id>
+```
+
+Validate the minimum release evidence bundle for that same candidate:
+
+```powershell
+py -m scripts.eval.validate_local_adapter_release_bundle `
+  --run-dir dist/training/<run_id> `
+  --benchmark-summary dist/benchmarks/<benchmark_run_id>/benchmark_summary.json `
+  --smoke-report kg/reports/local-adapter-smoke.json
 ```
 
 Call the generated-answer endpoint:

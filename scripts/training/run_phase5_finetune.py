@@ -651,6 +651,8 @@ def _run_inference_smoke(
     )
     passed = bool(completion)
     return {
+        "base_model": base_model,
+        "adapter_dir": str(adapter_dir),
         "prompt": prompt,
         "generated_text": decoded,
         "completion": completion,

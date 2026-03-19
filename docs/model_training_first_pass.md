@@ -68,6 +68,15 @@ pwsh .\scripts\local_adapter_smoke.ps1 `
   -RunDir dist/training/<run_id>
 ```
 
+Release-evidence bundle validation:
+
+```powershell
+py -m scripts.eval.validate_local_adapter_release_bundle `
+  --run-dir dist/training/<run_id> `
+  --benchmark-summary dist/benchmarks/<benchmark_run_id>/benchmark_summary.json `
+  --smoke-report kg/reports/local-adapter-smoke.json
+```
+
 ## Runtime expectations
 
 - `--prepare-only` is CPU-safe and only builds deterministic package artifacts.
@@ -98,6 +107,8 @@ Output layout:
 - `dist/training/<run_id>/run_metadata.json`
 - `dist/training/<run_id>/adapter/` (LoRA artifact)
 - `dist/training/<run_id>/inference_smoke.json`
+- `dist/training/<run_id>/release_evidence_manifest.json` (created only when the
+  optional release bundle is validated)
 
 ## Metadata contract (Task 5.3)
 
@@ -118,6 +129,13 @@ Output layout:
 - training metrics
 - inference smoke report path
 
+`inference_smoke.json` records at least:
+
+- `base_model`
+- `adapter_dir`
+- smoke prompt and generated completion
+- pass/fail result
+
 ## Notes
 
 - This workflow is a Phase 5 training workflow, not an operator runtime command.
@@ -132,6 +150,10 @@ Output layout:
   before it will serve the adapter.
 - Use `scripts/local_adapter_smoke.ps1` to verify the configured API path still
   enforces strict output/schema and egress expectations in local-adapter mode.
+- Use `docs/local_adapter_release_evidence.md` and
+  `config/local_adapter_release_evidence.example.json` to decide whether a
+  concrete run artifact has enough evidence to stay `Optional` or move to a
+  formal promotion review.
 - A real end-to-end local-adapter smoke still requires a concrete
   `dist/training/<run_id>/` artifact from Task 5.3. If that artifact is not
   present in the current checkout, the smoke remains a documented prerequisite,

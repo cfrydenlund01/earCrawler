@@ -319,6 +319,46 @@ def test_phase5_local_adapter_runtime_is_gated_and_documented() -> None:
     assert (REPO_ROOT / "scripts" / "local_adapter_smoke.ps1").exists()
 
 
+def test_phase5_local_adapter_release_evidence_contract_is_recorded() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
+    first_pass = (REPO_ROOT / "docs" / "model_training_first_pass.md").read_text(
+        encoding="utf-8"
+    )
+    capability_doc = (
+        REPO_ROOT / "docs" / "capability_graduation_boundaries.md"
+    ).read_text(encoding="utf-8")
+    release_doc = (
+        REPO_ROOT / "docs" / "local_adapter_release_evidence.md"
+    ).read_text(encoding="utf-8")
+    release_process = (
+        REPO_ROOT / "docs" / "ops" / "release_process.md"
+    ).read_text(encoding="utf-8")
+    operator_guide = (
+        REPO_ROOT / "docs" / "ops" / "windows_single_host_operator.md"
+    ).read_text(encoding="utf-8")
+    config_record = (
+        REPO_ROOT / "config" / "local_adapter_release_evidence.example.json"
+    ).read_text(encoding="utf-8")
+
+    assert "docs/local_adapter_release_evidence.md" in readme
+    assert "docs/local_adapter_release_evidence.md" in runbook
+    assert "config/local_adapter_release_evidence.example.json" in readme
+    assert "config/local_adapter_release_evidence.example.json" in runbook
+    assert "validate_local_adapter_release_bundle" in first_pass
+    assert "docs/local_adapter_release_evidence.md" in capability_doc
+    assert "Ready for formal promotion review" in release_doc
+    assert "Keep Optional" in release_doc
+    assert "release_evidence_manifest.json" in release_doc
+    assert "validate_local_adapter_release_bundle" in release_process
+    assert "release_evidence_manifest.json" in operator_guide
+    assert '"schema_version": "local-adapter-release-evidence-contract.v1"' in config_record
+    assert '"answer_accuracy_min": 0.65' in config_record
+    assert (
+        REPO_ROOT / "scripts" / "eval" / "validate_local_adapter_release_bundle.py"
+    ).exists()
+
+
 def test_phase6_benchmark_plan_targets_the_production_candidate() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     execution_plan = (

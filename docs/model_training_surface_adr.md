@@ -96,6 +96,28 @@ The key decisions are:
 - a local KG is optional provenance metadata, not a hard prerequisite for the
   first fine-tuning pass
 
+On March 19, 2026, Step 5.2 was executed against a real local candidate under
+`dist/training/step52-real-candidate-gpt2b-20260319/` using:
+
+- `scripts/training/run_phase5_finetune.py` (real adapter + metadata output)
+- `scripts/eval/run_local_adapter_benchmark.py` (benchmark bundle generation)
+- `scripts/eval/validate_local_adapter_release_bundle.py` (release-evidence
+  decision manifest)
+
+Recorded evidence artifacts:
+
+- `dist/training/step52-real-candidate-gpt2b-20260319/manifest.json`
+- `dist/training/step52-real-candidate-gpt2b-20260319/run_metadata.json`
+- `dist/training/step52-real-candidate-gpt2b-20260319/inference_smoke.json`
+- `dist/benchmarks/step52-real-candidate-gpt2b-20260319/benchmark_summary.json`
+- `dist/training/step52-real-candidate-gpt2b-20260319/release_evidence_manifest.json`
+
+The validator decision for this concrete candidate was `keep_optional`, which
+is expected for the current workspace evidence set and does not promote the
+local-adapter capability. In this workspace, the runtime smoke failed with
+`Retriever not ready`, so the evidence package records a non-passing runtime
+precondition.
+
 ## Phase 5.3 First Fine-Tuning Pass Record
 
 On March 11, 2026, Task 5.3 added a repeatable first-pass fine-tuning workflow
