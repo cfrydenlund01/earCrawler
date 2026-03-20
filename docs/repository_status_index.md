@@ -80,3 +80,31 @@ working set unless a task explicitly targets an optional or quarantined surface.
 
 For corpus, FAISS, eval, baseline, and training artifacts specifically, use
 `docs/data_artifact_inventory.md`.
+
+## Workspace State Workflow
+
+Use the workspace-state script when you need a quick source-vs-generated
+classification and cleanup pass:
+
+- Report current classification:
+  - `pwsh scripts/workspace-state.ps1 -Mode report`
+- Verify ghost residue is absent (fails if unsupported ghost paths are present):
+  - `pwsh scripts/workspace-state.ps1 -Mode verify`
+- Verify strict disposable-state cleanliness (also fails on `.venv*`,
+  `.pytest_tmp*`, and generated non-evidence roots like `build/`, `run/`, `runs/`):
+  - `pwsh scripts/workspace-state.ps1 -Mode verify -FailOnDisposable`
+- Clean unsupported ghost residue plus disposable workspace state (preserves
+  `dist/` and `.venv*` by default):
+  - `pwsh scripts/workspace-state.ps1 -Mode clean`
+- Clean `dist/` only when intentional:
+  - `pwsh scripts/workspace-state.ps1 -Mode clean -CleanDist`
+- Clean local virtual environments only when intentional:
+  - `pwsh scripts/workspace-state.ps1 -Mode clean -CleanVenvs`
+
+Ghost residue paths currently treated as unsupported workspace leftovers:
+
+- `earCrawler/agent`
+- `earCrawler/models/legalbert`
+- `earCrawler/quant`
+- `tests/agent`
+- `tests/models`

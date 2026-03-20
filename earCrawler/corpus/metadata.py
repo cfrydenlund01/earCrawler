@@ -112,8 +112,14 @@ class EarMetadataResolver:
             return meta
         if self._client is None:
             self._client = self._client_factory()
-        detail = self._client.get_document(key)
-        status = self._client.get_last_status("get_document")
+        typed_getter = getattr(self._client, "get_document_result", None)
+        if callable(typed_getter):
+            result = typed_getter(key)
+            detail = dict(getattr(result, "data", {}) or {})
+            status = getattr(result, "status", None)
+        else:
+            detail = self._client.get_document(key)
+            status = self._client.get_last_status("get_document")
         if status is not None and self._status_hook is not None:
             self._status_hook(status)
         source_url = (

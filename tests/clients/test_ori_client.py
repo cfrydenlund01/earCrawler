@@ -78,3 +78,18 @@ def test_get_listing_html_http_404_sets_upstream_unavailable() -> None:
     status = client.get_last_status("get_listing_html")
     assert status is not None
     assert status.state == "upstream_unavailable"
+
+
+def test_get_listing_html_result_returns_typed_failure(monkeypatch):
+    monkeypatch.setattr("api_clients.ori_client.time.sleep", lambda *_: None)
+    client = ORIClient(session=_AlwaysFailSession())
+    result = client.get_listing_html_result()
+    assert result.data == ""
+    assert result.state == "retry_exhausted"
+
+
+def test_get_case_html_result_returns_typed_failure() -> None:
+    client = ORIClient(session=_EmptyBodySession())
+    result = client.get_case_html_result("https://ori.hhs.gov/case/ABC")
+    assert result.data == ""
+    assert result.state == "invalid_response"

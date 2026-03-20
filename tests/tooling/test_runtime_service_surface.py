@@ -660,6 +660,13 @@ def test_ci_uses_supported_evidence_path_gate() -> None:
     assert "dist/api_smoke.json" in release_workflow
     assert "dist/optional_runtime_smoke.json" in release_workflow
     assert "dist/installed_runtime_smoke.json" in release_workflow
+    assert "Record build stage evidence" in release_workflow
+    assert "Record validation stage evidence" in release_workflow
+    assert "Record promotion stage evidence" in release_workflow
+    assert "release-build-stage" in release_workflow
+    assert "release-validation-stage" in release_workflow
+    assert "release-promotion-stage" in release_workflow
+    assert "dist/promotion/promotion_stage_evidence.json" in release_workflow
     assert "-RequireCompleteEvidence" in release_workflow
     assert "-ApiSmokeReportPath dist/api_smoke.json" in release_workflow
     assert "-InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json" in release_workflow

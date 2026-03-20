@@ -23,7 +23,7 @@ New-Item -ItemType Directory -Force -Path $BaselineDir | Out-Null
 
 kg/scripts/canonical-freeze.ps1 -SnapshotDir $SnapshotDir -OutputDir $BaselineDir
 scripts/make-manifest.ps1 -CanonicalDir $BaselineDir -DistDir ""
-scripts/verify-release.ps1 -ManifestPath (Join-Path $BaselineDir 'manifest.json') -BaseDir "."
+scripts/verify-release.ps1 -ManifestPath (Join-Path $BaselineDir 'manifest.json') -BaseDir "." -SkipDistChecks
 
 $required = @('dataset.nq', 'versions.json', 'manifest.json', 'checksums.sha256')
 foreach ($name in $required) {

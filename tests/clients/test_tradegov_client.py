@@ -78,3 +78,25 @@ def test_search_invalid_response_sets_status(monkeypatch):
     status = client.get_last_status("search")
     assert status is not None
     assert status.state == "invalid_response"
+
+
+def test_search_result_includes_typed_status(monkeypatch):
+    monkeypatch.setattr("api_clients.tradegov_client.get_secret", lambda *_, **__: "")
+    client = TradeGovClient()
+    result = client.search_result("ACME", limit=2)
+    assert result.data == []
+    assert result.state == "missing_credentials"
+    assert result.degraded is True
+
+
+def test_lookup_entity_result_propagates_failure_state(monkeypatch):
+    monkeypatch.setenv("TRADEGOV_API_KEY", "DUMMY")
+    client = TradeGovClient()
+
+    def _boom(*args, **kwargs):
+        raise TradeGovError("bad payload", state="invalid_response")
+
+    monkeypatch.setattr(client, "_get", _boom)
+    result = client.lookup_entity_result("ACME")
+    assert result.data == {}
+    assert result.state == "invalid_response"

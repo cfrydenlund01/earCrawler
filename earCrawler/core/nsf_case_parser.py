@@ -92,12 +92,32 @@ class NSFCaseParser:
         if live:
             client = ORIClient()
             try:
-                listing_html = client.get_listing_html()
+                listing_result_getter = getattr(client, "get_listing_html_result", None)
+                if callable(listing_result_getter):
+                    listing_result = listing_result_getter()
+                    listing_html = str(getattr(listing_result, "data", "") or "")
+                    listing_state = str(
+                        getattr(getattr(listing_result, "status", None), "state", "")
+                    )
+                    if listing_state not in {"ok", "no_results"} or not listing_html.strip():
+                        return []
+                else:
+                    listing_html = client.get_listing_html()
                 listing = BeautifulSoup(listing_html, "html.parser")
                 links = [a["href"] for a in listing.select("a[href]")]
                 for link in links:
                     url = link if link.startswith("http") else f"{client.BASE_URL}{link}"
-                    case_html = client.get_case_html(url)
+                    case_result_getter = getattr(client, "get_case_html_result", None)
+                    if callable(case_result_getter):
+                        case_result = case_result_getter(url)
+                        case_html = str(getattr(case_result, "data", "") or "")
+                        case_state = str(
+                            getattr(getattr(case_result, "status", None), "state", "")
+                        )
+                        if case_state not in {"ok", "no_results"} or not case_html.strip():
+                            continue
+                    else:
+                        case_html = client.get_case_html(url)
                     cases.append(self.parse_from_html(case_html, url))
             finally:
                 self.last_upstream_status = client.get_status_snapshot()

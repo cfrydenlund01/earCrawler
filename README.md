@@ -48,6 +48,11 @@ For Windows operator deployment from signed release artifacts, use `docs/ops/win
    python -m pip install -e .
    ```
    This path keeps the dependencies and console scripts inside `.venv\Scripts\`. `requirements.in` is the single dependency source of truth; `requirements.txt` is a compatibility wrapper that points at it. If you prefer a global install, omit step 2 and use `py -m pip install --user --upgrade .`, then ensure the scripts directory shown in the warning messages is on `PATH`.
+   Verify bootstrap prerequisites and dependency-policy consistency:
+   ```powershell
+   pwsh .\scripts\bootstrap-verify.ps1
+   py .\scripts\verify-dependency-policy.py
+   ```
    > Tip: Pip may leave a temporary folder (for example `~aml`) behind or warn that script shims such as `uvicorn.exe` are not on `PATH`. The folder can be deleted safely, and you can either add the scripts directory to `PATH` or continue using `python -m earCrawler.cli ...` to invoke commands.
 
    > **RAG extras (optional):** Base install intentionally excludes `sentence-transformers`, `torch`, `transformers`, and `peft`. Install these extras only when you need local embedding/indexing or the optional Task 5.4 local-adapter RAG path. They do not provide a supported model-training, fine-tuning, agent, or quantization stack.

@@ -11,7 +11,7 @@ from pathlib import Path
 root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root))
 
-from api_clients.upstream_status import UpstreamStatus
+from api_clients.upstream_status import UpstreamResult, UpstreamStatus
 from earCrawler.core.crawler import Crawler, TradeGovError, FederalRegisterError
 
 
@@ -131,3 +131,63 @@ def test_crawler_captures_upstream_status():
         "missing_credentials",
         "invalid_response",
     }
+
+
+def test_crawler_uses_typed_tradegov_result_for_degraded_state():
+    class _TypedTradeGovClient:
+        def search_entities_result(self, query: str):
+            return UpstreamResult(
+                data=[],
+                status=UpstreamStatus(
+                    source="tradegov",
+                    operation="search",
+                    state="missing_credentials",
+                    message="TRADEGOV_API_KEY missing",
+                ),
+            )
+
+    class _UnusedFederalRegisterClient:
+        def search_documents(self, entity_id: str):
+            return []
+
+    crawler = Crawler(_TypedTradeGovClient(), _UnusedFederalRegisterClient())
+    entities, documents = crawler.run("foo")
+    assert entities == []
+    assert documents == []
+    assert crawler.last_upstream_status["tradegov.search"]["state"] == "missing_credentials"
+
+
+def test_crawler_uses_typed_federalregister_result():
+    class _TypedTradeGovClient:
+        def search_entities_result(self, query: str):
+            return UpstreamResult(
+                data=[{"id": "1"}],
+                status=UpstreamStatus(
+                    source="tradegov",
+                    operation="search",
+                    state="ok",
+                    result_count=1,
+                ),
+            )
+
+    class _TypedFederalRegisterClient:
+        def search_documents_result(self, entity_id: str):
+            return UpstreamResult(
+                data=[],
+                status=UpstreamStatus(
+                    source="federalregister",
+                    operation="search_documents",
+                    state="retry_exhausted",
+                    retry_attempts=3,
+                    message="upstream timeout",
+                ),
+            )
+
+    crawler = Crawler(_TypedTradeGovClient(), _TypedFederalRegisterClient())
+    entities, documents = crawler.run("foo")
+    assert entities == [{"id": "1"}]
+    assert documents == []
+    assert (
+        crawler.last_upstream_status["federalregister.search_documents"]["state"]
+        == "retry_exhausted"
+    )

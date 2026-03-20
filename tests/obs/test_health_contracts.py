@@ -109,10 +109,14 @@ def test_health_endpoint_reports_live_sources_degraded_and_missing_credentials(
     assert live["summary"]["degraded"] == 1
     assert live["summary"]["healthy"] == 1
     assert live["summary"]["partially_degraded"] is True
+    assert live["failure_taxonomy"]["state_counts"]["ok"] == 1
+    assert live["failure_taxonomy"]["state_counts"]["missing_credentials"] == 1
+    assert live["failure_taxonomy"]["degraded_state_counts"]["missing_credentials"] == 1
 
     by_source = {entry["source"]: entry for entry in live["sources"]}
     assert by_source["tradegov"]["availability"] == "missing_credentials"
     assert by_source["tradegov"]["status"] == "degraded"
+    assert by_source["tradegov"]["state_counts"]["missing_credentials"] == 1
     assert by_source["federalregister"]["freshness"] == "fresh"
     assert by_source["federalregister"]["latest_cache_hit"] is True
     assert by_source["federalregister"]["latest_cache_age_seconds"] == 90.5
@@ -150,3 +154,4 @@ def test_health_endpoint_reports_stale_live_sources(tmp_path: Path, monkeypatch)
     assert live["status"] == "stale"
     assert live["summary"]["stale"] == 1
     assert live["sources"][0]["freshness"] == "stale"
+    assert live["failure_taxonomy"]["state_counts"]["ok"] == 1

@@ -71,6 +71,7 @@ domain user -> HTTPS IIS site (Windows auth + allowlist) -> ARR reverse proxy ->
 Reference assets:
 
 - example IIS config: `scripts/ops/iis-earcrawler-front-door.web.config.example`
+- front-door smoke probe: `scripts/ops/iis-front-door-smoke.ps1`
 - baseline app hosting guide: `docs/ops/windows_single_host_operator.md`
 
 This is the one concrete pattern operators should copy first when they need
@@ -108,6 +109,47 @@ Use the IIS pattern as follows:
 Do not expose Uvicorn directly on a non-loopback address and then treat IIS as
 optional defense in depth. In this pattern IIS is the network edge and
 EarCrawler remains a loopback-only backend.
+
+## Reproducible IIS drill
+
+Use this drill when you need broader-than-loopback access on a supported
+Windows host without changing the EarCrawler app auth model.
+
+1. Provision the supported baseline exactly as documented in
+   `docs/ops/windows_single_host_operator.md`.
+2. Keep the EarCrawler service bound to `127.0.0.1:9001` and verify local
+   health before adding IIS:
+   - `Invoke-WebRequest http://127.0.0.1:9001/health -UseBasicParsing`
+3. Create one deployment-owned backend key for the proxy hop:
+   - set `EARCRAWLER_API_KEYS=proxy=<generated-secret>` on the EarCrawler host
+   - use the same `proxy:<generated-secret>` value only inside the IIS rewrite
+     config
+4. Install IIS with Windows Authentication and logging enabled, then add URL
+   Rewrite plus ARR on the same host.
+5. Create the IIS site, bind the TLS certificate, and place
+   `scripts/ops/iis-earcrawler-front-door.web.config.example` into the site as
+   `web.config` after replacing the placeholder backend secret.
+6. Keep anonymous auth disabled and Windows Authentication enabled at the IIS
+   site or virtual directory.
+7. Publish only the IIS listener to the routed network; do not open direct
+   inbound access to `9001`.
+8. Run the front-door smoke probe against the IIS URL:
+   - `pwsh scripts/ops/iis-front-door-smoke.ps1 -BaseUrl https://earcrawler.example.mil -UseDefaultCredentials -ExpectedSubject proxy -ReportPath C:\ProgramData\EarCrawler\workspace\iis-front-door-smoke.txt -JsonReportPath C:\ProgramData\EarCrawler\workspace\iis-front-door-smoke.json`
+9. Retain the smoke report with the same host-local evidence set as the API
+   install and rollback records.
+
+The smoke probe checks the minimum approved boundary:
+
+- `/health` succeeds through IIS
+- `X-Request-Id` survives the proxy hop for log correlation
+- the backend `X-Subject` matches the deployment-owned proxy credential when
+  `-ExpectedSubject` is provided
+- quarantined `/v1/search` is not published through the front door
+- another unpublished path such as `/docs` is also denied
+
+That is the concrete validation shape for this reference pattern. It proves
+that IIS is acting as the only published listener and that the published route
+set stays narrower than the full app surface.
 
 ## Identity expectations
 
@@ -207,6 +249,15 @@ For the IIS reference pattern, the minimum useful attribution record is:
 This gives operators a deterministic join key between edge logs and app logs
 even though EarCrawler generates its own request id.
 
+For the reproducible IIS drill, retain:
+
+- IIS site binding and auth configuration record
+- the deployed `web.config`
+- the smoke probe text report
+- the smoke probe JSON report
+- the correlated IIS request log entry for the `/health` probe
+- the EarCrawler service log entry carrying the same `X-Request-Id`
+
 ## Secret rotation expectations
 
 Rotation splits into two layers:
@@ -236,6 +287,8 @@ For the IIS reference pattern, rotation should be:
 5. verify a proxied authenticated `/health` call and archive the resulting
    `X-Request-Id`
 
+The same smoke probe command above is the post-rotation verification step.
+
 ## Minimum proxy controls
 
 Any approved front door must provide all of the following:
@@ -263,6 +316,20 @@ For the IIS reference pattern, also:
 - keep ARR forwarding target fixed to `127.0.0.1:9001`
 - capture IIS logs in the same retention and incident-response workflow as the
   EarCrawler service logs
+
+Recommended IIS-specific logging fields for this reference pattern:
+
+- authenticated Windows user
+- c-ip
+- cs-host
+- cs-uri-stem
+- sc-status
+- time-taken
+- cs(User-Agent)
+
+Pair those IIS logs with the smoke probe report and the EarCrawler
+`X-Request-Id` response header to reconstruct the full path from edge caller to
+app request.
 
 ## When the current shared-secret model is no longer sufficient
 
@@ -310,3 +377,19 @@ pattern for this Windows-first repo.
 - Rotate both proxy-tier identity secrets and the backend EarCrawler secret.
 - Do not claim end-user identity enforcement inside EarCrawler unless the app
   is explicitly changed to support it.
+
+## Evidence now backing the pattern
+
+This repository now backs the approved IIS pattern with:
+
+- one narrow IIS reference config in
+  `scripts/ops/iis-earcrawler-front-door.web.config.example`
+- one repeatable front-door validation probe in
+  `scripts/ops/iis-front-door-smoke.ps1`
+- operator guidance in this document and
+  `docs/ops/windows_single_host_operator.md`
+
+This is evidence for the approved boundary and repeatable operator drill. It is
+not a claim that EarCrawler now supports direct app exposure, per-user auth
+inside the app, or any non-Windows front-door as an equally documented
+reference.

@@ -56,7 +56,7 @@ release intentionally updates them.
 
 Before provisioning the host, collect:
 
-- Java 11 or newer installed and available to the service account
+- Java 17 or newer installed and available to the service account
 - NSSM installed on the host
 - Apache Jena `5.3.0` zip from the official Apache distribution
 - Apache Jena Fuseki `5.3.0` zip from the official Apache distribution
@@ -306,7 +306,7 @@ If health fails after the upgrade:
 | `/$/ping` connection refused or timeout | Fuseki service is stopped, hung, or bound to the wrong port | Check `Get-Service EarCrawler-Fuseki`, review `C:\ProgramData\EarCrawler\fuseki\logs\fuseki-service.log`, confirm port `3030` is free |
 | `/ear/query` returns `404` | Wrong dataset name or wrong assembler config | Re-render config with `windows-fuseki-service.ps1 -Action render-config`, verify service path is `/ear/query`, then restart |
 | `/ear/query` returns `500` on trivial `SELECT` | TDB2 store is missing, damaged, or locked | Stop the service, inspect the dataset directory, and restore the latest good snapshot if needed |
-| Startup fails with Java errors | `JAVA_HOME` missing or incompatible Java runtime | Reinstall or repair Java 11+, confirm the service account can run `java -version` |
+| Startup fails with Java errors | `JAVA_HOME` missing or incompatible Java runtime | Reinstall or repair Java 17+, confirm the service account can run `java -version` |
 | `Address already in use` in Fuseki logs | Port collision on `3030` | Stop the conflicting process or move Fuseki to a reviewed alternate port and update `EARCRAWLER_FUSEKI_URL` accordingly |
 | EarCrawler API `/health` reports Fuseki errors after API startup | Startup order was wrong or `EARCRAWLER_FUSEKI_URL` does not match the local service | Fix Fuseki first, then restart the API after the health probe passes |
 
@@ -328,7 +328,8 @@ What is documented but still operator-executed:
 
 What still needs future automation:
 
-- clean-room release smoke that provisions a fresh local Fuseki host end-to-end
+- direct host-level provisioning automation outside a source checkout when
+  binaries are staged in an external release vault
 - automated verification of backup/restore on a schedule
 - host-side download and checksum verification of Fuseki without relying on a
   source checkout or separately staged archive

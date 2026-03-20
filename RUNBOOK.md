@@ -10,29 +10,33 @@
 1. Bump version in `pyproject.toml` and commit.
 2. Tag `vX.Y.Z` and push.
 3. Ensure signing secrets `SIGNING_CERT_PFX_BASE64` and `SIGNING_CERT_PASSWORD` are available when signing.
-4. Run `pwsh scripts/build-wheel.ps1`, `pwsh scripts/build-exe.ps1`, and `pwsh scripts/make-installer.ps1`.
-5. Run clean-room wheel validation from outside the source checkout:
+4. Run release evidence preflight before expensive build/test work:
+   - `pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist`
+   - this fails when `dist\` release artifacts are uncontrolled (missing checksums/signature, checksum drift, or untracked top-level outputs beside checksums).
+5. Run `pwsh scripts/build-wheel.ps1`, `pwsh scripts/build-exe.ps1`, and `pwsh scripts/make-installer.ps1`.
+6. Run clean-room wheel validation from outside the source checkout:
    - `pwsh scripts/package-wheel-smoke.ps1 -WheelPath dist\earcrawler-*.whl`
-6. Run clean-room installed-runtime smoke against the built wheel:
-   - `pwsh scripts/installed-runtime-smoke.ps1 -WheelPath dist\earcrawler-*.whl -Host 127.0.0.1 -Port 9001 -ReportPath dist\installed_runtime_smoke.json`
-7. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
-8. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
-9. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
-10. Run supported-path API smoke parity in the release workspace:
+7. Run clean-room installed-runtime smoke against the built wheel and local Fuseki dependency:
+   - `pwsh scripts/installed-runtime-smoke.ps1 -WheelPath dist\earcrawler-*.whl -UseHermeticWheelhouse -HermeticBundleZipPath dist\hermetic-artifacts.zip -ReleaseChecksumsPath dist\checksums.sha256 -UseLiveFuseki -AutoProvisionFuseki -RequireFullBaseline -Host 127.0.0.1 -Port 9001 -ReportPath dist\installed_runtime_smoke.json`
+   - Java 17+ is required when using `-AutoProvisionFuseki`.
+8. Run `pwsh scripts/sign-artifacts.ps1` to sign executables and installer.
+9. Verify locally with `signtool verify /pa dist\earctl-*.exe` and `signtool verify /pa dist\earcrawler-setup-*.exe`.
+10. Generate checksums and SBOM with `pwsh scripts/checksums.ps1` and `pwsh scripts/sbom.ps1`.
+11. Run supported-path API smoke parity in the release workspace:
    - `pwsh scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001`
    - `pwsh scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist\api_smoke.json`
    - `pwsh scripts/api-stop.ps1`
-11. Run release-shaped optional-mode smoke coverage:
+12. Run release-shaped optional-mode smoke coverage:
    - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist\optional_runtime_smoke.json`
-12. Run release integrity validation and write evidence:
+13. Run release integrity validation and write evidence:
    - `pwsh scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist\api_smoke.json -OptionalRuntimeSmokeReportPath dist\optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist\installed_runtime_smoke.json -EvidenceOutPath dist\release_validation_evidence.json`
-13. If a real Task 5.3 run artifact is available, run:
+14. If a real Task 5.3 run artifact is available, run:
    - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist\training\<run_id> -ReportPath dist\optional_runtime_smoke.json`
-14. If a real Task 5.3 run artifact is available, validate its release evidence bundle:
+15. If a real Task 5.3 run artifact is available, validate its release evidence bundle:
    - `pwsh scripts/local_adapter_smoke.ps1 -RunDir dist\training\<run_id>`
    - `py -m scripts.eval.run_local_adapter_benchmark --run-dir dist\training\<run_id> --manifest eval\manifest.json --dataset-id ear_compliance.v2 --dataset-id entity_obligations.v2 --dataset-id unanswerable.v2 --smoke-report kg\reports\local-adapter-smoke.json`
    - `py -m scripts.eval.validate_local_adapter_release_bundle --run-dir dist\training\<run_id> --benchmark-summary dist\benchmarks\<benchmark_run_id>\benchmark_summary.json --smoke-report kg\reports\local-adapter-smoke.json`
-15. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, `dist\api_smoke.json`, `dist\installed_runtime_smoke.json`, release validation evidence, and optional runtime smoke evidence files.
+16. Create a GitHub release and upload the wheel, EXE, installer, checksum, SBOM, `dist\api_smoke.json`, `dist\installed_runtime_smoke.json`, release validation evidence, and optional runtime smoke evidence files.
 
 Release artifact note
 - The wheel is the authoritative deployment artifact for the supported Windows API service path described in `docs/ops/windows_single_host_operator.md`.
@@ -190,7 +194,12 @@ $env:EARCRAWLER_THIN_RETRIEVAL_MIN_TOTAL_CHARS = "0"
 1. Modify `requirements.in` or `requirements-win.in` as needed.
 2. `pip-compile --generate-hashes requirements.in -o requirements-lock.txt`
 3. `pip-compile --generate-hashes requirements-win.in -o requirements-win-lock.txt`
-4. Rebuild the wheelhouse: `pwsh scripts/build-wheelhouse.ps1`
+4. Verify dependency-policy alignment: `py scripts/verify-dependency-policy.py`
+5. Rebuild the wheelhouse: `pwsh scripts/build-wheelhouse.ps1`
+
+### Bootstrap prerequisites
+- Run `pwsh scripts/bootstrap-verify.ps1` before first local setup or when shell/runtime prerequisites are unclear.
+- The verifier checks `pwsh`, `py`, project `.venv\Scripts\python.exe`, and Java major version >= 11.
 - To share data with support, run `scripts/telemetry-export.ps1` which bundles recent events into `dist/telemetry_bundle.jsonl.gz` after an additional redaction pass.
 
 ## Monitoring

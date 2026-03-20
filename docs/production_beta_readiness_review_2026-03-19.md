@@ -8,8 +8,8 @@ Repository: `earCrawler`
 
 Governing context:
 
-- `docs/ExecutionPlanRunPass10.md`
-- `docs/RunPass10.md`
+- `docs/ExecutionPlanRunPass11.md`
+- `docs/RunPass11.md`
 - `docs/capability_graduation_boundaries.md`
 - `docs/search_kg_quarantine_decision_package_2026-03-19.md`
 - `docs/local_adapter_release_evidence.md`
@@ -82,9 +82,9 @@ Current validation and evidence used for this review:
 - `docs/search_kg_quarantine_decision_package_2026-03-19.md`
   - decision: `Keep Quarantined`
 
-## What RunPass10 Strengths Were Preserved
+## What RunPass11 Strengths Were Preserved
 
-The key strengths identified in `docs/RunPass10.md` remain intact:
+The key strengths identified in `docs/RunPass11.md` remain intact:
 
 - support-boundary discipline is still explicit in code and docs
 - deterministic corpus and KG artifact discipline remains in place
@@ -102,9 +102,9 @@ consistent across:
 - operator documentation
 - release smoke and optional-runtime smoke
 
-## RunPass10 Weakness Review
+## RunPass11 Weakness Review
 
-| RunPass10 concern | Current state | Review outcome |
+| RunPass11 concern | Current state | Review outcome |
 | --- | --- | --- |
 | Upstream client failures were too lossy | Explicit upstream status objects now distinguish `no_results`, `missing_credentials`, `upstream_unavailable`, `invalid_response`, and `retry_exhausted`; degraded status is surfaced in callers, manifests, logs, and `/health` live-source reporting. | Resolved for the supported baseline. |
 | Startup and optional-runtime hot spots were under-tested | The suite now passes at `481` tests, with added coverage for app startup wiring, runtime-state access, local-adapter runtime, retriever components, upstream clients, and release verification behavior. | Resolved enough for production-beta confidence. |

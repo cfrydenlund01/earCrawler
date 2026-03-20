@@ -22,6 +22,7 @@ from earCrawler.utils.http_cache import HTTPCache
 from earCrawler.utils import budget
 from earCrawler.utils.log_json import JsonLogger
 from api_clients.upstream_status import (
+    UpstreamResult,
     UpstreamState,
     UpstreamStatus,
     UpstreamStatusTracker,
@@ -53,6 +54,15 @@ def _log_retry(retry_state: RetryCallState) -> None:
 
 class FederalRegisterError(Exception):
     """Raised for Federal Register client errors or invalid responses."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        state: UpstreamState = "invalid_response",
+    ) -> None:
+        super().__init__(message)
+        self.state = state
 
 
 class FederalRegisterClient:
@@ -225,6 +235,12 @@ class FederalRegisterClient:
 
     def get_ear_articles(self, term: str, *, per_page: int = 5) -> List[Dict[str, str]]:
         """Return normalized EAR article records for ``term``."""
+        return self.get_ear_articles_result(term, per_page=per_page).data
+
+    def get_ear_articles_result(
+        self, term: str, *, per_page: int = 5
+    ) -> UpstreamResult[List[Dict[str, str]]]:
+        """Return normalized EAR articles with explicit upstream status."""
         operation = "get_ear_articles"
         url = f"{self.BASE_URL}/documents"
         params = {"per_page": str(per_page), "conditions[term]": term}
@@ -233,18 +249,18 @@ class FederalRegisterClient:
                 self._get_json(url, params)
             )
         except FederalRegisterError as exc:
-            self._record_status(operation, "invalid_response", message=str(exc))
+            status = self._record_status(operation, exc.state, message=str(exc))
             _logger.error(
                 "api.request_failed",
                 url=url,
                 term=term,
-                state="invalid_response",
+                state=exc.state,
                 error=str(exc),
             )
-            return []
+            return UpstreamResult(data=[], status=status)
         except requests.RequestException as exc:
             state, status_code = self._classify_request_error(exc)
-            self._record_status(
+            status = self._record_status(
                 operation,
                 state,
                 message=str(exc),
@@ -259,7 +275,7 @@ class FederalRegisterClient:
                 status_code=status_code,
                 error=str(exc),
             )
-            return []
+            return UpstreamResult(data=[], status=status)
         results: List[Dict[str, str]] = []
         for doc in data.get("results", []):
             doc_id = str(doc.get("document_number") or doc.get("id") or "")
@@ -281,7 +297,7 @@ class FederalRegisterClient:
                 }
             )
         if results:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "ok",
                 result_count=len(results),
@@ -289,7 +305,7 @@ class FederalRegisterClient:
                 cache_age_seconds=cache_age_seconds,
             )
         else:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "no_results",
                 message=f"No documents for term={term!r}",
@@ -297,10 +313,14 @@ class FederalRegisterClient:
                 cache_hit=cache_hit,
                 cache_age_seconds=cache_age_seconds,
             )
-        return results
+        return UpstreamResult(data=results, status=status)
 
     def get_article_text(self, doc_id: str) -> str:
         """Return cleaned text for a Federal Register document."""
+        return self.get_article_text_result(doc_id).data
+
+    def get_article_text_result(self, doc_id: str) -> UpstreamResult[str]:
+        """Return cleaned text with explicit upstream status."""
         operation = "get_article_text"
         url = f"{self.BASE_URL}/documents/{doc_id}"
         try:
@@ -308,18 +328,18 @@ class FederalRegisterClient:
                 self._get_json(url, params={})
             )
         except FederalRegisterError as exc:
-            self._record_status(operation, "invalid_response", message=str(exc))
+            status = self._record_status(operation, exc.state, message=str(exc))
             _logger.error(
                 "api.request_failed",
                 url=url,
                 document=doc_id,
-                state="invalid_response",
+                state=exc.state,
                 error=str(exc),
             )
-            return ""
+            return UpstreamResult(data="", status=status)
         except requests.RequestException as exc:
             state, status_code = self._classify_request_error(exc)
-            self._record_status(
+            status = self._record_status(
                 operation,
                 state,
                 message=str(exc),
@@ -334,10 +354,10 @@ class FederalRegisterClient:
                 status_code=status_code,
                 error=str(exc),
             )
-            return ""
+            return UpstreamResult(data="", status=status)
         text = self._clean_text(data.get("body_html") or data.get("body_text") or "")
         if text:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "ok",
                 result_count=1,
@@ -345,7 +365,7 @@ class FederalRegisterClient:
                 cache_age_seconds=cache_age_seconds,
             )
         else:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "no_results",
                 message=f"Document {doc_id!r} has no body text",
@@ -353,7 +373,7 @@ class FederalRegisterClient:
                 cache_hit=cache_hit,
                 cache_age_seconds=cache_age_seconds,
             )
-        return text
+        return UpstreamResult(data=text, status=status)
 
     # Backwards compatible wrappers
     def search_documents(
@@ -362,6 +382,15 @@ class FederalRegisterClient:
         per_page: int = 100,
         page: int | None = None,
     ) -> List[Dict]:
+        return self.search_documents_result(query, per_page=per_page, page=page).data
+
+    def search_documents_result(
+        self,
+        query: str,
+        per_page: int = 100,
+        page: int | None = None,
+    ) -> UpstreamResult[List[Dict]]:
+        """Return raw Federal Register documents with explicit upstream status."""
         operation = "search_documents"
         url = f"{self.BASE_URL}/documents"
         params = {"conditions[any]": query, "per_page": str(per_page)}
@@ -372,19 +401,19 @@ class FederalRegisterClient:
                 self._get_json(url, params)
             )
         except FederalRegisterError as exc:
-            self._record_status(operation, "invalid_response", message=str(exc))
+            status = self._record_status(operation, exc.state, message=str(exc))
             _logger.error(
                 "api.request_failed",
                 url=url,
                 query=query,
                 page=page,
-                state="invalid_response",
+                state=exc.state,
                 error=str(exc),
             )
-            return []
+            return UpstreamResult(data=[], status=status)
         except requests.RequestException as exc:
             state, status_code = self._classify_request_error(exc)
-            self._record_status(
+            status = self._record_status(
                 operation,
                 state,
                 message=str(exc),
@@ -400,10 +429,10 @@ class FederalRegisterClient:
                 status_code=status_code,
                 error=str(exc),
             )
-            return []
+            return UpstreamResult(data=[], status=status)
         results = data.get("results", [])
         if results:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "ok",
                 result_count=len(results),
@@ -411,7 +440,7 @@ class FederalRegisterClient:
                 cache_age_seconds=cache_age_seconds,
             )
         else:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "no_results",
                 message=f"No documents for query={query!r}",
@@ -419,9 +448,13 @@ class FederalRegisterClient:
                 cache_hit=cache_hit,
                 cache_age_seconds=cache_age_seconds,
             )
-        return results
+        return UpstreamResult(data=list(results), status=status)
 
     def get_document(self, doc_number: str):
+        return self.get_document_result(doc_number).data
+
+    def get_document_result(self, doc_number: str) -> UpstreamResult[dict]:
+        """Return one Federal Register document with explicit upstream status."""
         operation = "get_document"
         url = f"{self.BASE_URL}/documents/{doc_number}"
         try:
@@ -429,18 +462,18 @@ class FederalRegisterClient:
                 self._get_json(url, params={})
             )
         except FederalRegisterError as exc:
-            self._record_status(operation, "invalid_response", message=str(exc))
+            status = self._record_status(operation, exc.state, message=str(exc))
             _logger.error(
                 "api.request_failed",
                 url=url,
                 document=doc_number,
-                state="invalid_response",
+                state=exc.state,
                 error=str(exc),
             )
-            return {}
+            return UpstreamResult(data={}, status=status)
         except requests.RequestException as exc:
             state, status_code = self._classify_request_error(exc)
-            self._record_status(
+            status = self._record_status(
                 operation,
                 state,
                 message=str(exc),
@@ -455,9 +488,9 @@ class FederalRegisterClient:
                 status_code=status_code,
                 error=str(exc),
             )
-            return {}
+            return UpstreamResult(data={}, status=status)
         if data:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "ok",
                 result_count=1,
@@ -465,7 +498,7 @@ class FederalRegisterClient:
                 cache_age_seconds=cache_age_seconds,
             )
         else:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "no_results",
                 message=f"Document {doc_number!r} not found",
@@ -473,7 +506,7 @@ class FederalRegisterClient:
                 cache_hit=cache_hit,
                 cache_age_seconds=cache_age_seconds,
             )
-        return data
+        return UpstreamResult(data=dict(data), status=status)
 
     def get_ear_text(self, citation: str) -> str:
         data = self.get_document(citation)

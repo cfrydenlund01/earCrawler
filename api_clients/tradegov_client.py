@@ -20,6 +20,7 @@ from earCrawler.utils.http_cache import HTTPCache
 from earCrawler.utils import budget
 from earCrawler.utils.log_json import JsonLogger
 from api_clients.upstream_status import (
+    UpstreamResult,
     UpstreamState,
     UpstreamStatus,
     UpstreamStatusTracker,
@@ -257,12 +258,22 @@ class TradeGovClient:
         sources: Optional[Iterable[str]] = None,
     ) -> List[Dict[str, str]]:
         """Search for entities matching ``query`` and return normalized records."""
+        return self.search_result(query, limit=limit, sources=sources).data
+
+    def search_result(
+        self,
+        query: str,
+        *,
+        limit: int = 10,
+        sources: Optional[Iterable[str]] = None,
+    ) -> UpstreamResult[List[Dict[str, str]]]:
+        """Search Trade.gov and return a typed payload plus upstream status."""
         operation = "search"
         params: dict[str, str] = {"name": query, "size": str(max(1, min(limit, 50)))}
         if sources:
             params["sources"] = ",".join(sources)
         if not self.api_key:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "missing_credentials",
                 message="TRADEGOV_API_KEY is empty; request skipped",
@@ -272,13 +283,13 @@ class TradeGovClient:
                 reason="missing_api_key",
                 endpoint="/search",
             )
-            return []
+            return UpstreamResult(data=[], status=status)
         try:
             data, cache_hit, cache_age_seconds = self._normalize_get_result(
                 self._get("/search", params)
             )
         except TradeGovError as exc:
-            self._record_status(operation, exc.state, message=str(exc))
+            status = self._record_status(operation, exc.state, message=str(exc))
             _logger.error(
                 "api.request_failed",
                 endpoint="/search",
@@ -286,10 +297,10 @@ class TradeGovClient:
                 state=exc.state,
                 error=str(exc),
             )
-            return []
+            return UpstreamResult(data=[], status=status)
         except requests.RequestException as exc:
             state, status_code = self._classify_request_error(exc)
-            self._record_status(
+            status = self._record_status(
                 operation,
                 state,
                 message=str(exc),
@@ -304,7 +315,7 @@ class TradeGovClient:
                 status_code=status_code,
                 error=str(exc),
             )
-            return []
+            return UpstreamResult(data=[], status=status)
         results: List[Dict[str, str]] = []
         for item in data.get("results", []):
             results.append(
@@ -316,7 +327,7 @@ class TradeGovClient:
                 }
             )
         if results:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "ok",
                 result_count=len(results),
@@ -324,7 +335,7 @@ class TradeGovClient:
                 cache_age_seconds=cache_age_seconds,
             )
         else:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "no_results",
                 message=f"No entities matched query={query!r}",
@@ -332,18 +343,23 @@ class TradeGovClient:
                 cache_hit=cache_hit,
                 cache_age_seconds=cache_age_seconds,
             )
-        return results
+        return UpstreamResult(data=results, status=status)
 
     def lookup_entity(self, query: str) -> Dict[str, str]:
         """Return the first entity result for ``query`` or an empty dict."""
+        return self.lookup_entity_result(query).data
+
+    def lookup_entity_result(self, query: str) -> UpstreamResult[Dict[str, str]]:
+        """Return the first entity result with explicit upstream status."""
         operation = "lookup_entity"
-        results = self.search(query, limit=1)
+        search_result = self.search_result(query, limit=1)
+        results = search_result.data
         if results:
-            self._record_status(operation, "ok", result_count=1)
-            return results[0]
-        search_status = self.get_last_status("search")
+            status = self._record_status(operation, "ok", result_count=1)
+            return UpstreamResult(data=results[0], status=status)
+        search_status = search_result.status
         if search_status is not None:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 search_status.state,
                 message=search_status.message,
@@ -352,17 +368,22 @@ class TradeGovClient:
                 result_count=0,
             )
         else:
-            self._record_status(
+            status = self._record_status(
                 operation,
                 "no_results",
                 message=f"No entity found for query={query!r}",
                 result_count=0,
             )
-        return {}
+        return UpstreamResult(data={}, status=status)
 
     # Backwards compatibility aliases
+    def search_entities_result(
+        self, query: str, page_size: int = 100
+    ) -> UpstreamResult[List[Dict[str, str]]]:
+        return self.search_result(query, limit=page_size)
+
     def search_entities(self, query: str, page_size: int = 100):
-        return iter(self.search(query, limit=page_size))
+        return iter(self.search_entities_result(query, page_size=page_size).data)
 
     # Resource lifecycle -------------------------------------------------
     def close(self) -> None:

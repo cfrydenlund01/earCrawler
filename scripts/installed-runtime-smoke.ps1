@@ -8,7 +8,14 @@ param(
   [string]$LockFilePath = 'requirements-win-lock.txt',
   [string]$WheelhousePath = '',
   [string]$HermeticBundleZipPath = '',
-  [string]$ReleaseChecksumsPath = ''
+  [string]$ReleaseChecksumsPath = '',
+  [switch]$UseLiveFuseki,
+  [switch]$AutoProvisionFuseki,
+  [string]$FusekiUrl = '',
+  [string]$FusekiHost = '127.0.0.1',
+  [int]$FusekiPort = 3030,
+  [string]$FusekiDatasetName = 'ear',
+  [switch]$RequireFullBaseline
 )
 
 $ErrorActionPreference = "Stop"
@@ -19,6 +26,18 @@ if ($HermeticBundleZipPath -and -not $UseHermeticWheelhouse.IsPresent) {
 }
 if ($ReleaseChecksumsPath -and -not $UseHermeticWheelhouse.IsPresent) {
   throw "-ReleaseChecksumsPath requires -UseHermeticWheelhouse."
+}
+if ($AutoProvisionFuseki.IsPresent -and -not $UseLiveFuseki.IsPresent) {
+  throw "-AutoProvisionFuseki requires -UseLiveFuseki."
+}
+if ($RequireFullBaseline.IsPresent -and -not $UseLiveFuseki.IsPresent) {
+  throw "-RequireFullBaseline requires -UseLiveFuseki."
+}
+if ($UseLiveFuseki.IsPresent -and -not $AutoProvisionFuseki.IsPresent -and -not $FusekiUrl) {
+  throw "-UseLiveFuseki requires -FusekiUrl when -AutoProvisionFuseki is not set."
+}
+if ($UseLiveFuseki.IsPresent -and $FusekiDatasetName -notmatch '^[A-Za-z0-9._-]+$') {
+  throw "FusekiDatasetName must match ^[A-Za-z0-9._-]+$."
 }
 
 function Invoke-CheckedCommand {
@@ -53,6 +72,36 @@ function Resolve-PythonInterpreter {
   throw "Python interpreter not found on PATH."
 }
 
+function Get-JavaMajorVersion {
+  $javaCmd = Get-Command "java" -ErrorAction SilentlyContinue
+  if (-not $javaCmd) {
+    throw "Java runtime not found on PATH. Java 17 or newer is required for Fuseki baseline provisioning."
+  }
+
+  $versionOutput = & $javaCmd.Source -version 2>&1
+  if ($LASTEXITCODE -ne 0) {
+    throw "Unable to execute 'java -version'."
+  }
+
+  $text = [string]($versionOutput -join "`n")
+  $match = [regex]::Match($text, 'version "(?<version>[^"]+)"')
+  if (-not $match.Success) {
+    throw "Unable to parse Java version from: $text"
+  }
+
+  $raw = $match.Groups["version"].Value
+  if ($raw.StartsWith("1.")) {
+    $parts = $raw.Split(".")
+    if ($parts.Length -lt 2) {
+      throw "Unable to parse Java 1.x version token: $raw"
+    }
+    return [int]$parts[1]
+  }
+
+  $majorToken = $raw.Split(".")[0]
+  return [int]$majorToken
+}
+
 function Stop-ApiProcess {
   param([System.Diagnostics.Process]$Process)
 
@@ -71,7 +120,153 @@ function Stop-ApiProcess {
   }
 }
 
+function Stop-ManagedProcess {
+  param(
+    [System.Diagnostics.Process]$Process,
+    [string]$Label
+  )
+
+  if ($null -eq $Process) {
+    return
+  }
+  if ($Process.HasExited) {
+    return
+  }
+  try {
+    Stop-Process -Id $Process.Id -Force -ErrorAction Stop
+  }
+  catch {
+    Write-Warning ("Unable to stop {0} process {1}: {2}" -f $Label, $Process.Id, $_.Exception.Message)
+  }
+}
+
+function Resolve-PwshExecutable {
+  $cmd = Get-Command "pwsh" -ErrorAction SilentlyContinue
+  if ($cmd) {
+    return $cmd.Source
+  }
+  throw "pwsh executable not found on PATH."
+}
+
+function Resolve-JenaFusekiHomes {
+  param(
+    [Parameter(Mandatory = $true)][string]$PythonExecutable,
+    [Parameter(Mandatory = $true)][string]$RepoRoot
+  )
+
+  $bootstrap = @"
+import json
+import pathlib
+import sys
+repo = pathlib.Path(r'{0}')
+sys.path.insert(0, str(repo))
+from earCrawler.utils import jena_tools, fuseki_tools
+jena_home = pathlib.Path(jena_tools.ensure_jena())
+fuseki_home = pathlib.Path(fuseki_tools.ensure_fuseki())
+print(json.dumps({{"jena_home": str(jena_home), "fuseki_home": str(fuseki_home)}}))
+"@ -f $RepoRoot
+
+  $raw = & $PythonExecutable -c $bootstrap
+  if ($LASTEXITCODE -ne 0) {
+    throw "Unable to resolve Jena/Fuseki tool homes."
+  }
+
+  $payload = $raw | ConvertFrom-Json
+  if (-not $payload.jena_home -or -not $payload.fuseki_home) {
+    throw "Jena/Fuseki tool resolution returned incomplete data."
+  }
+  return [ordered]@{
+    jena_home = [string]$payload.jena_home
+    fuseki_home = [string]$payload.fuseki_home
+  }
+}
+
+function Resolve-TdbLoaderScript {
+  param([Parameter(Mandatory = $true)][string]$JenaHome)
+
+  $batDir = Join-Path $JenaHome "bat"
+  $candidates = @("tdb2_tdbloader.bat", "tdb2.tdbloader.bat")
+  foreach ($candidate in $candidates) {
+    $path = Join-Path $batDir $candidate
+    if (Test-Path $path) {
+      return $path
+    }
+  }
+  throw "TDB2 loader script not found under $batDir."
+}
+
+function Resolve-FusekiServerExecutable {
+  param([Parameter(Mandatory = $true)][string]$FusekiHome)
+
+  $candidates = @(
+    (Join-Path $FusekiHome "fuseki-server.bat"),
+    (Join-Path $FusekiHome "fuseki-server.cmd"),
+    (Join-Path $FusekiHome "fuseki-server")
+  )
+  foreach ($candidate in $candidates) {
+    if (Test-Path $candidate) {
+      return $candidate
+    }
+  }
+  throw "Fuseki server launcher not found under $FusekiHome."
+}
+
+function Write-BaselineFusekiFixture {
+  param([Parameter(Mandatory = $true)][string]$OutPath)
+
+  $fixture = @"
+@prefix dcterms: <http://purl.org/dc/terms/> .
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix prov: <http://www.w3.org/ns/prov#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+<urn:example:entity:1> rdfs:label "Example Entity" ;
+  dcterms:description "Installed-runtime baseline fixture entity" ;
+  rdf:type <http://schema.org/Thing> ;
+  owl:sameAs <http://example.com/entity> ;
+  dcterms:identifier "FIX-001" .
+
+<urn:example:activity:1> prov:used <urn:example:entity:1> ;
+  prov:generated <urn:example:artifact:2> ;
+  prov:endedAtTime "2023-01-02T00:00:00Z" .
+"@
+
+  Set-Content -Path $OutPath -Value $fixture -Encoding ascii
+}
+
+function Wait-ForFusekiHealth {
+  param(
+    [Parameter(Mandatory = $true)][string]$PwshExecutable,
+    [Parameter(Mandatory = $true)][string]$ProbeScript,
+    [Parameter(Mandatory = $true)][string]$FusekiEndpoint,
+    [Parameter(Mandatory = $true)][string]$HealthReportPath,
+    [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process
+  )
+
+  $deadline = (Get-Date).AddSeconds(45)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      Invoke-CheckedCommand $PwshExecutable -File $ProbeScript -FusekiUrl $FusekiEndpoint -ReportPath $HealthReportPath
+      return
+    }
+    catch {
+      if ($Process.HasExited) {
+        throw "Fuseki process exited before health checks passed."
+      }
+      Start-Sleep -Milliseconds 750
+    }
+  }
+  throw "Timed out waiting for Fuseki health checks to pass."
+}
+
 $python = Resolve-PythonInterpreter
+if ($AutoProvisionFuseki.IsPresent) {
+  $javaMajorVersion = Get-JavaMajorVersion
+  if ($javaMajorVersion -lt 17) {
+    throw "Java 17 or newer is required for Fuseki baseline provisioning (found Java $javaMajorVersion)."
+  }
+}
 
 if ($WheelPath) {
   if (-not (Test-Path $WheelPath)) {
@@ -102,6 +297,13 @@ $report = [ordered]@{
   install_mode = if ($UseHermeticWheelhouse.IsPresent) { "hermetic_wheelhouse" } else { "direct_wheel" }
   install_source = if ($UseHermeticWheelhouse.IsPresent) { "repo_wheelhouse" } else { "direct_wheel" }
   install_details = [ordered]@{}
+  fuseki_dependency = [ordered]@{
+    mode = if ($UseLiveFuseki.IsPresent) { "live_fuseki" } else { "embedded_fixture" }
+    endpoint = ""
+    health_report_path = ""
+    provisioned = $false
+    status = if ($UseLiveFuseki.IsPresent) { "pending" } else { "not_required" }
+  }
   checks = @()
   api_smoke = [ordered]@{}
   runtime_contract = [ordered]@{}
@@ -110,6 +312,8 @@ $report = [ordered]@{
 }
 
 $apiProcess = $null
+$fusekiProcess = $null
+$fusekiRuntimeRoot = ""
 $smokeFailure = ""
 
 $savedEnv = @{
@@ -122,6 +326,9 @@ $savedEnv = @{
   EARCRAWLER_API_ENABLE_SEARCH = $env:EARCRAWLER_API_ENABLE_SEARCH
   EARCRAWLER_ENABLE_KG_EXPANSION = $env:EARCRAWLER_ENABLE_KG_EXPANSION
   EARCRAWLER_WHEEL_SMOKE_REPO_ROOT = $env:EARCRAWLER_WHEEL_SMOKE_REPO_ROOT
+  JENA_HOME = $env:JENA_HOME
+  FUSEKI_HOME = $env:FUSEKI_HOME
+  JAVA_HOME = $env:JAVA_HOME
   EARCTL_PYTHON = $env:EARCTL_PYTHON
 }
 
@@ -277,13 +484,96 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
   Set-Content -Path $importCheckPath -Value $importCheck -Encoding ascii
   Invoke-CheckedCommand $venvPython $importCheckPath
 
+  if ($UseLiveFuseki.IsPresent -and $AutoProvisionFuseki.IsPresent) {
+    $pwshExe = Resolve-PwshExecutable
+    $tools = Resolve-JenaFusekiHomes -PythonExecutable $python -RepoRoot $repoRoot
+
+    $env:JENA_HOME = [string]$tools.jena_home
+    $env:FUSEKI_HOME = [string]$tools.fuseki_home
+
+    $fusekiRuntimeRoot = Join-Path $smokeRoot "fuseki-runtime"
+    $fusekiProgramData = Join-Path $fusekiRuntimeRoot "programdata"
+    $fusekiConfigRoot = Join-Path $fusekiProgramData "config"
+    $fusekiDatabaseRoot = Join-Path $fusekiProgramData "databases\tdb2"
+    $fusekiLogRoot = Join-Path $fusekiProgramData "logs"
+    $fusekiConfigPath = Join-Path $fusekiConfigRoot "tdb2-readonly-query.ttl"
+    $fusekiFixturePath = Join-Path $fusekiRuntimeRoot "baseline-fixture.ttl"
+    $fusekiHealthReportPath = Join-Path $fusekiLogRoot "health-fuseki.txt"
+
+    New-Item -ItemType Directory -Force -Path $fusekiRuntimeRoot, $fusekiProgramData, $fusekiConfigRoot, $fusekiDatabaseRoot, $fusekiLogRoot | Out-Null
+    Write-BaselineFusekiFixture -OutPath $fusekiFixturePath
+
+    $fusekiServiceScript = Join-Path $repoRoot "scripts\ops\windows-fuseki-service.ps1"
+    & $fusekiServiceScript `
+      -Action render-config `
+      -ProgramDataRoot $fusekiProgramData `
+      -ConfigRoot $fusekiConfigRoot `
+      -DatabaseRoot $fusekiDatabaseRoot `
+      -ConfigPath $fusekiConfigPath `
+      -FusekiHost $FusekiHost `
+      -FusekiPort $FusekiPort `
+      -DatasetName $FusekiDatasetName
+    if ($LASTEXITCODE -ne 0) {
+      throw "Fuseki config render failed."
+    }
+
+    $tdbLoader = Resolve-TdbLoaderScript -JenaHome ([string]$tools.jena_home)
+    Invoke-CheckedCommand $tdbLoader "--loc=$fusekiDatabaseRoot" $fusekiFixturePath
+
+    $fusekiExe = Resolve-FusekiServerExecutable -FusekiHome ([string]$tools.fuseki_home)
+    $fusekiStdOut = Join-Path $fusekiLogRoot "fuseki-smoke.out.log"
+    $fusekiStdErr = Join-Path $fusekiLogRoot "fuseki-smoke.err.log"
+    $fusekiProcess = Start-Process `
+      -FilePath $fusekiExe `
+      -ArgumentList @("--config", $fusekiConfigPath, "--localhost", "--port", $FusekiPort.ToString()) `
+      -WorkingDirectory ([string]$tools.fuseki_home) `
+      -PassThru `
+      -WindowStyle Hidden `
+      -RedirectStandardOutput $fusekiStdOut `
+      -RedirectStandardError $fusekiStdErr
+
+    $FusekiUrl = "http://{0}:{1}/{2}/query" -f $FusekiHost, $FusekiPort, $FusekiDatasetName
+    Wait-ForFusekiHealth `
+      -PwshExecutable $pwshExe `
+      -ProbeScript (Join-Path $repoRoot "scripts\health\fuseki-probe.ps1") `
+      -FusekiEndpoint $FusekiUrl `
+      -HealthReportPath $fusekiHealthReportPath `
+      -Process $fusekiProcess
+
+    $report.fuseki_dependency = [ordered]@{
+      mode = "live_fuseki"
+      endpoint = $FusekiUrl
+      health_report_path = $fusekiHealthReportPath
+      provisioned = $true
+      status = "passed"
+    }
+  }
+  elseif ($UseLiveFuseki.IsPresent) {
+    $pwshExe = Resolve-PwshExecutable
+    $fusekiHealthReportPath = Join-Path $smokeRoot "fuseki-health.txt"
+    Invoke-CheckedCommand $pwshExe -File (Join-Path $repoRoot "scripts\health\fuseki-probe.ps1") -FusekiUrl $FusekiUrl -ReportPath $fusekiHealthReportPath
+    $report.fuseki_dependency = [ordered]@{
+      mode = "live_fuseki"
+      endpoint = $FusekiUrl
+      health_report_path = $fusekiHealthReportPath
+      provisioned = $false
+      status = "passed"
+    }
+  }
+
   $env:EARCRAWLER_API_HOST = $ApiHost
   $env:EARCRAWLER_API_PORT = [string]$Port
   $env:EARCRAWLER_API_INSTANCE_COUNT = "1"
-  $env:EARCRAWLER_API_EMBEDDED_FIXTURE = "1"
   $env:EARCRAWLER_API_ENABLE_SEARCH = "0"
   $env:EARCRAWLER_ENABLE_KG_EXPANSION = "0"
-  Remove-Item Env:EARCRAWLER_FUSEKI_URL -ErrorAction SilentlyContinue
+  if ($UseLiveFuseki.IsPresent) {
+    $env:EARCRAWLER_FUSEKI_URL = $FusekiUrl
+    Remove-Item Env:EARCRAWLER_API_EMBEDDED_FIXTURE -ErrorAction SilentlyContinue
+  }
+  else {
+    $env:EARCRAWLER_API_EMBEDDED_FIXTURE = "1"
+    Remove-Item Env:EARCRAWLER_FUSEKI_URL -ErrorAction SilentlyContinue
+  }
   Remove-Item Env:EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE -ErrorAction SilentlyContinue
 
   $apiProcess = Start-Process -FilePath $venvPython -ArgumentList @('-m', 'uvicorn', 'service.api_server.server:app', '--host', $ApiHost, '--port', $Port) -WorkingDirectory $workspace -PassThru -WindowStyle Hidden
@@ -327,9 +617,13 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
   } else {
     "direct_wheel"
   }
+  $baselineModeExpected = if ($RequireFullBaseline.IsPresent) { "live_fuseki" } else { [string]$report.fuseki_dependency.mode }
+  $baselineStatusExpected = if ($RequireFullBaseline.IsPresent) { "passed" } else { [string]$report.fuseki_dependency.status }
   $checkList = @(
     [ordered]@{ name = "install_mode"; passed = ($report.install_mode -eq $expectedInstallMode); expected = $expectedInstallMode; actual = [string]$report.install_mode },
     [ordered]@{ name = "install_source"; passed = ([string]$report.install_source -eq $expectedInstallSource); expected = $expectedInstallSource; actual = [string]$report.install_source },
+    [ordered]@{ name = "fuseki_dependency_mode"; passed = ([string]$report.fuseki_dependency.mode -eq $baselineModeExpected); expected = $baselineModeExpected; actual = [string]$report.fuseki_dependency.mode },
+    [ordered]@{ name = "fuseki_dependency_health"; passed = ([string]$report.fuseki_dependency.status -eq $baselineStatusExpected); expected = $baselineStatusExpected; actual = [string]$report.fuseki_dependency.status },
     [ordered]@{ name = "health_http_200"; passed = ([int]$healthResponse.StatusCode -eq 200); expected = "200"; actual = [string]$healthResponse.StatusCode },
     [ordered]@{ name = "supported_api_smoke"; passed = ([string]$apiSmokePayload.schema_version -eq "supported-api-smoke.v1" -and [string]$apiSmokePayload.overall_status -eq "passed"); expected = "supported-api-smoke.v1 + passed"; actual = ("{0} + {1}" -f [string]$apiSmokePayload.schema_version, [string]$apiSmokePayload.overall_status) },
     [ordered]@{ name = "runtime_contract_topology"; passed = ([string]$runtimeContract.topology -eq "single_host"); expected = "single_host"; actual = [string]$runtimeContract.topology },
@@ -370,6 +664,7 @@ catch {
 }
 finally {
   Stop-ApiProcess -Process $apiProcess
+  Stop-ManagedProcess -Process $fusekiProcess -Label "Fuseki"
 
   foreach ($key in $savedEnv.Keys) {
     $value = $savedEnv[$key]

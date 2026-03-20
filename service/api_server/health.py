@@ -165,6 +165,10 @@ def _check_live_sources() -> Dict[str, Any]:
         "manifest_path": str(manifest_path),
         "stale_after_seconds": stale_after_seconds,
         "sources": [],
+        "failure_taxonomy": {
+            "state_counts": {},
+            "degraded_state_counts": {},
+        },
         "summary": {
             "healthy": 0,
             "stale": 0,
@@ -226,8 +230,14 @@ def _check_live_sources() -> Dict[str, Any]:
         return payload
 
     sources: list[dict[str, Any]] = []
+    overall_state_counts: dict[str, int] = {}
     for source in sorted(grouped):
         entries = grouped[source]
+        state_counts: dict[str, int] = {}
+        for entry in entries:
+            state = str(entry["state"])
+            state_counts[state] = state_counts.get(state, 0) + 1
+            overall_state_counts[state] = overall_state_counts.get(state, 0) + 1
         latest_entry = max(entries, key=lambda entry: entry["timestamp"])
         latest_state = str(latest_entry["state"])
         last_checked = latest_entry["timestamp"]
@@ -293,6 +303,9 @@ def _check_live_sources() -> Dict[str, Any]:
             "freshness": freshness,
             "latest_state": latest_state,
             "last_checked_at": last_checked.isoformat().replace("+00:00", "Z"),
+            "state_counts": {
+                state: state_counts[state] for state in sorted(state_counts)
+            },
             "operations": operations,
         }
         if last_success is not None:
@@ -340,6 +353,17 @@ def _check_live_sources() -> Dict[str, Any]:
 
     payload["status"] = overall_status
     payload["sources"] = sources
+    degraded_state_counts = {
+        state: count
+        for state, count in sorted(overall_state_counts.items())
+        if state not in _HEALTHY_SOURCE_STATES
+    }
+    payload["failure_taxonomy"] = {
+        "state_counts": {
+            state: overall_state_counts[state] for state in sorted(overall_state_counts)
+        },
+        "degraded_state_counts": degraded_state_counts,
+    }
     payload["summary"] = {
         **counts,
         "partially_degraded": partially_degraded,

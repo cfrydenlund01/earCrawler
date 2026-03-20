@@ -2,6 +2,16 @@
 
 This document describes reproducible KG release steps.
 
+Local/CI preflight guard before deeper release work:
+- `scripts/release-evidence-preflight.ps1 -AllowEmptyDist`
+- fails fast when release-like files exist without `dist/checksums.sha256`, when `dist/checksums.sha256.sig` is missing, when checksums drift, or when uncontrolled top-level files sit next to the checksums file.
+
+GitHub release promotion stages (`.github/workflows/release.yml`):
+- `build`: produces signed distributables, checksums, canonical metadata, and `dist/promotion/build_stage_evidence.json`; uploads `release-build-stage`.
+- `validate`: downloads `release-build-stage`, runs release security baseline plus smoke/verification gates, writes `dist/release_validation_evidence.json` and `dist/promotion/validation_stage_evidence.json`; uploads `release-validation-stage`.
+- `promote`: downloads `release-validation-stage`, writes `dist/promotion/promotion_stage_evidence.json`, then publishes release assets.
+- Each stage retains its evidence as both workflow artifacts and release files under `dist/promotion/*.json`.
+
 1. Run `kg/scripts/canonical-freeze.ps1` to produce canonical files under `kg/canonical/`.
 2. Create deterministic archive with `scripts/make-canonical-zip.ps1`.
 3. Generate `manifest.json` and `checksums.sha256` via `scripts/make-manifest.ps1`.
@@ -22,10 +32,13 @@ This document describes reproducible KG release steps.
    - `signtool verify /pa dist/*.exe`
 11. Generate release checksums for distributable artifacts:
    - `scripts/checksums.ps1`
+   - `scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256`
 12. Run release security baseline evidence:
    - `scripts/security-baseline.ps1 -Python py -RequirementsLock requirements-win-lock.txt -PipAuditIgnoreFile security/pip_audit_ignore.txt -OutputDir dist/security`
 13. Run installed-runtime smoke in the actual field-install artifact shape:
-   - `scripts/installed-runtime-smoke.ps1 -WheelPath dist/earcrawler-*.whl -UseHermeticWheelhouse -HermeticBundleZipPath dist/hermetic-artifacts.zip -ReleaseChecksumsPath dist/checksums.sha256 -Host 127.0.0.1 -Port 9001 -ReportPath dist/installed_runtime_smoke.json`
+   - `scripts/installed-runtime-smoke.ps1 -WheelPath dist/earcrawler-*.whl -UseHermeticWheelhouse -HermeticBundleZipPath dist/hermetic-artifacts.zip -ReleaseChecksumsPath dist/checksums.sha256 -UseLiveFuseki -AutoProvisionFuseki -RequireFullBaseline -Host 127.0.0.1 -Port 9001 -ReportPath dist/installed_runtime_smoke.json`
+   - this now provisions a temporary local read-only Fuseki dependency, validates Fuseki health, and proves the installed wheel against the supported API surface in the same single-host runtime shape
+   - Java 17+ is required for the Fuseki auto-provision path
 14. Run supported-path API smoke in the same release workspace shape and collect observability probe evidence:
    - `scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001`
    - `scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/api_smoke.json`
@@ -51,10 +64,11 @@ This document describes reproducible KG release steps.
 19. Use `scripts/verify-release.ps1` to validate canonical + distributable artifacts and emit evidence:
    - `scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json -SecuritySummaryPath dist/security/security_scan_summary.json -ObservabilityApiProbePath dist/observability/api_probe.json -EvidenceOutPath dist/release_validation_evidence.json`
    - validation now fails if any distributable output still includes files with `PLACEHOLDER` in the filename (for example `manifest.sig.PLACEHOLDER.txt` in `dist/offline_bundle/`)
+   - validation now fails if `dist/checksums.sha256` does not cover every top-level release artifact present alongside it (except `checksums.sha256`, `checksums.sha256.sig`, and `release_validation_evidence.json`)
    - publication now also fails if the canonical manifest signature, release checksums signature, supported API smoke report, optional-runtime smoke report, installed-runtime smoke report, release security baseline summary, or observability API probe report are missing or non-passing
    - publication now also fails if installed-runtime smoke does not prove `install_mode = hermetic_wheelhouse`
    - publication now also fails if installed-runtime smoke does not prove `install_source = release_bundle`
-20. Archive `dist/api_smoke.json`, `dist/installed_runtime_smoke.json`, `dist/release_validation_evidence.json`, `dist/optional_runtime_smoke.json`, `dist/security/*.json`, `dist/observability/api_probe.json`, `dist/observability/health-api.txt`, and `dist/hermetic-artifacts.zip` with the release bundle.
+20. Archive `dist/api_smoke.json`, `dist/installed_runtime_smoke.json`, `dist/release_validation_evidence.json`, `dist/optional_runtime_smoke.json`, `dist/security/*.json`, `dist/observability/api_probe.json`, `dist/observability/health-api.txt`, `dist/hermetic-artifacts.zip`, and `dist/promotion/*.json` with the release bundle.
 
 Optional local-adapter note:
 - A passing `release_evidence_manifest.json` keeps one named adapter candidate
