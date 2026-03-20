@@ -9,7 +9,7 @@ The workflow in `.github/workflows/ci.yml` runs on:
 ## Jobs
 
 - `cpu`
-  Runs on `windows-latest` for pushes, pull requests, and tags. It checks out the repo, validates pinned versions, sets up Python 3.11, caches pip, installs `requirements.txt` plus the editable package, runs `scripts/package-wheel-smoke.ps1` (clean-room wheel install/entrypoint/resource validation in an isolated temp venv), checks formatting/lint with Black and Flake8, then runs `scripts/security-baseline.ps1` to produce security evidence:
+  Runs on `windows-latest` for pushes, pull requests, and tags. It checks out the repo, runs `scripts/release-evidence-preflight.ps1 -AllowEmptyDist` as an early drift guard, validates pinned versions, sets up Python 3.11, caches pip, installs `requirements.txt` plus the editable package, runs `scripts/package-wheel-smoke.ps1` (clean-room wheel install/entrypoint/resource validation in an isolated temp venv), checks formatting/lint with Black and Flake8, then runs `scripts/security-baseline.ps1` to produce security evidence:
   - dependency audit via `pip-audit` against `requirements-win-lock.txt` (with temporary ignore list `security/pip_audit_ignore.txt`)
   - static analysis via Bandit (`high-severity`, `high-confidence`)
   - secret-pattern scanning via `scripts/security_secret_scan.py`
@@ -23,7 +23,11 @@ The workflow in `.github/workflows/ci.yml` runs on:
   Runs only on pushes to `main`, on `windows-gpu-t4`, after `cpu`, with `continue-on-error: true`. It installs `requirements-gpu.txt`, runs `eval/collect_benchmark.sh`, and uploads `benchmark.md` as an artifact.
 
 - `release`
-  Runs only for tag refs after `cpu` passes, on `windows-latest`. It builds release artifacts, runs clean-room wheel smoke, runs `scripts/security-baseline.ps1` to generate release security evidence under `dist/security/`, packages `dist/hermetic-artifacts.zip`, signs and checksums distributables, then runs installed-runtime smoke from the same release bundle shape operators receive (`scripts/installed-runtime-smoke.ps1 -HermeticBundleZipPath dist/hermetic-artifacts.zip -ReleaseChecksumsPath dist/checksums.sha256`). While supported API smoke is running, it also runs `scripts/health/api-probe.ps1` and writes observability evidence to `dist/observability/api_probe.json`. Publication is gated by `scripts/verify-release.ps1`, which now requires passing functional smoke, security baseline summary, and observability probe evidence in addition to artifact/signature checks.
+  Runs only for tag refs after `cpu` passes, on `windows-latest`, and now uses explicit promotion stages in `.github/workflows/release.yml`:
+  - `build` creates distributable artifacts, checksums, canonical metadata, and `dist/promotion/build_stage_evidence.json`.
+  - `validate` downloads build artifacts, runs release security baseline, installed-runtime smoke, supported API smoke, optional runtime smoke, and `scripts/verify-release.ps1`, then records `dist/promotion/validation_stage_evidence.json`.
+  - `promote` downloads the validated bundle, records `dist/promotion/promotion_stage_evidence.json`, and only then publishes via GitHub Releases.
+  Stage evidence is retained as workflow artifacts (`release-build-stage`, `release-validation-stage`, `release-promotion-stage`) and as release files under `dist/promotion/*.json`.
 
 ## Secrets
 
@@ -42,5 +46,8 @@ Define them under GitHub repository **Secrets and variables -> Actions**.
 - Local rerun of the CI security baseline:
   - `pwsh scripts/security-baseline.ps1 -Python py -RequirementsLock requirements-win-lock.txt -PipAuditIgnoreFile security/pip_audit_ignore.txt -OutputDir dist/security`
   - outputs: `dist/security/pip_audit.json`, `dist/security/bandit.json`, `dist/security/secret_scan.json`, `dist/security/security_scan_summary.json`
+- Local rerun of the release-evidence drift guard:
+  - `pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist`
+  - fails fast when `dist/` has release-like artifacts without `checksums.sha256`, when `checksums.sha256.sig` is missing, when checksums do not match, or when untracked top-level release artifacts are present next to checksums.
 - The GPU and benchmark jobs are non-blocking because both are marked `continue-on-error: true`.
 

@@ -43,8 +43,17 @@ through an approved front door, and what is still quarantined or optional.
   (`/health` returns `200`, readiness is `pass`, and latency stays within the
   configured budget).
 - The installed-runtime smoke report remains the proof that release validation
-  was executed in the single-host field-install shape and did not widen the
-  supported network surface.
+  was executed in the single-host field-install shape, proved a healthy local
+  read-only Fuseki dependency, and did not widen the supported network surface.
+
+For the optional approved IIS front-door pattern, operators should also retain
+the output of `scripts/ops/iis-front-door-smoke.ps1` so there is host-local
+evidence that:
+
+- the proxy, not the app listener, is the published network edge
+- `X-Request-Id` survives the proxy hop for attribution
+- unpublished routes such as quarantined `/v1/search` remain denied at the
+  front door
 
 ## Operator network hardening checklist
 

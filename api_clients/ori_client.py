@@ -12,6 +12,7 @@ import requests
 
 from earCrawler.utils.log_json import JsonLogger
 from api_clients.upstream_status import (
+    UpstreamResult,
     UpstreamState,
     UpstreamStatus,
     UpstreamStatusTracker,
@@ -170,9 +171,47 @@ class ORIClient:
         url = f"{self.BASE_URL}/case_findings"
         return self._get(url, operation="get_listing_html")
 
+    def get_listing_html_result(self) -> UpstreamResult[str]:
+        """Return listing HTML with explicit upstream status."""
+        operation = "get_listing_html"
+        try:
+            data = self.get_listing_html()
+        except ORIClientError:
+            status = self.get_last_status(operation) or self._record_status(
+                operation,
+                "retry_exhausted",
+                message="ORI listing request failed without status",
+            )
+            return UpstreamResult(data="", status=status)
+        status = self.get_last_status(operation) or self._record_status(
+            operation,
+            "ok",
+            result_count=1,
+        )
+        return UpstreamResult(data=data, status=status)
+
     def get_case_html(self, url: str) -> str:
         """Return HTML for a specific case detail page ``url``."""
         return self._get(url, operation="get_case_html")
+
+    def get_case_html_result(self, url: str) -> UpstreamResult[str]:
+        """Return case HTML with explicit upstream status."""
+        operation = "get_case_html"
+        try:
+            data = self.get_case_html(url)
+        except ORIClientError:
+            status = self.get_last_status(operation) or self._record_status(
+                operation,
+                "retry_exhausted",
+                message="ORI case request failed without status",
+            )
+            return UpstreamResult(data="", status=status)
+        status = self.get_last_status(operation) or self._record_status(
+            operation,
+            "ok",
+            result_count=1,
+        )
+        return UpstreamResult(data=data, status=status)
 
     def close(self) -> None:
         try:

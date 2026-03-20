@@ -31,6 +31,16 @@ entrypoints and flags commonly confused legacy surfaces.
 - API contract and route status: `docs/api/readme.md`
 - Runtime vs research boundary: `docs/runtime_research_boundary.md`
 
+Before trusting an unfamiliar directory, classify the workspace state:
+
+- `pwsh scripts/workspace-state.ps1 -Mode report`
+- `pwsh scripts/workspace-state.ps1 -Mode verify`
+
+Treat `build/`, `dist/`, `run/`, `runs/`, `.venv*`, and `.pytest_tmp*` as
+generated or disposable workspace state unless a document above explicitly says
+otherwise. The repository-status index lists the current ghost-residue paths
+that must not be treated as supported source.
+
 ## Quarantined or legacy surfaces
 
 Do not treat these as supported runtime entrypoints:

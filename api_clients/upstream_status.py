@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Generic, Literal, TypeVar
 
 
 UpstreamState = Literal[
@@ -62,6 +62,30 @@ class UpstreamStatus:
         return payload
 
 
+T = TypeVar("T")
+
+
+@dataclass(frozen=True)
+class UpstreamResult(Generic[T]):
+    """Typed operation result containing payload plus explicit upstream status."""
+
+    data: T
+    status: UpstreamStatus
+
+    @property
+    def state(self) -> UpstreamState:
+        return self.status.state
+
+    @property
+    def degraded(self) -> bool:
+        return self.status.degraded
+
+    def as_dict(self) -> dict[str, object]:
+        payload = self.status.as_dict()
+        payload["degraded"] = self.degraded
+        return payload
+
+
 class UpstreamStatusTracker:
     """Track the latest status for each operation in a single source client."""
 
@@ -105,5 +129,4 @@ class UpstreamStatusTracker:
     def snapshot(self) -> dict[str, dict[str, object]]:
         return {name: self._latest[name].as_dict() for name in sorted(self._latest)}
 
-
-__all__ = ["UpstreamState", "UpstreamStatus", "UpstreamStatusTracker"]
+__all__ = ["UpstreamState", "UpstreamStatus", "UpstreamResult", "UpstreamStatusTracker"]

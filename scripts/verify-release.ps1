@@ -53,6 +53,49 @@ function Parse-Checksums {
     }
 }
 
+function Get-UntrackedTopLevelArtifacts {
+    param(
+        [Parameter(Mandatory = $true)][string]$RootDir,
+        [Parameter(Mandatory = $true)]$Entries,
+        [string[]]$AllowedNames
+    )
+
+    $expected = @{}
+    foreach ($entry in $Entries) {
+        $entryPath = [string]$entry.path
+        if (-not $entryPath) {
+            continue
+        }
+        $normalized = $entryPath.Replace('/', '\')
+        $parent = [IO.Path]::GetDirectoryName($normalized)
+        if (-not $parent) {
+            $leaf = [IO.Path]::GetFileName($normalized)
+            if ($leaf) {
+                $expected[$leaf.ToLowerInvariant()] = $true
+            }
+        }
+    }
+
+    $allowed = @{}
+    foreach ($name in $AllowedNames) {
+        if (-not $name) {
+            continue
+        }
+        $allowed[([string]$name).ToLowerInvariant()] = $true
+    }
+
+    $unexpected = @()
+    Get-ChildItem -Path $RootDir -File -ErrorAction SilentlyContinue |
+        Sort-Object Name |
+        ForEach-Object {
+            $key = $_.Name.ToLowerInvariant()
+            if (-not $expected.ContainsKey($key) -and -not $allowed.ContainsKey($key)) {
+                $unexpected += $_.Name
+            }
+        }
+    return $unexpected
+}
+
 function Get-PlaceholderArtifacts {
     param([string[]]$Roots)
 
@@ -192,6 +235,8 @@ function Test-InstalledRuntimeSmokeReport {
     }
 
     $expectedChecks = @(
+        "fuseki_dependency_mode",
+        "fuseki_dependency_health",
         "health_http_200",
         "supported_api_smoke",
         "install_source",
@@ -233,6 +278,19 @@ function Test-InstalledRuntimeSmokeReport {
     if ($payload.PSObject.Properties.Name -contains "install_source") {
         $installSource = [string]$payload.install_source
     }
+    $fusekiDependencyMode = ""
+    $fusekiDependencyStatus = ""
+    if ($payload.PSObject.Properties.Name -contains "fuseki_dependency") {
+        $fusekiDependency = $payload.fuseki_dependency
+        if ($null -ne $fusekiDependency) {
+            if ($fusekiDependency.PSObject.Properties.Name -contains "mode") {
+                $fusekiDependencyMode = [string]$fusekiDependency.mode
+            }
+            if ($fusekiDependency.PSObject.Properties.Name -contains "status") {
+                $fusekiDependencyStatus = [string]$fusekiDependency.status
+            }
+        }
+    }
 
     return [ordered]@{
         path = $Path
@@ -244,8 +302,12 @@ function Test-InstalledRuntimeSmokeReport {
         status = $reportStatus
         install_mode = $installMode
         install_source = $installSource
+        fuseki_dependency_mode = $fusekiDependencyMode
+        fuseki_dependency_status = $fusekiDependencyStatus
         hermetic_install_status = if ($installMode -eq "hermetic_wheelhouse") { "passed" } else { "failed" }
         field_install_shape_status = if ($installSource -eq "release_bundle") { "passed" } else { "failed" }
+        fuseki_mode_status = if ($fusekiDependencyMode -eq "live_fuseki") { "passed" } else { "failed" }
+        fuseki_health_status = if ($fusekiDependencyStatus -eq "passed") { "passed" } else { "failed" }
     }
 }
 
@@ -420,16 +482,49 @@ else {
     $checksumsResolved = (Resolve-Path $ChecksumsPath).Path
     $checksumsDir = Split-Path -Parent $checksumsResolved
     $entries = Parse-Checksums -Path $checksumsResolved
+    $checksumsRoot = [IO.Path]::GetFullPath($checksumsDir)
+    $checksumsRootPrefix = if (
+        $checksumsRoot.EndsWith('\') -or
+        $checksumsRoot.EndsWith('/')
+    ) {
+        $checksumsRoot
+    }
+    else {
+        "$checksumsRoot\"
+    }
     foreach ($entry in $entries) {
         $candidate = Join-Path $checksumsDir $entry.path
-        if (-not (Test-Path $candidate)) {
+        $candidateResolved = [IO.Path]::GetFullPath($candidate)
+        if (
+            -not $candidateResolved.StartsWith($checksumsRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)
+        ) {
+            throw "Checksums entry escapes release root: $($entry.path)"
+        }
+        if (-not (Test-Path $candidateResolved)) {
             throw "Missing dist artifact listed in checksums: $($entry.path)"
         }
-        $actual = (Get-FileHash $candidate -Algorithm SHA256).Hash.ToLowerInvariant()
+        $actual = (Get-FileHash $candidateResolved -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($actual -ne $entry.sha256) {
             throw "Dist checksum mismatch for $($entry.path)"
         }
         $distChecked += 1
+    }
+
+    $allowedTopLevelNames = @(
+        [IO.Path]::GetFileName($checksumsResolved),
+        [IO.Path]::GetFileName("$checksumsResolved.sig")
+    )
+    if ($EvidenceOutPath) {
+        $evidenceOutResolved = [IO.Path]::GetFullPath($EvidenceOutPath)
+        $evidenceParent = Split-Path -Parent $evidenceOutResolved
+        if ($evidenceParent -and $evidenceParent.Equals($checksumsRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $allowedTopLevelNames += [IO.Path]::GetFileName($evidenceOutResolved)
+        }
+    }
+    $unexpectedTopLevel = @(Get-UntrackedTopLevelArtifacts -RootDir $checksumsDir -Entries $entries -AllowedNames $allowedTopLevelNames)
+    if ($unexpectedTopLevel.Count -gt 0) {
+        $unexpectedList = ($unexpectedTopLevel | Sort-Object | ForEach-Object { " - $_" }) -join [Environment]::NewLine
+        throw "Untracked top-level release artifacts must be removed or added to checksums:`n$unexpectedList"
     }
 
     $placeholderRoots = @($checksumsDir)
@@ -500,6 +595,12 @@ if ($RequireCompleteEvidence) {
     }
     if ([string]$installedRuntimeSmoke.field_install_shape_status -ne "passed") {
         $evidenceFailures += "Installed runtime smoke must prove release-bundle field install shape."
+    }
+    if ([string]$installedRuntimeSmoke.fuseki_mode_status -ne "passed") {
+        $evidenceFailures += "Installed runtime smoke must prove live local Fuseki dependency mode."
+    }
+    if ([string]$installedRuntimeSmoke.fuseki_health_status -ne "passed") {
+        $evidenceFailures += "Installed runtime smoke must prove a healthy local Fuseki dependency."
     }
     if ([string]$securityBaseline.status -ne "passed") {
         $evidenceFailures += "CI security baseline evidence is required and must pass."

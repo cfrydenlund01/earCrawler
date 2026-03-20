@@ -2,6 +2,7 @@ __pycache__/
 /tools/
 !tools/.gitkeep
 .venv/
+.venv*/
 .env
 kg/reports/
 kg/shapes.ttl
@@ -9,6 +10,7 @@ perf/synth/out/
 .cache/
 .pytest_cache/
 .pytest_tmp/
+.pytest_tmp*/
 dist/
 build/
 data/ecfr/
@@ -55,3 +57,10 @@ config/llm_secrets.env
 
 # Agent guidance file
 AGENTS.md
+
+# Workspace-only ghost residue (unsupported local caches)
+earCrawler/agent/
+earCrawler/models/legalbert/
+earCrawler/quant/
+tests/agent/
+tests/models/

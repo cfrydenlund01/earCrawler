@@ -4,7 +4,18 @@ The repository uses a checksum-verified toolchain for Java and Python.
 
 ## Dependency sources
 
-`requirements.in` is the authoritative dependency input. Derived files are:
+`requirements.in` is the authoritative dependency input for this repository
+across runtime and development workflows.
+
+`pyproject.toml` remains the authoritative packaging metadata file, but its
+runtime dependency list is treated as a publish-time subset contract that must
+remain represented in `requirements.in`.
+
+There is intentionally no separate `requirements-dev.txt`; development and test
+dependencies are also declared in `requirements.in` and pinned through the same
+lockfile pipeline.
+
+Derived files are:
 
 - `requirements.txt` (wrapper used by standard installs/CI)
 - `requirements-lock.txt` (hash-locked output from `requirements.in`)
@@ -16,6 +27,28 @@ Regenerate lockfiles after changing `requirements.in`:
 py -m piptools compile --generate-hashes --output-file=requirements-lock.txt requirements.in
 py -m piptools compile --generate-hashes --output-file=requirements-win-lock.txt requirements-win.in
 ```
+
+Validate dependency-policy consistency (wrappers, lock headers, and
+`pyproject.toml` runtime subset alignment):
+
+```powershell
+py scripts/verify-dependency-policy.py
+```
+
+## Bootstrap verification
+
+Use one command to verify Windows-first prerequisites for source-checkout work:
+
+```powershell
+pwsh scripts/bootstrap-verify.ps1
+```
+
+Default checks validate:
+
+- `pwsh` availability
+- `py` launcher availability
+- project `.venv\Scripts\python.exe`
+- Java runtime on `PATH` with major version >= 11
 
 ## Versions and checksums
 

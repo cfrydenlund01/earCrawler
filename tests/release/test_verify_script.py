@@ -18,6 +18,17 @@ def run_ps(script, *args, env=None, check=True):
     return subprocess.run(cmd, cwd=ROOT, env=env_vars, check=check)
 
 
+def make_release_checksums(tmp_path, *, artifact_name="artifact.txt", artifact_body="release-ok"):
+    release_dir = tmp_path / "release"
+    release_dir.mkdir(parents=True, exist_ok=True)
+    artifact = release_dir / artifact_name
+    artifact.write_text(artifact_body, encoding="utf-8")
+    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
+    checksums = release_dir / "checksums.sha256"
+    checksums.write_text(f"{digest}  {artifact_name}\n", encoding="utf-8")
+    return release_dir, artifact, checksums
+
+
 def test_verify_detects_tamper(tmp_path):
     env = dict(SOURCE_DATE_EPOCH="946684800")
     run_ps("kg/scripts/canonical-freeze.ps1", env=env)
@@ -25,11 +36,28 @@ def test_verify_detects_tamper(tmp_path):
     target = ROOT / "kg" / "canonical" / "foo.txt"
     target.write_text("hello", encoding="utf-8")
     run_ps("scripts/make-manifest.ps1", env=env)
+    _, _, checksums = make_release_checksums(tmp_path)
+    evidence = tmp_path / "release_validation_evidence.json"
     # verification passes
-    run_ps("scripts/verify-release.ps1", env=env)
+    run_ps(
+        "scripts/verify-release.ps1",
+        "-ChecksumsPath",
+        str(checksums),
+        "-EvidenceOutPath",
+        str(evidence),
+        env=env,
+    )
     # tamper
     target.write_text("evil", encoding="utf-8")
-    res = run_ps("scripts/verify-release.ps1", env=env, check=False)
+    res = run_ps(
+        "scripts/verify-release.ps1",
+        "-ChecksumsPath",
+        str(checksums),
+        "-EvidenceOutPath",
+        str(evidence),
+        env=env,
+        check=False,
+    )
     assert res.returncode != 0
 
 
@@ -38,13 +66,7 @@ def test_verify_detects_dist_checksum_tamper(tmp_path):
     run_ps("kg/scripts/canonical-freeze.ps1", env=env)
     run_ps("scripts/make-manifest.ps1", env=env)
 
-    release_dir = tmp_path / "release"
-    release_dir.mkdir(parents=True, exist_ok=True)
-    artifact = release_dir / "artifact.txt"
-    artifact.write_text("release-ok", encoding="utf-8")
-    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    checksums = release_dir / "checksums.sha256"
-    checksums.write_text(f"{digest}  artifact.txt\n", encoding="utf-8")
+    _, artifact, checksums = make_release_checksums(tmp_path)
     evidence = tmp_path / "release_validation_evidence.json"
 
     run_ps(
@@ -98,18 +120,32 @@ def test_verify_fails_when_placeholder_artifacts_are_in_release_outputs(tmp_path
     assert res.returncode != 0
 
 
+def test_verify_fails_when_untracked_top_level_artifact_is_present(tmp_path):
+    env = dict(SOURCE_DATE_EPOCH="946684800")
+    run_ps("kg/scripts/canonical-freeze.ps1", env=env)
+    run_ps("scripts/make-manifest.ps1", env=env)
+
+    release_dir, _, checksums = make_release_checksums(tmp_path)
+    (release_dir / "stale-artifact.txt").write_text("leftover", encoding="utf-8")
+
+    res = run_ps(
+        "scripts/verify-release.ps1",
+        "-ChecksumsPath",
+        str(checksums),
+        "-EvidenceOutPath",
+        str(tmp_path / "release_validation_evidence.json"),
+        env=env,
+        check=False,
+    )
+    assert res.returncode != 0
+
+
 def test_verify_requires_complete_evidence_for_release_publication(tmp_path):
     env = dict(SOURCE_DATE_EPOCH="946684800")
     run_ps("kg/scripts/canonical-freeze.ps1", env=env)
     run_ps("scripts/make-manifest.ps1", env=env)
 
-    release_dir = tmp_path / "dist"
-    release_dir.mkdir(parents=True, exist_ok=True)
-    artifact = release_dir / "artifact.txt"
-    artifact.write_text("release-ok", encoding="utf-8")
-    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    checksums = release_dir / "checksums.sha256"
-    checksums.write_text(f"{digest}  artifact.txt\n", encoding="utf-8")
+    _, _, checksums = make_release_checksums(tmp_path)
 
     res = run_ps(
         "scripts/verify-release.ps1",
@@ -133,13 +169,7 @@ def test_verify_records_installed_runtime_smoke_status(tmp_path):
     run_ps("kg/scripts/canonical-freeze.ps1", env=env)
     run_ps("scripts/make-manifest.ps1", env=env)
 
-    release_dir = tmp_path / "release"
-    release_dir.mkdir(parents=True, exist_ok=True)
-    artifact = release_dir / "artifact.txt"
-    artifact.write_text("release-ok", encoding="utf-8")
-    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    checksums = release_dir / "checksums.sha256"
-    checksums.write_text(f"{digest}  artifact.txt\n", encoding="utf-8")
+    _, _, checksums = make_release_checksums(tmp_path)
 
     installed_runtime = tmp_path / "installed_runtime_smoke.json"
     installed_runtime.write_text(
@@ -149,7 +179,13 @@ def test_verify_records_installed_runtime_smoke_status(tmp_path):
                 "overall_status": "passed",
                 "install_mode": "hermetic_wheelhouse",
                 "install_source": "release_bundle",
+                "fuseki_dependency": {
+                    "mode": "live_fuseki",
+                    "status": "passed",
+                },
                 "checks": [
+                    {"name": "fuseki_dependency_mode", "passed": True},
+                    {"name": "fuseki_dependency_health", "passed": True},
                     {"name": "health_http_200", "passed": True},
                     {"name": "supported_api_smoke", "passed": True},
                     {"name": "install_source", "passed": True},
@@ -192,6 +228,10 @@ def test_verify_records_installed_runtime_smoke_status(tmp_path):
     assert payload["installed_runtime_smoke"]["schema_version"] == "installed-runtime-smoke.v1"
     assert payload["installed_runtime_smoke"]["install_mode"] == "hermetic_wheelhouse"
     assert payload["installed_runtime_smoke"]["install_source"] == "release_bundle"
+    assert payload["installed_runtime_smoke"]["fuseki_dependency_mode"] == "live_fuseki"
+    assert payload["installed_runtime_smoke"]["fuseki_dependency_status"] == "passed"
+    assert payload["installed_runtime_smoke"]["fuseki_mode_status"] == "passed"
+    assert payload["installed_runtime_smoke"]["fuseki_health_status"] == "passed"
     assert payload["installed_runtime_smoke"]["hermetic_install_status"] == "passed"
     assert payload["installed_runtime_smoke"]["field_install_shape_status"] == "passed"
 
@@ -201,13 +241,7 @@ def test_verify_records_security_and_observability_evidence_status(tmp_path):
     run_ps("kg/scripts/canonical-freeze.ps1", env=env)
     run_ps("scripts/make-manifest.ps1", env=env)
 
-    release_dir = tmp_path / "release"
-    release_dir.mkdir(parents=True, exist_ok=True)
-    artifact = release_dir / "artifact.txt"
-    artifact.write_text("release-ok", encoding="utf-8")
-    digest = hashlib.sha256(artifact.read_bytes()).hexdigest()
-    checksums = release_dir / "checksums.sha256"
-    checksums.write_text(f"{digest}  artifact.txt\n", encoding="utf-8")
+    _, _, checksums = make_release_checksums(tmp_path)
 
     security_summary = tmp_path / "security_scan_summary.json"
     security_summary.write_text(

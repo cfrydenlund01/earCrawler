@@ -637,8 +637,8 @@ C:\tools\nssm\nssm.exe restart EarCrawler-API
   clear any `local_adapter` env vars before rolling back the wheel.
 - Do not use this guide to claim container or multi-instance support. The supported target remains one Windows host.
 - If scale-out becomes in scope later, start from `docs/ops/multi_instance_deferred.md` instead of inferring support from this guide.
-- Broader-than-loopback exposure uses a separate front door. The reference pattern is IIS + ARR + Windows Authentication with EarCrawler still bound to loopback; see `docs/ops/external_auth_front_door.md` and `scripts/ops/iis-earcrawler-front-door.web.config.example`.
-- Still-missing deployment evidence: the supported read-only Fuseki path is now documented and partially automated, but clean-room proof for fresh-host Fuseki provisioning, text-index provisioning for `/v1/search`, and a fully exercised IIS front-door deployment still remains outstanding.
+- Broader-than-loopback exposure uses a separate front door. The reference pattern is IIS + ARR + Windows Authentication with EarCrawler still bound to loopback; see `docs/ops/external_auth_front_door.md`, `scripts/ops/iis-earcrawler-front-door.web.config.example`, and `scripts/ops/iis-front-door-smoke.ps1`.
+- When the optional IIS front door is deployed, retain the resulting `iis-front-door-smoke.json` report with the same host-local evidence set as install, upgrade, and rollback records.
 
 
 

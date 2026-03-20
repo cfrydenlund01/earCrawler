@@ -5,14 +5,24 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Release evidence preflight drift guard
+        shell: pwsh
+        run: scripts/release-evidence-preflight.ps1 -AllowEmptyDist
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - name: Install build deps
         run: |
           python -m pip install --upgrade pip
@@ -33,25 +43,6 @@ jobs:
             throw "No wheel built under dist/."
           }
           scripts/package-wheel-smoke.ps1 -WheelPath $wheel.FullName
-      - name: Release security baseline (dependency audit + SAST + secret scan)
-        shell: pwsh
-        run: scripts/security-baseline.ps1 -Python py -RequirementsLock requirements-win-lock.txt -PipAuditIgnoreFile security/pip_audit_ignore.txt -OutputDir dist/security
-      - name: Start supported API smoke service
-        shell: pwsh
-        run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
-      - name: Supported API smoke parity
-        shell: pwsh
-        run: scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/api_smoke.json
-      - name: Observability API probe
-        shell: pwsh
-        run: scripts/health/api-probe.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/observability/health-api.txt -JsonReportPath dist/observability/api_probe.json
-      - name: Stop supported API smoke service
-        if: always()
-        shell: pwsh
-        run: scripts/api-stop.ps1
-      - name: Optional runtime smoke (search/KG gate validation)
-        shell: pwsh
-        run: scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json
       - name: Build exe
         shell: pwsh
         run: scripts/build-exe.ps1
@@ -81,23 +72,9 @@ jobs:
       - name: Checksums
         shell: pwsh
         run: scripts/checksums.ps1
-      - name: Installed runtime smoke (release bundle field-install shape)
+      - name: Sign release checksums
         shell: pwsh
-        run: |
-          $wheel = Get-ChildItem dist -Filter "*.whl" |
-            Sort-Object LastWriteTime -Descending |
-            Select-Object -First 1
-          if (-not $wheel) {
-            throw "No wheel built under dist/."
-          }
-          scripts/installed-runtime-smoke.ps1 `
-            -WheelPath $wheel.FullName `
-            -UseHermeticWheelhouse `
-            -HermeticBundleZipPath dist/hermetic-artifacts.zip `
-            -ReleaseChecksumsPath dist/checksums.sha256 `
-            -Host 127.0.0.1 `
-            -Port 9001 `
-            -ReportPath dist/installed_runtime_smoke.json
+        run: scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256
       - name: SBOM
         shell: pwsh
         run: scripts/sbom.ps1
@@ -116,15 +93,167 @@ jobs:
       - name: Provenance attestation
         shell: pwsh
         run: scripts/provenance-attest.ps1
+      - name: Record build stage evidence
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem dist -Filter "*.whl" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $wheel) {
+            throw "No wheel built under dist/."
+          }
+          scripts/write-release-stage-manifest.ps1 `
+            -Stage build `
+            -Tag ${{ github.ref_name }} `
+            -OutPath dist/promotion/build_stage_evidence.json `
+            -EvidenceFiles @(
+              $wheel.FullName,
+              "dist/hermetic-artifacts.zip",
+              "dist/checksums.sha256",
+              "dist/sbom.spdx.json",
+              "kg/canonical/manifest.json",
+              "kg/canonical/provenance.json"
+            )
+      - name: Upload build stage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-build-stage
+          path: |
+            dist/**
+            kg/canonical/**
+            scripts/verify-release.ps1
+            scripts/write-release-stage-manifest.ps1
+          if-no-files-found: error
+
+  validate:
+    needs: build
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download build stage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-build-stage
+          path: .
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install validation deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install --upgrade --retries 5 -r requirements.txt
+          pip install --upgrade --retries 5 -e .
+      - name: Release evidence preflight drift guard
+        shell: pwsh
+        run: scripts/release-evidence-preflight.ps1 -AllowEmptyDist
+      - name: Release security baseline (dependency audit + SAST + secret scan)
+        shell: pwsh
+        run: scripts/security-baseline.ps1 -Python py -RequirementsLock requirements-win-lock.txt -PipAuditIgnoreFile security/pip_audit_ignore.txt -OutputDir dist/security
+      - name: Installed runtime smoke (release bundle field-install shape)
+        shell: pwsh
+        run: |
+          $wheel = Get-ChildItem dist -Filter "*.whl" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          if (-not $wheel) {
+            throw "No wheel built under dist/."
+          }
+          scripts/installed-runtime-smoke.ps1 `
+            -WheelPath $wheel.FullName `
+            -UseHermeticWheelhouse `
+            -HermeticBundleZipPath dist/hermetic-artifacts.zip `
+            -ReleaseChecksumsPath dist/checksums.sha256 `
+            -UseLiveFuseki `
+            -AutoProvisionFuseki `
+            -RequireFullBaseline `
+            -Host 127.0.0.1 `
+            -Port 9001 `
+            -ReportPath dist/installed_runtime_smoke.json
+      - name: Start supported API smoke service
+        shell: pwsh
+        run: scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
+      - name: Supported API smoke parity
+        shell: pwsh
+        run: scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/api_smoke.json
+      - name: Observability API probe
+        shell: pwsh
+        run: scripts/health/api-probe.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/observability/health-api.txt -JsonReportPath dist/observability/api_probe.json
+      - name: Stop supported API smoke service
+        if: always()
+        shell: pwsh
+        run: scripts/api-stop.ps1
+      - name: Optional runtime smoke (search/KG gate validation)
+        shell: pwsh
+        run: scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json
       - name: Release integrity validation
         shell: pwsh
         run: scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json -SecuritySummaryPath dist/security/security_scan_summary.json -ObservabilityApiProbePath dist/observability/api_probe.json -EvidenceOutPath dist/release_validation_evidence.json
       - name: Determinism check
         shell: pwsh
         run: scripts/rebuild-compare.ps1 -Version ${{ github.ref_name }}
+      - name: Record validation stage evidence
+        shell: pwsh
+        run: |
+          scripts/write-release-stage-manifest.ps1 `
+            -Stage validation `
+            -Tag ${{ github.ref_name }} `
+            -OutPath dist/promotion/validation_stage_evidence.json `
+            -EvidenceFiles @(
+              "dist/promotion/build_stage_evidence.json",
+              "dist/release_validation_evidence.json",
+              "dist/api_smoke.json",
+              "dist/optional_runtime_smoke.json",
+              "dist/installed_runtime_smoke.json",
+              "dist/security/security_scan_summary.json",
+              "dist/observability/api_probe.json"
+            )
+      - name: Upload validation stage artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-validation-stage
+          path: |
+            dist/**
+            kg/canonical/**
+            scripts/verify-release.ps1
+            scripts/write-release-stage-manifest.ps1
+          if-no-files-found: error
+
+  promote:
+    needs: validate
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download validation stage artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: release-validation-stage
+          path: .
       - name: Update changelog
         shell: pwsh
         run: scripts/changelog-update.ps1 -NextVersion ${{ github.ref_name }}
+      - name: Record promotion stage evidence
+        shell: pwsh
+        run: |
+          scripts/write-release-stage-manifest.ps1 `
+            -Stage promotion `
+            -Tag ${{ github.ref_name }} `
+            -OutPath dist/promotion/promotion_stage_evidence.json `
+            -EvidenceFiles @(
+              "dist/promotion/build_stage_evidence.json",
+              "dist/promotion/validation_stage_evidence.json",
+              "dist/release_validation_evidence.json",
+              "dist/checksums.sha256"
+            )
+      - name: Upload promotion stage evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-promotion-stage
+          path: dist/promotion/*.json
+          if-no-files-found: error
       - name: Release
         uses: softprops/action-gh-release@v1
         with:
@@ -141,6 +270,7 @@ jobs:
             dist/observability/*.json
             dist/observability/*.txt
             dist/sbom.spdx.json
+            dist/promotion/*.json
             kg/canonical/manifest.json
             kg/canonical/provenance.json
             kg/canonical/release_notes.md

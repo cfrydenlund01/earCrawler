@@ -6,8 +6,8 @@ Recommendation: `Keep Quarantined`
 
 Governing context:
 
-- `docs/ExecutionPlanRunPass10.md`
-- `docs/RunPass10.md`
+- `docs/ExecutionPlanRunPass11.md`
+- `docs/RunPass11.md`
 - `docs/kg_quarantine_exit_gate.md`
 - `docs/search_kg_quarantine_review_2026-03-19.md`
 - `docs/capability_graduation_boundaries.md`

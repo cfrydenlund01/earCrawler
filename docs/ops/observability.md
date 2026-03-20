@@ -9,6 +9,9 @@ This document summarises the monitoring signals introduced in B.23.
   state, and free disk space.
 * `live_sources` reports live upstream-source freshness and degradation based on
   `data/manifest.json` (`upstream_status`) by default.
+* `live_sources.failure_taxonomy` summarizes upstream states so operators can
+  distinguish `no_results` from degraded states such as `missing_credentials`,
+  `upstream_unavailable`, `invalid_response`, and `retry_exhausted`.
 * JSON structure:
 
 ```json
@@ -29,7 +32,14 @@ This document summarises the monitoring signals introduced in B.23.
     "status": "healthy",
     "manifest_path": "data/manifest.json",
     "stale_after_seconds": 86400,
-    "summary": {"healthy": 2, "stale": 0, "degraded": 0, "unknown": 0}
+    "failure_taxonomy": {
+      "state_counts": {"ok": 3, "no_results": 1},
+      "degraded_state_counts": {}
+    },
+    "summary": {"healthy": 2, "stale": 0, "degraded": 0, "unknown": 0},
+    "sources": [
+      {"source": "federalregister", "state_counts": {"ok": 2, "no_results": 1}}
+    ]
   }
 }
 ```

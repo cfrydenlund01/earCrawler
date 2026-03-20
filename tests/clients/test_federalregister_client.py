@@ -87,3 +87,24 @@ def test_get_ear_articles_retry_exhausted_sets_status(monkeypatch):
     status = client.get_last_status("get_ear_articles")
     assert status is not None
     assert status.state == "retry_exhausted"
+
+
+def test_search_documents_result_includes_typed_status(monkeypatch):
+    client = FederalRegisterClient()
+    monkeypatch.setattr(client, "_get_json", lambda *args, **kwargs: {"results": []})
+    result = client.search_documents_result("export", per_page=5)
+    assert result.data == []
+    assert result.state == "no_results"
+    assert result.degraded is False
+
+
+def test_get_document_result_propagates_invalid_response(monkeypatch):
+    client = FederalRegisterClient()
+
+    def _boom(*args, **kwargs):
+        raise FederalRegisterError("bad json", state="invalid_response")
+
+    monkeypatch.setattr(client, "_get_json", _boom)
+    result = client.get_document_result("2023-99999")
+    assert result.data == {}
+    assert result.state == "invalid_response"
