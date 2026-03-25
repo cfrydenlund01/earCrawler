@@ -139,4 +139,4 @@ Use this minimal record when Task 2.2 is executed:
 
 ## Current conclusion
 
-Current conclusion: the repo has a concrete KG unquarantine checklist and explicit no-go/reaffirmation records. See `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral for `/v1/search` and KG-backed hybrid retrieval). Search- and KG-dependent runtime behavior remains `Quarantined` unless a later decision is backed by a fresh evidence package.
+Current conclusion: the repo has a concrete KG unquarantine checklist and explicit no-go/current-boundary records. See `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/search_kg_quarantine_decision_package_2026-03-19.md` (keep quarantined for the current production-beta target). Search- and KG-dependent runtime behavior remains `Quarantined` unless a later decision is backed by a fresh evidence package.

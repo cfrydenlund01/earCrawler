@@ -16,7 +16,35 @@ Use this document together with:
 - `docs/hybrid_retrieval_design.md`
 - `docs/model_training_surface_adr.md`
 - `docs/local_adapter_release_evidence.md`
+- `docs/answer_generation_posture.md`
+- `docs/local_adapter_deprioritization_2026-03-25.md`
 - `docs/ops/windows_single_host_operator.md`
+
+## Status vocabulary
+
+Use one vocabulary set across the repo:
+
+- `Supported`: part of the baseline supported runtime or operator contract
+- `Optional`: implemented and maintained, but explicit opt-in and not baseline
+- `Quarantined`: intentionally kept out of the supported baseline until named
+  evidence and operator proof exist
+- `Legacy`: retained compatibility or historical code/module surface that is not
+  a current supported entrypoint
+- `Generated`: build, release, or local runtime output; never authored source
+- `Archival`: historical review or planning material retained for reference
+- `Proposal-only`: planning or research material that is not a runtime/operator
+  contract by itself
+
+Practical scope:
+
+- the runtime capability registry is authoritative for runtime-facing states and
+  currently uses `supported`, `optional`, `quarantined`, `legacy`,
+  `generated`, and `archival`
+- `Proposal-only` is a repo/documentation category for planning and research
+  material such as `Research/` and `docs/proposal/`
+- workspace-only residue such as ghost directories is not a capability state at
+  all; treat it as unsupported local leftover state and classify it with
+  `scripts/workspace-state.ps1`
 
 ## State summary
 
@@ -25,7 +53,7 @@ Use this document together with:
 | Text search (`/v1/search`, text-index-backed Fuseki search) | `Quarantined` | Disabled by default and excluded from default API contract artifacts | `EARCRAWLER_API_ENABLE_SEARCH=1` | `Optional` |
 | Hybrid ranking (dense + BM25 fusion only) | `Optional` | Dense remains the baseline retrieval mode | `EARCRAWLER_RETRIEVAL_MODE=hybrid` | `Supported` |
 | KG expansion | `Quarantined` | Disabled by default | `EARCRAWLER_ENABLE_KG_EXPANSION=1` plus provider settings | `Optional` |
-| Local-adapter serving (`LLM_PROVIDER=local_adapter`) | `Optional` | Off unless a recorded adapter artifact is supplied | `LLM_PROVIDER=local_adapter`, `EARCRAWLER_ENABLE_LOCAL_LLM=1`, and local-model env vars | `Supported` |
+| Local-adapter serving (`LLM_PROVIDER=local_adapter`) | `Optional` | Off unless a recorded adapter artifact is supplied | `LLM_PROVIDER=local_adapter`, `EARCRAWLER_ENABLE_LOCAL_LLM=1`, and local-model env vars | Deferred for current production-beta target |
 
 ## 1. Text search
 
@@ -41,6 +69,17 @@ Why:
 Current operator control:
 
 - local validation only: set `EARCRAWLER_API_ENABLE_SEARCH=1`
+
+Current planning rule:
+
+- keep the capability state as `Quarantined`
+- do not treat promotion of text search as active near-term work for the
+  current production-beta target
+- maintain only the explicit gate, default-contract exclusion, rollback-safe
+  smoke coverage, and operator rollback notes until a later dated decision
+  re-opens promotion work
+- use `docs/search_kg_quarantine_decision_package_2026-03-19.md` as the dated
+  maintenance-boundary record for this posture
 
 Promotion from `Quarantined` to `Optional` requires all of the following:
 
@@ -112,6 +151,17 @@ Current operator control:
 - local validation only: set `EARCRAWLER_ENABLE_KG_EXPANSION=1` plus the
   provider-specific environment variables
 
+Current planning rule:
+
+- keep the capability state as `Quarantined`
+- do not treat promotion of KG expansion as active near-term work for the
+  current production-beta target
+- maintain only the explicit gate, failure-policy checks, rollback notes, and
+  quarantine-aligned operator docs until a later dated decision re-opens
+  promotion work
+- use `docs/search_kg_quarantine_decision_package_2026-03-19.md` as the dated
+  maintenance-boundary record for this posture
+
 Promotion from `Quarantined` to `Optional` requires all of the following:
 
 - keep the runtime gate explicit and default-off
@@ -142,6 +192,10 @@ Why:
   schema and refusal controls
 - release readiness still depends on artifact-backed evidence rather than the
   feature simply existing in source
+- even a promoted adapter candidate would still need to respect the advisory
+  and human-review boundary in `docs/answer_generation_posture.md`
+- the track is formally deprioritized for the current production-beta target by
+  `docs/local_adapter_deprioritization_2026-03-25.md`
 
 Current operator control:
 
@@ -155,6 +209,14 @@ Current operator control:
 - roll back by unsetting the local-adapter env vars (or restoring remote-deny
   posture) and restarting the service
 
+Current planning rule:
+
+- keep the capability state as `Optional`
+- do not treat promotion to `Supported` as active near-term work for the
+  current production-beta target
+- resume promotion work only after a later dated decision explicitly re-opens
+  the track
+
 Promotion from `Optional` to `Supported` requires all of the following:
 
 - a passing evidence bundle defined in `docs/local_adapter_release_evidence.md`
@@ -166,6 +228,9 @@ Promotion from `Optional` to `Supported` requires all of the following:
   report archived with release evidence
 - a dated decision record stating whether support remains artifact-by-artifact
   optional or becomes part of the baseline supported deployment
+- a dated decision record stating whether the capability remains limited to
+  advisory answer drafting or has some narrower explicitly approved production
+  use beyond that baseline
 
 Exact evidence decision rule:
 
@@ -185,4 +250,10 @@ Use these rules to avoid future drift:
 - `docs/hybrid_retrieval_design.md` governs dense + BM25 hybrid ranking.
 - `docs/model_training_surface_adr.md` and the local-adapter runtime docs
   govern adapter-backed serving.
+- `docs/answer_generation_posture.md` governs what answer-generation behavior is
+  supportable for production beta, including abstention and human-review
+  boundaries.
 - `README.md` remains the canonical public capability matrix.
+- `docs/repository_status_index.md` is the canonical repo-surface map for
+  `Supported`, `Optional`, `Quarantined`, `Legacy`, `Generated`, `Archival`,
+  and `Proposal-only`.

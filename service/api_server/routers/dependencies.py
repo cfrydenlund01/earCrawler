@@ -39,4 +39,4 @@ def get_rag_cache(request: Request) -> RagQueryCache:
 
 
 def get_retriever(request: Request) -> RetrieverProtocol:
-    return request.app.state.rag_retriever
+    return get_runtime_state(request).retriever_runtime.retriever

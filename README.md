@@ -125,11 +125,11 @@ most often.
 | Surface | Status | Notes |
 | --- | --- | --- |
 | `earctl` / `py -m earCrawler.cli ...` and the documented Windows single-host service path | Supported | These are the supported operator entrypoints. Capability-level status still matters; use the rows below for feature-specific claims. |
-| `service.api_server`, `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, `/v1/rag/query` | Supported | These are the supported service/API surfaces for the Windows-first single-host runtime. Rate limits, concurrency limits, and the RAG cache are process-local; multi-instance correctness is not claimed. |
-| `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Default installs and baseline operator flows do not require them. |
+| `service.api_server`, `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, `/v1/rag/query` | Supported | These are the supported service/API surfaces for the Windows-first single-host runtime. Rate limits, concurrency limits, the RAG cache, retriever caches, and retriever warm state are process-local; multi-instance correctness is not claimed. |
+| `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Generated output is advisory-only for production beta and must not be treated as an autonomous legal/regulatory determination. See `docs/answer_generation_posture.md`. |
 | `EARCRAWLER_RETRIEVAL_MODE=hybrid` across `/v1/rag/query`, `/v1/rag/answer`, and eval flows | Optional | Off by default. Dense remains the baseline retrieval mode. Promotion/default-on criteria are tracked in `docs/capability_graduation_boundaries.md`. |
-| The optional local adapter runtime (`LLM_PROVIDER=local_adapter`) | Optional | Requires explicit local-model env plus a recorded Task 5.3 adapter artifact. Validation path: `scripts/local_adapter_smoke.ps1`. Promotion criteria are tracked in `docs/capability_graduation_boundaries.md`. |
-| `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral). Capability-specific promotion boundaries live in `docs/capability_graduation_boundaries.md`. |
+| The optional local adapter runtime (`LLM_PROVIDER=local_adapter`) | Optional | Implemented, but formally deprioritized for the current production-beta target. Requires explicit local-model env plus a recorded Task 5.3 adapter artifact. Validation path: `scripts/local_adapter_smoke.ps1`. See `docs/local_adapter_deprioritization_2026-03-25.md` and `docs/capability_graduation_boundaries.md`. |
+| `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/search_kg_quarantine_decision_package_2026-03-19.md` (keep quarantined with minimal maintenance surface for the current production-beta target). Capability-specific promotion boundaries live in `docs/capability_graduation_boundaries.md`. |
 | `Research/`, `docs/proposal/`, benchmark planning, model-training/fine-tuning notes, and other future-work design docs | Proposal-only | Useful for planning and evaluation, not an operator/runtime commitment. Phase 5 records include base-model selection (`docs/model_training_surface_adr.md`, `config/training_model_selection.example.env`), training-input contract (`docs/model_training_contract.md`, `config/training_input_contract.example.json`), first-pass run tooling (`docs/model_training_first_pass.md`, `config/training_first_pass.example.json`, `scripts/training/*`), and the Phase 6 benchmark plan (`docs/production_candidate_benchmark_plan.md`). |
 
 ## Runtime vs Research Boundary
@@ -139,15 +139,16 @@ If you are new to the repo, use this rule first:
 - `README.md`, `RUNBOOK.md`, `service/api_server`, `earctl`, and the code and scripts they directly rely on are the supported product/runtime surface.
 - `Research/`, `docs/proposal/`, and design notes for gated or future work are not production commitments by themselves.
 - If a feature is not described through a supported `earctl` or `service.api_server` path with tests and operator docs, treat it as research, experimental, or quarantined.
-- Phase 5 training records currently target `Qwen/Qwen2.5-7B-Instruct` as the production-intended 7B base model and include Task 5.3 first-pass tooling in `docs/model_training_first_pass.md` and `scripts/training/`.
+- Phase 5 training records keep `Qwen/Qwen2.5-7B-Instruct` as a planning-only future target and include Task 5.3 first-pass tooling in `docs/model_training_first_pass.md` and `scripts/training/`.
 - The training-input contract for this model work is recorded in `docs/model_training_contract.md`; it uses approved eCFR snapshot text and the derived retrieval corpus, not eval fixtures or benchmark artifacts.
 - Training scripts and artifacts are still a phase-gated workflow, not a supported operator runtime path by themselves.
 - Task 5.4 adds a separate optional runtime path that can load a Task 5.3 adapter through `/v1/rag/answer` only when `LLM_PROVIDER=local_adapter`, `EARCRAWLER_ENABLE_LOCAL_LLM=1`, and the recorded adapter artifacts are present.
-- The minimum release evidence bundle for a local-adapter candidate is defined in `docs/local_adapter_release_evidence.md` and `config/local_adapter_release_evidence.example.json`.
-- Phase 6 benchmark planning is now recorded in `docs/production_candidate_benchmark_plan.md`; benchmark execution still depends on a real Task 5.3 run artifact and a benchmark runner that targets the local-adapter runtime.
+- The minimum release evidence bundle for a local-adapter candidate is defined in `docs/local_adapter_release_evidence.md` and `config/local_adapter_release_evidence.example.json`, but that track is formally deprioritized for the current production-beta target by `docs/local_adapter_deprioritization_2026-03-25.md`.
+- Phase 6 benchmark planning is retained in `docs/production_candidate_benchmark_plan.md` as a future resumption plan, not active near-term release work.
 - Capability-specific promotion and rollback boundaries for text search, hybrid ranking, KG expansion, and local-adapter serving are tracked in `docs/capability_graduation_boundaries.md`.
 
 The repo-level boundary is documented in `docs/runtime_research_boundary.md`.
+New maintainers should begin with `docs/maintainer_start_here.md`.
 New contributors should begin with `docs/start_here_supported_paths.md`.
 Use `docs/repository_status_index.md` for the top-level map of supported,
 optional, quarantined, generated, and archival surfaces.
@@ -157,14 +158,16 @@ truth model.
 ## Single-Host Support Statement
 
 The supported deployment contract is one Windows host running one EarCrawler API
-service instance. Current rate limiting, concurrency controls, and the RAG
-query cache are process-local constructs. Running multiple API instances behind
-a load balancer would therefore change behavior immediately, and this repo does
-not claim that such a deployment is correct today.
+service instance. Current rate limiting, concurrency controls, the RAG query
+cache, retriever caches, and startup warmup state are process-local constructs.
+Running multiple API instances behind a load balancer would therefore change
+behavior immediately, and this repo does not claim that such a deployment is
+correct today.
 
 Future multi-instance design is deferred until the project has shared limit
 state, cache semantics, rollout/rollback behavior, and tests that explicitly
-cover scale-out behavior. See `docs/ops/multi_instance_deferred.md`.
+cover scale-out behavior. See `docs/ops/multi_instance_deferred.md` and
+`docs/single_host_runtime_state_boundary.md`.
 
 The CLI enforces role-based access control defined in `security/policy.yml` for operational commands. Protected surfaces include `crawl`, `fetch-*`, `warm-cache`, `telemetry`, `kg-load`, `kg-serve`, `kg-query`, `eval`, API/admin helpers, and release/bundle workflows. Local helper commands such as `nsf-parse`, `kg-emit`, `kg-export`, `fr-fetch`, and `rag-index *` remain outside RBAC. For local testing you can opt into one of the built-in test identities:
 
@@ -237,6 +240,12 @@ Status: `Optional`. This path requires explicit environment enablement and,
 depending on the mode, either provider credentials or a recorded local adapter
 artifact; it is not part of the default baseline runtime.
 
+Production-beta posture: generated output from `/v1/rag/answer` is a
+citation-grounded advisory draft, not a supported autonomous legal or
+regulatory decision. Use `docs/answer_generation_posture.md` for the current
+abstention rules, human-review boundary, and evidence threshold for any future
+promotion claim.
+
 The API can generate answers using:
 
 - remote OpenAI-compatible providers (Groq or NVIDIA NIM)
@@ -255,6 +264,10 @@ py -m earCrawler.cli api start
 
 For the local adapter path, point the runtime at a completed Task 5.3 artifact
 and keep the same evidence/schema guardrails:
+
+Current scope note: this path is implemented but formally deprioritized for the
+current production-beta target. Do not treat it as part of the normal release
+or deployed-host baseline. See `docs/local_adapter_deprioritization_2026-03-25.md`.
 
 ```powershell
 $env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES = '1'  # local test/dev only
@@ -294,7 +307,17 @@ Invoke-WebRequest `
   Select-Object -ExpandProperty Content
 ```
 
-The response includes `question`, `answer`, `contexts` (the passages passed to the LLM), `retrieved` (document metadata), `provider`, `model`, and flags `rag_enabled` / `llm_enabled` indicating whether the stack is active. Local adapter runs continue to use the same refusal policy, strict JSON schema validation, and citation grounding checks as remote runs.
+The response includes `question`, `answer`, `contexts` (the passages passed to
+the LLM), `retrieved` (document metadata), `provider`, `model`, and flags
+`rag_enabled` / `llm_enabled` indicating whether the stack is active. Local
+adapter runs continue to use the same refusal policy, strict JSON schema
+validation, and citation grounding checks as remote runs.
+
+Higher-risk interpretations still require human review before operational use,
+including concrete license determinations, License Exception conclusions, and
+time-sensitive applicability questions. If retrieval is thin, ambiguous, or
+temporally inconsistent, the safe behavior is to return `unanswerable` rather
+than guess.
 
 Retrieval mode selection is controlled by `EARCRAWLER_RETRIEVAL_MODE`:
 
@@ -638,4 +661,3 @@ Keep using the Trade.gov Data API for entity lookup and the Federal Register API
   corpus build -> corpus validate -> kg-emit -> SHACL gate -> supported API smoke -> no-network RAG smoke.
 - The API smoke gate covers only supported routes: `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, and `/v1/sparql`.
 - The no-network RAG smoke gate runs `tests/golden/test_phase2_golden_gate.py` with stubbed retrieval and stubbed LLM outputs; it does not depend on provider keys, FAISS, or live network access.
-

@@ -19,6 +19,7 @@ from .limits import RateLimitExceeded
 from .schemas.errors import ProblemDetails
 
 _logger = logging.getLogger("earcrawler.api.middleware")
+REQUEST_CONCURRENCY_STORAGE_SCOPE = "process_local"
 
 
 class RequestContextMiddleware:
@@ -128,15 +129,30 @@ class RequestContextMiddleware:
             await response(scope, receive, send)
 
 
-class ConcurrencyLimitMiddleware(BaseHTTPMiddleware):
-    def __init__(self, app: ASGIApp, limit: int) -> None:
-        super().__init__(app)
+class ConcurrencyGate:
+    """Process-local concurrency budget for the supported single-host API."""
+
+    def __init__(self, limit: int) -> None:
+        self.limit = limit
         self._sem = asyncio.Semaphore(limit)
+
+    async def __aenter__(self) -> "ConcurrencyGate":
+        await self._sem.acquire()
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb) -> None:
+        self._sem.release()
+
+
+class ConcurrencyLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app: ASGIApp, gate: ConcurrencyGate) -> None:
+        super().__init__(app)
+        self._gate = gate
 
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
-        async with self._sem:
+        async with self._gate:
             return await call_next(request)
 
 

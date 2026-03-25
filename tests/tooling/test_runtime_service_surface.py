@@ -364,6 +364,41 @@ def test_phase5_local_adapter_release_evidence_contract_is_recorded() -> None:
     ).exists()
 
 
+def test_local_adapter_track_is_formally_deprioritized_for_production_beta() -> None:
+    readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    runbook = (REPO_ROOT / "RUNBOOK.md").read_text(encoding="utf-8")
+    decision = (
+        REPO_ROOT / "docs" / "local_adapter_deprioritization_2026-03-25.md"
+    ).read_text(encoding="utf-8")
+    release_doc = (
+        REPO_ROOT / "docs" / "local_adapter_release_evidence.md"
+    ).read_text(encoding="utf-8")
+    benchmark_plan = (
+        REPO_ROOT / "docs" / "production_candidate_benchmark_plan.md"
+    ).read_text(encoding="utf-8")
+    capability_doc = (
+        REPO_ROOT / "docs" / "capability_graduation_boundaries.md"
+    ).read_text(encoding="utf-8")
+    operator_guide = (
+        REPO_ROOT / "docs" / "ops" / "windows_single_host_operator.md"
+    ).read_text(encoding="utf-8")
+    capability_index = _capability_index()
+
+    assert "formally deprioritized" in decision
+    assert "hf-internal-testing/tiny-random-gpt2" in decision
+    assert "Retriever not ready" in decision
+    assert "http://127.0.0.1:9" in decision
+    assert "keep_optional" in decision
+    assert "not_reviewable" in decision
+    assert "docs/local_adapter_deprioritization_2026-03-25.md" in readme
+    assert "docs/local_adapter_deprioritization_2026-03-25.md" in runbook
+    assert "docs/local_adapter_deprioritization_2026-03-25.md" in release_doc
+    assert "docs/local_adapter_deprioritization_2026-03-25.md" in benchmark_plan
+    assert "docs/local_adapter_deprioritization_2026-03-25.md" in capability_doc
+    assert "docs/local_adapter_deprioritization_2026-03-25.md" in operator_guide
+    assert "formally deprioritized" in capability_index["runtime.local_adapter_serving"]["notes"]
+
+
 def test_phase6_benchmark_plan_targets_the_production_candidate() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     execution_plan = (
@@ -401,6 +436,9 @@ def test_repo_documents_runtime_vs_research_boundary() -> None:
 
 def test_repo_publishes_repository_status_index_for_onboarding() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
+    maintainer_start = (
+        REPO_ROOT / "docs" / "maintainer_start_here.md"
+    ).read_text(encoding="utf-8")
     start_here = (
         REPO_ROOT / "docs" / "start_here_supported_paths.md"
     ).read_text(encoding="utf-8")
@@ -408,16 +446,77 @@ def test_repo_publishes_repository_status_index_for_onboarding() -> None:
         REPO_ROOT / "docs" / "repository_status_index.md"
     ).read_text(encoding="utf-8")
 
+    assert "docs/maintainer_start_here.md" in readme
+    assert "docs/maintainer_start_here.md" in start_here
     assert "docs/repository_status_index.md" in readme
     assert "docs/repository_status_index.md" in start_here
     assert "docs/ops/windows_single_host_operator.md" in start_here
-    for status in ("Supported", "Optional", "Quarantined", "Generated", "Archival"):
+    for status in (
+        "Supported",
+        "Optional",
+        "Quarantined",
+        "Legacy",
+        "Generated",
+        "Archival",
+        "Proposal-only",
+    ):
         assert f"`{status}`" in status_index
     assert "| `earCrawler/` | Supported |" in status_index
     assert "| `service/` | Supported |" in status_index
     assert "| `cli/` | Quarantined |" in status_index
+    assert "| `Research/` | Proposal-only |" in status_index
     assert "| `build/`, `dist/`, `run/`, `runs/`, `earCrawler.egg-info/` | Generated |" in status_index
     assert "Default contributor path" in status_index
+    assert "docs/maintainer_start_here.md" in status_index
+    assert "Authoritative Maintainer Path" in maintainer_start
+    assert "Supported Runtime Entrypoints" in maintainer_start
+    assert "Main Module Boundaries" in maintainer_start
+    assert "Authored Source Versus Generated State" in maintainer_start
+    assert "Capability Boundary" in maintainer_start
+    assert "docs/ops/windows_single_host_operator.md" in maintainer_start
+    assert "docs/ops/release_process.md" in maintainer_start
+
+
+def test_support_boundary_docs_use_consistent_categories() -> None:
+    capability_doc = (
+        REPO_ROOT / "docs" / "capability_graduation_boundaries.md"
+    ).read_text(encoding="utf-8")
+    boundary_doc = (
+        REPO_ROOT / "docs" / "runtime_research_boundary.md"
+    ).read_text(encoding="utf-8")
+    start_here = (
+        REPO_ROOT / "docs" / "start_here_supported_paths.md"
+    ).read_text(encoding="utf-8")
+    maintainer_start = (
+        REPO_ROOT / "docs" / "maintainer_start_here.md"
+    ).read_text(encoding="utf-8")
+    registry = _load_capability_registry()
+
+    registry_statuses = {entry["status"] for entry in registry["capabilities"]}
+    assert registry_statuses == {
+        "supported",
+        "optional",
+        "quarantined",
+        "legacy",
+        "generated",
+        "archival",
+    }
+    assert "## Status vocabulary" in capability_doc
+    for status in (
+        "`Supported`",
+        "`Optional`",
+        "`Quarantined`",
+        "`Legacy`",
+        "`Generated`",
+        "`Archival`",
+        "`Proposal-only`",
+    ):
+        assert status in capability_doc
+        assert status in maintainer_start
+    assert "unsupported local leftover state" in capability_doc
+    assert "unsupported local leftover state" in boundary_doc
+    assert "unsupported local leftover state" in start_here
+    assert "unsupported local leftover state" in maintainer_start
 
 
 def test_repo_publishes_data_artifact_inventory() -> None:
@@ -701,6 +800,3 @@ def test_cli_entrypoint_is_thin_and_uses_domain_registrars() -> None:
     assert "def _register_shared_commands(" in main_cli
     assert main_cli.count("@click.command(") <= 2
     assert len(main_cli.splitlines()) < 220
-
-
-

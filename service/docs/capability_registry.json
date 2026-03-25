@@ -51,7 +51,7 @@
         "EARCRAWLER_ENABLE_REMOTE_LLM=1 with provider credentials, or LLM_PROVIDER=local_adapter with explicit local-model settings"
       ],
       "contract_artifacts": "included",
-      "notes": "Implemented in the API contract, but baseline operator flows do not require it."
+      "notes": "Implemented in the API contract, but baseline operator flows do not require it. Production-beta posture is advisory-only with abstention on thin or ambiguous evidence; it is not an autonomous legal-answer surface."
     },
     {
       "id": "retrieval.hybrid",
@@ -90,7 +90,7 @@
         "EARCRAWLER_LOCAL_LLM_ADAPTER_DIR=<run-dir>/adapter"
       ],
       "contract_artifacts": "documented_only",
-      "notes": "Requires an explicit Task 5.3/5.4 adapter artifact and validation path."
+      "notes": "Requires an explicit Task 5.3/5.4 adapter artifact and validation path. The current reviewed evidence bundle is not promotion-ready, and the local-adapter track is formally deprioritized for the current production-beta target pending a later dated reactivation decision. Any future promotion would still inherit the advisory-only answer posture unless a dated decision widens it."
     },
     {
       "id": "api.search",

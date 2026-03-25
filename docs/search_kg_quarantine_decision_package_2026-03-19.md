@@ -6,10 +6,10 @@ Recommendation: `Keep Quarantined`
 
 Governing context:
 
-- `docs/ExecutionPlanRunPass11.md`
-- `docs/RunPass11.md`
+- `docs/Archive/ExecutionPlanRunPass11.md`
+- `docs/Archive/RunPass11.md`
 - `docs/kg_quarantine_exit_gate.md`
-- `docs/search_kg_quarantine_review_2026-03-19.md`
+- `docs/Archive/search_kg_quarantine_review_2026-03-19.md`
 - `docs/capability_graduation_boundaries.md`
 - `dist/search_kg_evidence/search_kg_evidence_bundle.json`
 - `dist/search_kg_evidence/search_kg_evidence_bundle.md`
@@ -49,6 +49,34 @@ This still matches:
 - `service/docs/capability_registry.json`
 - `/health` in the installed runtime smoke
 - the operator baseline in `docs/ops/windows_single_host_operator.md`
+
+## Maintenance Posture While Quarantined
+
+For the current production-beta target, these surfaces are not active promotion
+work. Until a later dated decision explicitly re-opens them, the required
+maintenance posture is intentionally narrow:
+
+- keep the runtime gates explicit and default-off
+- keep `api.search` and `kg.expansion` reported as `quarantined` in the
+  capability registry and `/health`
+- keep `/v1/search` excluded from default OpenAPI, Postman, and supported-route
+  smoke artifacts
+- keep `scripts/optional-runtime-smoke.ps1` validating search
+  default-off -> opt-in -> rollback and KG failure-policy behavior
+- keep deployed-host docs and baseline release flow pointed at the supported
+  search-off, KG-off operator path
+
+This decision does not require the repo to carry promotion-shaped obligations
+while the features stay quarantined. In particular, the current production-beta
+target does not require:
+
+- text-index-enabled Fuseki provisioning in the supported deployed-host path
+- supported-route canary or performance-budget coverage for `/v1/search`
+- baseline release smoke proving search or KG expansion success-path behavior
+- default contract artifacts that include `/v1/search`
+
+If any of the quarantine guards drift, restore the boundary rather than
+widening the supported claim.
 
 ## Operator Workflow Required Before Promotion
 

@@ -3,7 +3,7 @@
 Status: normative for any change that claims search- or KG-dependent runtime
 behavior is part of the supported production CLI path.
 
-As of March 12, 2026, this gate is not passed. KG-related runtime behavior remains quarantined. Decision records: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral for `/v1/search` and KG-backed hybrid retrieval).
+As of March 19, 2026, this gate is not passed. KG-related runtime behavior remains quarantined. Decision records: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/search_kg_quarantine_decision_package_2026-03-19.md` (keep quarantined for the current production-beta target).
 
 This gate governs:
 
@@ -34,6 +34,22 @@ It complements:
 - `docs/done_done_checklist.md`
 
 This document does not unquarantine any feature by itself.
+
+## Maintenance rule while this gate is unpassed
+
+While this gate remains unpassed, maintainers should preserve the quarantine
+boundary rather than carry promotion-like support obligations. The minimum
+required upkeep is:
+
+- explicit default-off runtime gates
+- `quarantined` status in the capability registry and `/health`
+- exclusion from default supported-route contract artifacts where applicable
+- rollback-safe local validation via `scripts/optional-runtime-smoke.ps1`
+
+Until the gate is passed and recorded, do not treat missing deployed-host
+search/KG success-path proof as a regression in the supported production-beta
+baseline. It is a reason to keep the capability quarantined, not to widen the
+claim.
 
 ## Current quarantine boundary
 

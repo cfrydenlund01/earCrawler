@@ -426,6 +426,18 @@ def test_warmup_skips_when_retriever_unavailable(monkeypatch):
     with TestClient(app) as client:
         health = client.get("/health")
         assert health.status_code == 200
+        assert (
+            health.json()["runtime_contract"]["runtime_state"]["retriever_runtime"][
+                "startup_warmup"
+            ]["status"]
+            == "skipped"
+        )
+        assert (
+            health.json()["runtime_contract"]["runtime_state"]["retriever_runtime"][
+                "startup_warmup"
+            ]["reason"]
+            == "retriever_unavaila"
+        )
 
     assert "rag.warmup.skipped" in events
 

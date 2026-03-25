@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from .capability_registry import build_runtime_capability_snapshot
 from .config import ApiSettings
-from .rag_support import RETRIEVER_CACHE_STORAGE_SCOPE
 from .runtime_state import ApiRuntimeState
 
 
@@ -25,10 +24,7 @@ def build_runtime_contract(
             and settings.declared_instance_count != 1
         ),
         "runtime_state": runtime_state.contract_payload(),
-        "process_local_state": {
-            **runtime_state.process_local_state(),
-            "retriever_cache": RETRIEVER_CACHE_STORAGE_SCOPE,
-        },
+        "process_local_state": runtime_state.process_local_state(),
         "operator_note": (
             "One Windows host and one EarCrawler API service instance are supported. "
             "Multi-instance behavior is not supported."

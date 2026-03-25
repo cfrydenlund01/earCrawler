@@ -4,6 +4,7 @@ from fastapi.testclient import TestClient
 
 from service.api_server import create_app
 from service.api_server.config import ApiSettings
+from service.api_server.rag_support import RetrieverWarmupOutcome
 
 
 def test_startup_warmup_uses_app_retriever(monkeypatch) -> None:
@@ -11,6 +12,12 @@ def test_startup_warmup_uses_app_retriever(monkeypatch) -> None:
 
     def _spy(retriever, *, request_logger=None):
         calls.append((retriever, request_logger))
+        return RetrieverWarmupOutcome(
+            status="completed",
+            requested=True,
+            timeout_seconds=1.0,
+            t_total_ms=0.5,
+        )
 
     monkeypatch.setattr("service.api_server.warm_retriever_if_enabled", _spy)
 
@@ -27,6 +34,15 @@ def test_startup_warmup_uses_app_retriever(monkeypatch) -> None:
     assert calls
     assert calls[0][0] is retriever
     assert calls[0][1] is app.state.request_logger
+    assert (
+        app.state.runtime_state.retriever_runtime.startup_warmup_status == "completed"
+    )
+    assert (
+        app.state.runtime_contract["runtime_state"]["retriever_runtime"][
+            "startup_warmup"
+        ]["status"]
+        == "completed"
+    )
 
 
 def test_shutdown_calls_fuseki_aclose_hook() -> None:

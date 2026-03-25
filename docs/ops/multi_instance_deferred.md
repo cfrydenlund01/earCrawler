@@ -7,13 +7,15 @@ Today the supported contract is:
 
 - one Windows host
 - one EarCrawler API service instance
-- one `runtime_state` owner for process-local limits and caches
+- one `runtime_state` owner for process-local limits, caches, concurrency, and
+  retriever warmup state
 
 Why support stops there today:
 
 - API rate limiting is enforced by the process-local `runtime_state`, not through shared distributed state.
-- The API concurrency limiter is process-local.
+- The API concurrency gate is process-local.
 - The RAG query cache is an in-memory per-process cache owned by that same runtime state boundary.
+- Retriever-local caches and startup warmup state are also process-local.
 - Repo-local operational guidance, rollback steps, and health checks assume one
   host and one service instance under operator control.
 
@@ -36,6 +38,8 @@ design and implementation pass that defines at least:
    replacement.
 5. Validation and regression tests that prove multi-instance behavior, rather
    than inferring it from the current single-host path.
+
+Architecture note: `docs/single_host_runtime_state_boundary.md`.
 
 Until that work exists and is documented, the supported deployment target
 remains the Windows-first single-host path described in

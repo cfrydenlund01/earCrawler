@@ -34,9 +34,41 @@ def test_health_reports_single_host_runtime_contract(app) -> None:
         ]
         == "process_local"
     )
+    assert (
+        runtime_contract["runtime_state"]["components"]["request_concurrency"][
+            "storage_scope"
+        ]
+        == "process_local"
+    )
+    assert (
+        runtime_contract["runtime_state"]["components"]["retriever_cache"][
+            "storage_scope"
+        ]
+        == "process_local"
+    )
+    assert (
+        runtime_contract["runtime_state"]["components"]["retriever_warm_state"][
+            "storage_scope"
+        ]
+        == "process_local"
+    )
+    assert (
+        runtime_contract["runtime_state"]["retriever_runtime"]["startup_warmup"][
+            "status"
+        ]
+        == "not_requested"
+    )
     assert runtime_contract["process_local_state"]["rate_limits"] == "process_local"
+    assert (
+        runtime_contract["process_local_state"]["request_concurrency"]
+        == "process_local"
+    )
     assert runtime_contract["process_local_state"]["rag_query_cache"] == "process_local"
     assert runtime_contract["process_local_state"]["retriever_cache"] == "process_local"
+    assert (
+        runtime_contract["process_local_state"]["retriever_warm_state"]
+        == "process_local"
+    )
     assert runtime_contract["capability_registry_schema"] == "capability-registry.v1"
     assert (
         runtime_contract["capability_registry_source"]
@@ -91,6 +123,7 @@ def test_create_app_exposes_runtime_state_container() -> None:
     assert app.state.rate_limiter is runtime_state.rate_limiter
     assert app.state.rag_cache is runtime_state.rag_query_cache
     assert app.state.rag_cache is rag_cache
+    assert app.state.rag_retriever is runtime_state.retriever_runtime.retriever
 
 
 def test_create_app_rejects_conflicting_runtime_state_and_rag_cache() -> None:
@@ -106,4 +139,19 @@ def test_create_app_rejects_conflicting_runtime_state_and_rag_cache() -> None:
             fuseki_client=StubFusekiClient({}),
             runtime_state=runtime_state,
             rag_cache=other_cache,
+        )
+
+
+def test_create_app_rejects_conflicting_runtime_state_and_retriever() -> None:
+    runtime_state = build_process_local_runtime_state(ApiSettings(fuseki_url=None))
+
+    with pytest.raises(
+        ValueError,
+        match="runtime_state and a different retriever",
+    ):
+        create_app(
+            settings=ApiSettings(fuseki_url=None),
+            fuseki_client=StubFusekiClient({}),
+            runtime_state=runtime_state,
+            retriever=object(),  # type: ignore[arg-type]
         )

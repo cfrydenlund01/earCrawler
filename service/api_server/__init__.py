@@ -58,10 +58,22 @@ def create_app(
         raise ValueError(
             "create_app received both runtime_state and a different rag_cache."
         )
-    runtime_state = runtime_state or build_process_local_runtime_state(
-        settings,
-        rag_query_cache=rag_cache,
-    )
+    if runtime_state is not None:
+        if (
+            retriever is not None
+            and runtime_state.retriever_runtime.retriever is not retriever
+        ):
+            raise ValueError(
+                "create_app received both runtime_state and a different retriever."
+            )
+    else:
+        retriever = retriever or load_retriever()
+        runtime_state = build_process_local_runtime_state(
+            settings,
+            rag_query_cache=rag_cache,
+            retriever=retriever,
+        )
+    retriever = runtime_state.retriever_runtime.retriever
 
     app = FastAPI(
         title="EarCrawler API",
@@ -99,6 +111,7 @@ def create_app(
     configure_middleware(
         app,
         settings=settings,
+        concurrency_gate=runtime_state.concurrency_gate,
         resolver=resolver,
         observability=observability,
         json_logger=json_logger,
@@ -113,7 +126,7 @@ def create_app(
     app.state.request_logger = json_logger
     app.state.runtime_contract = runtime_contract
     app.state.rag_cache = runtime_state.rag_query_cache
-    app.state.rag_retriever = retriever or load_retriever()
+    app.state.rag_retriever = retriever
 
     register_retriever_warmup(app, warm_retriever=warm_retriever_if_enabled)
 

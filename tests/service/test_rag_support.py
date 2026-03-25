@@ -68,10 +68,12 @@ def test_warmup_skips_for_disabled_and_not_ready(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setenv("EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS", "1")
     capture = _CaptureLogger()
 
-    rag_support.warm_retriever_if_enabled(
+    outcome = rag_support.warm_retriever_if_enabled(
         rag_support.NullRetriever(),
         request_logger=capture,  # type: ignore[arg-type]
     )
+    assert outcome.status == "skipped"
+    assert outcome.reason == "retriever_disabled"
     assert _has_event(
         capture.events, "info", "rag.warmup.skipped", reason="retriever_disabled"
     )
@@ -80,10 +82,12 @@ def test_warmup_skips_for_disabled_and_not_ready(monkeypatch: pytest.MonkeyPatch
         RuntimeError("broken"),
         failure_type="retriever_init_failed",
     )
-    rag_support.warm_retriever_if_enabled(
+    outcome = rag_support.warm_retriever_if_enabled(
         broken,
         request_logger=capture,  # type: ignore[arg-type]
     )
+    assert outcome.status == "skipped"
+    assert outcome.reason == "retriever_init_fai"
     assert _has_event(
         capture.events,
         "info",
@@ -104,8 +108,10 @@ def test_warmup_timeout_logs_skip(monkeypatch: pytest.MonkeyPatch) -> None:
         def warm(self) -> None:
             time.sleep(0.1)
 
-    rag_support.warm_retriever_if_enabled(
+    outcome = rag_support.warm_retriever_if_enabled(
         _SlowRetriever(),
         request_logger=capture,  # type: ignore[arg-type]
     )
+    assert outcome.status == "timeout"
+    assert outcome.reason == "timeout"
     assert _has_event(capture.events, "warning", "rag.warmup.skipped", reason="timeout")

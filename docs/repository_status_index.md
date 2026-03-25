@@ -13,8 +13,15 @@ Status labels:
   part of the baseline runtime.
 - `Quarantined`: kept in-tree for local validation, research, or future
   graduation work; not part of the supported default path.
+- `Legacy`: retained compatibility or historical code/module surface that is
+  not a current supported entrypoint.
+- `Proposal-only`: planning or research material that informs future work but
+  is not a runtime/operator commitment by itself.
 - `Generated`: build output, local state, or environment-specific artifacts.
 - `Archival`: historical records kept for reference, not active source of truth.
+
+Workspace-only ghost residue is not a tracked-source status. Treat it as
+unsupported local leftover state and verify it with `scripts/workspace-state.ps1`.
 
 ## Top-level map
 
@@ -44,7 +51,8 @@ Status labels:
 | `installer/` | Supported | Windows installer definitions used in release engineering. |
 | `tools/` | Optional | Local tool dependencies such as Jena downloads; useful for local validation, not primary source. |
 | `cli/` | Quarantined | Deprecated top-level CLI compatibility wrappers retained only to redirect users to `earCrawler.cli` / `earctl`. |
-| `Research/` | Quarantined | Research notes and decision logs; informative but not runtime/operator contract. |
+| `Research/` | Proposal-only | Research notes and decision logs; informative but not runtime/operator contract. |
+| `docs/proposal/` | Proposal-only | Draft architecture/security/observability proposals; planning material, not active operator truth. |
 | `demo/` | Quarantined | Demo-oriented assets, not the supported production baseline. |
 | `bundle/` | Optional | Offline/export bundle helpers used by specific packaging workflows. |
 | `canary/` | Optional | Canary configuration used for validation and monitoring workflows. |
@@ -61,6 +69,7 @@ Status labels:
 | `service.api_server` | Supported | Authoritative API runtime surface. |
 | `/v1/search` and KG-backed runtime behavior | Quarantined | Disabled or excluded from the default supported contract unless explicitly enabled and documented otherwise. |
 | `/v1/rag/answer`, hybrid retrieval, local-adapter runtime | Optional | Real capabilities with explicit gates; not baseline defaults. |
+| `Research/`, `docs/proposal/` | Proposal-only | Planning and review surfaces; not production/runtime commitments by themselves. |
 | `scripts/training/` and `docs/model_training_*` | Optional | Maintained phase-gated workflow for evidence generation, not the supported operator runtime by itself. |
 | `earCrawler.service.sparql_service`, `earCrawler.service.legacy.kg_service`, `earCrawler.ingestion.ingest` | Quarantined | Legacy/quarantined code paths; do not treat as current supported entrypoints. |
 
@@ -68,11 +77,12 @@ Status labels:
 
 If you are new to the repo, start here:
 
-1. `docs/start_here_supported_paths.md`
-2. `README.md`
-3. `RUNBOOK.md`
-4. `docs/api/readme.md`
-5. `docs/runtime_research_boundary.md`
+1. `docs/maintainer_start_here.md`
+2. `docs/start_here_supported_paths.md`
+3. `README.md`
+4. `RUNBOOK.md`
+5. `docs/api/readme.md`
+6. `docs/runtime_research_boundary.md`
 
 For day-to-day changes, treat `earCrawler/`, `service/`, `scripts/`,
 `config/`, `tests/`, and the active docs outside `docs/Archive/` as the default

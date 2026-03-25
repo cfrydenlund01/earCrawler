@@ -6,9 +6,9 @@ info:
     Read-only HTTP facade exposing curated SPARQL resources with rate limiting
     and immutable query templates. Supported endpoints are /health,
     /v1/entities/{entity_id}, /v1/lineage/{entity_id}, /v1/sparql, and
-    /v1/rag/query. /v1/rag/answer is optional and requires explicit remote-LLM
-    enablement. Quarantined routes such as /v1/search are excluded from default
-    OpenAPI contract artifacts.
+    /v1/rag/query. /v1/rag/answer is optional, advisory-only for production
+    beta, and requires explicit LLM enablement. Quarantined routes such as
+    /v1/search are excluded from default OpenAPI contract artifacts.
 servers:
   - url: http://localhost:9001
     description: Local development
@@ -467,8 +467,11 @@ paths:
     post:
       summary: Generate an answer using an optional LLM runtime
       description: >-
-        Status: Optional. This route requires explicit RAG and remote-LLM
-        enablement plus provider credentials.
+        Status: Optional. This route requires explicit RAG plus LLM enablement.
+        For the production-beta support boundary, generated output is an
+        advisory draft and must not be treated as an autonomous legal or
+        regulatory determination. Higher-risk interpretations still require
+        human review.
       parameters:
         - name: generate
           in: query

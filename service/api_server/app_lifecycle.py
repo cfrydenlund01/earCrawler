@@ -16,9 +16,11 @@ from .fuseki import FusekiClient, HttpFusekiClient, StubFusekiClient
 from .logging_integration import ObservabilityMiddleware
 from .middleware import (
     BodyLimitMiddleware,
+    ConcurrencyGate,
     ConcurrencyLimitMiddleware,
     RequestContextMiddleware,
 )
+from .rag_support import RetrieverWarmupOutcome
 
 _EMBEDDED_FIXTURE = {
     "entity_by_id": [
@@ -72,6 +74,7 @@ def configure_middleware(
     app: FastAPI,
     *,
     settings: ApiSettings,
+    concurrency_gate: ConcurrencyGate,
     resolver: ApiKeyResolver,
     observability: ObservabilityConfig,
     json_logger: JsonLogger,
@@ -82,7 +85,7 @@ def configure_middleware(
         ObservabilityMiddleware, logger=json_logger, config=observability
     )
     app.add_middleware(BodyLimitMiddleware, limit_bytes=settings.request_body_limit)
-    app.add_middleware(ConcurrencyLimitMiddleware, limit=settings.concurrency_limit)
+    app.add_middleware(ConcurrencyLimitMiddleware, gate=concurrency_gate)
     app.add_middleware(
         RequestContextMiddleware,
         resolver=resolver,
@@ -93,14 +96,23 @@ def configure_middleware(
 def register_retriever_warmup(
     app: FastAPI,
     *,
-    warm_retriever: Callable[..., None],
+    warm_retriever: Callable[..., RetrieverWarmupOutcome | None],
 ) -> None:
     """Register startup warmup with injectable warmup implementation."""
 
     async def _warm_retriever_on_startup() -> None:
-        warm_retriever(
-            app.state.rag_retriever, request_logger=app.state.request_logger
+        outcome = warm_retriever(
+            app.state.runtime_state.retriever_runtime.retriever,
+            request_logger=app.state.request_logger,
         )
+        if outcome is not None:
+            app.state.runtime_state.retriever_runtime.record_warmup(outcome)
+            app.state.runtime_contract["runtime_state"] = (
+                app.state.runtime_state.contract_payload()
+            )
+            app.state.runtime_contract["process_local_state"] = (
+                app.state.runtime_state.process_local_state()
+            )
 
     app.add_event_handler("startup", _warm_retriever_on_startup)
 

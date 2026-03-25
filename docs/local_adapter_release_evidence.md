@@ -1,12 +1,22 @@
 # Local-Adapter Release Evidence Bundle
 
-Status: active Phase 5 evidence contract (`local-adapter-release-evidence-contract.v2`) for the optional
+Status: retained Phase 5 evidence contract (`local-adapter-release-evidence-contract.v2`) for the optional
 `LLM_PROVIDER=local_adapter` runtime path.
+
+As of March 25, 2026, the local-adapter track is formally deprioritized for the
+current production-beta target by
+`docs/local_adapter_deprioritization_2026-03-25.md`. This document remains in
+place so future work has a machine-checkable resumption contract; it is not an
+active release checklist for the supported baseline.
 
 This document defines the minimum evidence bundle required before a Task 5.3
 adapter artifact can be treated as a real release candidate for the optional
 local-adapter serving path. It does not change the supported baseline runtime,
 and it does not promote the capability by itself.
+
+It also does not authorize autonomous legal or regulatory answer claims by
+itself. Production-beta answer posture, abstention rules, and the human-review
+boundary are defined separately in `docs/answer_generation_posture.md`.
 
 Use this document together with:
 
@@ -19,6 +29,13 @@ Use this document together with:
 ## Goal
 
 Make local-adapter release claims artifact-backed and reproducible.
+
+Current scope note:
+
+- this contract is retained for future resumption, not active near-term
+  production-beta promotion work
+- maintainers should not treat the existence of this contract as evidence that a
+  reviewable candidate is close today
 
 The minimum bundle must prove all of the following for one named
 `dist/training/<run_id>/` candidate:
@@ -249,7 +266,10 @@ The decision rule is exact and machine-checkable from
 
 Passing this contract does not directly change the capability state to
 `Supported`. Promotion still requires a dated decision record plus updates to
-the capability registry and operator docs.
+the capability registry and operator docs. Even after such a promotion review,
+the production-beta posture remains the answer-generation policy in
+`docs/answer_generation_posture.md` unless a dated decision explicitly widens
+that boundary.
 
 The validator manifest now records these fields explicitly:
 

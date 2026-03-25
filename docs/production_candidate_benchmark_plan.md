@@ -2,9 +2,11 @@
 
 Prepared: March 11, 2026
 
-Status: Phase 6 planning document. This defines how benchmarks should be run
-against the real production candidate after Phase 5. It does not claim that the
-benchmark run has already been executed in the current checkout.
+Status: retained Phase 6 resumption plan. This defines how benchmarks should be
+run against a real production candidate after Phase 5 if the local-adapter
+track is re-activated. As of March 25, 2026, the track is formally
+deprioritized for the current production-beta target by
+`docs/local_adapter_deprioritization_2026-03-25.md`.
 
 ## Goal
 
@@ -49,8 +51,11 @@ Do not execute the benchmark plan until all of the following are true:
 
 Current note for this checkout:
 
-- A real end-to-end local-adapter smoke has not yet been run here because no
-  concrete `dist/training/<run_id>/` artifact is present.
+- a concrete `dist/training/<run_id>/` artifact does exist in the workspace,
+  but the reviewed candidate is not a reviewable promotion bundle
+- the recorded smoke failed (`Retriever not ready`)
+- the paired benchmark evidence is not release-grade and does not reactivate
+  this plan
 
 ## Primary benchmark suite
 
@@ -172,7 +177,9 @@ py -m scripts.eval.run_local_adapter_benchmark `
 Current operational note:
 
 - benchmark execution still depends on a real local adapter run directory and a
-  passing `scripts/local_adapter_smoke.ps1` precondition on the host.
+  passing `scripts/local_adapter_smoke.ps1` precondition on the host
+- this plan is dormant until a dated decision re-activates the local-adapter
+  track
 
 ## Exit criteria for Task 6.1
 

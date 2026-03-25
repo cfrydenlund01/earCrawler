@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 _warm_logger = JsonLogger("rag-support")
 RAG_QUERY_CACHE_STORAGE_SCOPE = "process_local"
 RETRIEVER_CACHE_STORAGE_SCOPE = "process_local"
+RETRIEVER_WARM_STATE_STORAGE_SCOPE = "process_local"
 
 
 class RetrieverProtocol(Protocol):
@@ -68,11 +69,28 @@ class BrokenRetriever:
         raise self.failure
 
 
+@dataclass(frozen=True, slots=True)
+class RetrieverWarmupOutcome:
+    status: str
+    requested: bool
+    timeout_seconds: float
+    reason: str | None = None
+    t_total_ms: float | None = None
+
+
 def _warm_reason(value: object) -> str:
     reason = str(value or "").strip() or "unknown"
     if len(reason) > 18:
         return reason[:18]
     return reason
+
+
+def retriever_warmup_enabled() -> bool:
+    return os.getenv("EARCRAWLER_WARM_RETRIEVER", "0") == "1"
+
+
+def retriever_warmup_timeout_seconds() -> float:
+    return float(os.getenv("EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS", "5"))
 
 
 def load_retriever() -> RetrieverProtocol:
@@ -145,28 +163,46 @@ def load_retriever() -> RetrieverProtocol:
 
 def warm_retriever_if_enabled(
     retriever: RetrieverProtocol, *, request_logger: JsonLogger | None = None
-) -> None:
+) -> RetrieverWarmupOutcome:
     """Warm heavy retriever components when explicitly enabled."""
 
-    if os.getenv("EARCRAWLER_WARM_RETRIEVER", "0") != "1":
-        return
+    timeout_seconds = retriever_warmup_timeout_seconds()
+    if not retriever_warmup_enabled():
+        return RetrieverWarmupOutcome(
+            status="not_requested",
+            requested=False,
+            reason="disabled_by_config",
+            timeout_seconds=timeout_seconds,
+        )
     log = request_logger or _warm_logger
-    timeout_seconds = float(
-        os.getenv("EARCRAWLER_WARM_RETRIEVER_TIMEOUT_SECONDS", "5")
-    )
     if not bool(getattr(retriever, "enabled", True)):
         log.info("rag.warmup.skipped", reason="retriever_disabled")
-        return
+        return RetrieverWarmupOutcome(
+            status="skipped",
+            requested=True,
+            reason="retriever_disabled",
+            timeout_seconds=timeout_seconds,
+        )
     if not bool(getattr(retriever, "ready", True)):
         reason = _warm_reason(
             getattr(retriever, "failure_type", None) or "retriever_not_ready"
         )
         log.info("rag.warmup.skipped", reason=reason)
-        return
+        return RetrieverWarmupOutcome(
+            status="skipped",
+            requested=True,
+            reason=reason,
+            timeout_seconds=timeout_seconds,
+        )
     warm_callable = getattr(retriever, "warm", None)
     if not callable(warm_callable):
         log.info("rag.warmup.skipped", reason="warm_not_supported")
-        return
+        return RetrieverWarmupOutcome(
+            status="skipped",
+            requested=True,
+            reason="warm_not_supported",
+            timeout_seconds=timeout_seconds,
+        )
 
     start = time.perf_counter()
     try:
@@ -182,15 +218,33 @@ def warm_retriever_if_enabled(
             reason="timeout",
             timeout_seconds=timeout_seconds,
         )
-        return
+        return RetrieverWarmupOutcome(
+            status="timeout",
+            requested=True,
+            reason="timeout",
+            timeout_seconds=timeout_seconds,
+        )
     except Exception as exc:  # pragma: no cover - defensive runtime guard
-        log.warning("rag.warmup.skipped", reason=_warm_reason(exc))
-        return
+        reason = _warm_reason(exc)
+        log.warning("rag.warmup.skipped", reason=reason)
+        return RetrieverWarmupOutcome(
+            status="failed",
+            requested=True,
+            reason=reason,
+            timeout_seconds=timeout_seconds,
+        )
 
+    total_ms = round((time.perf_counter() - start) * 1000.0, 3)
     log.info(
         "rag.warmup.completed",
         timeout_seconds=timeout_seconds,
-        t_total_ms=round((time.perf_counter() - start) * 1000.0, 3),
+        t_total_ms=total_ms,
+    )
+    return RetrieverWarmupOutcome(
+        status="completed",
+        requested=True,
+        timeout_seconds=timeout_seconds,
+        t_total_ms=total_ms,
     )
 
 
@@ -240,8 +294,12 @@ __all__ = [
     "RagQueryCache",
     "RAG_QUERY_CACHE_STORAGE_SCOPE",
     "RETRIEVER_CACHE_STORAGE_SCOPE",
+    "RETRIEVER_WARM_STATE_STORAGE_SCOPE",
     "load_retriever",
+    "RetrieverWarmupOutcome",
     "warm_retriever_if_enabled",
+    "retriever_warmup_enabled",
+    "retriever_warmup_timeout_seconds",
     "NullRetriever",
     "BrokenRetriever",
 ]

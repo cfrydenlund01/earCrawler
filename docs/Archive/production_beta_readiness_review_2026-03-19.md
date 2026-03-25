@@ -8,8 +8,8 @@ Repository: `earCrawler`
 
 Governing context:
 
-- `docs/ExecutionPlanRunPass11.md`
-- `docs/RunPass11.md`
+- `docs/Archive/ExecutionPlanRunPass11.md`
+- `docs/Archive/RunPass11.md`
 - `docs/capability_graduation_boundaries.md`
 - `docs/search_kg_quarantine_decision_package_2026-03-19.md`
 - `docs/local_adapter_release_evidence.md`
@@ -84,7 +84,7 @@ Current validation and evidence used for this review:
 
 ## What RunPass11 Strengths Were Preserved
 
-The key strengths identified in `docs/RunPass11.md` remain intact:
+The key strengths identified in `docs/Archive/RunPass11.md` remain intact:
 
 - support-boundary discipline is still explicit in code and docs
 - deterministic corpus and KG artifact discipline remains in place

@@ -55,11 +55,11 @@ GitHub release promotion stages (`.github/workflows/release.yml`):
    - `scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256`
    - `scripts/provenance-attest.ps1`
    - `scripts/rebuild-compare.ps1 -Version <tag>`
-17. If a real Task 5.3 run artifact is available, produce the local-adapter evidence bundle:
+17. Only if you are explicitly resuming the deprioritized local-adapter track documented in `docs/local_adapter_deprioritization_2026-03-25.md`, and a real Task 5.3 run artifact is available, produce the local-adapter evidence bundle:
    - `scripts/local_adapter_smoke.ps1 -RunDir dist/training/<run_id>`
    - `py -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/<run_id> --manifest eval/manifest.json --dataset-id ear_compliance.v2 --dataset-id entity_obligations.v2 --dataset-id unanswerable.v2 --smoke-report kg/reports/local-adapter-smoke.json`
    - `py -m scripts.eval.validate_local_adapter_release_bundle --run-dir dist/training/<run_id> --benchmark-summary dist/benchmarks/<benchmark_run_id>/benchmark_summary.json --smoke-report kg/reports/local-adapter-smoke.json`
-18. If a real Task 5.3 run artifact is available, run the same optional-runtime smoke with local-adapter validation:
+18. Only if you are explicitly resuming the deprioritized local-adapter track documented in `docs/local_adapter_deprioritization_2026-03-25.md`, and a real Task 5.3 run artifact is available, run the same optional-runtime smoke with local-adapter validation:
    - `scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist/training/<run_id> -ReportPath dist/optional_runtime_smoke.json`
 19. Use `scripts/verify-release.ps1` to validate canonical + distributable artifacts and emit evidence:
    - `scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json -SecuritySummaryPath dist/security/security_scan_summary.json -ObservabilityApiProbePath dist/observability/api_probe.json -EvidenceOutPath dist/release_validation_evidence.json`
@@ -75,6 +75,9 @@ Optional local-adapter note:
   evidence-backed and reviewable, but it does not auto-promote the capability
   beyond `Optional`. Use `docs/local_adapter_release_evidence.md` for the exact
   decision rule.
+- For the current production-beta target, the local-adapter track is formally
+  deprioritized. Do not treat steps 17 and 18 as part of the normal release
+  gate unless a later dated decision explicitly re-activates that work.
 
 Single-host support note:
 - Release evidence should always map to the supported deployment contract: one

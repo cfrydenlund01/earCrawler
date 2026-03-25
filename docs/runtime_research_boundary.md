@@ -11,6 +11,19 @@ other exploratory material.
 Use this before treating a directory, script, or design note as a production
 commitment.
 
+Boundary vocabulary used in the active docs:
+
+- `Supported`
+- `Optional`
+- `Quarantined`
+- `Legacy`
+- `Generated`
+- `Archival`
+- `Proposal-only`
+
+Workspace-only ghost residue is separate from those labels. Treat it as
+unsupported local leftover state, not as tracked source.
+
 ## Supported product/runtime surface
 
 The supported runtime surface in this repository is narrow by design:
@@ -46,6 +59,9 @@ or proposal work but is not a supported runtime commitment:
 These areas may inform future work, but they are not by themselves promises
 about what operators can run or what release artifacts must support.
 
+Treat these surfaces as `Proposal-only` unless a supported command, runtime
+path, or operator doc explicitly promotes them.
+
 ## Quarantined or legacy areas
 
 The following are especially easy to misread as supported runtime surfaces, so
@@ -60,8 +76,12 @@ they are called out separately:
 - experimental retrieval modes or evaluation-only switches that the runbook
   still marks as opt-in
 
-For a quick onboarding map to supported entrypoints, see
-`docs/start_here_supported_paths.md`.
+Treat the code modules above as `Legacy` or `Quarantined`, not as proposal
+surfaces.
+
+For the authoritative maintainer handoff path, see
+`docs/maintainer_start_here.md`. For the quick supported developer-entrypoint
+map, see `docs/start_here_supported_paths.md`.
 
 ## Contributor rule of thumb
 

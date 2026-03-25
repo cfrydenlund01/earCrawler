@@ -30,9 +30,9 @@
    - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist\optional_runtime_smoke.json`
 13. Run release integrity validation and write evidence:
    - `pwsh scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist\api_smoke.json -OptionalRuntimeSmokeReportPath dist\optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist\installed_runtime_smoke.json -EvidenceOutPath dist\release_validation_evidence.json`
-14. If a real Task 5.3 run artifact is available, run:
+14. Only if you are explicitly resuming the deprioritized local-adapter track documented in `docs/local_adapter_deprioritization_2026-03-25.md`, and a real Task 5.3 run artifact is available, run:
    - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist\training\<run_id> -ReportPath dist\optional_runtime_smoke.json`
-15. If a real Task 5.3 run artifact is available, validate its release evidence bundle:
+15. Only if you are explicitly resuming the deprioritized local-adapter track documented in `docs/local_adapter_deprioritization_2026-03-25.md`, and a real Task 5.3 run artifact is available, validate its release evidence bundle:
    - `pwsh scripts/local_adapter_smoke.ps1 -RunDir dist\training\<run_id>`
    - `py -m scripts.eval.run_local_adapter_benchmark --run-dir dist\training\<run_id> --manifest eval\manifest.json --dataset-id ear_compliance.v2 --dataset-id entity_obligations.v2 --dataset-id unanswerable.v2 --smoke-report kg\reports\local-adapter-smoke.json`
    - `py -m scripts.eval.validate_local_adapter_release_bundle --run-dir dist\training\<run_id> --benchmark-summary dist\benchmarks\<benchmark_run_id>\benchmark_summary.json --smoke-report kg\reports\local-adapter-smoke.json`
@@ -60,20 +60,23 @@ Windows notes
 
 ## Supported Runtime Surface
 - Supported operator/runtime entrypoints are the installed `earctl` CLI, the FastAPI facade at `service.api_server`, and the pinned local read-only Fuseki dependency documented in `docs/ops/windows_fuseki_operator.md`. For release-artifact deployments, use the wheel + NSSM flow in `docs/ops/windows_single_host_operator.md`. The `earctl api ...` and `scripts/api-*.ps1` paths are source-checkout helpers, not the authoritative operator handoff path.
-- Supported runtime semantics are single-host only. Rate limits, concurrency controls, and the RAG cache are process-local today, so this runbook does not claim multi-instance correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`.
+- Supported runtime semantics are single-host only. Rate limits, concurrency controls, the RAG cache, retriever caches, and retriever warmup state are process-local today, so this runbook does not claim multi-instance correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`. Architecture note: `docs/single_host_runtime_state_boundary.md`.
 - Machine-readable capability state is published at `docs/api/capability_registry.json` (generated from `service/docs/capability_registry.json`). `README.md` remains the human-readable summary.
 - Supported API routes are `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, `/v1/sparql`, and `/v1/rag/query`.
 - Optional API/runtime features require explicit enablement: `/v1/rag/answer`, remote OpenAI-compatible providers, retrieval extras installed from `requirements-gpu.txt`, `EARCRAWLER_RETRIEVAL_MODE=hybrid`, and the Task 5.4 local adapter runtime (`LLM_PROVIDER=local_adapter` plus explicit local-model env).
-- The minimum optional local-adapter release bundle is defined in `docs/local_adapter_release_evidence.md` and `config/local_adapter_release_evidence.example.json`.
+- Generated answers are not part of the supported autonomous decision surface for production beta. When `/v1/rag/answer` is enabled, treat it as an advisory draft path with mandatory abstention on thin, ambiguous, or invalid evidence. Human review is required for higher-risk legal or regulatory interpretations. Governing policy: `docs/answer_generation_posture.md`.
+- The minimum optional local-adapter release bundle is defined in `docs/local_adapter_release_evidence.md` and `config/local_adapter_release_evidence.example.json`, but the local-adapter track is formally deprioritized for the current production-beta target. Decision record: `docs/local_adapter_deprioritization_2026-03-25.md`.
 - Quarantined runtime features include `/v1/search`, text-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion.
 - `/v1/search` is disabled by default at runtime; enable only for local validation with `EARCRAWLER_API_ENABLE_SEARCH=1`.
 - Hybrid ranking and local-adapter serving are tracked separately from KG quarantine in `docs/capability_graduation_boundaries.md`.
 - Release-shaped smoke coverage for optional/quarantined mode controls is available at `scripts/optional-runtime-smoke.ps1`.
 - `scripts/optional-runtime-smoke.ps1` always checks search gate default/off->on->off and KG expansion failure-policy behavior; local-adapter checks run only when `-LocalAdapterRunDir` is provided.
+- The dated maintenance-boundary record is `docs/search_kg_quarantine_decision_package_2026-03-19.md`: for the current production-beta target, preserve the quarantine boundary rather than widening the supported baseline for search or KG expansion.
 - Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
 - Do not use `earCrawler.ingestion.ingest` for operator deployments; it is a quarantined placeholder ingestion pipeline gated by `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`.
-- Search- and KG-dependent runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/review_pass_7_step9_3_decision_memo.md` (Pass 7 reaffirmed deferral). Capability-specific state boundaries live in `docs/capability_graduation_boundaries.md`.
+- Search- and KG-dependent runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/search_kg_quarantine_decision_package_2026-03-19.md` (keep quarantined with the current maintenance boundary). Capability-specific state boundaries live in `docs/capability_graduation_boundaries.md`.
 - For the repo-level boundary between supported runtime code and research/proposal material, see `docs/runtime_research_boundary.md`.
+- New maintainers should start from `docs/maintainer_start_here.md`.
 - New contributors should start from `docs/start_here_supported_paths.md`.
 
 ## Rollback
@@ -128,7 +131,8 @@ Windows notes
 - The evaluation harness expects exactly this shape and treats unknown extra keys as opaque; keep the schema stable when adding new datasets and bump the dataset `id`/`version` when you need to change semantics.
 - CLI helpers:
   - Required before every eval run: `py -m eval.validate_datasets` (or `python eval/validate_datasets.py`).
-  - `py -m earCrawler.cli eval run-rag --dataset-id <id> --fallback-max-uses 0` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Eval currently targets remote-provider runs; the optional local adapter runtime is for the supported `/v1/rag/answer` path and separate smoke validation.
+- `py -m earCrawler.cli eval run-rag --dataset-id <id> --fallback-max-uses 0` writes metrics to `dist/eval/<id>.rag.<provider>.<model>.json` and Markdown summaries to `dist/eval/<id>.rag.<provider>.<model>.md`. Eval currently targets remote-provider runs; the optional local adapter runtime is for the supported `/v1/rag/answer` path and separate smoke validation.
+- A passing local-adapter benchmark bundle would still be necessary before any promotion review, but that track is formally deprioritized for the current production-beta target and is not part of the normal release path. The production-beta answer posture remains advisory-only unless a dated decision explicitly widens it. See `docs/answer_generation_posture.md` and `docs/local_adapter_deprioritization_2026-03-25.md`.
   - Add `--retrieval-mode hybrid` for optional BM25+dense fusion runs, or `--compare-retrieval-modes` to emit dense-vs-hybrid comparison artifacts under the selected output directory.
   - Eval artifacts include strictness counters under `eval_strictness` (`fallbacks_used`, `fallback_counts`, `fallback_items`, threshold/breach flags). Runs fail when fallback count exceeds `fallback_max_uses`.
   - `python scripts/eval/log_eval_summary.py dist/eval/*.json` prints a markdown-ready bullet list that can be pasted into `Research/decision_log.md` when logging Phase E endpoints.
@@ -463,6 +467,3 @@ emitters with `new_prov_graph()` to regenerate provenance.
 - Adjust defaults in `earCrawler/telemetry/config.py` or override with CLI
   flags.
 - Inspect `kg/reports/gc-report.json` to review results.
-
-
-

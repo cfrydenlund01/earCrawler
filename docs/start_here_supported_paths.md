@@ -5,6 +5,10 @@ Prepared: March 10, 2026
 Use this page first when you are new to the repo. It points to the supported
 entrypoints and flags commonly confused legacy surfaces.
 
+If you are taking over the repository as a maintainer, start with
+`docs/maintainer_start_here.md` first. This page remains the quick supported
+developer-path companion.
+
 ## Supported first steps
 
 1. Build corpus inputs:
@@ -21,6 +25,7 @@ entrypoints and flags commonly confused legacy surfaces.
 
 ## Canonical docs
 
+- Maintainer handoff and authoritative doc path: `docs/maintainer_start_here.md`
 - Repository map and support-status labels: `docs/repository_status_index.md`
 - Data artifact truth model: `docs/data_artifact_inventory.md`
 - Product and capability boundary: `README.md`
@@ -41,6 +46,13 @@ generated or disposable workspace state unless a document above explicitly says
 otherwise. The repository-status index lists the current ghost-residue paths
 that must not be treated as supported source.
 
+Use the same category meanings everywhere:
+
+- `Supported`, `Optional`, `Quarantined`, `Legacy`, `Generated`, `Archival`,
+  and `Proposal-only`
+- workspace-only ghost residue is separate from those labels and should be
+  treated as unsupported local leftover state
+
 ## Quarantined or legacy surfaces
 
 Do not treat these as supported runtime entrypoints:
@@ -53,4 +65,3 @@ Do not treat these as supported runtime entrypoints:
   `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`)
 - KG-backed runtime features before `docs/kg_quarantine_exit_gate.md` is passed
   and recorded
-

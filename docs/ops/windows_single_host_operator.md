@@ -12,7 +12,7 @@ Use this guide for deployed hosts. `README.md`, `RUNBOOK.md`, `service/windows/*
 - Supported target: one Windows host running one EarCrawler API service.
 - Supported release-grade deployment artifacts for the API service: signed release checksums plus the published wheel and `hermetic-artifacts.zip` (pinned lockfile + wheelhouse installer payload) installed into a dedicated Python virtual environment.
 - Supported service wrapper: NSSM (`nssm.exe`) pointing at that virtual environment.
-- Rate limits, concurrency controls, and the RAG cache are process-local. This guide does not claim multi-instance correctness.
+- Rate limits, concurrency controls, the RAG cache, retriever caches, and retriever warmup state are process-local. This guide does not claim multi-instance correctness.
 - Not the operator deployment path: a source checkout, `earctl api start`, `scripts/api-*.ps1`, the PyInstaller `earctl.exe`, or the Inno Setup installer. Those are repo-local or convenience surfaces, not the authoritative API hosting path.
 - Provision the local read-only Fuseki dependency first using `docs/ops/windows_fuseki_operator.md`. This API guide assumes the supported Fuseki endpoint is `http://127.0.0.1:3030/ear/query` unless you intentionally override it.
 - Machine-readable runtime/capability state is reported in `/health` under `runtime_contract` and published in `docs/api/capability_registry.json`.
@@ -20,6 +20,8 @@ Use this guide for deployed hosts. `README.md`, `RUNBOOK.md`, `service/windows/*
 
 For the deferred future-work note on scale-out design, see
 `docs/ops/multi_instance_deferred.md`.
+For the runtime-state ownership boundary behind that contract, see
+`docs/single_host_runtime_state_boundary.md`.
 
 ## Baseline operator profile
 
@@ -74,7 +76,8 @@ Before touching the host, collect:
 - NSSM installed on the host
 - the Fuseki SPARQL query endpoint URL, for example `http://127.0.0.1:3030/ear/query`, provisioned per `docs/ops/windows_fuseki_operator.md`
 - a recorded Task 5.3 adapter artifact only if optional local-adapter serving
-  will be enabled
+  will be enabled during an explicit local-adapter review window; it is not
+  part of the normal production-beta deployment path
 - any required secrets:
   - `EARCRAWLER_API_KEYS` for inbound API auth if you are not running anonymously
   - `TRADEGOV_API_KEY` for scheduled ingest jobs
@@ -209,7 +212,8 @@ If you enable optional hybrid ranking, also set:
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_RETRIEVAL_MODE', 'hybrid', 'Machine')
 ```
 
-If you enable optional local-adapter serving, also set:
+If you enable optional local-adapter serving during an explicit review window,
+also set:
 
 ```powershell
 [System.Environment]::SetEnvironmentVariable('LLM_PROVIDER', 'local_adapter', 'Machine')
@@ -223,6 +227,11 @@ Do not enable `EARCRAWLER_API_ENABLE_SEARCH` or `EARCRAWLER_ENABLE_KG_EXPANSION`
 on deployed hosts. Those capabilities remain quarantined and are governed by
 `docs/kg_quarantine_exit_gate.md` plus
 `docs/capability_graduation_boundaries.md`.
+
+Do not enable local-adapter serving on normal production-beta hosts. That track
+is formally deprioritized for the current production-beta target by
+`docs/local_adapter_deprioritization_2026-03-25.md`. Use it only for an
+explicitly scoped review window with a named artifact and retained evidence.
 
 Do not set `EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE=1` on deployed hosts.
 That override exists only for local experiments. The supported contract remains
@@ -501,8 +510,8 @@ What this proves:
 - search rollback behavior (disabled again)
 - KG expansion failure-policy behavior (`disable` and `error`) with deterministic checks
 
-If you have a real Task 5.3 adapter artifact and explicitly need local-adapter
-proof, run:
+If you have a real Task 5.3 adapter artifact and are explicitly resuming the
+deprioritized local-adapter track for a review window, run:
 
 ```powershell
 pwsh scripts/optional-runtime-smoke.ps1 `
@@ -512,8 +521,8 @@ pwsh scripts/optional-runtime-smoke.ps1 `
   -ReportPath C:\ProgramData\EarCrawler\workspace\kg\reports\optional-runtime-smoke.json
 ```
 
-For a release-candidate adapter, also retain the evidence bundle defined in
-`docs/local_adapter_release_evidence.md`:
+For a release-candidate adapter review window, also retain the evidence bundle
+defined in `docs/local_adapter_release_evidence.md`:
 
 ```powershell
 pwsh scripts\local_adapter_smoke.ps1 `
@@ -533,6 +542,9 @@ py -m scripts.eval.validate_local_adapter_release_bundle `
 
 Keep the resulting `release_evidence_manifest.json` with the host-local release
 evidence for that candidate.
+
+Do not treat this local-adapter playbook as part of the supported baseline
+deployment checklist for the current production-beta target.
 
 Rollback for optional/quarantined local validation modes:
 
@@ -628,6 +640,18 @@ To disable remote answering again:
 C:\tools\nssm\nssm.exe restart EarCrawler-API
 ```
 
+## Still-missing deployment evidence
+
+This guide is the authoritative operator path for the supported Windows
+single-host baseline, but it still does not by itself prove:
+
+- multi-instance or load-balanced correctness
+- direct broader-than-loopback exposure without the separate front-door pattern
+- shared-state rollout, drain, or cache-coordination behavior across instances
+
+Treat those as out of scope until separate design, validation, and retained
+evidence exist.
+
 ## Operational notes
 
 - Keep at least the current and prior signed wheels, checksum files, and `hermetic-artifacts.zip` bundles on the host or in the release vault.
@@ -639,9 +663,6 @@ C:\tools\nssm\nssm.exe restart EarCrawler-API
 - If scale-out becomes in scope later, start from `docs/ops/multi_instance_deferred.md` instead of inferring support from this guide.
 - Broader-than-loopback exposure uses a separate front door. The reference pattern is IIS + ARR + Windows Authentication with EarCrawler still bound to loopback; see `docs/ops/external_auth_front_door.md`, `scripts/ops/iis-earcrawler-front-door.web.config.example`, and `scripts/ops/iis-front-door-smoke.ps1`.
 - When the optional IIS front door is deployed, retain the resulting `iis-front-door-smoke.json` report with the same host-local evidence set as install, upgrade, and rollback records.
-
-
-
 
 
 

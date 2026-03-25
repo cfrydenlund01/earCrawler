@@ -16,9 +16,11 @@ surface. Endpoints mirror the allowlisted SPARQL templates stored under
 must complete within the configured latency budget.
 
 Supported deployment semantics are single-host only. Current rate limits,
-concurrency controls, and the RAG cache are process-local, so this document
-does not claim multi-instance correctness. Deferred future-work note:
-`docs/ops/multi_instance_deferred.md`.
+concurrency controls, the RAG cache, retriever caches, and retriever warmup
+state are process-local, so this document does not claim multi-instance
+correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`.
+See `docs/single_host_runtime_state_boundary.md` for the explicit runtime-state
+ownership boundary behind `/health`.
 
 ## Endpoints
 
@@ -29,10 +31,12 @@ does not claim multi-instance correctness. Deferred future-work note:
 | `/v1/lineage/{entity_id}` | Supported | PROV-O lineage graph. |
 | `/v1/sparql` | Supported | Proxy for allowlisted SPARQL templates only. |
 | `/v1/rag/query` | Supported | Retrieval surface with lineage metadata. Route-level release-smoke latency/failure budgets are defined in `docs/ops/api_latency_budgets.md`. |
-| `/v1/rag/answer` | Optional | LLM answer generation through an explicitly enabled remote provider or the gated local Task 5.3 adapter runtime. |
+| `/v1/rag/answer` | Optional | LLM answer generation through an explicitly enabled remote provider or the gated local Task 5.3 adapter runtime. For production beta this is an advisory-only draft path, not an autonomous legal/regulatory decision surface. |
 | `/v1/search` | Quarantined | Text-index-backed label search. Disabled by default, excluded from default OpenAPI/Postman artifacts, and available only for local validation when runtime/client opt-in gates are set. |
 
 Refer to `service/openapi/openapi.yaml` for exhaustive schemas and examples.
+Use `docs/answer_generation_posture.md` for the governing abstention and
+human-review boundary behind `/v1/rag/answer`.
 
 ## Contract Artifacts
 
@@ -129,8 +133,8 @@ denied with `400`.
   `EARCRAWLER_API_ENABLE_SEARCH=1` plus a text-enabled Fuseki dataset
   (Jena `text:TextDataset` over `rdfs:label`, as configured in
   `bundle/assembler/tdb2-readonly.ttl`).
-* Rate-limit and concurrency budgets are per process; this document does not
-  claim aggregated multi-instance budgets.
+* Rate-limit, concurrency, cache, and warmup budgets/state are per process;
+  this document does not claim aggregated multi-instance budgets.
 
 Rate-limit state is surfaced via the `X-RateLimit-*` headers and `Retry-After`.
 

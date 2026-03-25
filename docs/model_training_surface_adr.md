@@ -173,3 +173,35 @@ This does not promote general local checkpoint serving, benchmark execution, or
 training workflows into the default runtime surface. It adds one narrowly gated
 optional serving path through `/v1/rag/answer` for the production candidate
 adapter produced by Task 5.3.
+
+This runtime integration also does not by itself widen the product claim to
+autonomous legal or regulatory answer generation. The supported production-beta
+answer posture, including abstention and human-review boundaries, is defined in
+`docs/answer_generation_posture.md`.
+
+## Phase D.2 Local-Adapter Scope Decision
+
+On March 25, 2026, Execution Plan RunPass11 Step D.2 concluded that the
+local-adapter track should be formally deprioritized for the current
+production-beta target rather than treated as near-term promotion work.
+
+Why:
+
+- the reviewed candidate under
+  `dist/training/step52-real-candidate-gpt2b-20260319/` uses the placeholder
+  base model `hf-internal-testing/tiny-random-gpt2`
+- `kg/reports/local-adapter-smoke.json` records `Retriever not ready`
+- the paired benchmark bundle was run against `http://127.0.0.1:9`
+- `release_evidence_manifest.json` records `keep_optional` and
+  `not_reviewable`
+
+Consequence:
+
+- the optional runtime path and evidence scripts remain in-tree as a bounded
+  future resumption path
+- maintainers should not treat Task 5 local-adapter artifacts as active
+  production-beta promotion work unless a later dated decision re-activates the
+  track
+
+The dated decision record is
+`docs/local_adapter_deprioritization_2026-03-25.md`.

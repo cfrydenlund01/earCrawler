@@ -12,6 +12,13 @@ Capability status follows the registry plus `README.md` and
 `EARCRAWLER_RETRIEVAL_MODE=hybrid`, and local-adapter serving are `Optional`;
 `/v1/search` and KG expansion remain `Quarantined` until
 `docs/kg_quarantine_exit_gate.md` is passed and recorded.
+The dated maintenance-boundary decision for the current production-beta target
+is `docs/search_kg_quarantine_decision_package_2026-03-19.md`: preserve the
+explicit quarantine boundary instead of treating these features as active
+promotion work.
+Generated answers remain advisory-only for the production-beta target and must
+not be treated as autonomous legal or regulatory determinations. See
+`docs/answer_generation_posture.md`.
 The quarantined `/v1/search` route is disabled by default and requires
 `EARCRAWLER_API_ENABLE_SEARCH=1` for local validation workflows.
 Default OpenAPI contract artifacts exclude `/v1/search`.
@@ -22,13 +29,14 @@ latency and rate-limit budgets. Use the `/openapi.yaml` document for schema
 details.
 
 Supported deployment semantics are single-host only. Current rate limits,
-concurrency controls, and the RAG cache are process-local, so this document
-does not claim multi-instance correctness. Deferred future-work note:
-`docs/ops/multi_instance_deferred.md`.
-The API now routes rate-limit and RAG cache ownership through the
+concurrency controls, the RAG cache, retriever caches, and retriever warmup
+state are process-local, so this document does not claim multi-instance
+correctness. Deferred future-work note: `docs/ops/multi_instance_deferred.md`.
+The API now routes runtime-owned state through the
 `service/api_server/runtime_state.py` boundary so the supported single-host
 assumption is explicit in one place rather than being implied by scattered
-`app.state` wiring.
+`app.state` wiring. Architecture note:
+`docs/single_host_runtime_state_boundary.md`.
 The `/health` payload reports this contract under `runtime_contract`, including
 the capability snapshot consumed from the registry, so release and operator
 checks can validate the deployment shape directly.
