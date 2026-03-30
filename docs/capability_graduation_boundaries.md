@@ -78,8 +78,10 @@ Current planning rule:
 - maintain only the explicit gate, default-contract exclusion, rollback-safe
   smoke coverage, and operator rollback notes until a later dated decision
   re-opens promotion work
-- use `docs/search_kg_quarantine_decision_package_2026-03-19.md` as the dated
-  maintenance-boundary record for this posture
+- use `docs/search_kg_capability_decision_2026-03-27.md` as the current dated
+  capability decision and
+  `docs/search_kg_quarantine_decision_package_2026-03-19.md` as supporting
+  evidence history for this posture
 
 Promotion from `Quarantined` to `Optional` requires all of the following:
 
@@ -159,8 +161,10 @@ Current planning rule:
 - maintain only the explicit gate, failure-policy checks, rollback notes, and
   quarantine-aligned operator docs until a later dated decision re-opens
   promotion work
-- use `docs/search_kg_quarantine_decision_package_2026-03-19.md` as the dated
-  maintenance-boundary record for this posture
+- use `docs/search_kg_capability_decision_2026-03-27.md` as the current dated
+  capability decision and
+  `docs/search_kg_quarantine_decision_package_2026-03-19.md` as supporting
+  evidence history for this posture
 
 Promotion from `Quarantined` to `Optional` requires all of the following:
 

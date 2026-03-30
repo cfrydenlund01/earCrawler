@@ -32,13 +32,27 @@ def read_ear_paragraphs(
         path = crawler.paragraphs_path
         if not path.exists():
             return []
-        rows: list[dict[str, str]] = []
+        latest_rows: dict[str, tuple[int, str, dict[str, str]]] = {}
         for payload in read_records(path):
             identifier = (
                 f"{payload.get('document_number')}:{payload.get('paragraph_index')}"
             )
-            rows.append({"identifier": identifier, "text": payload.get("text", "")})
-        return rows
+            version = int(payload.get("version") or 1)
+            scraped_at = str(payload.get("scraped_at") or "")
+            candidate = {
+                "identifier": identifier,
+                "text": str(payload.get("text", "")),
+            }
+            current = latest_rows.get(identifier)
+            if current is None:
+                latest_rows[identifier] = (version, scraped_at, candidate)
+                continue
+            current_version, current_scraped_at, _ = current
+            if version > current_version or (
+                version == current_version and scraped_at > current_scraped_at
+            ):
+                latest_rows[identifier] = (version, scraped_at, candidate)
+        return [latest_rows[key][2] for key in sorted(latest_rows)]
     fixtures_dir = fixtures or DEFAULT_FIXTURES
     loader = loader_cls(fr_client_cls(), query=query)
     paragraphs = loader.run(

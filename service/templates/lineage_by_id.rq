@@ -4,19 +4,15 @@ SELECT ?source ?relation ?target ?timestamp
 WHERE {
   VALUES ?source { {{id}} }
   {
-    SELECT ?source ?relation ?target ?timestamp WHERE {
-      ?activity prov:used ?source .
-      ?activity prov:generated ?target .
-      BIND(prov:used AS ?relation)
-      OPTIONAL { ?activity prov:endedAtTime ?timestamp }
-    }
+    ?activity prov:used ?source .
+    ?activity prov:generated ?target .
+    BIND(prov:used AS ?relation)
+    OPTIONAL { ?activity prov:endedAtTime ?timestamp }
   }
   UNION
   {
-    SELECT ?source ?relation ?target ?timestamp WHERE {
-      ?source prov:wasDerivedFrom ?target .
-      BIND(prov:wasDerivedFrom AS ?relation)
-    }
+    ?source prov:wasDerivedFrom ?target .
+    BIND(prov:wasDerivedFrom AS ?relation)
   }
 }
 ORDER BY ?relation ?target

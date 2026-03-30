@@ -35,6 +35,12 @@ class SnapshotMetadata:
     snapshot_manifest_path: str | None
 
 
+@dataclass(frozen=True)
+class SnapshotContract:
+    expected_manifest_path: Path | None
+    expected_payload_path: Path | None
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
@@ -80,6 +86,36 @@ def _resolve_repo_relative(path_value: str) -> Path:
     if path.is_absolute():
         return path.resolve()
     return (REPO_ROOT / path).resolve()
+
+
+def _contains_placeholder(value: str | None) -> bool:
+    token = str(value or "").strip()
+    return "<" in token and ">" in token
+
+
+def _load_snapshot_contract(training_input_contract_path: Path) -> SnapshotContract:
+    contract = _load_json(training_input_contract_path)
+    authoritative = contract.get("authoritative_sources")
+    if not isinstance(authoritative, dict):
+        raise ValueError("Training input contract is missing authoritative_sources.")
+
+    manifest_raw = str(authoritative.get("offline_snapshot_manifest") or "").strip()
+    payload_raw = str(authoritative.get("offline_snapshot_payload") or "").strip()
+    if manifest_raw and _contains_placeholder(manifest_raw):
+        raise ValueError(
+            "Training input contract contains a placeholder offline_snapshot_manifest."
+        )
+    if payload_raw and _contains_placeholder(payload_raw):
+        raise ValueError(
+            "Training input contract contains a placeholder offline_snapshot_payload."
+        )
+
+    manifest_path = _resolve_repo_relative(manifest_raw) if manifest_raw else None
+    payload_path = _resolve_repo_relative(payload_raw) if payload_raw else None
+    return SnapshotContract(
+        expected_manifest_path=manifest_path,
+        expected_payload_path=payload_path,
+    )
 
 
 def _validate_training_corpus_preflight(
@@ -146,6 +182,138 @@ def _validate_training_corpus_preflight(
             f"corpus={actual_doc_count} index_meta={expected_doc_count}"
         )
     return actual_digest, actual_doc_count
+
+
+def _validate_snapshot_preflight(
+    *,
+    snapshot: SnapshotMetadata,
+    snapshot_manifest: Path | None,
+    training_input_contract_path: Path,
+    index_meta_path: Path,
+) -> None:
+    contract = _load_snapshot_contract(training_input_contract_path)
+    if contract.expected_manifest_path is None:
+        if snapshot.snapshot_id in {"", "unknown-snapshot"} or _contains_placeholder(
+            snapshot.snapshot_id
+        ):
+            raise ValueError(
+                "Snapshot ID is required and cannot be unknown/placeholder."
+            )
+        if snapshot.snapshot_sha256 in {"", "unknown"} or _contains_placeholder(
+            snapshot.snapshot_sha256
+        ):
+            raise ValueError(
+                "Snapshot SHA-256 is required and cannot be unknown/placeholder."
+            )
+        return
+
+    if snapshot_manifest is None:
+        raise ValueError(
+            "Configured snapshot manifest is required by training input contract."
+        )
+    if snapshot_manifest != contract.expected_manifest_path:
+        raise ValueError(
+            "Configured snapshot manifest path does not match training input contract. "
+            f"configured='{snapshot_manifest}' expected='{contract.expected_manifest_path}'"
+        )
+    if not snapshot_manifest.exists():
+        raise FileNotFoundError(f"Snapshot manifest not found: {snapshot_manifest}")
+
+    manifest = _load_json(snapshot_manifest)
+    manifest_snapshot_id = str(manifest.get("snapshot_id") or "").strip()
+    payload = manifest.get("payload")
+    if not isinstance(payload, dict):
+        raise ValueError("Snapshot manifest is missing payload metadata.")
+    manifest_snapshot_sha = str(payload.get("sha256") or "").strip().lower()
+    payload_relative = str(payload.get("path") or "").strip()
+
+    if not manifest_snapshot_id:
+        raise ValueError("Snapshot manifest is missing snapshot_id.")
+    if _contains_placeholder(manifest_snapshot_id):
+        raise ValueError("Snapshot manifest snapshot_id cannot be a placeholder.")
+    if not re.fullmatch(r"[0-9a-f]{64}", manifest_snapshot_sha):
+        raise ValueError("Snapshot manifest payload.sha256 must be a valid SHA-256 hex.")
+
+    if contract.expected_payload_path is not None:
+        expected_payload = contract.expected_payload_path
+        if payload_relative:
+            manifest_payload = (snapshot_manifest.parent / payload_relative).resolve()
+        else:
+            manifest_payload = None
+        if manifest_payload is None or manifest_payload != expected_payload:
+            raise ValueError(
+                "Snapshot payload path in manifest does not match training input contract. "
+                f"manifest='{manifest_payload}' expected='{expected_payload}'"
+            )
+
+    if snapshot.snapshot_id != manifest_snapshot_id:
+        raise ValueError(
+            "Configured snapshot_id does not match snapshot manifest. "
+            f"configured='{snapshot.snapshot_id}' manifest='{manifest_snapshot_id}'"
+        )
+    if snapshot.snapshot_sha256.lower() != manifest_snapshot_sha:
+        raise ValueError(
+            "Configured snapshot_sha256 does not match snapshot manifest payload hash. "
+            f"configured='{snapshot.snapshot_sha256}' manifest='{manifest_snapshot_sha}'"
+        )
+
+    index_meta = _load_json(index_meta_path)
+    index_snapshot = index_meta.get("snapshot")
+    if isinstance(index_snapshot, dict):
+        index_snapshot_id = str(index_snapshot.get("snapshot_id") or "").strip()
+        index_snapshot_sha = str(index_snapshot.get("snapshot_sha256") or "").strip().lower()
+        if index_snapshot_id and index_snapshot_id != manifest_snapshot_id:
+            raise ValueError(
+                "FAISS index metadata snapshot_id does not match snapshot manifest. "
+                f"index_meta='{index_snapshot_id}' manifest='{manifest_snapshot_id}'"
+            )
+        if index_snapshot_sha and index_snapshot_sha != manifest_snapshot_sha:
+            raise ValueError(
+                "FAISS index metadata snapshot_sha256 does not match snapshot manifest. "
+                f"index_meta='{index_snapshot_sha}' manifest='{manifest_snapshot_sha}'"
+            )
+
+
+def _validate_qlora_preflight(
+    *,
+    require_qlora_4bit: bool,
+    use_4bit: bool,
+    base_model: str,
+) -> None:
+    if require_qlora_4bit and not use_4bit:
+        raise ValueError(
+            "QLoRA 4-bit evidence is required for this run, but use_4bit is false. "
+            f"Enable --use-4bit for base model '{base_model}'."
+        )
+
+
+def _validate_qlora_runtime_preflight(
+    *,
+    require_qlora_4bit: bool,
+    use_4bit: bool,
+    base_model: str,
+) -> None:
+    if not (require_qlora_4bit or use_4bit):
+        return
+
+    try:
+        import torch
+    except Exception as exc:  # pragma: no cover - environment specific import failure
+        raise ValueError(
+            "QLoRA runtime preflight failed: PyTorch is not importable in this environment."
+        ) from exc
+
+    cuda_available = bool(torch.cuda.is_available())
+    cuda_device_count = int(torch.cuda.device_count()) if cuda_available else 0
+    torch_version = str(getattr(torch, "__version__", "unknown"))
+    if "+cpu" in torch_version.lower() or not cuda_available or cuda_device_count < 1:
+        raise ValueError(
+            "QLoRA runtime preflight failed: CUDA-capable PyTorch is required for the "
+            f"7B QLoRA candidate path on '{base_model}'. "
+            f"Detected torch='{torch_version}', cuda_available={cuda_available}, "
+            f"cuda_device_count={cuda_device_count}. "
+            "Install a CUDA-enabled torch build on a host with at least one visible CUDA device."
+        )
 
 
 def _write_json(path: Path, payload: Any) -> None:
@@ -450,6 +618,33 @@ def _load_training_deps() -> tuple[Any, Any, Any, Any, Any, Any, Any]:
     )
 
 
+def _collect_quantization_evidence(model: Any) -> dict[str, Any]:
+    quantization_config = getattr(model, "quantization_config", None)
+    config_load_in_4bit: bool | None = None
+    quantization_type: str | None = None
+    compute_dtype: str | None = None
+    use_double_quant: bool | None = None
+    if quantization_config is not None:
+        config_load_in_4bit = bool(getattr(quantization_config, "load_in_4bit", False))
+        raw_type = getattr(quantization_config, "bnb_4bit_quant_type", None)
+        quantization_type = str(raw_type) if raw_type is not None else None
+        raw_dtype = getattr(quantization_config, "bnb_4bit_compute_dtype", None)
+        compute_dtype = str(raw_dtype) if raw_dtype is not None else None
+        raw_double_quant = getattr(quantization_config, "bnb_4bit_use_double_quant", None)
+        if raw_double_quant is not None:
+            use_double_quant = bool(raw_double_quant)
+    model_flag_is_loaded_in_4bit = bool(getattr(model, "is_loaded_in_4bit", False))
+    effective_use_4bit = bool(model_flag_is_loaded_in_4bit or config_load_in_4bit)
+    return {
+        "effective_use_4bit": effective_use_4bit,
+        "model_flag_is_loaded_in_4bit": model_flag_is_loaded_in_4bit,
+        "quantization_config_load_in_4bit": config_load_in_4bit,
+        "quantization_config_type": quantization_type,
+        "quantization_config_compute_dtype": compute_dtype,
+        "quantization_config_double_quant": use_double_quant,
+    }
+
+
 def _train_adapter(
     *,
     base_model: str,
@@ -465,6 +660,7 @@ def _train_adapter(
     lora_dropout: float,
     lora_target_modules: list[str],
     use_4bit: bool,
+    require_qlora_4bit: bool,
     allow_pt_bin: bool,
 ) -> dict[str, Any]:
     (
@@ -536,6 +732,11 @@ def _train_adapter(
         )
 
     model = AutoModelForCausalLM.from_pretrained(base_model, **model_kwargs)
+    quantization_evidence = _collect_quantization_evidence(model)
+    if use_4bit and not bool(quantization_evidence.get("effective_use_4bit")):
+        raise RuntimeError(
+            "Requested --use-4bit, but model load did not report effective 4-bit quantization."
+        )
     if use_4bit:
         model = prepare_model_for_kbit_training(model)
 
@@ -591,6 +792,11 @@ def _train_adapter(
     metrics["global_step"] = int(getattr(trainer.state, "global_step", 0) or 0)
     metrics["train_samples"] = len(examples)
     metrics["adapter_dir"] = str(adapter_dir)
+    metrics["qlora"] = {
+        "required": bool(require_qlora_4bit),
+        "requested_use_4bit": bool(use_4bit),
+        **quantization_evidence,
+    }
     return metrics
 
 
@@ -726,6 +932,14 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--use-4bit", action="store_true")
     parser.add_argument(
+        "--require-qlora-4bit",
+        action="store_true",
+        help=(
+            "Require 4-bit QLoRA evidence for this run. "
+            "When enabled, preflight fails unless --use-4bit is true."
+        ),
+    )
+    parser.add_argument(
         "--allow-pt-bin",
         action="store_true",
         help=(
@@ -770,6 +984,30 @@ def main(argv: list[str] | None = None) -> int:
         snapshot_id=args.snapshot_id,
         snapshot_sha256=args.snapshot_sha256,
     )
+    try:
+        _validate_snapshot_preflight(
+            snapshot=snapshot,
+            snapshot_manifest=snapshot_manifest,
+            training_input_contract_path=training_input_contract_path,
+            index_meta_path=index_meta_path,
+        )
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Training snapshot preflight failed: {exc}", file=sys.stderr)
+        return 2
+    try:
+        _validate_qlora_preflight(
+            require_qlora_4bit=bool(args.require_qlora_4bit),
+            use_4bit=bool(args.use_4bit),
+            base_model=str(args.base_model),
+        )
+        _validate_qlora_runtime_preflight(
+            require_qlora_4bit=bool(args.require_qlora_4bit),
+            use_4bit=bool(args.use_4bit),
+            base_model=str(args.base_model),
+        )
+    except ValueError as exc:
+        print(f"Training QLoRA preflight failed: {exc}", file=sys.stderr)
+        return 2
     run_id = _resolve_run_id(
         run_id=args.run_id,
         base_model=args.base_model,
@@ -807,6 +1045,8 @@ def main(argv: list[str] | None = None) -> int:
         "retrieval_corpus_doc_count": corpus_doc_count,
         "training_input_contract_path": str(training_input_contract_path),
         "index_meta_path": str(index_meta_path),
+        "qlora_required": bool(args.require_qlora_4bit),
+        "requested_use_4bit": bool(args.use_4bit),
         "example_schema_version": "instruction-tuning.v1",
         "example_count": len(examples),
         "examples_path": str(examples_path),
@@ -833,6 +1073,9 @@ def main(argv: list[str] | None = None) -> int:
         "retrieval_corpus": str(retrieval_corpus_path),
         "training_input_contract": str(training_input_contract_path),
         "index_meta": str(index_meta_path),
+        "qlora": {
+            "required": bool(args.require_qlora_4bit),
+        },
         "max_examples": int(args.max_examples),
         "refusal_every": int(args.refusal_every),
         "training_hyperparams": {
@@ -870,6 +1113,19 @@ def main(argv: list[str] | None = None) -> int:
         "artifact_dir": None,
         "smoke_report": None,
         "status": "prepare_only" if args.prepare_only else "pending",
+        "qlora": {
+            "required": bool(args.require_qlora_4bit),
+            "requested_use_4bit": bool(args.use_4bit),
+            "effective_use_4bit": None,
+            "model_flag_is_loaded_in_4bit": None,
+            "quantization_config_load_in_4bit": None,
+            "quantization_config_type": None,
+            "quantization_config_compute_dtype": None,
+            "quantization_config_double_quant": None,
+            "evidence_status": "not_executed_prepare_only"
+            if args.prepare_only
+            else "pending",
+        },
     }
 
     if args.prepare_only:
@@ -896,6 +1152,7 @@ def main(argv: list[str] | None = None) -> int:
             if token.strip()
         ],
         use_4bit=bool(args.use_4bit),
+        require_qlora_4bit=bool(args.require_qlora_4bit),
         allow_pt_bin=bool(args.allow_pt_bin),
     )
     adapter_dir = run_dir / "adapter"
@@ -908,6 +1165,12 @@ def main(argv: list[str] | None = None) -> int:
         allow_pt_bin=bool(args.allow_pt_bin),
     )
     _write_json(run_dir / "inference_smoke.json", smoke_report)
+
+    qlora_metrics = artifact_metrics.get("qlora")
+    if isinstance(qlora_metrics, dict):
+        qlora_metrics = dict(qlora_metrics)
+        qlora_metrics["evidence_status"] = "captured_during_training"
+        metadata["qlora"] = qlora_metrics
 
     metadata.update(
         {

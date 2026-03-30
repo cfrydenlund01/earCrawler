@@ -24,6 +24,9 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 if ($HermeticBundleZipPath -and -not $UseHermeticWheelhouse.IsPresent) {
   throw "-HermeticBundleZipPath requires -UseHermeticWheelhouse."
 }
+if ($HermeticBundleZipPath -and -not $ReleaseChecksumsPath) {
+  throw "-HermeticBundleZipPath requires -ReleaseChecksumsPath."
+}
 if ($ReleaseChecksumsPath -and -not $UseHermeticWheelhouse.IsPresent) {
   throw "-ReleaseChecksumsPath requires -UseHermeticWheelhouse."
 }
@@ -108,16 +111,7 @@ function Stop-ApiProcess {
   if ($null -eq $Process) {
     return
   }
-  if ($Process.HasExited) {
-    return
-  }
-
-  try {
-    Stop-Process -Id $Process.Id -Force -ErrorAction Stop
-  }
-  catch {
-    Write-Warning ("Unable to stop installed-runtime API process {0}: {1}" -f $Process.Id, $_.Exception.Message)
-  }
+  Stop-ProcessTree -RootProcessId $Process.Id -Label "installed-runtime API"
 }
 
 function Stop-ManagedProcess {
@@ -129,14 +123,64 @@ function Stop-ManagedProcess {
   if ($null -eq $Process) {
     return
   }
-  if ($Process.HasExited) {
+  Stop-ProcessTree -RootProcessId $Process.Id -Label $Label
+}
+
+function Get-ChildProcessIds {
+  param([int]$ParentProcessId)
+
+  if ($ParentProcessId -le 0) {
+    return @()
+  }
+
+  $children = Get-CimInstance Win32_Process -Filter ("ParentProcessId = {0}" -f $ParentProcessId) -ErrorAction SilentlyContinue
+  if ($null -eq $children) {
+    return @()
+  }
+  return @($children | Select-Object -ExpandProperty ProcessId)
+}
+
+function Stop-ProcessTree {
+  param(
+    [int]$RootProcessId,
+    [string]$Label
+  )
+
+  if ($RootProcessId -le 0) {
     return
   }
-  try {
-    Stop-Process -Id $Process.Id -Force -ErrorAction Stop
+
+  $queue = New-Object System.Collections.Generic.Queue[int]
+  $visited = New-Object System.Collections.Generic.HashSet[int]
+  $discovered = New-Object System.Collections.Generic.List[int]
+  $queue.Enqueue($RootProcessId)
+
+  while ($queue.Count -gt 0) {
+    $candidateId = $queue.Dequeue()
+    if (-not $visited.Add($candidateId)) {
+      continue
+    }
+    [void]$discovered.Add($candidateId)
+    foreach ($childId in (Get-ChildProcessIds -ParentProcessId $candidateId)) {
+      if (-not $visited.Contains($childId)) {
+        $queue.Enqueue([int]$childId)
+      }
+    }
   }
-  catch {
-    Write-Warning ("Unable to stop {0} process {1}: {2}" -f $Label, $Process.Id, $_.Exception.Message)
+
+  $orderedIds = @($discovered.ToArray())
+  [Array]::Reverse($orderedIds)
+  foreach ($targetId in $orderedIds) {
+    try {
+      $proc = Get-Process -Id $targetId -ErrorAction SilentlyContinue
+      if ($null -eq $proc) {
+        continue
+      }
+      Stop-Process -Id $targetId -Force -ErrorAction Stop
+    }
+    catch {
+      Write-Warning ("Unable to stop {0} process {1}: {2}" -f $Label, $targetId, $_.Exception.Message)
+    }
   }
 }
 
@@ -211,6 +255,42 @@ function Resolve-FusekiServerExecutable {
   throw "Fuseki server launcher not found under $FusekiHome."
 }
 
+function Resolve-ExpectedArtifactHash {
+  param(
+    [Parameter(Mandatory = $true)][string]$ChecksumsFile,
+    [Parameter(Mandatory = $true)][string]$ArtifactFile
+  )
+
+  $artifactLeaf = (Split-Path -Leaf $ArtifactFile).ToLowerInvariant()
+  $checksumsDir = Split-Path -Parent $ChecksumsFile
+  $pattern = "^\s*([0-9a-fA-F]{64})\s+\*?(.+?)\s*$"
+
+  foreach ($line in Get-Content -Path $ChecksumsFile) {
+    if (-not $line.Trim()) {
+      continue
+    }
+    if ($line -notmatch $pattern) {
+      throw "Malformed checksum line in ${ChecksumsFile}: $line"
+    }
+    $hash = $Matches[1].ToLowerInvariant()
+    $entryPath = $Matches[2]
+    $entryLeaf = (Split-Path -Leaf $entryPath).ToLowerInvariant()
+    if ($entryLeaf -eq $artifactLeaf) {
+      return $hash
+    }
+
+    $entryAbsolute = Join-Path -Path $checksumsDir -ChildPath $entryPath
+    if (Test-Path $entryAbsolute) {
+      $resolvedEntry = (Resolve-Path $entryAbsolute).Path
+      if ($resolvedEntry -eq $ArtifactFile) {
+        return $hash
+      }
+    }
+  }
+
+  throw "Checksum entry not found in $ChecksumsFile for artifact $(Split-Path -Leaf $ArtifactFile)."
+}
+
 function Write-BaselineFusekiFixture {
   param([Parameter(Mandatory = $true)][string]$OutPath)
 
@@ -230,6 +310,8 @@ function Write-BaselineFusekiFixture {
 <urn:example:activity:1> prov:used <urn:example:entity:1> ;
   prov:generated <urn:example:artifact:2> ;
   prov:endedAtTime "2023-01-02T00:00:00Z" .
+
+<urn:example:entity:1> prov:wasDerivedFrom <urn:example:artifact:2> .
 "@
 
   Set-Content -Path $OutPath -Value $fixture -Encoding ascii
@@ -241,10 +323,12 @@ function Wait-ForFusekiHealth {
     [Parameter(Mandatory = $true)][string]$ProbeScript,
     [Parameter(Mandatory = $true)][string]$FusekiEndpoint,
     [Parameter(Mandatory = $true)][string]$HealthReportPath,
-    [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process
+    [Parameter(Mandatory = $true)][System.Diagnostics.Process]$Process,
+    [string]$FusekiStdErrPath = "",
+    [string]$FusekiStdOutPath = ""
   )
 
-  $deadline = (Get-Date).AddSeconds(45)
+  $deadline = (Get-Date).AddSeconds(120)
   while ((Get-Date) -lt $deadline) {
     try {
       Invoke-CheckedCommand $PwshExecutable -File $ProbeScript -FusekiUrl $FusekiEndpoint -ReportPath $HealthReportPath
@@ -252,12 +336,32 @@ function Wait-ForFusekiHealth {
     }
     catch {
       if ($Process.HasExited) {
-        throw "Fuseki process exited before health checks passed."
+        $stderrTail = ""
+        if ($FusekiStdErrPath -and (Test-Path $FusekiStdErrPath)) {
+          $stderrTail = (Get-Content -Path $FusekiStdErrPath -Tail 80) -join "`n"
+        }
+        $stdoutTail = ""
+        if ($FusekiStdOutPath -and (Test-Path $FusekiStdOutPath)) {
+          $stdoutTail = (Get-Content -Path $FusekiStdOutPath -Tail 80) -join "`n"
+        }
+        throw "Fuseki process exited before health checks passed. stderr tail:`n$stderrTail`nstdout tail:`n$stdoutTail"
       }
       Start-Sleep -Milliseconds 750
     }
   }
-  throw "Timed out waiting for Fuseki health checks to pass."
+  $stderrTail = ""
+  if ($FusekiStdErrPath -and (Test-Path $FusekiStdErrPath)) {
+    $stderrTail = (Get-Content -Path $FusekiStdErrPath -Tail 80) -join "`n"
+  }
+  $stdoutTail = ""
+  if ($FusekiStdOutPath -and (Test-Path $FusekiStdOutPath)) {
+    $stdoutTail = (Get-Content -Path $FusekiStdOutPath -Tail 80) -join "`n"
+  }
+  $lastProbeReport = ""
+  if ($HealthReportPath -and (Test-Path $HealthReportPath)) {
+    $lastProbeReport = Get-Content -Path $HealthReportPath -Raw
+  }
+  throw "Timed out waiting for Fuseki health checks to pass. last probe report:`n$lastProbeReport`nstderr tail:`n$stderrTail`nstdout tail:`n$stdoutTail"
 }
 
 $python = Resolve-PythonInterpreter
@@ -345,7 +449,19 @@ try {
     $resolvedLockFilePath = $null
     $resolvedWheelhousePath = $null
     $resolvedBundleZipPath = ""
+    $resolvedChecksumsPath = ""
     $installScript = Join-Path $repoRoot "scripts\install-from-wheelhouse.ps1"
+
+    if ($ReleaseChecksumsPath) {
+      $candidateChecksumsPath = $ReleaseChecksumsPath
+      if (-not [IO.Path]::IsPathRooted($candidateChecksumsPath)) {
+        $candidateChecksumsPath = Join-Path $repoRoot $candidateChecksumsPath
+      }
+      if (-not (Test-Path $candidateChecksumsPath)) {
+        throw "Release checksums file not found: $candidateChecksumsPath"
+      }
+      $resolvedChecksumsPath = (Resolve-Path $candidateChecksumsPath).Path
+    }
 
     if ($HermeticBundleZipPath) {
       $candidateBundlePath = $HermeticBundleZipPath
@@ -356,6 +472,11 @@ try {
         throw "Hermetic bundle zip not found: $candidateBundlePath"
       }
       $resolvedBundleZipPath = (Resolve-Path $candidateBundlePath).Path
+      $expectedBundleHash = Resolve-ExpectedArtifactHash -ChecksumsFile $resolvedChecksumsPath -ArtifactFile $resolvedBundleZipPath
+      $actualBundleHash = (Get-FileHash -Path $resolvedBundleZipPath -Algorithm SHA256).Hash.ToLowerInvariant()
+      if ($actualBundleHash -ne $expectedBundleHash) {
+        throw "Hermetic bundle checksum mismatch for $(Split-Path -Leaf $resolvedBundleZipPath): expected $expectedBundleHash, got $actualBundleHash."
+      }
 
       $bundleExtractRoot = Join-Path $smokeRoot "hermetic-bundle"
       New-Item -ItemType Directory -Force -Path $bundleExtractRoot | Out-Null
@@ -421,18 +542,6 @@ try {
       }
     }
 
-    $resolvedChecksumsPath = ""
-    if ($ReleaseChecksumsPath) {
-      $candidateChecksumsPath = $ReleaseChecksumsPath
-      if (-not [IO.Path]::IsPathRooted($candidateChecksumsPath)) {
-        $candidateChecksumsPath = Join-Path $repoRoot $candidateChecksumsPath
-      }
-      if (-not (Test-Path $candidateChecksumsPath)) {
-        throw "Release checksums file not found: $candidateChecksumsPath"
-      }
-      $resolvedChecksumsPath = (Resolve-Path $candidateChecksumsPath).Path
-    }
-
     $report.install_details = [ordered]@{
       lock_file = $resolvedLockFilePath
       wheelhouse_path = $resolvedWheelhousePath
@@ -440,6 +549,7 @@ try {
       installer_script_path = $installScript
       release_bundle_zip = $resolvedBundleZipPath
       checksums_path = $resolvedChecksumsPath
+      hermetic_bundle_checksum_verified = [bool]($resolvedBundleZipPath -and $resolvedChecksumsPath)
       wheel_checksum_verified = [bool]$resolvedChecksumsPath
     }
 
@@ -518,14 +628,18 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
     }
 
     $tdbLoader = Resolve-TdbLoaderScript -JenaHome ([string]$tools.jena_home)
-    Invoke-CheckedCommand $tdbLoader "--loc=$fusekiDatabaseRoot" $fusekiFixturePath
+    # The generated Fuseki assembler enables unionDefaultGraph, so baseline fixture
+    # triples must be loaded into a named graph to be visible through default-graph
+    # queries used by the supported API smoke checks.
+    $baselineFixtureGraph = "urn:earcrawler:baseline-fixture"
+    Invoke-CheckedCommand $tdbLoader "--loc=$fusekiDatabaseRoot" "--graph=$baselineFixtureGraph" $fusekiFixturePath
 
     $fusekiExe = Resolve-FusekiServerExecutable -FusekiHome ([string]$tools.fuseki_home)
     $fusekiStdOut = Join-Path $fusekiLogRoot "fuseki-smoke.out.log"
     $fusekiStdErr = Join-Path $fusekiLogRoot "fuseki-smoke.err.log"
     $fusekiProcess = Start-Process `
       -FilePath $fusekiExe `
-      -ArgumentList @("--config", $fusekiConfigPath, "--localhost", "--port", $FusekiPort.ToString()) `
+      -ArgumentList @("--config=$fusekiConfigPath", "--localhost", "--port", $FusekiPort.ToString(), "--ping") `
       -WorkingDirectory ([string]$tools.fuseki_home) `
       -PassThru `
       -WindowStyle Hidden `
@@ -538,7 +652,9 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
       -ProbeScript (Join-Path $repoRoot "scripts\health\fuseki-probe.ps1") `
       -FusekiEndpoint $FusekiUrl `
       -HealthReportPath $fusekiHealthReportPath `
-      -Process $fusekiProcess
+      -Process $fusekiProcess `
+      -FusekiStdErrPath $fusekiStdErr `
+      -FusekiStdOutPath $fusekiStdOut
 
     $report.fuseki_dependency = [ordered]@{
       mode = "live_fuseki"
@@ -605,11 +721,27 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
 
   $apiSmokeReportPath = Join-Path $smokeRoot "api_smoke.json"
   $apiSmokeScript = Join-Path $repoRoot "scripts\api-smoke.ps1"
-  & $apiSmokeScript -Host $ApiHost -Port $Port -ReportPath $apiSmokeReportPath
-  if ($LASTEXITCODE -ne 0) {
-    throw "Supported API smoke failed for installed-wheel runtime."
+  $apiSmokeFailure = ""
+  try {
+    & $apiSmokeScript -Host $ApiHost -Port $Port -ReportPath $apiSmokeReportPath
+  }
+  catch {
+    $apiSmokeFailure = $_.Exception.Message
+  }
+  $apiSmokeExitCode = $LASTEXITCODE
+  if (-not (Test-Path $apiSmokeReportPath)) {
+    if ($apiSmokeFailure) {
+      throw "Supported API smoke failed before producing a report: $apiSmokeFailure"
+    }
+    throw "Supported API smoke did not produce a report at $apiSmokeReportPath."
   }
   $apiSmokePayload = Get-Content -Path $apiSmokeReportPath -Raw | ConvertFrom-Json
+  if ($apiSmokeFailure -and [string]$apiSmokePayload.overall_status -eq "passed") {
+    throw "Supported API smoke reported pass but raised an error: $apiSmokeFailure"
+  }
+  if ($apiSmokeExitCode -ne 0 -and [string]$apiSmokePayload.overall_status -eq "passed") {
+    throw "Supported API smoke exited non-zero despite a passing report."
+  }
 
   $expectedInstallMode = if ($UseHermeticWheelhouse.IsPresent) { "hermetic_wheelhouse" } else { "direct_wheel" }
   $expectedInstallSource = if ($UseHermeticWheelhouse.IsPresent) {
@@ -634,11 +766,30 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
     [ordered]@{ name = "runtime_contract_kg_expansion"; passed = ([string]$capabilities.'kg.expansion'.status -eq "quarantined"); expected = "quarantined"; actual = [string]$capabilities.'kg.expansion'.status }
   )
 
+  $apiSmokeChecks = @()
+  $apiSmokeFailedChecks = @()
+  foreach ($check in @($apiSmokePayload.checks)) {
+    $entry = [ordered]@{
+      name = [string]$check.name
+      status = [string]$check.status
+      status_code = [int]$check.status_code
+    }
+    if ($check.PSObject.Properties.Name -contains "error" -and $check.error) {
+      $entry.error = [string]$check.error
+    }
+    $apiSmokeChecks += $entry
+    if ([string]$check.status -ne "passed") {
+      $apiSmokeFailedChecks += [string]$check.name
+    }
+  }
+
   $report.checks = $checkList
   $report.api_smoke = [ordered]@{
     path = $apiSmokeReportPath
     schema_version = [string]$apiSmokePayload.schema_version
     overall_status = [string]$apiSmokePayload.overall_status
+    checks = $apiSmokeChecks
+    failed_checks = $apiSmokeFailedChecks
   }
   $report.runtime_contract = [ordered]@{
     topology = [string]$runtimeContract.topology

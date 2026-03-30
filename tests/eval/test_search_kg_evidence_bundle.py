@@ -40,27 +40,39 @@ def _make_registry(tmp_path: Path) -> Path:
     return registry_path
 
 
-def _make_optional_runtime_smoke(tmp_path: Path) -> Path:
+def _make_optional_runtime_smoke(
+    tmp_path: Path, *, include_production_like: bool = False
+) -> Path:
     path = tmp_path / "dist" / "optional_runtime_smoke.json"
-    _write_json(
-        path,
-        {
-            "schema_version": "optional-runtime-smoke.v1",
-            "overall_status": "passed",
-            "search_mode_checks": [
-                {"name": "search_default_off", "status": "passed", "search": {"status_code": 404}},
-                {"name": "search_opt_in_on", "status": "passed", "search": {"status_code": 200}},
-                {"name": "search_rollback_off", "status": "passed", "search": {"status_code": 404}},
-            ],
-            "kg_expansion_failure_policy_checks": {
-                "status": "passed",
-                "checks": {
-                    "disable_missing_fuseki": {"status": "passed"},
-                    "error_missing_fuseki": {"status": "passed"},
-                    "json_stub_expansion": {"status": "passed"},
-                },
+    payload = {
+        "schema_version": "optional-runtime-smoke.v1",
+        "overall_status": "passed",
+        "search_mode_checks": [
+            {"name": "search_default_off", "status": "passed", "search": {"status_code": 404}},
+            {"name": "search_opt_in_on", "status": "passed", "search": {"status_code": 200}},
+            {"name": "search_rollback_off", "status": "passed", "search": {"status_code": 404}},
+        ],
+        "kg_expansion_failure_policy_checks": {
+            "status": "passed",
+            "checks": {
+                "disable_missing_fuseki": {"status": "passed"},
+                "error_missing_fuseki": {"status": "passed"},
+                "json_stub_expansion": {"status": "passed"},
             },
         },
+    }
+    if include_production_like:
+        payload["search_kg_production_like"] = {
+            "status": "passed",
+            "report": {
+                "overall_status": "passed",
+                "search": {"status": "passed"},
+                "kg_expansion": {"status": "passed"},
+            },
+        }
+    _write_json(
+        path,
+        payload,
     )
     return path
 
@@ -136,7 +148,7 @@ def test_bundle_keeps_search_and_kg_quarantined_when_gate_evidence_is_incomplete
     assert payload["required_smoke_coverage"]["optional_runtime_smoke"]["status"] == "passed"
     assert payload["required_smoke_coverage"]["installed_runtime_smoke"]["status"] == "passed"
     assert payload["required_smoke_coverage"]["release_validation"]["status"] == "incomplete"
-    assert any("text-index-enabled Fuseki" in item for item in payload["blocking_gaps"])
+    assert any("Release validation evidence is incomplete" in item for item in payload["blocking_gaps"])
     assert "Keep Quarantined" in out_md.read_text(encoding="utf-8")
 
 
@@ -188,3 +200,50 @@ def test_bundle_marks_ready_for_formal_promotion_review_only_with_complete_evide
     assert payload["recommendation"] == "Ready for formal promotion review"
     assert payload["blocking_gaps"] == []
     assert "Ready for formal promotion review" in out_md.read_text(encoding="utf-8")
+
+
+def test_bundle_uses_optional_runtime_production_like_proof_when_present(
+    tmp_path: Path,
+) -> None:
+    registry = _make_registry(tmp_path)
+    optional_smoke = _make_optional_runtime_smoke(
+        tmp_path, include_production_like=True
+    )
+    installed_smoke = _make_installed_runtime_smoke(tmp_path)
+    release_evidence = _make_release_validation_evidence(tmp_path, complete=True)
+    search_operator = tmp_path / "evidence" / "search_operator_evidence.md"
+    search_operator.parent.mkdir(parents=True, exist_ok=True)
+    search_operator.write_text("# operator proof\n", encoding="utf-8")
+    out_json = tmp_path / "out" / "bundle.json"
+    out_md = tmp_path / "out" / "bundle.md"
+
+    rc = bundle.main(
+        [
+            "--capability-registry",
+            str(registry),
+            "--optional-runtime-smoke",
+            str(optional_smoke),
+            "--installed-runtime-smoke",
+            str(installed_smoke),
+            "--release-validation-evidence",
+            str(release_evidence),
+            "--search-operator-evidence",
+            str(search_operator),
+            "--decision-date",
+            "2026-03-27",
+            "--out-json",
+            str(out_json),
+            "--out-md",
+            str(out_md),
+        ]
+    )
+
+    assert rc == 0
+    payload = json.loads(out_json.read_text(encoding="utf-8"))
+    assert payload["recommendation"] == "Ready for formal promotion review"
+    assert payload["required_smoke_coverage"]["optional_runtime_smoke"][
+        "production_like_search_status"
+    ] == "passed"
+    assert payload["required_smoke_coverage"]["optional_runtime_smoke"][
+        "production_like_kg_status"
+    ] == "passed"

@@ -72,7 +72,7 @@ $assemblerPath = Join-Path $targetDir 'tdb2-text-smoke.ttl'
 @'
 @prefix : <#> .
 @prefix fuseki: <http://jena.apache.org/fuseki#> .
-@prefix tdb2: <http://jena.hpl.hp.com/2008/tdb#> .
+@prefix tdb2: <http://jena.apache.org/2016/tdb#> .
 @prefix ja: <http://jena.hpl.hp.com/2005/11/Assembler#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 @prefix text: <http://jena.apache.org/text#> .

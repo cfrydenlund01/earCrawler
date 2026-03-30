@@ -5,6 +5,10 @@ import sys
 from pathlib import Path
 from subprocess import run
 
+import click
+import pytest
+
+from earCrawler.cli.kg_commands import _dataset_store_dir
 
 def _write(path: Path, records: list[dict]) -> None:
     with path.open("w", encoding="utf-8") as fh:
@@ -68,3 +72,12 @@ def test_legacy_cli_kg_emit_warns() -> None:
     assert res.returncode == 0
     assert "Legacy top-level CLI wrapper" in res.stderr
     assert "earctl kg emit" in res.stderr
+
+
+def test_dataset_store_dir_maps_dataset_under_db_root(tmp_path: Path) -> None:
+    assert _dataset_store_dir(tmp_path / "db", "/ear") == tmp_path / "db" / "ear"
+
+
+def test_dataset_store_dir_rejects_missing_leading_slash(tmp_path: Path) -> None:
+    with pytest.raises(click.BadParameter):
+        _dataset_store_dir(tmp_path / "db", "ear")

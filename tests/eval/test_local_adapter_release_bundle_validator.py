@@ -11,7 +11,13 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def _make_run_dir(tmp_path: Path) -> Path:
+def _make_run_dir(
+    tmp_path: Path,
+    *,
+    config_use_4bit: bool = True,
+    metadata_effective_4bit: bool = True,
+    include_qlora_metadata: bool = True,
+) -> Path:
     run_dir = tmp_path / "training" / "run-1"
     adapter = run_dir / "adapter"
     adapter.mkdir(parents=True)
@@ -35,16 +41,26 @@ def _make_run_dir(tmp_path: Path) -> Path:
         {
             "schema_version": "training-run-config.v1",
             "run_id": "run-1",
+            "training_hyperparams": {
+                "use_4bit": config_use_4bit,
+            },
         },
     )
+    metadata_payload = {
+        "schema_version": "training-run-metadata.v1",
+        "run_id": "run-1",
+        "status": "completed",
+        "git_head": "deadbeef",
+    }
+    if include_qlora_metadata:
+        metadata_payload["qlora"] = {
+            "required": True,
+            "requested_use_4bit": True,
+            "effective_use_4bit": metadata_effective_4bit,
+        }
     _write_json(
         run_dir / "run_metadata.json",
-        {
-            "schema_version": "training-run-metadata.v1",
-            "run_id": "run-1",
-            "status": "completed",
-            "git_head": "deadbeef",
-        },
+        metadata_payload,
     )
     _write_json(
         run_dir / "inference_smoke.json",
@@ -254,3 +270,31 @@ def test_validator_keeps_capability_optional_when_benchmark_precondition_is_not_
         "smoke_precondition.required" in item or "preconditions/local_adapter_smoke.json" in item
         for item in payload["insufficient_evidence"]
     )
+
+
+def test_validator_rejects_candidate_without_required_qlora_4bit_evidence(
+    tmp_path: Path,
+) -> None:
+    run_dir = _make_run_dir(tmp_path, config_use_4bit=False, metadata_effective_4bit=False)
+    benchmark_summary = _make_benchmark_bundle(tmp_path, run_dir)
+    smoke_report = _make_smoke_report(tmp_path, run_dir)
+
+    out_path = run_dir / "release_evidence_manifest.json"
+    rc = validator.main(
+        [
+            "--run-dir",
+            str(run_dir),
+            "--benchmark-summary",
+            str(benchmark_summary),
+            "--smoke-report",
+            str(smoke_report),
+            "--out",
+            str(out_path),
+        ]
+    )
+
+    assert rc == 1
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["decision"] == "reject_candidate"
+    assert any("use_4bit" in item for item in payload["failing_evidence"])
+    assert any("effective_use_4bit" in item for item in payload["failing_evidence"])

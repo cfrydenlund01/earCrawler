@@ -29,6 +29,14 @@ def _resolve_sparql_client() -> type[SPARQLClient]:
     return SPARQLClient
 
 
+def _dataset_store_dir(db_dir: Path, dataset: str) -> Path:
+    token = str(dataset or "").strip()
+    if not token.startswith("/"):
+        raise click.BadParameter("dataset must start with '/'")
+    relative = token.lstrip("/")
+    return db_dir / Path(relative) if relative else db_dir
+
+
 def _validate_ttls(
     ctx: click.Context,
     ttls: tuple[Path, ...],
@@ -89,18 +97,25 @@ def kg_export(data_dir: str, out_ttl: str) -> None:
 @click.option("--ttl", "-t", default="kg/ear_triples.ttl", help="Turtle file to load.")
 @click.option("--db", "-d", default="db", help="TDB2 DB directory.")
 @click.option(
+    "--dataset",
+    default="/ear",
+    show_default=True,
+    help="Dataset name used to derive storage path under --db (must start with '/').",
+)
+@click.option(
     "--no-auto-install",
     is_flag=True,
     default=False,
     help="Disable auto-download of Apache Jena; fail if not present.",
 )
-def kg_load(ttl: str, db: str, no_auto_install: bool) -> None:
+def kg_load(ttl: str, db: str, dataset: str, no_auto_install: bool) -> None:
     """Load Turtle into a local TDB2 store."""
 
     from earCrawler.kg.loader import load_tdb
 
-    load_tdb(Path(ttl), Path(db), auto_install=not no_auto_install)
-    click.echo(f"Loaded {ttl} into TDB2 at {db}")
+    target_db = _dataset_store_dir(Path(db), dataset)
+    load_tdb(Path(ttl), target_db, auto_install=not no_auto_install)
+    click.echo(f"Loaded {ttl} into TDB2 at {target_db}")
 
 
 @click.command(name="kg-serve")

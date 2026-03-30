@@ -1,3 +1,11 @@
+# Output from AI:
+The review verdict is Not production-ready beta. The repo is close, and py -3 -m pytest -q is green at 520 passed, 7 skipped, but the live workspace fails the release trust gates:
+
+scripts/release-evidence-preflight.ps1 -AllowEmptyDist fails because uncontrolled top-level dist/ artifacts are present.
+scripts/verify-release.ps1 -RequireCompleteEvidence fails because dist/checksums.sha256 still references earcrawler-kg-dev-20260319-snapshot.zip while dist/ now contains earcrawler-kg-dev-20260325-snapshot.zip.
+scripts/bootstrap-verify.ps1 fails on this host because Java is 8, below the repo’s minimum.
+The new review doc captures the evidence, the preserved strengths, and the specific blockers needed to get back to a defensible constrained beta verdict.
+
 # Production Beta Readiness Review
 
 Decision date: March 25, 2026
@@ -14,8 +22,8 @@ Review scope:
 
 Governing context:
 
-- `docs/Archive/ExecutionPlanRunPass11.md`
-- `docs/Archive/RunPass11.md`
+- `docs/ExecutionPlanRunPass11.md`
+- `docs/RunPass11.md`
 - `docs/answer_generation_posture.md`
 - `docs/local_adapter_deprioritization_2026-03-25.md`
 - `docs/maintainer_start_here.md`

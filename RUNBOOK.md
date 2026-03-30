@@ -71,10 +71,23 @@ Windows notes
 - Hybrid ranking and local-adapter serving are tracked separately from KG quarantine in `docs/capability_graduation_boundaries.md`.
 - Release-shaped smoke coverage for optional/quarantined mode controls is available at `scripts/optional-runtime-smoke.ps1`.
 - `scripts/optional-runtime-smoke.ps1` always checks search gate default/off->on->off and KG expansion failure-policy behavior; local-adapter checks run only when `-LocalAdapterRunDir` is provided.
-- The dated maintenance-boundary record is `docs/search_kg_quarantine_decision_package_2026-03-19.md`: for the current production-beta target, preserve the quarantine boundary rather than widening the supported baseline for search or KG expansion.
+- The current dated capability decision is
+  `docs/search_kg_capability_decision_2026-03-27.md`: for the current
+  production-beta target, preserve the quarantine boundary rather than widen
+  the supported baseline for search or KG expansion. Use
+  `docs/search_kg_quarantine_decision_package_2026-03-19.md` as supporting
+  evidence history.
 - Do not run `earCrawler.service.sparql_service` or `earCrawler.service.legacy.kg_service` for operator deployments; both are quarantined legacy modules outside the supported runtime surface.
 - Do not use `earCrawler.ingestion.ingest` for operator deployments; it is a quarantined placeholder ingestion pipeline gated by `EARCRAWLER_ENABLE_LEGACY_INGESTION=1`.
-- Search- and KG-dependent runtime features remain quarantined until the exit criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/search_kg_quarantine_decision_package_2026-03-19.md` (keep quarantined with the current maintenance boundary). Capability-specific state boundaries live in `docs/capability_graduation_boundaries.md`.
+- Search- and KG-dependent runtime features remain quarantined until the exit
+  criteria in `docs/kg_quarantine_exit_gate.md` are explicitly passed and
+  recorded. Current decision record:
+  `docs/search_kg_capability_decision_2026-03-27.md` (Step 5.3: keep
+  quarantined). Supporting history:
+  `docs/kg_search_status_decision_2026-03-10.md` and
+  `docs/search_kg_quarantine_decision_package_2026-03-19.md`.
+  Capability-specific state boundaries live in
+  `docs/capability_graduation_boundaries.md`.
 - For the repo-level boundary between supported runtime code and research/proposal material, see `docs/runtime_research_boundary.md`.
 - New maintainers should start from `docs/maintainer_start_here.md`.
 - New contributors should start from `docs/start_here_supported_paths.md`.

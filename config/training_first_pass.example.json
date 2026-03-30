@@ -2,9 +2,9 @@
   "schema_version": "training-run-config.v1",
   "status": "planning_only_until_executed",
   "base_model": "Qwen/Qwen2.5-7B-Instruct",
-  "snapshot_manifest": "snapshots/offline/<snapshot_id>/manifest.json",
-  "snapshot_id": "<snapshot_id>",
-  "snapshot_sha256": "<payload_sha256>",
+  "snapshot_manifest": "snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json",
+  "snapshot_id": "ecfr_current_20260210_1627_parts_736_740_742_744_746",
+  "snapshot_sha256": "3f3fa624f3af38490a65afa809cb23beba0b0788e01b2db497ac67f2ce5439ca",
   "retrieval_corpus": "data/faiss/retrieval_corpus.jsonl",
   "training_input_contract": "config/training_input_contract.example.json",
   "index_meta": "data/faiss/index.meta.json",
@@ -22,13 +22,15 @@
   "lora_alpha": 32,
   "lora_dropout": 0.05,
   "lora_target_modules": "q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj",
-  "use_4bit": false,
+  "use_4bit": true,
+  "require_qlora_4bit": true,
   "allow_pt_bin": false,
   "smoke_prompt": "When is a license required under EAR section 736.2(b)?",
   "smoke_max_new_tokens": 96,
   "notes": [
     "Copy this file to a local, non-committed path before running a real pass.",
-    "Set snapshot_id and snapshot_sha256 from the approved offline snapshot manifest.",
-    "The generated adapter and metadata are written under dist/training/<run_id>/."
+    "If you intentionally use a newer approved snapshot, update snapshot_manifest, snapshot_id, and snapshot_sha256 together.",
+    "The generated adapter and metadata are written under dist/training/<run_id>/.",
+    "First 7B production-candidate runs require QLoRA evidence (use_4bit + metadata proof)."
   ]
 }

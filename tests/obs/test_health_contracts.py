@@ -28,7 +28,10 @@ def _enable_socket_fixture(socket_enabled):
     yield
 
 
-def test_health_endpoint_reports_checks():
+def test_health_endpoint_reports_checks(tmp_path: Path, monkeypatch):
+    monkeypatch.setenv(
+        "EARCRAWLER_SOURCE_MANIFEST_PATH", str(tmp_path / "missing-manifest.json")
+    )
     settings = ApiSettings(fuseki_url=None)
     registry = TemplateRegistry.load_default()
     app = create_app(settings=settings, registry=registry)

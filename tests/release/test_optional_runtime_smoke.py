@@ -37,6 +37,7 @@ def test_optional_runtime_smoke_runs_without_local_adapter_artifact(tmp_path: Pa
     assert payload["schema_version"] == "optional-runtime-smoke.v1"
     assert payload["overall_status"] == "passed"
     assert payload["kg_expansion_failure_policy_checks"]["status"] == "passed"
+    assert payload["search_kg_production_like"]["status"] in {"passed", "failed", "skipped"}
     assert payload["local_adapter_check"]["status"] == "skipped"
 
     phase_names = [phase["name"] for phase in payload["search_mode_checks"]]

@@ -130,3 +130,63 @@ def test_live_manifest_includes_upstream_status(tmp_path: Path, monkeypatch) -> 
     assert upstream_status[0]["state"] == "retry_exhausted"
     on_disk = json.loads((data_dir / "manifest.json").read_text(encoding="utf-8"))
     assert on_disk["upstream_status"][0]["state"] == "retry_exhausted"
+
+
+def test_live_build_prefers_latest_ear_paragraph_version_per_identifier(
+    tmp_path: Path, monkeypatch
+) -> None:
+    class StubCrawler:
+        def __init__(self, _client, storage_dir: Path) -> None:
+            self.paragraphs_path = Path(storage_dir) / "ear_paragraphs.jsonl"
+
+        def run(self, _query: str) -> None:
+            self.paragraphs_path.parent.mkdir(parents=True, exist_ok=True)
+            rows = [
+                {
+                    "document_number": "DOC-1",
+                    "paragraph_index": 0,
+                    "text": "Original paragraph text.",
+                    "version": 1,
+                    "scraped_at": "2026-03-26T00:00:00Z",
+                },
+                {
+                    "document_number": "DOC-1",
+                    "paragraph_index": 0,
+                    "text": "Updated paragraph text.",
+                    "version": 2,
+                    "scraped_at": "2026-03-26T01:00:00Z",
+                },
+            ]
+            self.paragraphs_path.write_text(
+                "\n".join(json.dumps(row) for row in rows) + "\n",
+                encoding="utf-8",
+            )
+
+    class StubFederalRegisterClient:
+        def __init__(self, *args, **kwargs) -> None:
+            self._status = UpstreamStatus(
+                source="federalregister",
+                operation="get_document",
+                state="ok",
+                result_count=1,
+            )
+
+        def get_document(self, _doc_number: str) -> dict:
+            return {}
+
+        def get_last_status(self, operation: str | None = None):
+            if operation in (None, "get_document"):
+                return self._status
+            return None
+
+    monkeypatch.setattr("earCrawler.corpus.builder.EARCrawler", StubCrawler)
+    monkeypatch.setattr(
+        "earCrawler.corpus.builder.FederalRegisterClient",
+        StubFederalRegisterClient,
+    )
+    data_dir = tmp_path / "data"
+    manifest = build_corpus(["ear"], data_dir, live=True, fixtures=None)
+    assert manifest["summary"]["ear"] == 1
+    ear_records = _read_jsonl(data_dir / "ear_corpus.jsonl")
+    assert len(ear_records) == 1
+    assert ear_records[0]["paragraph"] == "Updated paragraph text."

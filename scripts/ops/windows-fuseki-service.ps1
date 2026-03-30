@@ -7,11 +7,14 @@ param(
     [string]$ProgramDataRoot = "C:\ProgramData\EarCrawler\fuseki",
     [string]$ConfigRoot = "",
     [string]$DatabaseRoot = "",
+    [string]$LuceneRoot = "",
     [string]$LogRoot = "",
     [string]$ConfigPath = "",
     [string]$FusekiHost = "127.0.0.1",
     [int]$FusekiPort = 3030,
     [string]$DatasetName = "ear",
+    [switch]$EnableTextIndexValidation,
+    [string]$TextProbeQuery = "__earcrawler_text_probe__",
     [switch]$AllowUnsupportedHost,
     [switch]$DryRun
 )
@@ -22,6 +25,9 @@ $ErrorActionPreference = "Stop"
 function Write-ContractBanner {
     Write-Host "Support contract: one Windows host, one read-only Fuseki instance, one EarCrawler API instance."
     Write-Host "Quarantined Fuseki-backed search and KG expansion are not enabled by this script."
+    if ($EnableTextIndexValidation) {
+        Write-Host "Optional validation mode: renders a text-index-enabled Fuseki config for quarantined search/KG promotion evidence only."
+    }
 }
 
 function Test-IsLoopbackHost {
@@ -87,22 +93,73 @@ function Convert-ToFileUri {
     param([Parameter(Mandatory = $true)][string]$Path)
 
     $resolved = [System.IO.Path]::GetFullPath($Path)
-    return ([System.Uri]([System.IO.DirectoryInfo]::new($resolved).FullName)).AbsoluteUri
+    return $resolved.Replace('\', '/')
 }
 
-function Write-ReadonlyAssembler {
+function Write-FusekiAssembler {
     param(
         [Parameter(Mandatory = $true)][string]$OutPath,
         [Parameter(Mandatory = $true)][string]$TdbLocation,
         [Parameter(Mandatory = $true)][string]$ServiceDatasetName,
+        [string]$LuceneLocation = "",
+        [switch]$TextIndexValidationMode,
         [switch]$DryRunMode
     )
 
     $datasetUri = Convert-ToFileUri -Path $TdbLocation
-    $content = @"
+    if ($TextIndexValidationMode) {
+        if (-not $LuceneLocation) {
+            throw "LuceneLocation is required when TextIndexValidationMode is enabled."
+        }
+        $luceneUri = Convert-ToFileUri -Path $LuceneLocation
+        $content = @"
 @prefix : <#> .
 @prefix fuseki: <http://jena.apache.org/fuseki#> .
-@prefix tdb2: <http://jena.hpl.hp.com/2008/tdb#> .
+@prefix tdb2: <http://jena.apache.org/2016/tdb#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix text: <http://jena.apache.org/text#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+
+[] rdf:type fuseki:Server ;
+   fuseki:services (
+      [ rdf:type fuseki:Service ;
+        fuseki:name "$ServiceDatasetName" ;
+        fuseki:serviceQuery "query" ;
+        fuseki:serviceUpdate "update" ;
+        fuseki:serviceReadGraphStore "get" ;
+        fuseki:serviceReadQuads "quads" ;
+        fuseki:dataset :dataset ;
+        fuseki:status "validation_text_index"
+      ]
+   ) .
+
+:dataset rdf:type text:TextDataset ;
+    text:dataset :tdb_dataset ;
+    text:index :text_index .
+
+:tdb_dataset rdf:type tdb2:DatasetTDB2 ;
+    tdb2:location "$datasetUri" ;
+    tdb2:unionDefaultGraph true ;
+    tdb2:requireWritePermission true .
+
+:text_index rdf:type text:TextIndexLucene ;
+    text:directory "$luceneUri" ;
+    text:entityMap :entity_map .
+
+:entity_map rdf:type text:EntityMap ;
+    text:entityField "entity" ;
+    text:defaultField "label" ;
+    text:map (
+        [ text:field "label" ;
+          text:predicate rdfs:label ]
+    ) .
+"@
+    }
+    else {
+        $content = @"
+@prefix : <#> .
+@prefix fuseki: <http://jena.apache.org/fuseki#> .
+@prefix tdb2: <http://jena.apache.org/2016/tdb#> .
 @prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
 
 [] rdf:type fuseki:Server ;
@@ -122,6 +179,7 @@ function Write-ReadonlyAssembler {
     tdb2:unionDefaultGraph true ;
     tdb2:requireWritePermission true .
 "@
+    }
 
     if ($DryRunMode) {
         Write-Host "[DRY-RUN] Write read-only Fuseki assembler to $OutPath"
@@ -157,13 +215,28 @@ if (-not $ConfigRoot) {
     $ConfigRoot = Join-Path $ProgramDataRoot "config"
 }
 if (-not $DatabaseRoot) {
-    $DatabaseRoot = Join-Path $ProgramDataRoot "databases\tdb2"
+    $DatabaseRoot = if ($EnableTextIndexValidation) {
+        Join-Path $ProgramDataRoot "databases\tdb2-text"
+    } else {
+        Join-Path $ProgramDataRoot "databases\tdb2"
+    }
+}
+if (-not $LuceneRoot) {
+    $LuceneRoot = if ($EnableTextIndexValidation) {
+        Join-Path $ProgramDataRoot "databases\lucene"
+    } else {
+        ""
+    }
 }
 if (-not $LogRoot) {
     $LogRoot = Join-Path $ProgramDataRoot "logs"
 }
 if (-not $ConfigPath) {
-    $ConfigPath = Join-Path $ConfigRoot "tdb2-readonly-query.ttl"
+    $ConfigPath = if ($EnableTextIndexValidation) {
+        Join-Path $ConfigRoot "tdb2-text-validation-query.ttl"
+    } else {
+        Join-Path $ConfigRoot "tdb2-readonly-query.ttl"
+    }
 }
 
 $endpointUrl = "http://{0}:{1}/{2}/query" -f $FusekiHost, $FusekiPort, $DatasetName
@@ -173,26 +246,50 @@ switch ($Action) {
     "render-config" {
         Ensure-Directory -Path $ConfigRoot -DryRunMode:$DryRun
         Ensure-Directory -Path $DatabaseRoot -DryRunMode:$DryRun
-        Write-ReadonlyAssembler -OutPath $ConfigPath -TdbLocation $DatabaseRoot -ServiceDatasetName $DatasetName -DryRunMode:$DryRun
+        if ($EnableTextIndexValidation) {
+            Ensure-Directory -Path $LuceneRoot -DryRunMode:$DryRun
+        }
+        Write-FusekiAssembler `
+            -OutPath $ConfigPath `
+            -TdbLocation $DatabaseRoot `
+            -ServiceDatasetName $DatasetName `
+            -LuceneLocation $LuceneRoot `
+            -TextIndexValidationMode:$EnableTextIndexValidation `
+            -DryRunMode:$DryRun
     }
     "install" {
         $fusekiExe = if ($DryRun) { Join-Path $FusekiHome "fuseki-server.bat" } else { Get-FusekiExecutable -Home $FusekiHome }
         Ensure-Directory -Path $ConfigRoot -DryRunMode:$DryRun
         Ensure-Directory -Path $DatabaseRoot -DryRunMode:$DryRun
+        if ($EnableTextIndexValidation) {
+            Ensure-Directory -Path $LuceneRoot -DryRunMode:$DryRun
+        }
         Ensure-Directory -Path $LogRoot -DryRunMode:$DryRun
-        Write-ReadonlyAssembler -OutPath $ConfigPath -TdbLocation $DatabaseRoot -ServiceDatasetName $DatasetName -DryRunMode:$DryRun
+        Write-FusekiAssembler `
+            -OutPath $ConfigPath `
+            -TdbLocation $DatabaseRoot `
+            -ServiceDatasetName $DatasetName `
+            -LuceneLocation $LuceneRoot `
+            -TextIndexValidationMode:$EnableTextIndexValidation `
+            -DryRunMode:$DryRun
 
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @(
             "install", $ServiceName, $fusekiExe,
-            "--config", $ConfigPath,
+            "--config=$ConfigPath",
             "--localhost",
-            "--port", $FusekiPort.ToString()
+            "--port", $FusekiPort.ToString(),
+            "--ping"
         )
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("set", $ServiceName, "AppDirectory", $FusekiHome)
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("set", $ServiceName, "AppStdout", (Join-Path $LogRoot "fuseki-service.log"))
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("set", $ServiceName, "AppStderr", (Join-Path $LogRoot "fuseki-service.log"))
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("set", $ServiceName, "Start", "SERVICE_AUTO_START")
-        Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("set", $ServiceName, "Description", "EarCrawler Fuseki (supported single-host read-only graph service)")
+        $description = if ($EnableTextIndexValidation) {
+            "EarCrawler Fuseki (single-host text-index validation service for quarantined search/KG evidence)"
+        } else {
+            "EarCrawler Fuseki (supported single-host read-only graph service)"
+        }
+        Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("set", $ServiceName, "Description", $description)
     }
     "uninstall" {
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("remove", $ServiceName, "confirm")
@@ -222,17 +319,30 @@ switch ($Action) {
             endpoint = $endpointUrl
             config_path = $ConfigPath
             database_root = $DatabaseRoot
+            lucene_root = $LuceneRoot
+            text_index_validation_enabled = [bool]$EnableTextIndexValidation
         } | ConvertTo-Json -Depth 4
     }
     "health" {
         if ($DryRun) {
-            Write-Host "[DRY-RUN] pwsh $healthScript -FusekiUrl $endpointUrl"
+            $dryRunCmd = "pwsh $healthScript -FusekiUrl $endpointUrl"
+            if ($EnableTextIndexValidation) {
+                $dryRunCmd += " -RequireTextQuery -TextQuery `"$TextProbeQuery`""
+            }
+            Write-Host "[DRY-RUN] $dryRunCmd"
             break
         }
         if (-not (Test-Path $healthScript)) {
             throw "Health script not found: $healthScript"
         }
-        & $healthScript -FusekiUrl $endpointUrl
+        $healthArgs = @{
+            FusekiUrl = $endpointUrl
+        }
+        if ($EnableTextIndexValidation) {
+            $healthArgs.RequireTextQuery = $true
+            $healthArgs.TextQuery = $TextProbeQuery
+        }
+        & $healthScript @healthArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Fuseki health check failed for $endpointUrl."
         }

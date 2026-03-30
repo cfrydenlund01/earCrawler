@@ -73,6 +73,23 @@ def _write_index_meta(path: Path, *, corpus_digest: str, doc_count: int) -> None
     )
 
 
+def _write_snapshot_manifest(path: Path, *, snapshot_id: str, snapshot_sha256: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {
+                "manifest_version": "offline-snapshot.v1",
+                "snapshot_id": snapshot_id,
+                "payload": {
+                    "path": "snapshot.jsonl",
+                    "sha256": snapshot_sha256,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
 def _run_prepare_only(
     *,
     corpus: Path,
@@ -80,29 +97,36 @@ def _run_prepare_only(
     run_id: str,
     contract: Path,
     index_meta: Path,
+    use_4bit: bool = False,
+    require_qlora_4bit: bool = False,
 ) -> subprocess.CompletedProcess[str]:
+    command = [
+        sys.executable,
+        "scripts/training/run_phase5_finetune.py",
+        "--prepare-only",
+        "--retrieval-corpus",
+        str(corpus),
+        "--training-input-contract",
+        str(contract),
+        "--index-meta",
+        str(index_meta),
+        "--output-root",
+        str(out_root),
+        "--run-id",
+        run_id,
+        "--snapshot-id",
+        "ecfr-title15-2026-02-28",
+        "--snapshot-sha256",
+        "abc123",
+        "--max-examples",
+        "4",
+    ]
+    if use_4bit:
+        command.append("--use-4bit")
+    if require_qlora_4bit:
+        command.append("--require-qlora-4bit")
     return subprocess.run(
-        [
-            sys.executable,
-            "scripts/training/run_phase5_finetune.py",
-            "--prepare-only",
-            "--retrieval-corpus",
-            str(corpus),
-            "--training-input-contract",
-            str(contract),
-            "--index-meta",
-            str(index_meta),
-            "--output-root",
-            str(out_root),
-            "--run-id",
-            run_id,
-            "--snapshot-id",
-            "ecfr-title15-2026-02-28",
-            "--snapshot-sha256",
-            "abc123",
-            "--max-examples",
-            "4",
-        ],
+        command,
         cwd=REPO_ROOT,
         text=True,
         encoding="utf-8",
@@ -155,6 +179,9 @@ def test_phase5_training_runner_prepare_only_writes_manifest_and_metadata(
     assert manifest["example_count"] == 4
     assert metadata["status"] == "prepare_only"
     assert metadata["prepare_only"] is True
+    assert metadata["qlora"]["required"] is False
+    assert metadata["qlora"]["requested_use_4bit"] is False
+    assert metadata["qlora"]["effective_use_4bit"] is None
 
 
 def test_phase5_training_runner_fails_when_contract_corpus_path_mismatches(
@@ -238,3 +265,188 @@ def test_phase5_training_runner_fails_when_index_meta_doc_count_mismatches(
     assert proc.returncode == 2
     assert "Training corpus preflight failed:" in proc.stdout
     assert "Retrieval corpus document count mismatch vs FAISS metadata" in proc.stdout
+
+
+def test_phase5_training_runner_fails_when_snapshot_manifest_required_but_not_configured(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    snapshot_manifest = tmp_path / "snapshots" / "offline" / "approved" / "manifest.json"
+    _write_snapshot_manifest(
+        snapshot_manifest,
+        snapshot_id="approved-snapshot",
+        snapshot_sha256="a" * 64,
+    )
+    index_meta = tmp_path / "index.meta.json"
+    index_meta.write_text(
+        json.dumps(
+            {
+                "schema_version": "retriever-index-meta.v1",
+                "corpus_digest": _sha256_file(corpus),
+                "doc_count": 2,
+                "snapshot": {
+                    "snapshot_id": "approved-snapshot",
+                    "snapshot_sha256": "a" * 64,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    contract = tmp_path / "training_input_contract.json"
+    contract.write_text(
+        json.dumps(
+            {
+                "schema_version": "training-input-contract.v1",
+                "authoritative_sources": {
+                    "offline_snapshot_manifest": str(snapshot_manifest),
+                    "offline_snapshot_payload": str(snapshot_manifest.parent / "snapshot.jsonl"),
+                    "retrieval_corpus_jsonl": str(corpus),
+                    "faiss_index_meta_json": str(index_meta),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "scripts/training/run_phase5_finetune.py",
+            "--prepare-only",
+            "--retrieval-corpus",
+            str(corpus),
+            "--training-input-contract",
+            str(contract),
+            "--index-meta",
+            str(index_meta),
+            "--output-root",
+            str(tmp_path / "dist_training"),
+            "--run-id",
+            "phase5-missing-snapshot-manifest",
+            "--snapshot-id",
+            "approved-snapshot",
+            "--snapshot-sha256",
+            "a" * 64,
+            "--max-examples",
+            "4",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+    assert proc.returncode == 2
+    assert "Training snapshot preflight failed:" in proc.stdout
+    assert "Configured snapshot manifest is required by training input contract" in proc.stdout
+
+
+def test_phase5_training_runner_fails_when_snapshot_manifest_mismatches_index_snapshot(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    snapshot_manifest = tmp_path / "snapshots" / "offline" / "approved" / "manifest.json"
+    _write_snapshot_manifest(
+        snapshot_manifest,
+        snapshot_id="approved-snapshot",
+        snapshot_sha256="a" * 64,
+    )
+    index_meta = tmp_path / "index.meta.json"
+    index_meta.write_text(
+        json.dumps(
+            {
+                "schema_version": "retriever-index-meta.v1",
+                "corpus_digest": _sha256_file(corpus),
+                "doc_count": 2,
+                "snapshot": {
+                    "snapshot_id": "stale-snapshot",
+                    "snapshot_sha256": "a" * 64,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+    contract = tmp_path / "training_input_contract.json"
+    contract.write_text(
+        json.dumps(
+            {
+                "schema_version": "training-input-contract.v1",
+                "authoritative_sources": {
+                    "offline_snapshot_manifest": str(snapshot_manifest),
+                    "offline_snapshot_payload": str(snapshot_manifest.parent / "snapshot.jsonl"),
+                    "retrieval_corpus_jsonl": str(corpus),
+                    "faiss_index_meta_json": str(index_meta),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "scripts/training/run_phase5_finetune.py",
+            "--prepare-only",
+            "--retrieval-corpus",
+            str(corpus),
+            "--training-input-contract",
+            str(contract),
+            "--index-meta",
+            str(index_meta),
+            "--snapshot-manifest",
+            str(snapshot_manifest),
+            "--snapshot-id",
+            "approved-snapshot",
+            "--snapshot-sha256",
+            "a" * 64,
+            "--output-root",
+            str(tmp_path / "dist_training"),
+            "--run-id",
+            "phase5-stale-index-snapshot",
+            "--max-examples",
+            "4",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+    assert proc.returncode == 2
+    assert "Training snapshot preflight failed:" in proc.stdout
+    assert "FAISS index metadata snapshot_id does not match snapshot manifest" in proc.stdout
+
+
+def test_phase5_training_runner_fails_when_qlora_required_without_4bit(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    index_meta = tmp_path / "index.meta.json"
+    _write_index_meta(
+        index_meta,
+        corpus_digest=_sha256_file(corpus),
+        doc_count=2,
+    )
+    contract = tmp_path / "training_input_contract.json"
+    _write_training_contract(contract, corpus=corpus, index_meta=index_meta)
+
+    proc = _run_prepare_only(
+        corpus=corpus,
+        out_root=tmp_path / "dist_training",
+        run_id="phase5-qlora-required-no-4bit",
+        contract=contract,
+        index_meta=index_meta,
+        use_4bit=False,
+        require_qlora_4bit=True,
+    )
+
+    assert proc.returncode == 2
+    assert "Training QLoRA preflight failed:" in proc.stdout
+    assert "use_4bit is false" in proc.stdout

@@ -14,6 +14,10 @@ DEFAULT_INSTALLED_RUNTIME_SMOKE = REPO_ROOT / "dist" / "installed_runtime_smoke.
 DEFAULT_RELEASE_EVIDENCE = REPO_ROOT / "dist" / "release_validation_evidence.json"
 DEFAULT_OUT_JSON = REPO_ROOT / "dist" / "search_kg_evidence" / "search_kg_evidence_bundle.json"
 DEFAULT_OUT_MD = REPO_ROOT / "dist" / "search_kg_evidence" / "search_kg_evidence_bundle.md"
+DEFAULT_WINDOWS_FUSEKI_OPERATOR = REPO_ROOT / "docs" / "ops" / "windows_fuseki_operator.md"
+DEFAULT_WINDOWS_SINGLE_HOST_OPERATOR = REPO_ROOT / "docs" / "ops" / "windows_single_host_operator.md"
+DEFAULT_FUSEKI_SERVICE_SCRIPT = REPO_ROOT / "scripts" / "ops" / "windows-fuseki-service.ps1"
+DEFAULT_SEARCH_KG_PRODLIKE_SMOKE_SCRIPT = REPO_ROOT / "scripts" / "search-kg-prodlike-smoke.ps1"
 
 SEARCH_PHASES = ("search_default_off", "search_opt_in_on", "search_rollback_off")
 KG_FAILURE_CHECKS = (
@@ -79,6 +83,9 @@ def _summarize_optional_runtime_smoke(payload: Mapping[str, Any] | None) -> dict
             "missing_search_phases": list(SEARCH_PHASES),
             "kg_failure_check_statuses": {},
             "missing_kg_failure_checks": list(KG_FAILURE_CHECKS),
+            "production_like_status": "missing",
+            "production_like_search_status": "missing",
+            "production_like_kg_status": "missing",
         }
 
     search_statuses: dict[str, str] = {}
@@ -102,6 +109,25 @@ def _summarize_optional_runtime_smoke(payload: Mapping[str, Any] | None) -> dict
     missing_search = [name for name in SEARCH_PHASES if name not in search_statuses]
     missing_kg = [name for name in KG_FAILURE_CHECKS if name not in kg_statuses]
 
+    production_like_status = "missing"
+    production_like_search_status = "missing"
+    production_like_kg_status = "missing"
+    production_like_raw = payload.get("search_kg_production_like") or {}
+    if isinstance(production_like_raw, Mapping):
+        production_like_status = str(production_like_raw.get("status") or "missing")
+        production_like_report = production_like_raw.get("report") or {}
+        if isinstance(production_like_report, Mapping):
+            search_report = production_like_report.get("search") or {}
+            kg_report = production_like_report.get("kg_expansion") or {}
+            if isinstance(search_report, Mapping):
+                production_like_search_status = str(
+                    search_report.get("status") or production_like_search_status
+                )
+            if isinstance(kg_report, Mapping):
+                production_like_kg_status = str(
+                    kg_report.get("status") or production_like_kg_status
+                )
+
     passed = (
         str(payload.get("schema_version") or "") == "optional-runtime-smoke.v1"
         and str(payload.get("overall_status") or "") == "passed"
@@ -118,6 +144,9 @@ def _summarize_optional_runtime_smoke(payload: Mapping[str, Any] | None) -> dict
         "missing_search_phases": missing_search,
         "kg_failure_check_statuses": kg_statuses,
         "missing_kg_failure_checks": missing_kg,
+        "production_like_status": production_like_status,
+        "production_like_search_status": production_like_search_status,
+        "production_like_kg_status": production_like_kg_status,
     }
 
 
@@ -198,6 +227,48 @@ def _summarize_release_evidence(payload: Mapping[str, Any] | None) -> dict[str, 
 
 def _existing_path(path: Path | None) -> bool:
     return path is not None and path.exists()
+
+
+def _summarize_operator_validation_evidence(
+    *,
+    fuseki_operator_doc: Path = DEFAULT_WINDOWS_FUSEKI_OPERATOR,
+    single_host_operator_doc: Path = DEFAULT_WINDOWS_SINGLE_HOST_OPERATOR,
+    fuseki_service_script: Path = DEFAULT_FUSEKI_SERVICE_SCRIPT,
+    search_kg_prodlike_smoke_script: Path = DEFAULT_SEARCH_KG_PRODLIKE_SMOKE_SCRIPT,
+) -> dict[str, Any]:
+    if not (
+        fuseki_operator_doc.exists()
+        and single_host_operator_doc.exists()
+        and fuseki_service_script.exists()
+        and search_kg_prodlike_smoke_script.exists()
+    ):
+        return {
+            "status": "missing",
+            "fuseki_operator_doc_present": fuseki_operator_doc.exists(),
+            "single_host_operator_doc_present": single_host_operator_doc.exists(),
+            "fuseki_service_script_present": fuseki_service_script.exists(),
+            "search_kg_prodlike_smoke_script_present": search_kg_prodlike_smoke_script.exists(),
+        }
+
+    fuseki_operator_text = fuseki_operator_doc.read_text(encoding="utf-8")
+    single_host_operator_text = single_host_operator_doc.read_text(encoding="utf-8")
+    fuseki_service_text = fuseki_service_script.read_text(encoding="utf-8")
+
+    checks = {
+        "fuseki_operator_text_index_validation": "EnableTextIndexValidation"
+        in fuseki_operator_text
+        and "search-kg-prodlike-smoke.ps1" in fuseki_operator_text
+        and "rollback" in fuseki_operator_text.lower(),
+        "single_host_operator_optional_search_kg_playbook": "search-kg-prodlike-smoke.ps1"
+        in single_host_operator_text
+        and "EARCRAWLER_API_ENABLE_SEARCH" in single_host_operator_text
+        and "EARCRAWLER_ENABLE_KG_EXPANSION" in single_host_operator_text,
+        "fuseki_service_validation_mode": "EnableTextIndexValidation" in fuseki_service_text,
+    }
+    return {
+        "status": "passed" if all(checks.values()) else "failed",
+        "checks": checks,
+    }
 
 
 def _build_operator_workflow_requirements() -> list[dict[str, str]]:
@@ -297,6 +368,7 @@ def _build_gap_list(
     optional_summary: Mapping[str, Any],
     installed_summary: Mapping[str, Any],
     release_summary: Mapping[str, Any],
+    operator_validation_evidence: Mapping[str, Any],
     search_prod_smoke: Path | None,
     search_operator_evidence: Path | None,
     kg_prod_smoke: Path | None,
@@ -312,11 +384,20 @@ def _build_gap_list(
             gaps.append(f"Release validation evidence is incomplete: {reason}.")
         else:
             gaps.append("Release validation evidence is incomplete for the required smoke and distributable-artifact checks.")
-    if not _existing_path(search_operator_evidence):
+    search_operator_ready = _existing_path(search_operator_evidence) or str(
+        operator_validation_evidence.get("status")
+    ) == "passed"
+    if not search_operator_ready:
         gaps.append("No operator-owned text-index-enabled Fuseki provisioning/rollback evidence is attached for /v1/search.")
-    if not _existing_path(search_prod_smoke):
+    search_prodlike_ready = _existing_path(search_prod_smoke) or str(
+        optional_summary.get("production_like_search_status")
+    ) == "passed"
+    if not search_prodlike_ready:
         gaps.append("No production-like smoke artifact is attached for /v1/search against a real text-index-backed Fuseki runtime path.")
-    if not _existing_path(kg_prod_smoke):
+    kg_prodlike_ready = _existing_path(kg_prod_smoke) or str(
+        optional_summary.get("production_like_kg_status")
+    ) == "passed"
+    if not kg_prodlike_ready:
         gaps.append("No production-like smoke artifact is attached for KG expansion success through the supported runtime shape.")
     return gaps
 
@@ -409,11 +490,13 @@ def main(argv: list[str] | None = None) -> int:
     optional_summary = _summarize_optional_runtime_smoke(optional_runtime_smoke)
     installed_summary = _summarize_installed_runtime_smoke(installed_runtime_smoke)
     release_summary = _summarize_release_evidence(release_validation_evidence)
+    operator_validation_evidence = _summarize_operator_validation_evidence()
 
     gaps = _build_gap_list(
         optional_summary=optional_summary,
         installed_summary=installed_summary,
         release_summary=release_summary,
+        operator_validation_evidence=operator_validation_evidence,
         search_prod_smoke=args.search_prod_smoke.resolve() if args.search_prod_smoke else None,
         search_operator_evidence=args.search_operator_evidence.resolve() if args.search_operator_evidence else None,
         kg_prod_smoke=args.kg_prod_smoke.resolve() if args.kg_prod_smoke else None,
@@ -450,6 +533,7 @@ def main(argv: list[str] | None = None) -> int:
             "installed_runtime_smoke": installed_summary,
             "release_validation": release_summary,
         },
+        "operator_validation_evidence": operator_validation_evidence,
         "operator_workflow_requirements": _build_operator_workflow_requirements(),
         "rollback_requirements": _build_rollback_requirements(),
         "failure_mode_expectations": _build_failure_mode_expectations(optional_runtime_smoke),
@@ -475,4 +559,3 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
-

@@ -41,7 +41,9 @@ Direct Python invocation:
 py scripts/training/run_phase5_finetune.py `
   --config config/training_first_pass.example.json `
   --snapshot-manifest snapshots/offline/<snapshot_id>/manifest.json `
-  --retrieval-corpus data/faiss/retrieval_corpus.jsonl
+  --retrieval-corpus data/faiss/retrieval_corpus.jsonl `
+  --use-4bit `
+  --require-qlora-4bit
 ```
 
 Prepare-only package generation (no training):
@@ -92,9 +94,12 @@ py -m scripts.eval.build_local_adapter_candidate_bundle `
 - The runner performs a preflight before packaging/training and fails when the
   configured corpus path does not match the training input contract, or when
   corpus digest/document count do not match `data/faiss/index.meta.json`.
+- For the first 7B production-candidate path, QLoRA is required
+  (`require_qlora_4bit=true` and `use_4bit=true`).
 - Full fine-tuning for a 7B model is expected to run on a CUDA-capable host.
-- `--use-4bit` is optional and can reduce memory pressure when the environment
-  supports bitsandbytes/quantized loading.
+- The runner records machine-checkable QLoRA evidence in
+  `run_metadata.json` (`qlora.required`, `qlora.requested_use_4bit`,
+  `qlora.effective_use_4bit`).
 - The runner defaults to `use_safetensors=True`. Only use `--allow-pt-bin` if
   you intentionally need legacy `.bin` weights.
 
@@ -136,6 +141,7 @@ Output layout:
 - git HEAD (when available)
 - python interpreter/version
 - status (`prepare_only`, `completed`, or `smoke_failed`)
+- QLoRA evidence (`required`, requested 4-bit flag, and effective 4-bit result)
 - adapter artifact location
 - training metrics
 - inference smoke report path

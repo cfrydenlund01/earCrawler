@@ -2,6 +2,7 @@ param(
     [string]$RootPath = ".",
     [string]$VenvPath = ".venv",
     [int]$MinJavaMajor = 11,
+    [int]$SupportedReleaseJavaMajor = 17,
     [switch]$SkipPyLauncherCheck,
     [switch]$SkipVenvCheck,
     [switch]$SkipJavaCheck,
@@ -101,8 +102,11 @@ else {
         elseif ([int]$versionInfo.major -lt $MinJavaMajor) {
             $checks += Add-CheckResult -Name "java_runtime" -Passed $false -Detail "Java major version $($versionInfo.major) is below required minimum $MinJavaMajor. $($versionInfo.detail)"
         }
+        elseif ([int]$versionInfo.major -lt $SupportedReleaseJavaMajor) {
+            $checks += Add-CheckResult -Name "java_runtime" -Passed $true -Detail "Java major version $($versionInfo.major) satisfies bootstrap minimum $MinJavaMajor, but supported Fuseki auto-provision release/install flows require Java $SupportedReleaseJavaMajor or newer. $($versionInfo.detail)"
+        }
         else {
-            $checks += Add-CheckResult -Name "java_runtime" -Passed $true -Detail $versionInfo.detail
+            $checks += Add-CheckResult -Name "java_runtime" -Passed $true -Detail "Java major version $($versionInfo.major) satisfies bootstrap minimum $MinJavaMajor and the supported Fuseki auto-provision release/install floor ($SupportedReleaseJavaMajor+). $($versionInfo.detail)"
         }
     }
 }

@@ -1,6 +1,6 @@
 {
   "build_timestamp_utc": "2026-02-10T22:46:44.035687Z",
-  "corpus_digest": "c447526e2d22174ff5ef099aff41a4e0dec99a0c74b51fde594a3d03f5bf3f48",
+  "corpus_digest": "1d2468da965eb68c352312f2225a2900c3958a363da670d4808c11c95d701e64",
   "corpus_schema_version": "retrieval-corpus.v1",
   "doc_count": 3040,
   "embedding_model": "all-MiniLM-L12-v2",

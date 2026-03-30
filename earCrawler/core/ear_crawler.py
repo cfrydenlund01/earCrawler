@@ -81,6 +81,7 @@ class EARCrawler:
         self.paragraphs_path = self.storage_dir / "ear_paragraphs.jsonl"
         self.index_path = self.storage_dir / "hash_index.json"
         self.hash_index: Dict[str, ParagraphRecord] = {}
+        self._position_versions: Dict[tuple[str, int], int] = {}
         self._load_index()
 
     def _load_index(self) -> None:
@@ -91,6 +92,15 @@ class EARCrawler:
                     self.hash_index[sha] = ParagraphRecord(**rec)
             except Exception as exc:
                 self.logger.warning("Failed to load hash index: %s", exc)
+        self._rebuild_position_versions()
+
+    def _rebuild_position_versions(self) -> None:
+        self._position_versions = {}
+        for record in self.hash_index.values():
+            key = (record.document_number, int(record.paragraph_index))
+            current = self._position_versions.get(key, 0)
+            if int(record.version) > current:
+                self._position_versions[key] = int(record.version)
 
     def _save_index(self) -> None:
         serialisable = {sha: asdict(rec) for sha, rec in self.hash_index.items()}
@@ -131,7 +141,7 @@ class EARCrawler:
             return []
 
         for doc in documents_iter:
-            doc_number = str(doc.get("document_number") or doc.get("document_number"))
+            doc_number = str(doc.get("document_number") or doc.get("id") or "")
             if not doc_number:
                 self.logger.warning(
                     "Skipping document missing 'document_number': %s", doc
@@ -165,14 +175,8 @@ class EARCrawler:
                 citations = self._extract_citations(text)
                 if sha in self.hash_index:
                     continue
-                version = 1
-                for existing in self.hash_index.values():
-                    if (
-                        existing.document_number == doc_number
-                        and existing.paragraph_index == idx
-                    ):
-                        version = existing.version + 1
-                        break
+                key = (doc_number, idx)
+                version = self._position_versions.get(key, 0) + 1
                 record = ParagraphRecord(
                     document_number=doc_number,
                     paragraph_index=idx,
@@ -186,6 +190,7 @@ class EARCrawler:
                 )
                 new_records.append(record)
                 self.hash_index[sha] = record
+                self._position_versions[key] = version
             if delay > 0:
                 time.sleep(delay)
         if new_records:

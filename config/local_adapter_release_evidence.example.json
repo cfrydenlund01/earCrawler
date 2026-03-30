@@ -48,15 +48,22 @@
     "supported_rate_gte_retrieval_only": true,
     "overclaim_rate_lte_retrieval_only": true
   },
+  "qlora": {
+    "required_for_base_models": [
+      "Qwen/Qwen2.5-7B-Instruct"
+    ],
+    "evidence_note": "For the first 7B production-candidate path, run_config.training_hyperparams.use_4bit and run_metadata.qlora.effective_use_4bit must both prove a 4-bit run."
+  },
   "decision_rule": {
     "keep_optional_when": [
       "Any required artifact, archived benchmark precondition, or rollback document is missing.",
-      "The Task 5.3 provenance fields or benchmark precondition hashes are missing or inconsistent.",
+      "The Task 5.3 provenance fields, QLoRA evidence fields, or benchmark precondition hashes are missing or inconsistent.",
       "The benchmark bundle cannot be machine-checked against the reviewed runtime smoke report."
     ],
     "reject_candidate_when": [
       "The evidence bundle is complete, but inference_smoke.json or scripts/local_adapter_smoke.ps1 is non-passing.",
       "The benchmark smoke precondition is present but non-passing.",
+      "A QLoRA-required base model run does not prove use_4bit and effective_use_4bit.",
       "The benchmark bundle violates a threshold in this contract.",
       "The local_adapter condition performs worse than retrieval_only on a required comparison rule."
     ],
