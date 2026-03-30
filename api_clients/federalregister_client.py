@@ -7,6 +7,7 @@ import re
 from html import unescape
 from pathlib import Path
 from typing import Dict, List
+from urllib.parse import urlparse
 
 import requests
 from tenacity import (
@@ -31,6 +32,7 @@ from api_clients.upstream_status import (
 
 _VARY_HEADERS = ("Accept", "User-Agent")
 _logger = JsonLogger("federalregister-client")
+_ALT_FR_HOST = "https://www.federalregister.gov/api/v1"
 
 
 def _log_retry(retry_state: RetryCallState) -> None:
@@ -147,6 +149,48 @@ class FederalRegisterClient:
         """Return the latest status payload for each tracked operation."""
         return self._status.snapshot()
 
+    def _build_alt_url(self, request_url: str) -> str:
+        if request_url.startswith(_ALT_FR_HOST):
+            return request_url
+        if request_url.startswith("https://api.federalregister.gov/v1"):
+            return request_url.replace("https://api.federalregister.gov/v1", _ALT_FR_HOST)
+        parsed = urlparse(request_url)
+        if parsed.path:
+            path = parsed.path
+            if parsed.query:
+                path = f"{path}?{parsed.query}"
+            return f"{_ALT_FR_HOST}{path}"
+        return _ALT_FR_HOST
+
+    def _request_json_once(
+        self,
+        *,
+        request_url: str,
+        params: dict[str, str],
+        headers: dict[str, str],
+    ) -> tuple[requests.Response, dict]:
+        with budget.consume("federalregister", self.request_limit):
+            resp = self.cache.get(
+                self.session,
+                request_url,
+                params,
+                headers=headers,
+                vary_headers=_VARY_HEADERS,
+            )
+        resp.raise_for_status()
+        content_type = resp.headers.get("Content-Type", "")
+        if "application/json" not in content_type.lower():
+            raise FederalRegisterError(
+                f"Non-JSON response from FR at {resp.url}",
+                state="invalid_response",
+            )
+        try:
+            payload = resp.json()
+        except ValueError as exc:  # pragma: no cover
+            _logger.error("api.invalid_json", url=request_url, error=str(exc))
+            raise FederalRegisterError("Invalid JSON from Federal Register") from exc
+        return resp, payload
+
     @retry(
         reraise=True,
         stop=stop_after_attempt(3),
@@ -158,43 +202,43 @@ class FederalRegisterClient:
         headers = {"User-Agent": self.user_agent, "Accept": "application/json"}
         _logger.info("api.request", url=url, params=params, limit=self.request_limit)
         try:
-            with budget.consume("federalregister", self.request_limit):
-                resp = self.cache.get(
-                    self.session,
-                    url,
-                    params,
-                    headers=headers,
-                    vary_headers=_VARY_HEADERS,
-                )
+            resp, payload = self._request_json_once(
+                request_url=url,
+                params=params,
+                headers=headers,
+            )
         except budget.BudgetExceededError:
             _logger.error("api.budget_exceeded", url=url, limit=self.request_limit)
             raise
-        resp.raise_for_status()
-        content_type = resp.headers.get("Content-Type", "")
-        if "application/json" not in content_type.lower():
-            # Some FR edges return an HTML anti-bot page (e.g., https://unblock.federalregister.gov)
-            # when the api.* host is blocked. Retry once against the www host if we have not already.
-            alt_host = "https://www.federalregister.gov/api/v1"
-            if not resp.url.startswith(alt_host):
-                alt_url = resp.url.replace("https://api.federalregister.gov/v1", alt_host)
-                _logger.warning(
-                    "api.invalid_content_type_retry",
-                    url=resp.url,
-                    alt_url=alt_url,
-                    content_type=content_type,
-                )
-                return self._get_json(alt_url, params)
-            _logger.error(
-                "api.invalid_content_type",
-                url=resp.url,
-                content_type=content_type,
-            )
-            raise FederalRegisterError(f"Non-JSON response from FR at {resp.url}")
-        try:
-            payload = resp.json()
-        except ValueError as exc:  # pragma: no cover
-            _logger.error("api.invalid_json", url=url, error=str(exc))
-            raise FederalRegisterError("Invalid JSON from Federal Register") from exc
+        except FederalRegisterError as exc:
+            # Some FR edges return HTML anti-bot pages. Retry once against www
+            # without recursively re-entering the tenacity wrapper.
+            if exc.state == "invalid_response":
+                alt_url = self._build_alt_url(url)
+                if alt_url != url:
+                    _logger.warning(
+                        "api.invalid_content_type_retry",
+                        url=url,
+                        alt_url=alt_url,
+                        content_type="non-json",
+                    )
+                    try:
+                        resp, payload = self._request_json_once(
+                            request_url=alt_url,
+                            params=params,
+                            headers=headers,
+                        )
+                    except budget.BudgetExceededError:
+                        _logger.error("api.budget_exceeded", url=alt_url, limit=self.request_limit)
+                        raise
+                    except FederalRegisterError:
+                        _logger.error("api.invalid_content_type", url=alt_url, content_type="non-json")
+                        raise
+                else:
+                    _logger.error("api.invalid_content_type", url=url, content_type="non-json")
+                    raise
+            else:
+                raise
         _logger.info(
             "api.response",
             url=url,
@@ -393,7 +437,7 @@ class FederalRegisterClient:
         """Return raw Federal Register documents with explicit upstream status."""
         operation = "search_documents"
         url = f"{self.BASE_URL}/documents"
-        params = {"conditions[any]": query, "per_page": str(per_page)}
+        params = {"conditions[term]": query, "per_page": str(per_page)}
         if page is not None:
             params["page"] = str(page)
         try:

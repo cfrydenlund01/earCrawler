@@ -10,7 +10,7 @@ earCrawler is the crawling and knowledge-graph component that powers the EAR-QA 
 
 - Windows 11 with PowerShell 7 (`pwsh`) on `PATH`
 - Python 3.11 or newer (`py --version`)
-- Java 11+ JDK (required for Apache Jena; `ensure_jena` auto-detects and sets `JAVA_HOME`)
+- Java 11+ JDK absolute minimum for local bootstrap checks; Java 17+ is required for the supported Fuseki auto-provision release/install path (`ensure_jena` auto-detects and sets `JAVA_HOME`)
 - Git
 - Trade.gov CSL API subscription key (required for live data pulls)
 - Apache Jena Fuseki 4/5 (the CLI can auto-download it on Windows)
@@ -129,7 +129,7 @@ most often.
 | `/v1/rag/answer`, remote OpenAI-compatible providers, and retrieval extras installed from `requirements-gpu.txt` | Optional | Available only when explicitly enabled and configured. Generated output is advisory-only for production beta and must not be treated as an autonomous legal/regulatory determination. See `docs/answer_generation_posture.md`. |
 | `EARCRAWLER_RETRIEVAL_MODE=hybrid` across `/v1/rag/query`, `/v1/rag/answer`, and eval flows | Optional | Off by default. Dense remains the baseline retrieval mode. Promotion/default-on criteria are tracked in `docs/capability_graduation_boundaries.md`. |
 | The optional local adapter runtime (`LLM_PROVIDER=local_adapter`) | Optional | Implemented, but formally deprioritized for the current production-beta target. Requires explicit local-model env plus a recorded Task 5.3 adapter artifact. Validation path: `scripts/local_adapter_smoke.ps1`. See `docs/local_adapter_deprioritization_2026-03-25.md` and `docs/capability_graduation_boundaries.md`. |
-| `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Current decisions: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/search_kg_quarantine_decision_package_2026-03-19.md` (keep quarantined with minimal maintenance surface for the current production-beta target). Capability-specific promotion boundaries live in `docs/capability_graduation_boundaries.md`. |
+| `/v1/search`, text-index-backed Fuseki search, `kg-load`, `kg-serve`, `kg-query`, and KG expansion | Quarantined | Implemented for local validation and research, but not part of the supported production contract until `docs/kg_quarantine_exit_gate.md` is passed and recorded. Current decision record: `docs/search_kg_capability_decision_2026-03-27.md` (Step 5.3: keep quarantined). Supporting history: `docs/kg_search_status_decision_2026-03-10.md` and `docs/search_kg_quarantine_decision_package_2026-03-19.md`. Capability-specific promotion boundaries live in `docs/capability_graduation_boundaries.md`. |
 | `Research/`, `docs/proposal/`, benchmark planning, model-training/fine-tuning notes, and other future-work design docs | Proposal-only | Useful for planning and evaluation, not an operator/runtime commitment. Phase 5 records include base-model selection (`docs/model_training_surface_adr.md`, `config/training_model_selection.example.env`), training-input contract (`docs/model_training_contract.md`, `config/training_input_contract.example.json`), first-pass run tooling (`docs/model_training_first_pass.md`, `config/training_first_pass.example.json`, `scripts/training/*`), and the Phase 6 benchmark plan (`docs/production_candidate_benchmark_plan.md`). |
 
 ## Runtime vs Research Boundary
@@ -368,7 +368,7 @@ quarantine work, but they are not part of the supported production contract
 until `docs/kg_quarantine_exit_gate.md` is passed and recorded.
 
 1. **Ensure Jena is available**  
-   The first CLI call that needs Jena will download it into `tools/jena` and populate the `JENA_HOME`/`JAVA_HOME` environment variables if they are not already set. If Java cannot be located automatically, install JDK 11+ and set `JAVA_HOME` before retrying. You can pre-flight the download:
+   The first CLI call that needs Jena will download it into `tools/jena` and populate the `JENA_HOME`/`JAVA_HOME` environment variables if they are not already set. If Java cannot be located automatically, install JDK 11+ and set `JAVA_HOME` before retrying (use JDK 17+ for the supported Fuseki auto-provision release/install path). You can pre-flight the download:
    ```powershell
    py -m earCrawler.cli kg-serve --dry-run
    ```

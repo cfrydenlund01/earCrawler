@@ -136,6 +136,7 @@ def main(argv: list[str] | None = None) -> int:
         insufficient.append("Missing rollback docs: " + ", ".join(sorted(missing_rollback_docs)))
 
     manifest: dict[str, Any] = {}
+    run_config: dict[str, Any] = {}
     run_metadata: dict[str, Any] = {}
     inference_smoke: dict[str, Any] = {}
     runtime_smoke: dict[str, Any] = {}
@@ -147,6 +148,10 @@ def main(argv: list[str] | None = None) -> int:
         manifest = _require_mapping(_read_json(run_dir / "manifest.json"), "manifest.json")
     except Exception as exc:
         parse_failures.append(f"Cannot read manifest.json: {exc}")
+    try:
+        run_config = _require_mapping(_read_json(run_dir / "run_config.json"), "run_config.json")
+    except Exception as exc:
+        parse_failures.append(f"Cannot read run_config.json: {exc}")
     try:
         run_metadata = _require_mapping(_read_json(run_dir / "run_metadata.json"), "run_metadata.json")
     except Exception as exc:
@@ -198,6 +203,82 @@ def main(argv: list[str] | None = None) -> int:
             metadata_checks.append("run_metadata.json status must equal completed")
     if metadata_checks:
         insufficient.extend(metadata_checks)
+
+    qlora_insufficient_checks: list[str] = []
+    qlora_runtime_checks: list[str] = []
+    qlora_contract_raw = contract.get("qlora")
+    qlora_contract: dict[str, Any] = {}
+    if qlora_contract_raw is not None:
+        try:
+            qlora_contract = _require_mapping(qlora_contract_raw, "contract.qlora")
+        except ValueError as exc:
+            qlora_insufficient_checks.append(str(exc))
+
+    required_base_models = {
+        str(item).strip()
+        for item in qlora_contract.get("required_for_base_models") or []
+        if str(item).strip()
+    }
+    qlora_required_for_candidate = bool(
+        str(manifest.get("base_model") or "").strip() in required_base_models
+    )
+    if qlora_required_for_candidate:
+        train_hyperparams = run_config.get("training_hyperparams")
+        if not isinstance(train_hyperparams, Mapping):
+            qlora_insufficient_checks.append(
+                "run_config.json is missing training_hyperparams for QLoRA evidence."
+            )
+        else:
+            use_4bit_value = train_hyperparams.get("use_4bit")
+            if use_4bit_value is None:
+                qlora_insufficient_checks.append(
+                    "run_config.json training_hyperparams.use_4bit is missing."
+                )
+            elif not bool(use_4bit_value):
+                qlora_runtime_checks.append(
+                    "run_config.json training_hyperparams.use_4bit must equal true for a QLoRA-required candidate."
+                )
+
+        qlora_metadata = run_metadata.get("qlora")
+        if not isinstance(qlora_metadata, Mapping):
+            qlora_insufficient_checks.append(
+                "run_metadata.json is missing qlora evidence."
+            )
+        else:
+            required_flag = qlora_metadata.get("required")
+            if required_flag is None:
+                qlora_insufficient_checks.append(
+                    "run_metadata.json qlora.required is missing."
+                )
+            elif not bool(required_flag):
+                qlora_runtime_checks.append(
+                    "run_metadata.json qlora.required must equal true for a QLoRA-required candidate."
+                )
+
+            requested_flag = qlora_metadata.get("requested_use_4bit")
+            if requested_flag is None:
+                qlora_insufficient_checks.append(
+                    "run_metadata.json qlora.requested_use_4bit is missing."
+                )
+            elif not bool(requested_flag):
+                qlora_runtime_checks.append(
+                    "run_metadata.json qlora.requested_use_4bit must equal true for a QLoRA-required candidate."
+                )
+
+            effective_flag = qlora_metadata.get("effective_use_4bit")
+            if effective_flag is None:
+                qlora_insufficient_checks.append(
+                    "run_metadata.json qlora.effective_use_4bit is missing."
+                )
+            elif not bool(effective_flag):
+                qlora_runtime_checks.append(
+                    "run_metadata.json qlora.effective_use_4bit must equal true for a QLoRA-required candidate."
+                )
+
+    if qlora_insufficient_checks:
+        insufficient.extend(qlora_insufficient_checks)
+    if qlora_runtime_checks:
+        candidate_execution_failures.extend(qlora_runtime_checks)
 
     inference_checks: list[str] = []
     if inference_smoke:
@@ -373,6 +454,7 @@ def main(argv: list[str] | None = None) -> int:
             "retrieval_corpus_doc_count": manifest.get("retrieval_corpus_doc_count"),
             "base_model": manifest.get("base_model"),
             "git_head": run_metadata.get("git_head"),
+            "qlora": run_metadata.get("qlora"),
             "file_hashes": {
                 rel: _sha256_file(Path(path)) for rel, path in run_paths.items() if Path(path).exists()
             }
@@ -410,6 +492,8 @@ def main(argv: list[str] | None = None) -> int:
             "runtime_smoke_checks": runtime_checks,
             "benchmark_checks": benchmark_checks,
             "benchmark_precondition_checks": benchmark_precondition_checks,
+            "qlora_insufficient_checks": qlora_insufficient_checks,
+            "qlora_runtime_checks": qlora_runtime_checks,
             "candidate_execution_failures": candidate_execution_failures,
             "threshold_failures": failures,
             "comparison_failures": comparison_failures

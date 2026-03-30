@@ -123,10 +123,79 @@ function Invoke-SearchPhase {
     }
 }
 
+function Get-JavaMajorVersionFromExecutable {
+    param([string]$JavaExecutable)
+
+    if (-not $JavaExecutable -or -not (Test-Path $JavaExecutable)) {
+        return $null
+    }
+    try {
+        $versionOutput = & $JavaExecutable -version 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            return $null
+        }
+        $text = [string]($versionOutput -join "`n")
+        $match = [regex]::Match($text, 'version "(?<version>[^"]+)"')
+        if (-not $match.Success) {
+            return $null
+        }
+        $raw = $match.Groups["version"].Value
+        if ($raw.StartsWith("1.")) {
+            return [int]$raw.Split(".")[1]
+        }
+        return [int]$raw.Split(".")[0]
+    } catch {
+        return $null
+    }
+}
+
+function Test-Java17OrNewer {
+    param([Parameter(Mandatory = $true)][string]$RepoRoot)
+
+    $candidateHomes = New-Object System.Collections.Generic.List[string]
+    if ($env:JAVA_HOME) {
+        [void]$candidateHomes.Add($env:JAVA_HOME)
+    }
+    $javaCmd = Get-Command "java" -ErrorAction SilentlyContinue
+    if ($javaCmd) {
+        $major = Get-JavaMajorVersionFromExecutable -JavaExecutable $javaCmd.Source
+        if ($major -ge 17) {
+            return $true
+        }
+        $candidateFromPath = Split-Path -Parent (Split-Path -Parent $javaCmd.Source)
+        if ($candidateFromPath) {
+            [void]$candidateHomes.Add($candidateFromPath)
+        }
+    }
+
+    $searchRoots = @(
+        (Join-Path $RepoRoot 'tools\jdk17'),
+        (Join-Path $env:ProgramFiles 'Eclipse Adoptium'),
+        (Join-Path $env:ProgramFiles 'Java'),
+        (Join-Path $env:ProgramFiles 'Microsoft')
+    ) | Where-Object { $_ -and (Test-Path $_) }
+    foreach ($root in $searchRoots) {
+        foreach ($candidate in Get-ChildItem -Path $root -Directory -ErrorAction SilentlyContinue) {
+            [void]$candidateHomes.Add($candidate.FullName)
+        }
+    }
+
+    foreach ($candidateHome in ($candidateHomes | Select-Object -Unique)) {
+        $javaExe = Join-Path $candidateHome 'bin\java.exe'
+        $major = Get-JavaMajorVersionFromExecutable -JavaExecutable $javaExe
+        if ($major -ge 17) {
+            return $true
+        }
+    }
+    return $false
+}
+
 $baseUrl = "http://{0}:{1}" -f $ApiHost, $Port
+$repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $apiStartScript = Join-Path $PSScriptRoot "api-start.ps1"
 $apiStopScript = Join-Path $PSScriptRoot "api-stop.ps1"
 $localAdapterSmokeScript = Join-Path $PSScriptRoot "local_adapter_smoke.ps1"
+$searchKgProdlikeSmokeScript = Join-Path $PSScriptRoot "search-kg-prodlike-smoke.ps1"
 $python = Resolve-PythonInterpreter
 
 $savedEnv = @{
@@ -311,6 +380,44 @@ print(json.dumps({"status": "passed" if overall else "failed", "checks": result}
         }
     }
 
+    $searchKgProdlikeResult = [ordered]@{
+        status = "skipped"
+        reason = "production_like_validation_not_run"
+    }
+    $hasProdlikePrereqs = (Test-Path $searchKgProdlikeSmokeScript) `
+        -and (Test-Path (Join-Path $repoRoot "tools\jena")) `
+        -and (Test-Path (Join-Path $repoRoot "tools\fuseki")) `
+        -and (Test-Java17OrNewer -RepoRoot $repoRoot)
+    if ($hasProdlikePrereqs) {
+        $prodlikeReportPath = Join-Path ([System.IO.Path]::GetTempPath()) ("earcrawler-search-kg-prodlike-" + [guid]::NewGuid().ToString("N") + ".json")
+        try {
+            & $searchKgProdlikeSmokeScript -Host $ApiHost -Port $Port -ReportPath $prodlikeReportPath
+            $prodlikePayload = Get-Content $prodlikeReportPath -Raw | ConvertFrom-Json
+            $searchKgProdlikeResult = [ordered]@{
+                status = if ([string]$prodlikePayload.overall_status -eq "passed") { "passed" } else { "failed" }
+                report = $prodlikePayload
+            }
+        } catch {
+            $searchKgProdlikeResult = [ordered]@{
+                status = "failed"
+                error = $_.Exception.Message
+            }
+            if (Test-Path $prodlikeReportPath) {
+                try {
+                    $searchKgProdlikeResult.report = Get-Content $prodlikeReportPath -Raw | ConvertFrom-Json
+                } catch {
+                }
+            }
+        } finally {
+            Remove-Item $prodlikeReportPath -ErrorAction SilentlyContinue
+        }
+    } elseif (Test-Path $searchKgProdlikeSmokeScript) {
+        $searchKgProdlikeResult = [ordered]@{
+            status = "skipped"
+            reason = "java17_or_local_jena_fuseki_tools_missing"
+        }
+    }
+
     $searchPassed = ($searchPhases | Where-Object { $_.status -ne "passed" } | Measure-Object).Count -eq 0
     $kgPassed = ([string]$kgProbe.status -eq "passed")
     $localAdapterPassed = ([string]$localAdapterResult.status -in @("passed", "skipped"))
@@ -322,6 +429,7 @@ print(json.dumps({"status": "passed" if overall else "failed", "checks": result}
         base_url = $baseUrl
         search_mode_checks = $searchPhases
         kg_expansion_failure_policy_checks = $kgProbe
+        search_kg_production_like = $searchKgProdlikeResult
         local_adapter_check = $localAdapterResult
         overall_status = if ($overallPassed) { "passed" } else { "failed" }
     }

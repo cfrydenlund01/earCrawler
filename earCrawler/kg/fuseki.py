@@ -74,13 +74,21 @@ def build_fuseki_cmd(
     """
 
     server = fuseki_server_path()
+    dataset_token = str(dataset or "").strip()
+    dataset_loc = Path(db_dir)
+    if dataset_token.startswith("/"):
+        relative = dataset_token.lstrip("/")
+        if relative:
+            dataset_loc = dataset_loc / Path(relative)
+
     cmd = [
         str(server),
         "--port",
         str(port),
+        "--tdb2",
         "--loc",
-        str(Path(db_dir).resolve()),
-        dataset,
+        str(dataset_loc.resolve()),
+        dataset_token,
     ]
     return cmd
 

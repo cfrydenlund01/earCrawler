@@ -3,8 +3,8 @@
   "schema_version": "training-input-contract.v1",
   "base_model": "Qwen/Qwen2.5-7B-Instruct",
   "authoritative_sources": {
-    "offline_snapshot_manifest": "snapshots/offline/<snapshot_id>/manifest.json",
-    "offline_snapshot_payload": "snapshots/offline/<snapshot_id>/snapshot.jsonl",
+    "offline_snapshot_manifest": "snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json",
+    "offline_snapshot_payload": "snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl",
     "retrieval_corpus_jsonl": "data/faiss/retrieval_corpus.jsonl",
     "faiss_index_meta_json": "data/faiss/index.meta.json"
   },

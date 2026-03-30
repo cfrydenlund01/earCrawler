@@ -510,6 +510,29 @@ What this proves:
 - search rollback behavior (disabled again)
 - KG expansion failure-policy behavior (`disable` and `error`) with deterministic checks
 
+For the operator-owned production-like proof package required before any search
+or KG promotion decision, also run:
+
+```powershell
+pwsh scripts/search-kg-prodlike-smoke.ps1 `
+  -Host 127.0.0.1 `
+  -Port 9001 `
+  -FusekiHost 127.0.0.1 `
+  -FusekiPort 3040 `
+  -ReportPath C:\ProgramData\EarCrawler\workspace\kg\reports\search-kg-prodlike-smoke.json
+```
+
+This validation path is still quarantined. It uses the optional
+text-index-enabled Fuseki workflow from `docs/ops/windows_fuseki_operator.md`
+and proves only that the real operator-owned API + Fuseki runtime shape can:
+
+- seed a deterministic validation graph into a text-index-backed Fuseki dataset
+- return `200` from `/v1/search` when `EARCRAWLER_API_ENABLE_SEARCH=1`
+- execute Fuseki-backed KG expansion successfully when `EARCRAWLER_ENABLE_KG_EXPANSION=1`
+
+Treat a failure in this proof as a no-go signal for promotion evidence, not as
+a supported-baseline outage.
+
 If you have a real Task 5.3 adapter artifact and are explicitly resuming the
 deprioritized local-adapter track for a review window, run:
 
@@ -556,6 +579,10 @@ Rollback for optional/quarantined local validation modes:
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_ENABLE_LOCAL_LLM', '0', 'Machine')
 C:\tools\nssm\nssm.exe restart EarCrawler-API
 ```
+
+If you also enabled the text-index validation Fuseki shape for
+`scripts/search-kg-prodlike-smoke.ps1`, re-render or reinstall the baseline
+Fuseki config without `-EnableTextIndexValidation` before restarting the API.
 
 After rollback, re-check `/health` and confirm the capability snapshot has
 returned to the baseline posture: default API surface `supported`, search and
@@ -663,7 +690,6 @@ evidence exist.
 - If scale-out becomes in scope later, start from `docs/ops/multi_instance_deferred.md` instead of inferring support from this guide.
 - Broader-than-loopback exposure uses a separate front door. The reference pattern is IIS + ARR + Windows Authentication with EarCrawler still bound to loopback; see `docs/ops/external_auth_front_door.md`, `scripts/ops/iis-earcrawler-front-door.web.config.example`, and `scripts/ops/iis-front-door-smoke.ps1`.
 - When the optional IIS front door is deployed, retain the resulting `iis-front-door-smoke.json` report with the same host-local evidence set as install, upgrade, and rollback records.
-
 
 
 

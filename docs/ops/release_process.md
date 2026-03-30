@@ -6,6 +6,10 @@ Local/CI preflight guard before deeper release work:
 - `scripts/release-evidence-preflight.ps1 -AllowEmptyDist`
 - fails fast when release-like files exist without `dist/checksums.sha256`, when `dist/checksums.sha256.sig` is missing, when checksums drift, or when uncontrolled top-level files sit next to the checksums file.
 
+Java prerequisite contract:
+- `scripts/bootstrap-verify.ps1` enforces the absolute bootstrap minimum (`Java 11+`).
+- The supported Fuseki auto-provision release/install path requires `Java 17+`.
+
 GitHub release promotion stages (`.github/workflows/release.yml`):
 - `build`: produces signed distributables, checksums, canonical metadata, and `dist/promotion/build_stage_evidence.json`; uploads `release-build-stage`.
 - `validate`: downloads `release-build-stage`, runs release security baseline plus smoke/verification gates, writes `dist/release_validation_evidence.json` and `dist/promotion/validation_stage_evidence.json`; uploads `release-validation-stage`.

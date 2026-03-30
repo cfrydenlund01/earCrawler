@@ -2,7 +2,9 @@
 param(
     [string]$FusekiUrl = $env:EARCRAWLER_FUSEKI_URL,
     [string]$ConfigPath = 'service/config/observability.yml',
-    [string]$ReportPath = 'kg/reports/health-fuseki.txt'
+    [string]$ReportPath = 'kg/reports/health-fuseki.txt',
+    [switch]$RequireTextQuery,
+    [string]$TextQuery = '__earcrawler_text_probe__'
 )
 
 Set-StrictMode -Version Latest
@@ -57,7 +59,14 @@ $query = 'SELECT (1 AS ?ok) WHERE { } LIMIT 1'
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $selectOk = $false
 try {
-    $selectResponse = Invoke-WebRequest -Uri $endpointUri.AbsoluteUri -UseBasicParsing -TimeoutSec ([Math]::Ceiling($selectBudget / 1000.0)) -Method Post -Body $query -ContentType 'application/sparql-query'
+    $selectResponse = Invoke-WebRequest `
+        -Uri $endpointUri.AbsoluteUri `
+        -UseBasicParsing `
+        -TimeoutSec ([Math]::Ceiling($selectBudget / 1000.0)) `
+        -Method Post `
+        -Body $query `
+        -ContentType 'application/sparql-query' `
+        -Headers @{ Accept = 'application/sparql-results+json' }
     $sw.Stop()
     $selectMs = [math]::Round($sw.Elapsed.TotalMilliseconds, 2)
     $reportLines += "Select latency: $selectMs ms (budget $selectBudget ms)"
@@ -82,7 +91,57 @@ try {
     $reportLines += "Select error: $($_.Exception.Message)"
 }
 
-$overall = $pingOk -and $selectOk
+if ($RequireTextQuery) {
+    $textQuerySparql = @"
+PREFIX text: <http://jena.apache.org/text#>
+PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+SELECT (COUNT(*) AS ?count)
+WHERE {
+  (?entity ?score ?snippet) text:query (rdfs:label "$TextQuery") .
+}
+"@
+
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+    $textOk = $false
+    try {
+        $textResponse = Invoke-WebRequest `
+            -Uri $endpointUri.AbsoluteUri `
+            -UseBasicParsing `
+            -TimeoutSec ([Math]::Ceiling($selectBudget / 1000.0)) `
+            -Method Post `
+            -Body $textQuerySparql `
+            -ContentType 'application/sparql-query' `
+            -Headers @{ Accept = 'application/sparql-results+json' }
+        $sw.Stop()
+        $textMs = [math]::Round($sw.Elapsed.TotalMilliseconds, 2)
+        $reportLines += "Text-query latency: $textMs ms (budget $selectBudget ms)"
+        $reportLines += "Text-query status: $($textResponse.StatusCode)"
+        try {
+            $raw = $textResponse.Content
+            if ($raw -is [byte[]]) {
+                $raw = [System.Text.Encoding]::UTF8.GetString($raw)
+            }
+            $json = $raw | ConvertFrom-Json
+            $bindings = @($json.results.bindings)
+            $countValue = $null
+            if ($bindings.Count -gt 0 -and $bindings[0].PSObject.Properties.Name -contains 'count') {
+                $countValue = $bindings[0].count.value
+            }
+            $reportLines += "Text-query count: $countValue"
+            $textOk = ($textResponse.StatusCode -eq 200) -and ($textMs -le $selectBudget)
+        } catch {
+            $reportLines += "Failed to parse text-query response: $($_.Exception.Message)"
+        }
+    } catch {
+        $sw.Stop()
+        $reportLines += "Text-query error: $($_.Exception.Message)"
+    }
+}
+else {
+    $textOk = $true
+}
+
+$overall = $pingOk -and $selectOk -and $textOk
 $reportLines += "Overall: $(if ($overall) { 'pass' } else { 'fail' })"
 
 $reportDir = Split-Path -Parent $ReportPath

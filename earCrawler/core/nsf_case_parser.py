@@ -6,6 +6,7 @@ import hashlib
 import re
 from pathlib import Path
 from typing import Dict, List
+from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
@@ -23,6 +24,7 @@ class NSFCaseParser:
         r"(?:\s+(?:of|and|for|the|[A-Z][a-z]+)){0,5}"
     )
     PERSON_RE = re.compile(r"\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+")
+    _LIVE_CASE_LINK_RE = re.compile(r"case-summary-|/case/", re.IGNORECASE)
 
     def __init__(self) -> None:
         self.last_upstream_status: dict[str, dict[str, object]] = {}
@@ -66,8 +68,7 @@ class NSFCaseParser:
         soup = BeautifulSoup(html, "html.parser")
         title_tag = soup.find("h1")
         title = self.normalize(title_tag.get_text(" ")) if title_tag else ""
-        match = re.search(r"Case Number\s*(\S+)", title)
-        case_number = match.group(1) if match else ""
+        case_number = self._case_number_from_title_or_url(title, url)
         paragraphs = self.paragraphs(html)
         joined = "\n".join(paragraphs)
         entities = self.extract_entities(joined)
@@ -103,10 +104,9 @@ class NSFCaseParser:
                         return []
                 else:
                     listing_html = client.get_listing_html()
-                listing = BeautifulSoup(listing_html, "html.parser")
-                links = [a["href"] for a in listing.select("a[href]")]
+                links = self._extract_live_case_links(listing_html, client.BASE_URL)
                 for link in links:
-                    url = link if link.startswith("http") else f"{client.BASE_URL}{link}"
+                    url = urljoin(client.BASE_URL, link)
                     case_result_getter = getattr(client, "get_case_html_result", None)
                     if callable(case_result_getter):
                         case_result = case_result_getter(url)
@@ -133,3 +133,32 @@ class NSFCaseParser:
                 case_html = case_path.read_text(encoding="utf-8")
                 cases.append(self.parse_from_html(case_html, case_path.as_posix()))
         return cases
+
+    @classmethod
+    def _extract_live_case_links(cls, listing_html: str, base_url: str) -> List[str]:
+        listing = BeautifulSoup(listing_html, "html.parser")
+        links: List[str] = []
+        seen: set[str] = set()
+        for anchor in listing.select("a[href]"):
+            href = str(anchor.get("href") or "").strip()
+            if not href:
+                continue
+            absolute = urljoin(base_url, href)
+            if not cls._LIVE_CASE_LINK_RE.search(absolute):
+                continue
+            if absolute in seen:
+                continue
+            seen.add(absolute)
+            links.append(absolute)
+        return links
+
+    @staticmethod
+    def _case_number_from_title_or_url(title: str, url: str) -> str:
+        match = re.search(r"Case Number\s*(\S+)", title)
+        if match:
+            return match.group(1)
+        slug = Path(url).name
+        normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", slug).strip("-").upper()
+        if normalized:
+            return f"ORI-{normalized}"
+        return "ORI-UNKNOWN"

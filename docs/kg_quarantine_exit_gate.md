@@ -3,7 +3,12 @@
 Status: normative for any change that claims search- or KG-dependent runtime
 behavior is part of the supported production CLI path.
 
-As of March 19, 2026, this gate is not passed. KG-related runtime behavior remains quarantined. Decision records: `docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go) and `docs/search_kg_quarantine_decision_package_2026-03-19.md` (keep quarantined for the current production-beta target).
+As of March 27, 2026, this gate is not passed. KG-related runtime behavior
+remains quarantined. Decision records:
+`docs/kg_search_status_decision_2026-03-10.md` (Task 2.2 no-go),
+`docs/search_kg_quarantine_decision_package_2026-03-19.md` (March evidence
+package), and `docs/search_kg_capability_decision_2026-03-27.md` (Step 5.3
+decision: keep quarantined).
 
 This gate governs:
 

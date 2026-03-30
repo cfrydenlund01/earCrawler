@@ -41,6 +41,11 @@ class ORIClient:
     """Tiny ORI HTTP client."""
 
     BASE_URL = "https://ori.hhs.gov"
+    LISTING_PATHS = (
+        "/case_summary",
+        "/content/case_summary",
+        "/case_findings",
+    )
 
     def __init__(self, *, session: requests.Session | None = None) -> None:
         self.session = session or requests.Session()
@@ -168,8 +173,22 @@ class ORIClient:
 
     def get_listing_html(self) -> str:
         """Return HTML for the case findings listing page."""
-        url = f"{self.BASE_URL}/case_findings"
-        return self._get(url, operation="get_listing_html")
+        last_not_found: ORIClientError | None = None
+        for path in self.LISTING_PATHS:
+            url = f"{self.BASE_URL}{path}"
+            try:
+                return self._get(url, operation="get_listing_html")
+            except ORIClientError as exc:
+                if exc.status_code == 404:
+                    last_not_found = exc
+                    continue
+                raise
+        if last_not_found is not None:
+            raise last_not_found
+        raise ORIClientError(
+            "ORI listing request failed without an HTTP response",
+            state="retry_exhausted",
+        )
 
     def get_listing_html_result(self) -> UpstreamResult[str]:
         """Return listing HTML with explicit upstream status."""

@@ -25,18 +25,30 @@ function Invoke-SmokeCheck {
         $headers['Content-Type'] = $ContentType
     }
 
-    $response = if ($Body) {
-        Invoke-WebRequest -Uri $Uri -Method $Method -Headers $headers -Body $Body -UseBasicParsing -TimeoutSec 10
-    } else {
-        Invoke-WebRequest -Uri $Uri -Method $Method -Headers $headers -UseBasicParsing -TimeoutSec 10
-    }
+    try {
+        $response = if ($Body) {
+            Invoke-WebRequest -Uri $Uri -Method $Method -Headers $headers -Body $Body -UseBasicParsing -TimeoutSec 10 -SkipHttpErrorCheck
+        } else {
+            Invoke-WebRequest -Uri $Uri -Method $Method -Headers $headers -UseBasicParsing -TimeoutSec 10 -SkipHttpErrorCheck
+        }
 
-    return [ordered]@{
-        name = $Name
-        uri = $Uri
-        method = $Method
-        status_code = [int]$response.StatusCode
-        status = if ([int]$response.StatusCode -eq 200) { 'passed' } else { 'failed' }
+        return [ordered]@{
+            name = $Name
+            uri = $Uri
+            method = $Method
+            status_code = [int]$response.StatusCode
+            status = if ([int]$response.StatusCode -eq 200) { 'passed' } else { 'failed' }
+        }
+    }
+    catch {
+        return [ordered]@{
+            name = $Name
+            uri = $Uri
+            method = $Method
+            status_code = 0
+            status = 'failed'
+            error = $_.Exception.Message
+        }
     }
 }
 

@@ -248,8 +248,14 @@ def test_phase5_first_finetune_pass_is_recorded_with_repeatable_commands() -> No
     assert "Implementation status (March 11, 2026)" in execution_plan
     assert "dist/training/<run_id>/run_metadata.json" in runbook
     assert "scripts/training/inference_smoke.py" in runbook
+    assert "require_qlora_4bit=true" in runbook
+    assert "qlora.effective_use_4bit" in runbook
     assert '"schema_version": "training-run-config.v1"' in config_record
     assert '"base_model": "Qwen/Qwen2.5-7B-Instruct"' in config_record
+    assert '"require_qlora_4bit": true' in config_record
+    assert '"use_4bit": true' in config_record
+    assert "<snapshot_id>" not in config_record
+    assert "<payload_sha256>" not in config_record
     assert (REPO_ROOT / "scripts" / "training" / "run_phase5_finetune.py").exists()
     assert (REPO_ROOT / "scripts" / "training" / "inference_smoke.py").exists()
     assert (REPO_ROOT / "scripts" / "training" / "run_phase5_finetune.ps1").exists()
@@ -352,9 +358,11 @@ def test_phase5_local_adapter_release_evidence_contract_is_recorded() -> None:
     assert "Keep Optional" in release_doc
     assert "release_evidence_manifest.json" in release_doc
     assert "build_local_adapter_candidate_bundle" in release_doc
+    assert "qlora.effective_use_4bit=true" in release_doc
     assert "validate_local_adapter_release_bundle" in release_process
     assert "release_evidence_manifest.json" in operator_guide
     assert '"schema_version": "local-adapter-release-evidence-contract.v2"' in config_record
+    assert '"required_for_base_models"' in config_record
     assert '"answer_accuracy_min": 0.65' in config_record
     assert (
         REPO_ROOT / "scripts" / "eval" / "validate_local_adapter_release_bundle.py"
@@ -642,6 +650,9 @@ def test_windows_operator_guide_records_optional_vs_quarantined_capability_contr
     operator_guide = (
         REPO_ROOT / "docs" / "ops" / "windows_single_host_operator.md"
     ).read_text(encoding="utf-8")
+    fuseki_operator_guide = (
+        REPO_ROOT / "docs" / "ops" / "windows_fuseki_operator.md"
+    ).read_text(encoding="utf-8")
     service_docs = (REPO_ROOT / "service" / "docs" / "index.md").read_text(
         encoding="utf-8"
     )
@@ -651,6 +662,7 @@ def test_windows_operator_guide_records_optional_vs_quarantined_capability_contr
 
     assert (REPO_ROOT / "scripts" / "optional-runtime-smoke.ps1").exists()
     assert "optional-runtime-smoke.ps1" in operator_guide
+    assert "search-kg-prodlike-smoke.ps1" in operator_guide
     assert "EARCRAWLER_RETRIEVAL_MODE" in operator_guide
     assert "LLM_PROVIDER" in operator_guide
     assert "EARCRAWLER_API_ENABLE_SEARCH" in operator_guide
@@ -672,7 +684,11 @@ def test_windows_operator_guide_records_optional_vs_quarantined_capability_contr
     assert "dr-evidence-index.json" in operator_guide
     assert "scripts/api-smoke.ps1" in operator_guide
     assert "Still-missing deployment evidence" in operator_guide
+    assert "EnableTextIndexValidation" in fuseki_operator_guide
+    assert "search-kg-prodlike-smoke.ps1" in fuseki_operator_guide
+    assert "TextProbeQuery" in fuseki_operator_guide
     assert (REPO_ROOT / "scripts" / "ops" / "windows-recurring-dr-evidence.ps1").exists()
+    assert (REPO_ROOT / "scripts" / "search-kg-prodlike-smoke.ps1").exists()
     assert "EARCRAWLER_RETRIEVAL_MODE=hybrid" in service_docs
     assert "KG expansion remain `Quarantined`" in service_docs
     assert "runtime_contract" in service_docs

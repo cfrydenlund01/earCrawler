@@ -1,11 +1,14 @@
 # Search And KG Quarantine Decision Package
 
 Decision date: March 19, 2026
+Refreshed: March 27, 2026
 
 Recommendation: `Keep Quarantined`
 
 Governing context:
 
+- `docs/ExecutionPlan11.5.md`
+- `docs/ExecutionPlan11.5_log.md`
 - `docs/Archive/ExecutionPlanRunPass11.md`
 - `docs/Archive/RunPass11.md`
 - `docs/kg_quarantine_exit_gate.md`
@@ -16,6 +19,7 @@ Governing context:
 - `dist/optional_runtime_smoke.json`
 - `dist/installed_runtime_smoke.json`
 - `dist/release_validation_evidence.json`
+- `dist/kg_query_results.json`
 
 ## Scope
 
@@ -121,13 +125,17 @@ Current evidence that does exist:
     - `kg.expansion = quarantined`
 - `dist/release_validation_evidence.json`
   - present
-  - not complete
+  - complete
+- `dist/kg_query_results.json`
+  - passed
+  - confirms the current emitted KG can be loaded, served, and queried through the supported local TDB2/Fuseki runtime shape
 
 This means the repo currently proves:
 
 - the quarantine gates behave correctly in local/release-shaped validation
 - the rollback-safe default contract is intact
 - the declared failure policy is bounded and conservative
+- the current corpus -> KG -> local query runtime path works against the emitted graph
 
 This does not mean the quarantined capabilities are ready for promotion.
 
@@ -166,17 +174,13 @@ evidence for promotion.
 
 ## Evidence Gaps Blocking Promotion
 
-The current blockers remain concrete and unchanged:
+The remaining blockers are concrete:
 
-1. `dist/release_validation_evidence.json` is incomplete because
-   `dist/checksums.sha256` was not found for the distributable-artifact proof.
-2. No operator-owned text-index-enabled Fuseki provisioning and rollback
+1. No operator-owned text-index-enabled Fuseki provisioning and rollback
    evidence is attached for `/v1/search`.
-3. No production-like smoke artifact is attached for `/v1/search` against a
+2. No production-like smoke artifact is attached for `/v1/search` against a
    real text-index-backed Fuseki runtime path.
-4. No production-like smoke artifact is attached for KG expansion success
-   through the supported runtime shape.
-5. No dated pass record exists showing the exit-gate criteria are fully
+3. No dated pass record exists showing the exit-gate criteria are fully
    satisfied with current evidence.
 
 These gaps directly block the gate sections on:
@@ -188,7 +192,7 @@ These gaps directly block the gate sections on:
 
 ## Decision
 
-Decision for Step 3.3: `Keep Quarantined`.
+Decision for Step 4.4 refresh: `Keep Quarantined`.
 
 Rationale:
 
@@ -199,6 +203,19 @@ Rationale:
 - The governing gate is binary. It remains unpassed.
 
 `Ready for formal promotion review` is not justified by current evidence.
+
+## Step 4.4 Refresh Note
+
+- The March 19 quarantine decision remains in force after the Phase 1 through
+  Phase 4 evidence refresh.
+- Release-integrity evidence is now complete and current.
+- The KG corpus/load/serve/query runtime path is now proven in the supported
+  local TDB2/Fuseki shape.
+- That current proof still does not close the search-side operator-owned
+  provisioning and `/v1/search` production-like smoke gaps required by the
+  quarantine exit gate.
+- Capability status remains unchanged: `api.search = quarantined`,
+  `kg.expansion = quarantined`.
 
 ## What Would Need To Exist Before Reconsideration
 

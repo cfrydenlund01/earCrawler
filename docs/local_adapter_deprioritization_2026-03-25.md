@@ -3,6 +3,10 @@
 Date: March 25, 2026
 
 Status: active decision for the current production-beta target.
+Reactivation note: `docs/local_adapter_reactivation_2026-03-27.md` reopens the
+track for bounded candidate work under ExecutionPlan11.5 Step 6.1, but it does
+not promote the capability or add local-adapter obligations to the supported
+baseline release path.
 
 Use this document together with:
 

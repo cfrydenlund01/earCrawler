@@ -31,6 +31,10 @@ Fuseki up first, verify it, then start the EarCrawler API service.
 This guide does not unquarantine search or KG-backed runtime behavior. It
 operationalizes the baseline read-only query dependency only.
 
+For the quarantined search/KG promotion-proof path, use the optional text-index
+validation workflow below. That workflow is evidence-only and does not change
+the supported baseline.
+
 ## Pinned version
 
 Pinned tool versions are recorded in `tools/versions.json`:
@@ -207,6 +211,66 @@ pwsh scripts/health/fuseki-probe.ps1 `
   -ReportPath C:\ProgramData\EarCrawler\fuseki\logs\health-fuseki.txt
 ```
 
+## Optional text-index validation for quarantined search/KG evidence
+
+Use this mode only when assembling promotion evidence for quarantined
+`/v1/search` or KG expansion. It is not the supported baseline service shape.
+
+Render or install the validation config with `-EnableTextIndexValidation`:
+
+```powershell
+pwsh scripts/ops/windows-fuseki-service.ps1 `
+  -Action render-config `
+  -ProgramDataRoot 'C:\ProgramData\EarCrawler\fuseki-validation' `
+  -ConfigRoot 'C:\ProgramData\EarCrawler\fuseki-validation\config' `
+  -DatabaseRoot 'C:\ProgramData\EarCrawler\fuseki-validation\databases\tdb2-text' `
+  -LuceneRoot 'C:\ProgramData\EarCrawler\fuseki-validation\databases\lucene' `
+  -ConfigPath 'C:\ProgramData\EarCrawler\fuseki-validation\config\tdb2-text-validation-query.ttl' `
+  -FusekiHost 127.0.0.1 `
+  -FusekiPort 3040 `
+  -DatasetName ear `
+  -EnableTextIndexValidation
+```
+
+What changes in this mode:
+
+- the assembler uses a Jena `text:TextDataset` over `rdfs:label`
+- a Lucene directory is provisioned beside the TDB2 store
+- the validation service exposes `/ear/query` plus `/ear/update` so the
+  deterministic validation graph can seed and exercise the text index
+- this mode exists only to support `scripts/search-kg-prodlike-smoke.ps1`
+
+Health-check the validation service with a text query:
+
+```powershell
+pwsh scripts/ops/windows-fuseki-service.ps1 `
+  -Action health `
+  -FusekiHost 127.0.0.1 `
+  -FusekiPort 3040 `
+  -DatasetName ear `
+  -EnableTextIndexValidation `
+  -TextProbeQuery 'Export Validation Entity'
+```
+
+Production-like validation smoke for the quarantined runtime shape:
+
+```powershell
+pwsh scripts/search-kg-prodlike-smoke.ps1 `
+  -Host 127.0.0.1 `
+  -Port 9001 `
+  -FusekiHost 127.0.0.1 `
+  -FusekiPort 3040 `
+  -ReportPath C:\ProgramData\EarCrawler\workspace\kg\reports\search-kg-prodlike-smoke.json
+```
+
+Rollback from the validation mode:
+
+1. stop the validation Fuseki process or service
+2. restore the baseline read-only config by re-running `windows-fuseki-service.ps1` without `-EnableTextIndexValidation`
+3. remove any deployed-host overrides for `EARCRAWLER_API_ENABLE_SEARCH` and `EARCRAWLER_ENABLE_KG_EXPANSION`
+4. restart Fuseki, then restart the EarCrawler API service
+5. re-run the baseline health checks and `scripts/optional-runtime-smoke.ps1`
+
 ## Backup
 
 Take a Fuseki backup before every upgrade and before any manual TDB2 repair.
@@ -333,7 +397,6 @@ What still needs future automation:
 - automated verification of backup/restore on a schedule
 - host-side download and checksum verification of Fuseki without relying on a
   source checkout or separately staged archive
-
 
 
 

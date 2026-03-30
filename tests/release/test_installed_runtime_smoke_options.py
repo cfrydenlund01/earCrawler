@@ -32,3 +32,13 @@ def test_live_fuseki_requires_url_without_auto_provision():
     )
     assert result.returncode != 0
 
+
+def test_hermetic_bundle_requires_release_checksums():
+    result = run_ps(
+        "scripts/installed-runtime-smoke.ps1",
+        "-UseHermeticWheelhouse",
+        "-HermeticBundleZipPath",
+        "dist/hermetic-artifacts.zip",
+        check=False,
+    )
+    assert result.returncode != 0

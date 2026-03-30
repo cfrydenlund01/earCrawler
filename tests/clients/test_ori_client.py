@@ -93,3 +93,37 @@ def test_get_case_html_result_returns_typed_failure() -> None:
     result = client.get_case_html_result("https://ori.hhs.gov/case/ABC")
     assert result.data == ""
     assert result.state == "invalid_response"
+
+
+class _ListingFallbackResponse:
+    def __init__(self, status_code: int, text: str) -> None:
+        self.status_code = status_code
+        self.text = text
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            err = requests.HTTPError(str(self.status_code))
+            err.response = self
+            raise err
+        return None
+
+
+class _ListingFallbackSession:
+    def get(self, url: str, timeout: int = 10):  # pragma: no cover - stub
+        if url.endswith("/content/case_summary"):
+            return _ListingFallbackResponse(200, "<html><body>ok</body></html>")
+        if url.endswith("/case_summary"):
+            return _ListingFallbackResponse(404, "not found")
+        return _ListingFallbackResponse(404, "not found")
+
+    def close(self):  # pragma: no cover - stub
+        return None
+
+
+def test_get_listing_html_falls_back_to_content_case_summary() -> None:
+    client = ORIClient(session=_ListingFallbackSession())
+    html = client.get_listing_html()
+    assert "ok" in html
+    status = client.get_last_status("get_listing_html")
+    assert status is not None
+    assert status.state == "ok"

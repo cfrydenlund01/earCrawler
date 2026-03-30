@@ -14,7 +14,10 @@ def test_build_fuseki_cmd_windows_paths(tmp_path, monkeypatch):
     monkeypatch.setattr(fuseki, "fuseki_server_path", lambda: server)
     cmd = fuseki.build_fuseki_cmd(tmp_path / "db", "/ear", 3030)
     assert Path(cmd[0]).resolve() == server.resolve()
+    assert "--tdb2" in cmd
     assert "--loc" in cmd
+    loc_index = cmd.index("--loc")
+    assert Path(cmd[loc_index + 1]).resolve() == (tmp_path / "db" / "ear").resolve()
     assert cmd[-1] == "/ear"
 
 

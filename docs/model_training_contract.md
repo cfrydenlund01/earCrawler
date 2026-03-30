@@ -216,8 +216,15 @@ writing artifacts or launching training:
    `config/training_input_contract.example.json`.
 2. The configured `--index-meta` path must match
    `authoritative_sources.faiss_index_meta_json` when that field is present.
-3. The retrieval corpus SHA-256 and non-empty JSONL record count must match
+3. The configured `--snapshot-manifest` path must match
+   `authoritative_sources.offline_snapshot_manifest` when that field is
+   present, and `snapshot_id` / `snapshot_sha256` must match the manifest.
+4. The FAISS `snapshot.snapshot_id` / `snapshot.snapshot_sha256` values must
+   match the approved snapshot manifest when FAISS snapshot metadata is present.
+5. The retrieval corpus SHA-256 and non-empty JSONL record count must match
    `corpus_digest` and `doc_count` from `data/faiss/index.meta.json`.
+6. When `require_qlora_4bit=true`, `use_4bit=true` is mandatory before
+   packaging/training can proceed.
 
 If any check fails, the run exits before packaging or training.
 

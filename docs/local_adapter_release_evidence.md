@@ -101,6 +101,13 @@ The release-evidence validator copies these facts into
 summary and smoke report so the review bundle can be archived and compared
 later.
 
+For the first 7B production-candidate path (`Qwen/Qwen2.5-7B-Instruct`), the
+bundle must also prove QLoRA 4-bit execution:
+
+- `run_config.json` must set `training_hyperparams.use_4bit=true`
+- `run_metadata.json` must include `qlora.required=true`,
+  `qlora.requested_use_4bit=true`, and `qlora.effective_use_4bit=true`
+
 ## Benchmark requirements
 
 Use the benchmark runner from `docs/production_candidate_benchmark_plan.md`:
@@ -245,9 +252,10 @@ The decision rule is exact and machine-checkable from
 - `Keep Optional`
   - if any required artifact is missing
   - if rollback docs are missing
-  - if benchmark precondition metadata or hashes are missing or inconsistent
-  - if the archived benchmark smoke copy does not match the reviewed runtime
-    smoke report
+- if benchmark precondition metadata or hashes are missing or inconsistent
+- if required QLoRA evidence fields are missing
+- if the archived benchmark smoke copy does not match the reviewed runtime
+  smoke report
   - this means the candidate is not reviewable yet and the capability remains
     `Optional`
 - `Reject candidate`
@@ -303,6 +311,8 @@ Examples of candidate rejection:
 
 - `local-adapter-smoke.json` is present, but status is not `passed`
 - the benchmark smoke precondition is archived, but status is not `passed`
+- a QLoRA-required candidate does not prove `use_4bit` +
+  `effective_use_4bit`
 - accuracy or groundedness thresholds fail
 - strict-output failure rate is non-zero
 - `local_adapter` underperforms `retrieval_only` on a required comparison

@@ -124,3 +124,32 @@ def test_run_live_returns_empty_when_listing_is_degraded(monkeypatch) -> None:
 
     assert cases == []
     assert parser.last_upstream_status["get_listing_html"]["state"] == "upstream_unavailable"
+
+
+def test_extract_live_case_links_filters_navigation_links() -> None:
+    html = """
+    <html><body>
+      <a href="/about-ori">About</a>
+      <a href="/content/case-summary-alpha">Case Alpha</a>
+      <a href="/content/case-summary-alpha">Case Alpha Duplicate</a>
+      <a href="/content/case-summary-beta">Case Beta</a>
+      <a href="/contact-us">Contact</a>
+    </body></html>
+    """
+    links = NSFCaseParser._extract_live_case_links(html, "https://ori.hhs.gov")
+    assert links == [
+        "https://ori.hhs.gov/content/case-summary-alpha",
+        "https://ori.hhs.gov/content/case-summary-beta",
+    ]
+
+
+def test_parse_from_html_derives_case_number_from_url_when_title_lacks_case_number() -> None:
+    parser = NSFCaseParser()
+    html = """
+    <html><body>
+      <h1>Main navigation</h1>
+      <p>This paragraph is intentionally long enough for parser capture.</p>
+    </body></html>
+    """
+    case = parser.parse_from_html(html, "https://ori.hhs.gov/content/case-summary-alpha")
+    assert case["case_number"] == "ORI-CASE-SUMMARY-ALPHA"
