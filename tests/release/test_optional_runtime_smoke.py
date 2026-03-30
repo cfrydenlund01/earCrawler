@@ -45,3 +45,8 @@ def test_optional_runtime_smoke_runs_without_local_adapter_artifact(tmp_path: Pa
     assert payload["search_mode_checks"][0]["search"]["status_code"] == 404
     assert payload["search_mode_checks"][1]["search"]["status_code"] == 200
     assert payload["search_mode_checks"][2]["search"]["status_code"] == 404
+    for phase in payload["search_mode_checks"]:
+        assert phase["api_start_lifecycle"]["schema_version"] == "api-start-lifecycle.v1"
+        assert phase["api_stop_lifecycle"]["schema_version"] == "api-stop-lifecycle.v1"
+        assert phase["api_start_lifecycle"]["overall_status"] == "passed"
+        assert phase["api_stop_lifecycle"]["status"] in {"stopped", "stale_state_removed"}

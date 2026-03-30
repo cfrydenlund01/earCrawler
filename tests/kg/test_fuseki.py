@@ -4,6 +4,8 @@ import pytest
 
 import earCrawler.kg.fuseki as fuseki
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 def test_build_fuseki_cmd_windows_paths(tmp_path, monkeypatch):
     jena_home = tmp_path / "tools" / "jena"
@@ -19,6 +21,48 @@ def test_build_fuseki_cmd_windows_paths(tmp_path, monkeypatch):
     loc_index = cmd.index("--loc")
     assert Path(cmd[loc_index + 1]).resolve() == (tmp_path / "db" / "ear").resolve()
     assert cmd[-1] == "/ear"
+
+
+def test_build_fuseki_cmd_normalizes_dataset_token(tmp_path, monkeypatch):
+    jena_home = tmp_path / "tools" / "jena"
+    server = jena_home / "bin" / "fuseki-server"
+    server.parent.mkdir(parents=True)
+    server.write_text("")
+    monkeypatch.setattr(fuseki, "ensure_jena", lambda download=True: jena_home)
+    monkeypatch.setattr(fuseki, "fuseki_server_path", lambda: server)
+    cmd = fuseki.build_fuseki_cmd(tmp_path / "db", " /ear/ ", 3030)
+    loc_index = cmd.index("--loc")
+    assert Path(cmd[loc_index + 1]).resolve() == (tmp_path / "db" / "ear").resolve()
+    assert cmd[-1] == "/ear"
+
+
+def test_build_fuseki_cmd_rejects_non_absolute_dataset(tmp_path, monkeypatch):
+    jena_home = tmp_path / "tools" / "jena"
+    server = jena_home / "bin" / "fuseki-server"
+    server.parent.mkdir(parents=True)
+    server.write_text("")
+    monkeypatch.setattr(fuseki, "ensure_jena", lambda download=True: jena_home)
+    monkeypatch.setattr(fuseki, "fuseki_server_path", lambda: server)
+    with pytest.raises(ValueError, match="dataset must start with '/'"):
+        fuseki.build_fuseki_cmd(tmp_path / "db", "ear", 3030)
+
+
+def test_installed_runtime_smoke_loads_baseline_fixture_into_named_graph():
+    script = (REPO_ROOT / "scripts" / "installed-runtime-smoke.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert '$baselineFixtureGraph = "urn:earcrawler:baseline-fixture"' in script
+    assert '"--graph=$baselineFixtureGraph"' in script
+
+
+def test_windows_fuseki_service_enforces_java17_for_runtime_actions():
+    script = (REPO_ROOT / "scripts" / "ops" / "windows-fuseki-service.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "function Assert-Java17Runtime" in script
+    assert 'Assert-Java17Runtime -OperationName "install"' in script
+    assert 'Assert-Java17Runtime -OperationName "start"' in script
+    assert 'Assert-Java17Runtime -OperationName "restart"' in script
 
 
 class DummyProc:

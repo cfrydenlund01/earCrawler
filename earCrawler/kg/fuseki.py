@@ -63,6 +63,16 @@ def fuseki_server_path() -> Path:
     return exe.resolve()
 
 
+def normalize_dataset_token(dataset: str) -> str:
+    """Return a canonical dataset token for Fuseki CLI arguments."""
+
+    token = str(dataset or "").strip()
+    if not token.startswith("/"):
+        raise ValueError("dataset must start with '/'")
+    relative = token.lstrip("/").strip("/")
+    return f"/{relative}" if relative else "/"
+
+
 def build_fuseki_cmd(
     db_dir: Path, dataset: str, port: int, java_opts: Optional[str] = None
 ) -> list[str]:
@@ -74,12 +84,11 @@ def build_fuseki_cmd(
     """
 
     server = fuseki_server_path()
-    dataset_token = str(dataset or "").strip()
+    dataset_token = normalize_dataset_token(dataset)
     dataset_loc = Path(db_dir)
-    if dataset_token.startswith("/"):
+    if dataset_token != "/":
         relative = dataset_token.lstrip("/")
-        if relative:
-            dataset_loc = dataset_loc / Path(relative)
+        dataset_loc = dataset_loc / Path(relative)
 
     cmd = [
         str(server),

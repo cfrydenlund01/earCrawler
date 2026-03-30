@@ -77,14 +77,28 @@ function Invoke-HttpProbe {
 
 function Stop-SmokeApi {
     param(
-        [Parameter(Mandatory = $true)][string]$ApiStopScript
+        [Parameter(Mandatory = $true)][string]$ApiStopScript,
+        [string]$LifecycleReportPath = ''
     )
 
     try {
-        & $ApiStopScript
+        if ($LifecycleReportPath) {
+            & $ApiStopScript -LifecycleReportPath $LifecycleReportPath
+        } else {
+            & $ApiStopScript
+        }
     } catch {
         Write-Warning ("API stop helper raised an error: {0}" -f $_.Exception.Message)
     }
+
+    if ($LifecycleReportPath -and (Test-Path $LifecycleReportPath)) {
+        try {
+            return Get-Content -Path $LifecycleReportPath -Raw | ConvertFrom-Json
+        } catch {
+            return $null
+        }
+    }
+    return $null
 }
 
 function Invoke-SearchPhase {
@@ -105,21 +119,42 @@ function Invoke-SearchPhase {
         $env:EARCRAWLER_API_ENABLE_SEARCH = '0'
     }
 
-    & $ApiStartScript -Host $ApiHostValue -Port $PortValue
+    $startLifecyclePath = Join-Path ([System.IO.Path]::GetTempPath()) ("earcrawler-api-start-phase-" + [guid]::NewGuid().ToString("N") + ".json")
+    $stopLifecyclePath = Join-Path ([System.IO.Path]::GetTempPath()) ("earcrawler-api-stop-phase-" + [guid]::NewGuid().ToString("N") + ".json")
+    $startLifecycle = $null
+    $stopLifecycle = $null
+
+    $health = $null
+    $search = $null
+    $passed = $false
+
+    & $ApiStartScript -Host $ApiHostValue -Port $PortValue -LifecycleReportPath $startLifecyclePath
+    if (Test-Path $startLifecyclePath) {
+        try {
+            $startLifecycle = Get-Content -Path $startLifecyclePath -Raw | ConvertFrom-Json
+        } catch {
+            $startLifecycle = $null
+        }
+    }
     try {
         $health = Invoke-HttpProbe -Uri "$BaseUrl/health"
         $search = Invoke-HttpProbe -Uri "$BaseUrl/v1/search?q=export&limit=1"
         $passed = ($health.status_code -eq 200) -and ($search.status_code -eq $ExpectedSearchStatus)
-        return [ordered]@{
-            name = $Name
-            enable_search = $EnableSearch
-            expected_search_status = $ExpectedSearchStatus
-            health = $health
-            search = $search
-            status = if ($passed) { "passed" } else { "failed" }
-        }
     } finally {
-        Stop-SmokeApi -ApiStopScript $ApiStopScript
+        $stopLifecycle = Stop-SmokeApi -ApiStopScript $ApiStopScript -LifecycleReportPath $stopLifecyclePath
+        Remove-Item -Path $startLifecyclePath -ErrorAction SilentlyContinue
+        Remove-Item -Path $stopLifecyclePath -ErrorAction SilentlyContinue
+    }
+
+    return [ordered]@{
+        name = $Name
+        enable_search = $EnableSearch
+        expected_search_status = $ExpectedSearchStatus
+        health = $health
+        search = $search
+        api_start_lifecycle = $startLifecycle
+        api_stop_lifecycle = $stopLifecycle
+        status = if ($passed) { "passed" } else { "failed" }
     }
 }
 
@@ -368,7 +403,7 @@ print(json.dumps({"status": "passed" if overall else "failed", "checks": result}
                         report = $localReport
                     }
                 } finally {
-                    Stop-SmokeApi -ApiStopScript $apiStopScript
+                    [void](Stop-SmokeApi -ApiStopScript $apiStopScript)
                 }
             } catch {
                 $localAdapterResult = [ordered]@{
@@ -445,7 +480,7 @@ print(json.dumps({"status": "passed" if overall else "failed", "checks": result}
     }
 }
 finally {
-    Stop-SmokeApi -ApiStopScript $apiStopScript
+    [void](Stop-SmokeApi -ApiStopScript $apiStopScript)
     foreach ($entry in $savedEnv.GetEnumerator()) {
         if ($null -eq $entry.Value) {
             Remove-Item "Env:$($entry.Key)" -ErrorAction SilentlyContinue

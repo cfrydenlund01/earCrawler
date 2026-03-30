@@ -1,0 +1,68 @@
+from pybliometrics.scopus import ScopusSearch, AffiliationRetrieval
+from pybliometrics.scopus.utils.startup import init
+
+# Initialize Pybliometrics with the correct configuration file path
+init(config_dir="~/.config/pybliometrics.cfg")
+
+class ScopusSearcher:
+    def __init__(self, api_key): # 19206e91834f044c9d650eb1e9652909
+        self.api_key = api_key
+
+    def search(self, title, author):
+        query = f'TITLE({title}) AND AUTHLASTNAME({author})'
+        s = ScopusSearch(query, subscriber=True, apiKey=self.api_key)
+        results = s.results
+
+        articles = []
+        for result in results:
+            authors = result.author_names.split(";")
+            author_ids = result.author_ids.split(";")
+            aff_ids = result.author_afids.split(";")
+            author_info = []
+            for name, auth_id, aff_id in zip(authors, author_ids, aff_ids):
+                aff_details = self.get_affiliation_details(aff_id)
+                author_info.append({
+                    "name": name,
+                    "affiliation_ids": aff_id,
+                    "affiliation_details": aff_details
+                })
+            articles.append({
+                "title": result.title,
+                "year": result.coverDate[:4],
+                "authors": author_info
+            })
+        return articles
+
+    def get_affiliation_details(self, aff_id):
+        try:
+            aff = AffiliationRetrieval(aff_id)
+            return {
+                "name": aff.affiliation_name,
+                "address": aff.address,
+                "city": aff.city,
+                "country": aff.country,
+                "department": aff.org_domain
+            }
+        except Exception as e:
+            return {"error": str(e)}
+
+def search_articles(title, author):
+    api_key = "your_api_key_here"
+    scopus_searcher = ScopusSearcher(api_key)
+    scopus_results = scopus_searcher.search(title, author)
+
+    for article in scopus_results:
+        print(f"Title: {article['title']}")
+        print(f"Year: {article['year']}\n")
+        for author in article['authors']:
+            print(f"Author: {author['name']}")
+            aff = author['affiliation_details']
+            if "error" in aff:
+                print(f"Affiliation: {aff['error']}")
+            else:
+                print(f"Affiliation: {aff['name']}, {aff['address']}, {aff['city']}, {aff['country']}\n")
+
+# Example usage
+title = input("Enter keywords or part of the title to search: ")
+author = input("Enter the author's name or part of it to refine the search: ")
+search_articles(title, author)

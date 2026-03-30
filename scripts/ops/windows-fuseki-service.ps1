@@ -52,6 +52,113 @@ function Ensure-SingleHostBinding {
     throw "Refusing non-loopback bind '$HostName'. Use -AllowUnsupportedHost only for local experiments."
 }
 
+function Get-JavaMajorVersion {
+    $javaCmd = Get-Command "java" -ErrorAction SilentlyContinue
+    if (-not $javaCmd) {
+        throw "Java runtime not found on PATH. Java 17 or newer is required for supported Fuseki operations."
+    }
+
+    $versionOutput = & $javaCmd.Source -version 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to execute 'java -version'."
+    }
+
+    $text = [string]($versionOutput -join "`n")
+    $match = [regex]::Match($text, 'version "(?<version>[^"]+)"')
+    if (-not $match.Success) {
+        throw "Unable to parse Java version from: $text"
+    }
+
+    $raw = $match.Groups["version"].Value
+    if ($raw.StartsWith("1.")) {
+        $parts = $raw.Split(".")
+        if ($parts.Length -lt 2) {
+            throw "Unable to parse Java 1.x version token: $raw"
+        }
+        return [int]$parts[1]
+    }
+
+    $majorToken = $raw.Split(".")[0]
+    return [int]$majorToken
+}
+
+function Assert-Java17Runtime {
+    param([Parameter(Mandatory = $true)][string]$OperationName)
+
+    $majorVersion = Get-JavaMajorVersion
+    if ($majorVersion -lt 17) {
+        throw "Java 17 or newer is required to $OperationName Fuseki service operations (found Java $majorVersion). Ensure JAVA_HOME/PATH resolve to Java 17+."
+    }
+}
+
+function Get-ListeningPortOwners {
+    param([int]$LocalPort)
+
+    $netTcpCommand = Get-Command "Get-NetTCPConnection" -ErrorAction SilentlyContinue
+    if (-not $netTcpCommand) {
+        throw "Get-NetTCPConnection is unavailable; cannot validate port ownership for port $LocalPort."
+    }
+
+    $connections = Get-NetTCPConnection -State Listen -LocalPort $LocalPort -ErrorAction SilentlyContinue
+    if ($null -eq $connections) {
+        return @()
+    }
+
+    $owners = New-Object System.Collections.Generic.List[object]
+    foreach ($group in ($connections | Group-Object -Property OwningProcess)) {
+        $pidValue = [int]$group.Name
+        $proc = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
+        $processName = if ($proc) { [string]$proc.ProcessName } else { "" }
+        $owners.Add([ordered]@{
+            pid = $pidValue
+            process_name = $processName
+        })
+    }
+
+    return @($owners | Sort-Object -Property pid)
+}
+
+function Get-ServiceProcessId {
+    param([Parameter(Mandatory = $true)][string]$TargetServiceName)
+
+    $escapedName = $TargetServiceName.Replace("'", "''")
+    $svc = Get-CimInstance Win32_Service -Filter ("Name='{0}'" -f $escapedName) -ErrorAction SilentlyContinue
+    if ($null -eq $svc) {
+        return 0
+    }
+    return [int]$svc.ProcessId
+}
+
+function Assert-FusekiPortStartOwnership {
+    param(
+        [Parameter(Mandatory = $true)][string]$TargetServiceName,
+        [Parameter(Mandatory = $true)][int]$TargetPort
+    )
+
+    $owners = Get-ListeningPortOwners -LocalPort $TargetPort
+    if (@($owners).Count -eq 0) {
+        return [ordered]@{
+            status = "free"
+            owners = @()
+        }
+    }
+
+    $servicePid = Get-ServiceProcessId -TargetServiceName $TargetServiceName
+    if ($servicePid -gt 0) {
+        $foreignOwners = @($owners | Where-Object { [int]$_.pid -ne $servicePid })
+        if (@($foreignOwners).Count -eq 0) {
+            return [ordered]@{
+                status = "owned_by_service"
+                owners = @($owners)
+                service_pid = $servicePid
+            }
+        }
+    }
+
+    $ownerSummary = @($owners | ForEach-Object { "pid=$($_.pid) process=$($_.process_name)" }) -join "; "
+    throw "Fuseki port $TargetPort is already occupied by a non-service process. $ownerSummary"
+}
+
 function Invoke-Nssm {
     param(
         [Parameter(Mandatory = $true)][string]$Executable,
@@ -258,6 +365,7 @@ switch ($Action) {
             -DryRunMode:$DryRun
     }
     "install" {
+        Assert-Java17Runtime -OperationName "install"
         $fusekiExe = if ($DryRun) { Join-Path $FusekiHome "fuseki-server.bat" } else { Get-FusekiExecutable -Home $FusekiHome }
         Ensure-Directory -Path $ConfigRoot -DryRunMode:$DryRun
         Ensure-Directory -Path $DatabaseRoot -DryRunMode:$DryRun
@@ -295,12 +403,20 @@ switch ($Action) {
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("remove", $ServiceName, "confirm")
     }
     "start" {
+        Assert-Java17Runtime -OperationName "start"
+        $portState = Assert-FusekiPortStartOwnership -TargetServiceName $ServiceName -TargetPort $FusekiPort
+        if ($portState.status -eq "owned_by_service") {
+            Write-Host "Fuseki service already owns port $FusekiPort; no start action needed."
+            break
+        }
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("start", $ServiceName)
     }
     "stop" {
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("stop", $ServiceName)
     }
     "restart" {
+        Assert-Java17Runtime -OperationName "restart"
+        [void](Assert-FusekiPortStartOwnership -TargetServiceName $ServiceName -TargetPort $FusekiPort)
         Invoke-Nssm -Executable $NssmPath -DryRunMode:$DryRun -Arguments @("restart", $ServiceName)
     }
     "status" {
