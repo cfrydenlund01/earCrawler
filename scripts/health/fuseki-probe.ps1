@@ -41,6 +41,40 @@ $reportLines = @()
 $reportLines += "Fuseki endpoint: $FusekiUrl"
 $reportLines += "Fuseki ping: $pingUri"
 
+function Get-ListeningPortOwners {
+    param([int]$LocalPort)
+
+    $netTcpCommand = Get-Command 'Get-NetTCPConnection' -ErrorAction SilentlyContinue
+    if (-not $netTcpCommand) {
+        return @()
+    }
+
+    $connections = Get-NetTCPConnection -State Listen -LocalPort $LocalPort -ErrorAction SilentlyContinue
+    if ($null -eq $connections) {
+        return @()
+    }
+
+    $owners = New-Object System.Collections.Generic.List[object]
+    foreach ($group in ($connections | Group-Object -Property OwningProcess)) {
+        $pidValue = [int]$group.Name
+        $proc = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
+        $owners.Add([ordered]@{
+            pid = $pidValue
+            process_name = if ($proc) { [string]$proc.ProcessName } else { "" }
+        })
+    }
+
+    return @($owners | Sort-Object -Property pid)
+}
+
+$listeners = Get-ListeningPortOwners -LocalPort $endpointUri.Port
+$listenerSummary = @($listeners | ForEach-Object { "pid=$($_.pid) process=$($_.process_name)" }) -join "; "
+if ($listenerSummary) {
+    $reportLines += "Listener owners: $listenerSummary"
+} else {
+    $reportLines += "Listener owners: none detected"
+}
+
 $sw = [System.Diagnostics.Stopwatch]::StartNew()
 $pingOk = $false
 try {

@@ -184,6 +184,38 @@ function Stop-ProcessTree {
   }
 }
 
+function Get-ListeningPortOwners {
+  param([int]$LocalPort)
+
+  $netTcpCommand = Get-Command "Get-NetTCPConnection" -ErrorAction SilentlyContinue
+  if (-not $netTcpCommand) {
+    throw "Get-NetTCPConnection is unavailable; cannot validate port ownership for port $LocalPort."
+  }
+
+  $connections = Get-NetTCPConnection -State Listen -LocalPort $LocalPort -ErrorAction SilentlyContinue
+  if ($null -eq $connections) {
+    return @()
+  }
+
+  $owners = New-Object System.Collections.Generic.List[object]
+  foreach ($group in ($connections | Group-Object -Property OwningProcess)) {
+    $pidValue = [int]$group.Name
+    $proc = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
+    $processName = if ($proc) { [string]$proc.ProcessName } else { "" }
+    $cim = Get-CimInstance Win32_Process -Filter ("ProcessId = {0}" -f $pidValue) -ErrorAction SilentlyContinue
+    $commandLine = if ($cim) { [string]$cim.CommandLine } else { "" }
+    $localAddresses = @($group.Group | Select-Object -ExpandProperty LocalAddress -Unique)
+    $owners.Add([ordered]@{
+      pid = $pidValue
+      process_name = $processName
+      command_line = $commandLine
+      local_addresses = $localAddresses
+    })
+  }
+
+  return @($owners | Sort-Object -Property pid)
+}
+
 function Resolve-PwshExecutable {
   $cmd = Get-Command "pwsh" -ErrorAction SilentlyContinue
   if ($cmd) {
@@ -365,6 +397,7 @@ function Wait-ForFusekiHealth {
 }
 
 $python = Resolve-PythonInterpreter
+$javaMajorVersion = $null
 if ($AutoProvisionFuseki.IsPresent) {
   $javaMajorVersion = Get-JavaMajorVersion
   if ($javaMajorVersion -lt 17) {
@@ -401,11 +434,25 @@ $report = [ordered]@{
   install_mode = if ($UseHermeticWheelhouse.IsPresent) { "hermetic_wheelhouse" } else { "direct_wheel" }
   install_source = if ($UseHermeticWheelhouse.IsPresent) { "repo_wheelhouse" } else { "direct_wheel" }
   install_details = [ordered]@{}
+  service_lifecycle = [ordered]@{
+    api_port_preflight = [ordered]@{
+      status = "pending"
+      port = $Port
+      owners = @()
+    }
+    fuseki_port_preflight = [ordered]@{
+      status = if ($AutoProvisionFuseki.IsPresent) { "pending" } else { "not_applicable" }
+      port = $FusekiPort
+      owners = @()
+    }
+  }
   fuseki_dependency = [ordered]@{
     mode = if ($UseLiveFuseki.IsPresent) { "live_fuseki" } else { "embedded_fixture" }
     endpoint = ""
     health_report_path = ""
     provisioned = $false
+    java_major_version = $javaMajorVersion
+    baseline_fixture_graph = ""
     status = if ($UseLiveFuseki.IsPresent) { "pending" } else { "not_required" }
   }
   checks = @()
@@ -595,6 +642,15 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
   Invoke-CheckedCommand $venvPython $importCheckPath
 
   if ($UseLiveFuseki.IsPresent -and $AutoProvisionFuseki.IsPresent) {
+    $fusekiPortOwners = Get-ListeningPortOwners -LocalPort $FusekiPort
+    if (@($fusekiPortOwners).Count -gt 0) {
+      $report.service_lifecycle.fuseki_port_preflight.status = "occupied"
+      $report.service_lifecycle.fuseki_port_preflight.owners = @($fusekiPortOwners)
+      $ownerSummary = @($fusekiPortOwners | ForEach-Object { "pid=$($_.pid) process=$($_.process_name)" }) -join "; "
+      throw "Fuseki port $FusekiPort is already occupied. $ownerSummary"
+    }
+    $report.service_lifecycle.fuseki_port_preflight.status = "free"
+
     $pwshExe = Resolve-PwshExecutable
     $tools = Resolve-JenaFusekiHomes -PythonExecutable $python -RepoRoot $repoRoot
 
@@ -661,6 +717,8 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
       endpoint = $FusekiUrl
       health_report_path = $fusekiHealthReportPath
       provisioned = $true
+      java_major_version = $javaMajorVersion
+      baseline_fixture_graph = $baselineFixtureGraph
       status = "passed"
     }
   }
@@ -673,6 +731,8 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
       endpoint = $FusekiUrl
       health_report_path = $fusekiHealthReportPath
       provisioned = $false
+      java_major_version = $javaMajorVersion
+      baseline_fixture_graph = ""
       status = "passed"
     }
   }
@@ -691,6 +751,15 @@ if str(module_path).lower().startswith(str(repo_root).lower()):
     Remove-Item Env:EARCRAWLER_FUSEKI_URL -ErrorAction SilentlyContinue
   }
   Remove-Item Env:EARCRAWLER_ALLOW_UNSUPPORTED_MULTI_INSTANCE -ErrorAction SilentlyContinue
+
+  $apiPortOwners = Get-ListeningPortOwners -LocalPort $Port
+  if (@($apiPortOwners).Count -gt 0) {
+    $report.service_lifecycle.api_port_preflight.status = "occupied"
+    $report.service_lifecycle.api_port_preflight.owners = @($apiPortOwners)
+    $ownerSummary = @($apiPortOwners | ForEach-Object { "pid=$($_.pid) process=$($_.process_name)" }) -join "; "
+    throw "API port $Port is already occupied. $ownerSummary"
+  }
+  $report.service_lifecycle.api_port_preflight.status = "free"
 
   $apiProcess = Start-Process -FilePath $venvPython -ArgumentList @('-m', 'uvicorn', 'service.api_server.server:app', '--host', $ApiHost, '--port', $Port) -WorkingDirectory $workspace -PassThru -WindowStyle Hidden
 

@@ -61,6 +61,32 @@ function Invoke-Probe($Uri, $Method = 'GET', $ExpectStatus = 200, $Body = $null)
     }
 }
 
+function Get-ListeningPortOwners {
+    param([int]$LocalPort)
+
+    $netTcpCommand = Get-Command 'Get-NetTCPConnection' -ErrorAction SilentlyContinue
+    if (-not $netTcpCommand) {
+        return @()
+    }
+
+    $connections = Get-NetTCPConnection -State Listen -LocalPort $LocalPort -ErrorAction SilentlyContinue
+    if ($null -eq $connections) {
+        return @()
+    }
+
+    $owners = New-Object System.Collections.Generic.List[object]
+    foreach ($group in ($connections | Group-Object -Property OwningProcess)) {
+        $pidValue = [int]$group.Name
+        $proc = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
+        $owners.Add([ordered]@{
+            pid = $pidValue
+            process_name = if ($proc) { [string]$proc.ProcessName } else { "" }
+        })
+    }
+
+    return @($owners | Sort-Object -Property pid)
+}
+
 $healthUri = "$baseUrl/health"
 $health = Invoke-Probe -Uri $healthUri
 $report += "Health status: $($health.StatusCode) in $($health.DurationMs) ms"
@@ -71,6 +97,9 @@ if ($health.Body -and $health.Body.readiness) {
 }
 $healthBudgetOk = ($health.DurationMs -le $apiBudget)
 $report += "Health budget OK: $(if ($healthBudgetOk) { 'yes' } else { 'no' })"
+$listeners = Get-ListeningPortOwners -LocalPort $Port
+$listenerPids = @($listeners | ForEach-Object { [int]$_.pid })
+$report += "API listener PIDs: $(if ($listenerPids.Count -gt 0) { $listenerPids -join ', ' } else { 'none detected' })"
 
 $overall = ($health.StatusCode -eq 200) -and $ready -and $healthBudgetOk
 
@@ -138,6 +167,11 @@ if ($JsonReportPath) {
             readiness_pass = $ready
             budget_ok = $healthBudgetOk
             error = if ($health.Error) { [string]$health.Error } else { "" }
+        }
+        listeners = [ordered]@{
+            port = $Port
+            owners = @($listeners)
+            detected = ([bool](@($listeners).Count -gt 0))
         }
         search = $searchDetails
         overall_status = if ($overall) { 'passed' } else { 'failed' }

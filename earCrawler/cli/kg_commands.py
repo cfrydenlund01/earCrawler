@@ -29,10 +29,15 @@ def _resolve_sparql_client() -> type[SPARQLClient]:
     return SPARQLClient
 
 
+def _normalize_dataset(dataset: str) -> str:
+    try:
+        return fuseki.normalize_dataset_token(dataset)
+    except ValueError as exc:
+        raise click.BadParameter(str(exc)) from exc
+
+
 def _dataset_store_dir(db_dir: Path, dataset: str) -> Path:
-    token = str(dataset or "").strip()
-    if not token.startswith("/"):
-        raise click.BadParameter("dataset must start with '/'")
+    token = _normalize_dataset(dataset)
     relative = token.lstrip("/")
     return db_dir / Path(relative) if relative else db_dir
 
@@ -113,7 +118,8 @@ def kg_load(ttl: str, db: str, dataset: str, no_auto_install: bool) -> None:
 
     from earCrawler.kg.loader import load_tdb
 
-    target_db = _dataset_store_dir(Path(db), dataset)
+    dataset_token = _normalize_dataset(dataset)
+    target_db = _dataset_store_dir(Path(db), dataset_token)
     load_tdb(Path(ttl), target_db, auto_install=not no_auto_install)
     click.echo(f"Loaded {ttl} into TDB2 at {target_db}")
 
@@ -152,19 +158,22 @@ def kg_serve(
 ) -> None:
     """Serve the local TDB2 store with Fuseki."""
 
-    if not dataset.startswith("/"):
-        raise click.BadParameter("dataset must start with '/'")
-    cmd = fuseki.build_fuseki_cmd(Path(db), dataset, port, java_opts)
+    dataset_token = _normalize_dataset(dataset)
+    cmd = fuseki.build_fuseki_cmd(Path(db), dataset_token, port, java_opts)
     if dry_run:
         click.echo(" ".join(cmd))
         return
     try:
         proc = fuseki.start_fuseki(
-            Path(db), dataset=dataset, port=port, wait=not no_wait, java_opts=java_opts
+            Path(db),
+            dataset=dataset_token,
+            port=port,
+            wait=not no_wait,
+            java_opts=java_opts,
         )
     except RuntimeError as exc:
         raise click.ClickException(str(exc))
-    click.echo(f"Fuseki running at http://localhost:{port}{dataset}/sparql")
+    click.echo(f"Fuseki running at http://localhost:{port}{dataset_token}/sparql")
     if no_wait:
         return
     try:

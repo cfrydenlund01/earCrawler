@@ -190,3 +190,55 @@ def test_live_build_prefers_latest_ear_paragraph_version_per_identifier(
     ear_records = _read_jsonl(data_dir / "ear_corpus.jsonl")
     assert len(ear_records) == 1
     assert ear_records[0]["paragraph"] == "Updated paragraph text."
+
+
+def test_live_manifest_captures_search_snapshot_when_degraded(
+    tmp_path: Path, monkeypatch
+) -> None:
+    class SnapshotCrawler:
+        def __init__(self, _client, storage_dir: Path) -> None:
+            self.paragraphs_path = Path(storage_dir) / "ear_paragraphs.jsonl"
+
+        def run(self, _query: str) -> None:
+            # Simulate a failed crawl with no paragraphs written
+            self.paragraphs_path.parent.mkdir(parents=True, exist_ok=True)
+
+    class SnapshotFederalRegisterClient:
+        def __init__(self, *args, **kwargs) -> None:
+            self._snapshot = {
+                "search_documents": {
+                    "source": "federalregister",
+                    "operation": "search_documents",
+                    "state": "retry_exhausted",
+                    "message": "upstream timeout",
+                    "retry_attempts": 3,
+                }
+            }
+
+        def get_status_snapshot(self):
+            return self._snapshot
+
+        def get_document(self, _doc_number: str) -> dict:
+            return {}
+
+        def get_last_status(self, operation: str | None = None):
+            return None
+
+    monkeypatch.setattr("earCrawler.corpus.builder.EARCrawler", SnapshotCrawler)
+    monkeypatch.setattr(
+        "earCrawler.corpus.builder.FederalRegisterClient",
+        SnapshotFederalRegisterClient,
+    )
+    data_dir = tmp_path / "data"
+    manifest = build_corpus(["ear"], data_dir, live=True, fixtures=None)
+    upstream_status = manifest.get("upstream_status") or []
+    assert any(entry["operation"] == "search_documents" for entry in upstream_status)
+    search_entry = next(
+        entry for entry in upstream_status if entry["operation"] == "search_documents"
+    )
+    assert search_entry["state"] == "retry_exhausted"
+    on_disk = json.loads((data_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert any(
+        entry["operation"] == "search_documents"
+        for entry in on_disk.get("upstream_status", [])
+    )

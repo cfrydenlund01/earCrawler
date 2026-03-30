@@ -1,40 +1,15 @@
 {
-  "generated_at": "2026-03-26T23:00:24Z",
+  "generated_at": "2026-03-30T17:42:51Z",
   "files": [
     {
       "name": "ear_corpus.jsonl",
-      "records": 6736,
-      "sha256": "f0ccb231bf440d7050adb624539dffe4e862f7d8f512cfd858104e668d82d7b4"
+      "records": 4,
+      "sha256": "f13c3d53d1cc9e051657b63ebfb43f10df79eb359663f92f09d11ffca42a8571"
     },
     {
       "name": "nsf_corpus.jsonl",
-      "records": 239,
-      "sha256": "ad84c23b49c5a285a3b2c7536255aeefaf81d13bb1bebf32403883088462ddb8"
-    }
-  ],
-  "upstream_status": [
-    {
-      "source": "federalregister",
-      "operation": "get_document",
-      "state": "ok",
-      "timestamp": "2026-03-26T23:00:12.734404Z",
-      "result_count": 1,
-      "cache_hit": true,
-      "cache_age_seconds": 447.772
-    },
-    {
-      "source": "ori",
-      "operation": "get_case_html",
-      "state": "ok",
-      "timestamp": "2026-03-26T23:00:24.546350Z",
-      "result_count": 1
-    },
-    {
-      "source": "ori",
-      "operation": "get_listing_html",
-      "state": "ok",
-      "timestamp": "2026-03-26T23:00:13.668458Z",
-      "result_count": 1
+      "records": 2,
+      "sha256": "fc6c41c86e38ebb6e351ecaa807af4e4af867a4c32d0140e8f173ec592b4515a"
     }
   ]
 }

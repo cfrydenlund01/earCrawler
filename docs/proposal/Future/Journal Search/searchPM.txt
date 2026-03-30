@@ -1,0 +1,47 @@
+from Bio import Entrez
+
+def search_pubmed(title, author):
+    Entrez.email = "cfrydenlund@uttyler.edu"  # Always provide your email
+    Entrez.api_key = "7521274913f411a1a047fab02edc5c902d08"  # Optional: your NCBI API key if you have one
+
+    # Construct the query
+    query = f"{title}[Title] AND {author}[Author]"
+
+    # Perform the search
+    handle = Entrez.esearch(db="pubmed", term=query, retmax=10)
+    record = Entrez.read(handle)
+    handle.close()
+
+    if not record['IdList']:
+        print("No articles found.")
+        return
+
+    # Fetch details
+    handle = Entrez.efetch(db="pubmed", id=",".join(record['IdList']), retmode="xml")
+    articles = Entrez.read(handle)
+    handle.close()
+
+    for article in articles['PubmedArticle']:
+        # Extract the article title
+        title = article['MedlineCitation']['Article']['ArticleTitle']
+        print(f"Title: {title}")
+
+        # Extract the publication year
+        year = article['MedlineCitation']['Article']['Journal']['JournalIssue']['PubDate'].get('Year', 'No year listed')
+        print(f"Year: {year}\n")
+
+        # Extract authors and affiliations
+        authors = article['MedlineCitation']['Article']['AuthorList']
+        for author in authors:
+            last_name = author.get('LastName', 'No last name listed')
+            fore_name = author.get('ForeName', 'No fore name listed')
+            affiliation_info = author.get('AffiliationInfo', [])
+            affiliation = affiliation_info[0]['Affiliation'] if affiliation_info else 'No affiliation listed'
+            full_name = f"{fore_name} {last_name}"
+            print(f"Author: {full_name}")
+            print(f"Affiliation: {affiliation}\n")
+
+# Prompt user for article title and author name
+article_title = input("Enter keywords or part of the title to search: ")
+author_name = input("Enter the author's name or part of it to refine the search: ")
+search_pubmed(article_title, author_name)

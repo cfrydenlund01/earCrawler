@@ -132,6 +132,7 @@ class CorpusBuilder:
             live=self.live,
             out_dir=self.out_dir,
             fixtures=self.fixtures,
+            status_sink=self._capture_upstream_snapshot,
             query=EAR_QUERY,
             crawler_cls=self._ear_crawler_cls,
             fr_client_cls=self._fr_client_cls,

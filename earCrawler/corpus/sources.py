@@ -21,15 +21,23 @@ def read_ear_paragraphs(
     live: bool,
     out_dir: Path,
     fixtures: Path | None,
+    status_sink=None,
     query: str = EAR_QUERY,
     crawler_cls=EARCrawler,
     fr_client_cls=FederalRegisterClient,
     loader_cls=EARLoader,
 ) -> list[dict[str, str]]:
     if live:
-        crawler = crawler_cls(fr_client_cls(), out_dir / ".ear_crawler")
+        fr_client = fr_client_cls()
+        crawler = crawler_cls(fr_client, out_dir / ".ear_crawler")
         crawler.run(query)
         path = crawler.paragraphs_path
+        if callable(status_sink):
+            status_snapshot = getattr(fr_client, "get_status_snapshot", None)
+            if callable(status_snapshot):
+                snapshot = status_snapshot()
+                if snapshot:
+                    status_sink(snapshot)
         if not path.exists():
             return []
         latest_rows: dict[str, tuple[int, str, dict[str, str]]] = {}

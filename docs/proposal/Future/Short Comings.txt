@@ -1,0 +1,3 @@
+1) NDAA list not a part of CSL search - needs to be added to production CLI.
+2) Retraining at >15% document change, >15% document additions or subtractions, manually
+	- Before retraining, model could sort through document changes and additions, and note deletions, for updated result information
