@@ -629,7 +629,15 @@ Input artifacts needed before 7.1.b can run:
  - `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl`
  - `dist/training/current_training_config.json` (already populated from the template for reference)
 
-Those artifacts are gitignored by policy, so the next person to fetch the repo must copy the approved JSONL, FAISS metadata, and snapshot bundle into these paths before rerunning Step 7.1.b. Once they are present, rerun `.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only --use-4bit --require-qlora-4bit`.
+Those artifacts are mostly gitignored by policy:
+- `data/faiss/retrieval_corpus.jsonl`, `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl`, `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json`, and `dist/training/current_training_config.json` are generated or local-only and must be rebuilt in a fresh workspace.
+- `data/faiss/index.meta.json` is tracked in git and should come from the branch, not from a local reconstruction.
+
+Fastest recovery path on the CUDA host:
+1. Validate the approved offline snapshot first with `.venv\Scripts\python.exe -m earCrawler.cli rag-index validate-snapshot --snapshot snapshots/offline/<snapshot_id>/snapshot.jsonl`.
+2. Rebuild the canonical retrieval corpus from that snapshot with `.venv\Scripts\python.exe -m earCrawler.cli rag-index build-corpus --snapshot snapshots/offline/<snapshot_id>/snapshot.jsonl --out data/faiss/retrieval_corpus.jsonl`.
+3. If the local FAISS sidecar needs to be refreshed for verification, rebuild it from the canonical corpus with `.venv\Scripts\python.exe -m earCrawler.cli rag-index rebuild-index --corpus data/faiss/retrieval_corpus.jsonl --out-base dist/index`.
+4. Recreate `dist/training/current_training_config.json` from `config/training_first_pass.example.json` and the current approved snapshot/corpus values, then rerun `.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only --use-4bit --require-qlora-4bit`.
 
 Engineer reference map:
 - Training runner code:
