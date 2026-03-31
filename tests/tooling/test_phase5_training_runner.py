@@ -184,6 +184,67 @@ def test_phase5_training_runner_prepare_only_writes_manifest_and_metadata(
     assert metadata["qlora"]["effective_use_4bit"] is None
 
 
+def test_phase5_training_runner_prepare_only_supports_qlora_packaging_without_runtime_cuda(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    index_meta = tmp_path / "index.meta.json"
+    _write_index_meta(
+        index_meta,
+        corpus_digest=_sha256_file(corpus),
+        doc_count=2,
+    )
+    contract = tmp_path / "training_input_contract.json"
+    _write_training_contract(contract, corpus=corpus, index_meta=index_meta)
+
+    out_root = tmp_path / "dist_training"
+    run_id = "phase5-prepare-only-qlora"
+    proc = _run_prepare_only(
+        corpus=corpus,
+        out_root=out_root,
+        run_id=run_id,
+        contract=contract,
+        index_meta=index_meta,
+        use_4bit=True,
+        require_qlora_4bit=True,
+    )
+    assert proc.returncode == 0, proc.stdout
+
+    metadata_path = out_root / run_id / "run_metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    assert metadata["status"] == "prepare_only"
+    assert metadata["qlora"]["required"] is True
+    assert metadata["qlora"]["requested_use_4bit"] is True
+    assert metadata["qlora"]["effective_use_4bit"] is None
+    assert metadata["qlora"]["evidence_status"] == "not_executed_prepare_only"
+
+
+def test_phase5_training_runner_reports_missing_retrieval_corpus_as_preflight_failure(
+    tmp_path: Path,
+) -> None:
+    missing_corpus = tmp_path / "missing_retrieval_corpus.jsonl"
+    index_meta = tmp_path / "index.meta.json"
+    _write_index_meta(
+        index_meta,
+        corpus_digest="0" * 64,
+        doc_count=0,
+    )
+    contract = tmp_path / "training_input_contract.json"
+    _write_training_contract(contract, corpus=missing_corpus, index_meta=index_meta)
+
+    proc = _run_prepare_only(
+        corpus=missing_corpus,
+        out_root=tmp_path / "dist_training",
+        run_id="phase5-missing-corpus",
+        contract=contract,
+        index_meta=index_meta,
+    )
+
+    assert proc.returncode == 2
+    assert "Training corpus preflight failed: Retrieval corpus not found:" in proc.stdout
+
+
 def test_phase5_training_runner_fails_when_contract_corpus_path_mismatches(
     tmp_path: Path,
 ) -> None:

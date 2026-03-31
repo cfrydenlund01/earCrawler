@@ -28,6 +28,13 @@ artifacts and run metadata in a deterministic layout.
 
 ## Repeatable commands
 
+Step 7.1 environment prep (no training):
+
+```powershell
+pwsh .\scripts\training\prepare_qlora_env.ps1 `
+  -TorchMode auto
+```
+
 PowerShell wrapper:
 
 ```powershell
@@ -38,7 +45,7 @@ pwsh .\scripts\training\run_phase5_finetune.ps1 `
 Direct Python invocation:
 
 ```powershell
-py scripts/training/run_phase5_finetune.py `
+.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py `
   --config config/training_first_pass.example.json `
   --snapshot-manifest snapshots/offline/<snapshot_id>/manifest.json `
   --retrieval-corpus data/faiss/retrieval_corpus.jsonl `
@@ -49,7 +56,7 @@ py scripts/training/run_phase5_finetune.py `
 Prepare-only package generation (no training):
 
 ```powershell
-py scripts/training/run_phase5_finetune.py `
+.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py `
   --config config/training_first_pass.example.json `
   --prepare-only
 ```
@@ -57,7 +64,7 @@ py scripts/training/run_phase5_finetune.py `
 Standalone inference smoke for a previously produced adapter:
 
 ```powershell
-py scripts/training/inference_smoke.py `
+.venv\Scripts\python.exe scripts/training/inference_smoke.py `
   --base-model Qwen/Qwen2.5-7B-Instruct `
   --adapter-dir dist/training/<run_id>/adapter `
   --out dist/training/<run_id>/inference_smoke.rerun.json
@@ -73,7 +80,7 @@ pwsh .\scripts\local_adapter_smoke.ps1 `
 Release-evidence bundle validation:
 
 ```powershell
-py -m scripts.eval.validate_local_adapter_release_bundle `
+.venv\Scripts\python.exe -m scripts.eval.validate_local_adapter_release_bundle `
   --run-dir dist/training/<run_id> `
   --benchmark-summary dist/benchmarks/<benchmark_run_id>/benchmark_summary.json `
   --smoke-report kg/reports/local-adapter-smoke.json
@@ -82,7 +89,7 @@ py -m scripts.eval.validate_local_adapter_release_bundle `
 Reviewable candidate bundle assembly:
 
 ```powershell
-py -m scripts.eval.build_local_adapter_candidate_bundle `
+.venv\Scripts\python.exe -m scripts.eval.build_local_adapter_candidate_bundle `
   --run-dir dist/training/<run_id> `
   --benchmark-summary dist/benchmarks/<benchmark_run_id>/benchmark_summary.json `
   --smoke-report kg/reports/local-adapter-smoke.json
@@ -91,11 +98,16 @@ py -m scripts.eval.build_local_adapter_candidate_bundle `
 ## Runtime expectations
 
 - `--prepare-only` is CPU-safe and only builds deterministic package artifacts.
+- `scripts/training/prepare_qlora_env.ps1` can auto-detect NVIDIA GPUs and apply
+  a CUDA torch build (`-TorchMode auto`), or print manual torch commands
+  (`-TorchMode manual`).
 - The runner performs a preflight before packaging/training and fails when the
   configured corpus path does not match the training input contract, or when
   corpus digest/document count do not match `data/faiss/index.meta.json`.
 - For the first 7B production-candidate path, QLoRA is required
   (`require_qlora_4bit=true` and `use_4bit=true`).
+- QLoRA runtime preflight (`torch.cuda.is_available()==true` and at least one
+  CUDA device) is enforced for non-`--prepare-only` runs before training starts.
 - Full fine-tuning for a 7B model is expected to run on a CUDA-capable host.
 - The runner records machine-checkable QLoRA evidence in
   `run_metadata.json` (`qlora.required`, `qlora.requested_use_4bit`,

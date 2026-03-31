@@ -963,7 +963,11 @@ def main(argv: list[str] | None = None) -> int:
     start_utc = _utc_now_iso()
     retrieval_corpus_path = Path(args.retrieval_corpus).resolve()
     if not retrieval_corpus_path.exists():
-        raise FileNotFoundError(f"Retrieval corpus not found: {retrieval_corpus_path}")
+        print(
+            f"Training corpus preflight failed: Retrieval corpus not found: {retrieval_corpus_path}",
+            file=sys.stderr,
+        )
+        return 2
     training_input_contract_path = Path(args.training_input_contract).resolve()
     index_meta_path = Path(args.index_meta).resolve()
     try:
@@ -1000,11 +1004,12 @@ def main(argv: list[str] | None = None) -> int:
             use_4bit=bool(args.use_4bit),
             base_model=str(args.base_model),
         )
-        _validate_qlora_runtime_preflight(
-            require_qlora_4bit=bool(args.require_qlora_4bit),
-            use_4bit=bool(args.use_4bit),
-            base_model=str(args.base_model),
-        )
+        if not bool(args.prepare_only):
+            _validate_qlora_runtime_preflight(
+                require_qlora_4bit=bool(args.require_qlora_4bit),
+                use_4bit=bool(args.use_4bit),
+                base_model=str(args.base_model),
+            )
     except ValueError as exc:
         print(f"Training QLoRA preflight failed: {exc}", file=sys.stderr)
         return 2

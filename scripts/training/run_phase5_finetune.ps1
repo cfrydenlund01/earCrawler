@@ -3,13 +3,32 @@ $ErrorActionPreference = "Stop"
 
 param(
     [string]$ConfigPath = "config/training_first_pass.example.json",
-    [switch]$PrepareOnly
+    [switch]$PrepareOnly,
+    [string]$PythonExecutable = ""
 )
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 Set-Location $repoRoot
 
-$python = if ($env:EARCTL_PYTHON) { $env:EARCTL_PYTHON } else { "py" }
+function Resolve-PythonCommand {
+    param(
+        [Parameter(Mandatory = $true)][string]$RepoRoot,
+        [Parameter(Mandatory = $false)][string]$ExplicitPython
+    )
+    if ($ExplicitPython) {
+        return $ExplicitPython
+    }
+    if ($env:EARCTL_PYTHON) {
+        return $env:EARCTL_PYTHON
+    }
+    $venvPython = Join-Path $RepoRoot ".venv\Scripts\python.exe"
+    if (Test-Path $venvPython) {
+        return $venvPython
+    }
+    return "py"
+}
+
+$python = Resolve-PythonCommand -RepoRoot $repoRoot -ExplicitPython $PythonExecutable
 $cmd = @(
     "scripts/training/run_phase5_finetune.py",
     "--config", $ConfigPath

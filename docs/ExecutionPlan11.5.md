@@ -572,6 +572,22 @@ py scripts/training/run_phase5_finetune.py `
   --use-4bit
 ```
 
+Step 7.1 task breakdown before launching full training:
+
+1. `7.1.a` Prepare the venv for CUDA-capable QLoRA execution (auto-apply when available; support manual mode):
+```powershell
+pwsh .\scripts\training\prepare_qlora_env.ps1 `
+  -TorchMode auto
+```
+2. `7.1.b` Rebuild the deterministic run package with QLoRA-required config and metadata, but do not start training:
+```powershell
+.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py `
+  --config config/training_first_pass.example.json `
+  --prepare-only `
+  --use-4bit `
+  --require-qlora-4bit
+```
+
 ### Step 7.2 - Re-Run Standalone And API Runtime Smokes
 Explanation: a candidate is not reviewable unless both the adapter artifact and
 the supported `/v1/rag/answer` runtime path work.

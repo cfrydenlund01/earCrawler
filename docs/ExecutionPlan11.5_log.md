@@ -612,6 +612,25 @@ Step 7.1 status note:
   torch/GPU), not by a silent or ambiguous hang. Next action is to run Step 7.1
   on a CUDA-capable host with a CUDA-enabled torch build.
 
+Step 7.1 task breakdown (active):
+- `7.1.a` Prepare training environment and venv CUDA readiness:
+  - run `pwsh .\scripts\training\prepare_qlora_env.ps1 -TorchMode auto`
+  - if CUDA auto-apply is not desired, run `-TorchMode manual` and apply the
+    printed torch install command explicitly
+- `7.1.b` Prepare QLoRA candidate package without starting training:
+  - run `.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py --config config/training_first_pass.example.json --prepare-only --use-4bit --require-qlora-4bit`
+  - verify `dist/training/<run_id>/run_config.json` and `run_metadata.json`
+    record `qlora.required=true` and requested 4-bit evidence fields
+
+Input artifacts needed before 7.1.b can run:
+ - `data/faiss/retrieval_corpus.jsonl`
+ - `data/faiss/index.meta.json`
+ - `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json`
+ - `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl`
+ - `dist/training/current_training_config.json` (already populated from the template for reference)
+
+Those artifacts are gitignored by policy, so the next person to fetch the repo must copy the approved JSONL, FAISS metadata, and snapshot bundle into these paths before rerunning Step 7.1.b. Once they are present, rerun `.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only --use-4bit --require-qlora-4bit`.
+
 Engineer reference map:
 - Training runner code:
   - `scripts/training/run_phase5_finetune.py`
