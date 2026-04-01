@@ -20,10 +20,32 @@ def _run_smoke(
     prompt: str,
     max_new_tokens: int,
     allow_pt_bin: bool,
+    load_in_4bit: bool,
 ) -> dict[str, Any]:
     import torch
     from peft import PeftModel
     from transformers import AutoModelForCausalLM, AutoTokenizer
+
+    quantization_config = None
+    if load_in_4bit:
+        try:
+            from transformers import BitsAndBytesConfig
+        except ImportError as exc:  # pragma: no cover - defensive guard
+            raise RuntimeError(
+                "BitsAndBytes is required for 4-bit inference. Install bitsandbytes."
+            ) from exc
+
+        dtype = (
+            torch.bfloat16
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+            else torch.float16
+        )
+        quantization_config = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=dtype,
+            bnb_4bit_use_double_quant=True,
+            bnb_4bit_quant_type="nf4",
+        )
 
     tokenizer = AutoTokenizer.from_pretrained(str(adapter_dir), trust_remote_code=True)
     if tokenizer.pad_token is None:
@@ -33,6 +55,10 @@ def _run_smoke(
         "trust_remote_code": True,
         "use_safetensors": not allow_pt_bin,
     }
+    if quantization_config:
+        model_kwargs["quantization_config"] = quantization_config
+        model_kwargs["device_map"] = "auto"
+        model_kwargs["low_cpu_mem_usage"] = True
     if torch.cuda.is_available():
         model_kwargs["device_map"] = "auto"
         if torch.cuda.is_bf16_supported():
@@ -91,6 +117,12 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--load-in-4bit",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Load the base model in 4-bit mode (requires bitsandbytes).",
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=Path("dist") / "training" / "inference_smoke.json",
@@ -107,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
         prompt=str(args.prompt),
         max_new_tokens=int(args.max_new_tokens),
         allow_pt_bin=bool(args.allow_pt_bin),
+        load_in_4bit=bool(args.load_in_4bit),
     )
     _write_json(args.out.resolve(), report)
     print(f"Wrote {args.out}")

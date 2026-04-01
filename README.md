@@ -337,6 +337,59 @@ Windows retrieval smoke:
 
 ---
 
+## Offline Snapshot, Corpus, and Training Inputs
+
+These artifacts are generated or local-only and should be rebuilt in a fresh workspace instead of hand-edited:
+
+- `snapshots/offline/<snapshot_id>/snapshot.jsonl`
+- `snapshots/offline/<snapshot_id>/manifest.json`
+- `data/faiss/retrieval_corpus.jsonl`
+- `data/faiss/index.meta.json` (tracked metadata sidecar that must match the corpus digest)
+- `dist/training/current_training_config.json`
+
+For the current approved Phase 3/6 snapshot used by the training contract, the workspace convention is:
+`snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/`
+
+Rebuild the chain in this order:
+
+1. Fetch or regenerate the offline snapshot payload and manifest.
+   ```powershell
+   $env:EARCRAWLER_ALLOW_NETWORK = '1'
+   .venv\Scripts\python.exe -m earCrawler.cli rag-index fetch-ecfr `
+     --title 15 `
+     --part 736 --part 740 --part 742 --part 744 --part 746 `
+     --snapshot-id ecfr_current_20260210_1627_parts_736_740_742_744_746 `
+     --out snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl `
+     --manifest-out snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json
+   ```
+2. Validate the snapshot before downstream builds.
+   ```powershell
+   .venv\Scripts\python.exe -m earCrawler.cli rag-index validate-snapshot `
+     --snapshot snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl
+   ```
+3. Rebuild the canonical retrieval corpus.
+   ```powershell
+   .venv\Scripts\python.exe -m earCrawler.cli rag-index build-corpus `
+     --snapshot snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl `
+     --out data/faiss/retrieval_corpus.jsonl
+   ```
+4. Refresh the local FAISS sidecar only if you need a fresh smoke-verified index.
+   ```powershell
+   .venv\Scripts\python.exe -m earCrawler.cli rag-index rebuild-index `
+     --corpus data/faiss/retrieval_corpus.jsonl `
+     --out-base dist/index `
+     --smoke-query "General prohibitions" `
+     --expect-section EAR-736.2
+   ```
+5. Recreate the first-pass training config from the checked-in template.
+   ```powershell
+   Copy-Item config/training_first_pass.example.json dist/training/current_training_config.json -Force
+   ```
+
+The first-pass training runner expects the snapshot, corpus, and FAISS metadata chain to be present before `--prepare-only` or a real pass is attempted.
+
+---
+
 ## RAG + Remote LLM Evaluation
 
 You can score the existing eval datasets (`eval/*.jsonl`) through the RAG pipeline using remote providers (Groq or NVIDIA NIM). Remote calls are gated by `EARCRAWLER_ENABLE_REMOTE_LLM=1` and provider API keys in `config/llm_secrets.env` or your environment. The defaults come from `earCrawler/config/llm_secrets.py` and remain provider-agnostic/configurable via environment overrides if a default remote model changes.

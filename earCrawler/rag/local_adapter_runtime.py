@@ -95,12 +95,31 @@ def _load_local_stack(
     tokenizer = AutoTokenizer.from_pretrained(str(adapter_path), trust_remote_code=True)
 
     model_kwargs: dict[str, Any] = {"trust_remote_code": True}
+    quantization_config = None
     if device_name == "cuda":
         if getattr(torch.cuda, "is_available", lambda: False)():
-            if getattr(torch.cuda, "is_bf16_supported", lambda: False)():
-                model_kwargs["torch_dtype"] = torch.bfloat16
-            else:
-                model_kwargs["torch_dtype"] = torch.float16
+            try:
+                from transformers import BitsAndBytesConfig
+            except ImportError as exc:  # pragma: no cover - defensive guard
+                raise LLMProviderError(
+                    "BitsAndBytes is required for local adapter CUDA inference. "
+                    "Install the optional GPU/runtime extras before enabling local adapters."
+                ) from exc
+
+            dtype = (
+                torch.bfloat16
+                if getattr(torch.cuda, "is_bf16_supported", lambda: False)()
+                else torch.float16
+            )
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_compute_dtype=dtype,
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_quant_type="nf4",
+            )
+            model_kwargs["quantization_config"] = quantization_config
+            model_kwargs["device_map"] = "auto"
+            model_kwargs["low_cpu_mem_usage"] = True
         else:
             raise LLMProviderError(
                 "EARCRAWLER_LOCAL_LLM_DEVICE=cuda requested but CUDA is not available."
@@ -126,6 +145,22 @@ def _resolve_device_name() -> str:
     return "cuda" if getattr(torch.cuda, "is_available", lambda: False)() else "cpu"
 
 
+def _resolve_generation_limits() -> tuple[int, float | None]:
+    max_new_tokens = max(32, int(os.getenv("EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS", "64")))
+    raw_max_time = str(os.getenv("EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS", "20")).strip()
+    if not raw_max_time:
+        return max_new_tokens, None
+    try:
+        max_time = float(raw_max_time)
+    except ValueError as exc:  # pragma: no cover - defensive env guard
+        raise LLMProviderError(
+            "EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS must be a positive number."
+        ) from exc
+    if max_time <= 0:
+        return max_new_tokens, None
+    return max_new_tokens, max_time
+
+
 def generate_local_chat(
     messages: Sequence[dict[str, str]],
     *,
@@ -139,17 +174,34 @@ def generate_local_chat(
         device_name,
     )
     prompt_text = _chat_prompt_text(messages, tokenizer)
-    max_new_tokens = max(32, int(os.getenv("EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS", "256")))
+    max_new_tokens, max_time = _resolve_generation_limits()
 
     inputs = tokenizer(prompt_text, return_tensors="pt")
     if hasattr(model, "device"):
         inputs = {key: value.to(model.device) for key, value in inputs.items()}
-    generated = model.generate(
-        **inputs,
-        do_sample=False,
-        max_new_tokens=max_new_tokens,
-        pad_token_id=getattr(tokenizer, "eos_token_id", None),
-    )
+    generate_kwargs: dict[str, Any] = {
+        "do_sample": False,
+        "max_new_tokens": max_new_tokens,
+        "pad_token_id": getattr(tokenizer, "eos_token_id", None),
+    }
+    if max_time is not None:
+        generate_kwargs["max_time"] = max_time
+    try:
+        import torch
+    except ImportError:  # pragma: no cover - optional dependency guard
+        torch = None
+
+    if torch is not None and hasattr(torch, "inference_mode"):
+        with torch.inference_mode():
+            generated = model.generate(
+                **inputs,
+                **generate_kwargs,
+            )
+    else:
+        generated = model.generate(
+            **inputs,
+            **generate_kwargs,
+        )
     prompt_len = int(inputs["input_ids"].shape[-1])
     continuation = generated[0][prompt_len:]
     text = str(tokenizer.decode(continuation, skip_special_tokens=True)).strip()

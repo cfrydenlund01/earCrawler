@@ -86,9 +86,12 @@ function Get-ListeningPortOwners {
         $pidValue = [int]$group.Name
         $proc = Get-Process -Id $pidValue -ErrorAction SilentlyContinue
         $processName = if ($proc) { [string]$proc.ProcessName } else { "" }
+        $cim = Get-CimInstance Win32_Process -Filter ("ProcessId = {0}" -f $pidValue) -ErrorAction SilentlyContinue
+        $commandLine = if ($cim) { [string]$cim.CommandLine } else { "" }
         $owners.Add([ordered]@{
             pid = $pidValue
             process_name = $processName
+            command_line = $commandLine
         })
     }
     return @($owners | Sort-Object -Property pid)
@@ -208,7 +211,34 @@ foreach ($targetPid in $targetPids) {
 Remove-ApiStateArtifacts -PidPath $pidFile -StatePath $stateFile
 
 if ($portValue) {
-    $owners = Get-ListeningPortOwners -LocalPort $portValue
+    $owners = @()
+    $deadline = (Get-Date).AddSeconds(10)
+    do {
+        $owners = Get-ListeningPortOwners -LocalPort $portValue
+        if (@($owners).Count -eq 0) {
+            break
+        }
+        Start-Sleep -Milliseconds 300
+    } while ((Get-Date) -lt $deadline)
+
+    $managedPortOwners = @(
+        $owners | Where-Object {
+            [string]$_.command_line -match 'service\.api_server\.server:app'
+        }
+    )
+    foreach ($owner in $managedPortOwners) {
+        Stop-ProcessTree -RootProcessId ([int]$owner.pid) -Label 'managed API port owner'
+    }
+    if (@($managedPortOwners).Count -gt 0) {
+        $deadline = (Get-Date).AddSeconds(10)
+        do {
+            $owners = Get-ListeningPortOwners -LocalPort $portValue
+            if (@($owners).Count -eq 0) {
+                break
+            }
+            Start-Sleep -Milliseconds 300
+        } while ((Get-Date) -lt $deadline)
+    }
     $lifecycle.remaining_port_owners = @($owners)
 }
 

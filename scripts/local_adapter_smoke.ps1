@@ -61,6 +61,7 @@ try {
         -Method Post `
         -Headers @{ 'Content-Type' = 'application/json' } `
         -Body $payload `
+        -TimeoutSec 180 `
         -UseBasicParsing
 
     $result = $response.Content | ConvertFrom-Json

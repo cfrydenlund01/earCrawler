@@ -21,6 +21,42 @@ def _provider_cfg(*, base_model: str, adapter_dir: Path | str) -> ProviderConfig
     )
 
 
+class _FakeTensor(list):
+    @property
+    def shape(self) -> tuple[int, int]:
+        return (1, len(self[0]))
+
+    def to(self, _device: str) -> "_FakeTensor":
+        return self
+
+
+class _FakeTokenizer:
+    eos_token = ""
+    eos_token_id = 99
+
+    def __call__(self, _prompt: str, return_tensors: str = "pt") -> dict[str, _FakeTensor]:
+        assert return_tensors == "pt"
+        return {"input_ids": _FakeTensor([[1, 2, 3]])}
+
+    def decode(self, _tokens, skip_special_tokens: bool = True) -> str:
+        assert skip_special_tokens is True
+        return "generated answer"
+
+
+class _FakeModel:
+    device = "cpu"
+
+    def __init__(self) -> None:
+        self.generate_kwargs: dict[str, object] | None = None
+
+    def generate(self, **kwargs):
+        self.generate_kwargs = kwargs
+        return [[1, 2, 3, 4, 5]]
+
+    def eval(self) -> None:
+        return None
+
+
 def test_resolve_local_adapter_artifacts_requires_base_model(tmp_path: Path) -> None:
     adapter_dir = tmp_path / "run" / "adapter"
     adapter_dir.mkdir(parents=True)
@@ -54,3 +90,57 @@ def test_resolve_local_adapter_artifacts_rejects_base_model_mismatch(
     cfg = _provider_cfg(base_model="Qwen/Qwen2.5-7B-Instruct", adapter_dir=adapter_dir)
     with pytest.raises(LLMProviderError, match="base model mismatch"):
         local_adapter_runtime.resolve_local_adapter_artifacts(cfg)
+
+
+def test_resolve_generation_limits_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS", raising=False)
+    monkeypatch.delenv("EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS", raising=False)
+
+    max_new_tokens, max_time = local_adapter_runtime._resolve_generation_limits()
+
+    assert max_new_tokens == 64
+    assert max_time == 20.0
+
+
+def test_generate_local_chat_applies_generation_limits(monkeypatch) -> None:
+    fake_model = _FakeModel()
+    fake_tokenizer = _FakeTokenizer()
+
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS", "96")
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS", "12.5")
+    monkeypatch.setattr(
+        local_adapter_runtime,
+        "resolve_local_adapter_artifacts",
+        lambda _provider_cfg: local_adapter_runtime.LocalAdapterArtifacts(
+            adapter_dir=Path("adapter"),
+            run_dir=Path("run"),
+            base_model="Qwen/Qwen2.5-7B-Instruct",
+            model_label="run-1",
+        ),
+    )
+    monkeypatch.setattr(local_adapter_runtime, "_resolve_device_name", lambda: "cpu")
+    monkeypatch.setattr(
+        local_adapter_runtime,
+        "_load_local_stack",
+        lambda *_args: (fake_tokenizer, fake_model, ""),
+    )
+
+    result = local_adapter_runtime.generate_local_chat(
+        [{"role": "user", "content": "Q?"}],
+        provider_cfg=ProviderConfig(
+            provider="local_adapter",
+            api_key="",
+            model="run-1",
+            base_url="",
+            base_model="Qwen/Qwen2.5-7B-Instruct",
+            adapter_dir="adapter",
+            execution_mode="local",
+        ),
+    )
+
+    assert result == "generated answer"
+    assert fake_model.generate_kwargs is not None
+    assert fake_model.generate_kwargs["max_new_tokens"] == 96
+    assert fake_model.generate_kwargs["max_time"] == 12.5
+    assert fake_model.generate_kwargs["do_sample"] is False
+    assert fake_model.generate_kwargs["pad_token_id"] == 99

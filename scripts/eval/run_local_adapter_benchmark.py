@@ -35,6 +35,21 @@ TRAINING_MANIFEST_VERSION = "training-package.v1"
 RUN_METADATA_VERSION = "training-run-metadata.v1"
 
 
+def _transport_error_kind(*, status_code: int, error: str | None) -> str | None:
+    if int(status_code or 0) != 0:
+        return None
+    message = str(error or "").strip().lower()
+    if not message:
+        return "transport_error"
+    if "read timed out" in message or "read timeout" in message:
+        return "read_timeout"
+    if "actively refused" in message or "winerror 10061" in message:
+        return "connection_refused"
+    if "forcibly closed" in message or "connectionreseterror" in message or "winerror 10054" in message:
+        return "connection_reset"
+    return "transport_error"
+
+
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -71,6 +86,24 @@ def _json_sha256(payload: Mapping[str, Any]) -> str:
 
 def _copy_json(src: Path, dst: Path) -> None:
     _write_json(dst, _read_json(src))
+
+
+def _probe_health(
+    *,
+    session: requests.Session,
+    base_url: str,
+    api_key: str | None,
+    timeout: float,
+) -> tuple[bool, int | None, str | None]:
+    url = f"{base_url.rstrip('/')}/health"
+    headers = {"Accept": "application/json"}
+    if api_key:
+        headers["X-Api-Key"] = api_key
+    try:
+        resp = session.get(url, headers=headers, timeout=float(timeout))
+    except Exception as exc:
+        return False, None, str(exc)
+    return int(resp.status_code) == 200, int(resp.status_code), None
 
 
 def _resolve_schema_path(manifest_path: Path) -> Path:
@@ -270,6 +303,47 @@ def _call_answer(
     return int(resp.status_code), body, latency_ms, None
 
 
+def _warm_local_adapter(
+    *,
+    session: requests.Session,
+    base_url: str,
+    api_key: str | None,
+    query: str,
+    top_k: int,
+    timeout: float,
+) -> dict[str, Any]:
+    status, payload, latency_ms, error = _call_answer(
+        session=session,
+        base_url=base_url,
+        api_key=api_key,
+        query=query,
+        top_k=top_k,
+        generate=True,
+        timeout=timeout,
+    )
+    provider = str(payload.get("provider") or "").strip().lower()
+    transport_error = _transport_error_kind(status_code=status, error=error)
+    ok = transport_error is None and status in {200, 422}
+    if ok and status == 200 and provider and provider != "local_adapter":
+        ok = False
+        error = f"unexpected provider={provider}"
+    return {
+        "status": "passed" if ok else "failed",
+        "query": query,
+        "top_k": int(top_k),
+        "timeout_seconds": float(timeout),
+        "status_code": status,
+        "latency_ms": latency_ms,
+        "transport_error": transport_error,
+        "error": error,
+        "provider": payload.get("provider"),
+        "model": payload.get("model"),
+        "trace_id": payload.get("trace_id"),
+        "output_ok": payload.get("output_ok"),
+        "output_error": payload.get("output_error"),
+    }
+
+
 def _score_dataset(
     *,
     manifest: dict[str, Any],
@@ -302,6 +376,8 @@ def _score_dataset(
     request_503 = 0
     request_failed = 0
     strict_output_failures = 0
+    transport_failures = 0
+    transport_error_kinds: dict[str, int] = {}
     latencies: list[float] = []
     grounded_counts = {
         "items": 0,
@@ -320,6 +396,8 @@ def _score_dataset(
         payload = response.get("payload") if isinstance(response.get("payload"), Mapping) else {}
         payload = dict(payload or {})
         lat = float(response.get("latency_ms") or 0.0)
+        error = str(response.get("error") or "").strip() or None
+        transport_error = _transport_error_kind(status_code=status, error=error)
         latencies.append(lat)
         if status == 422:
             request_422 += 1
@@ -327,6 +405,9 @@ def _score_dataset(
             request_503 += 1
         if status >= 400 or status == 0:
             request_failed += 1
+        if transport_error:
+            transport_failures += 1
+            transport_error_kinds[transport_error] = int(transport_error_kinds.get(transport_error) or 0) + 1
         output_ok = bool(payload.get("output_ok"))
         if status == 422 or not output_ok:
             strict_output_failures += 1
@@ -384,7 +465,8 @@ def _score_dataset(
                 "citation_recall": citation.recall,
                 "citation_f1": citation.f1,
                 "groundedness_ok": bool(grounded.get("ok")),
-                "error": response.get("error"),
+                "transport_error": transport_error,
+                "error": error,
             }
         )
 
@@ -397,6 +479,9 @@ def _score_dataset(
         "strict_output_failure_count": strict_output_failures,
         "strict_output_failure_rate": (strict_output_failures / total) if total else 0.0,
         "request_failure_rate": (request_failed / total) if total else 0.0,
+        "transport_failure_count": transport_failures,
+        "transport_failure_rate": (transport_failures / total) if total else 0.0,
+        "transport_error_kinds": transport_error_kinds,
         "request_422_count": request_422,
         "request_422_rate": (request_422 / total) if total else 0.0,
         "request_503_count": request_503,
@@ -412,13 +497,17 @@ def _score_dataset(
 def _aggregate(metrics: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     total_items = sum(int(m.get("num_items") or 0) for m in metrics)
     strict_output_failures = sum(int(m.get("strict_output_failure_count") or 0) for m in metrics)
+    transport_failures = sum(int(m.get("transport_failure_count") or 0) for m in metrics)
     request_422 = sum(int(m.get("request_422_count") or 0) for m in metrics)
     request_503 = sum(int(m.get("request_503_count") or 0) for m in metrics)
     weighted = lambda key: sum(float(m.get(key) or 0.0) * int(m.get("num_items") or 0) for m in metrics) / total_items if total_items else 0.0
     all_latencies: list[float] = []
     providers: set[str] = set()
     models: set[str] = set()
+    transport_error_kinds: dict[str, int] = {}
     for metric in metrics:
+        for key, value in (metric.get("transport_error_kinds") or {}).items():
+            transport_error_kinds[str(key)] = int(transport_error_kinds.get(str(key)) or 0) + int(value or 0)
         for row in metric.get("items") or []:
             try:
                 all_latencies.append(float(row.get("latency_ms") or 0.0))
@@ -435,6 +524,9 @@ def _aggregate(metrics: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
         "unanswerable_accuracy": weighted("unanswerable_accuracy"),
         "strict_output_failure_count": strict_output_failures,
         "strict_output_failure_rate": (strict_output_failures / total_items) if total_items else 0.0,
+        "transport_failure_count": transport_failures,
+        "transport_failure_rate": (transport_failures / total_items) if total_items else 0.0,
+        "transport_error_kinds": transport_error_kinds,
         "request_422_count": request_422,
         "request_422_rate": (request_422 / total_items) if total_items else 0.0,
         "request_503_count": request_503,
@@ -473,6 +565,7 @@ def _render_summary_md(summary: Mapping[str, Any]) -> str:
                 f"- Supported rate: `{float(metric.get('supported_rate') or 0.0):.4f}`",
                 f"- Overclaim rate: `{float(metric.get('overclaim_rate') or 0.0):.4f}`",
                 f"- Strict-output failure rate: `{float(metric.get('strict_output_failure_rate') or 0.0):.4f}`",
+                f"- Transport failure rate: `{float(metric.get('transport_failure_rate') or 0.0):.4f}`",
                 f"- Request 422 / 503 rates: `{float(metric.get('request_422_rate') or 0.0):.4f}` / `{float(metric.get('request_503_rate') or 0.0):.4f}`",
                 f"- Latency p50/p95 ms: `{lat.get('p50')}` / `{lat.get('p95')}`",
                 "",
@@ -491,6 +584,9 @@ def _compute_benchmark_config(
     answer_score_mode: str,
     semantic_threshold: float,
     timeout_seconds: float,
+    local_adapter_warmup: bool,
+    local_adapter_warmup_query: str,
+    local_adapter_warmup_timeout_seconds: float,
     require_smoke: bool,
     include_retrieval_control: bool,
     smoke_report_path: Path,
@@ -508,6 +604,9 @@ def _compute_benchmark_config(
         "answer_score_mode": str(answer_score_mode),
         "semantic_threshold": float(semantic_threshold),
         "timeout_seconds": float(timeout_seconds),
+        "local_adapter_warmup": bool(local_adapter_warmup),
+        "local_adapter_warmup_query": str(local_adapter_warmup_query),
+        "local_adapter_warmup_timeout_seconds": float(local_adapter_warmup_timeout_seconds),
         "require_smoke": bool(require_smoke),
         "include_retrieval_control": bool(include_retrieval_control),
         "smoke_report_path": str(smoke_report_path),
@@ -534,12 +633,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--max-items", type=int, default=None)
     parser.add_argument("--answer-score-mode", choices=["semantic", "normalized", "exact"], default="semantic")
     parser.add_argument("--semantic-threshold", type=float, default=0.6)
-    parser.add_argument("--timeout-seconds", type=float, default=30.0)
+    parser.add_argument("--timeout-seconds", type=float, default=120.0)
+    parser.add_argument("--local-adapter-warmup", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--local-adapter-warmup-query", default="Do laptops to France need a license?")
+    parser.add_argument("--local-adapter-warmup-timeout-seconds", type=float, default=120.0)
     parser.add_argument("--out-root", type=Path, default=Path("dist") / "benchmarks")
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--smoke-report", type=Path, default=Path("kg") / "reports" / "local-adapter-smoke.json")
     parser.add_argument("--require-smoke", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--include-retrieval-control", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--max-consecutive-transport-failures", type=int, default=3)
     parser.add_argument("--overwrite", action="store_true")
     args = parser.parse_args(argv)
 
@@ -583,6 +686,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         answer_score_mode=str(args.answer_score_mode),
         semantic_threshold=float(args.semantic_threshold),
         timeout_seconds=float(args.timeout_seconds),
+        local_adapter_warmup=bool(args.local_adapter_warmup),
+        local_adapter_warmup_query=str(args.local_adapter_warmup_query),
+        local_adapter_warmup_timeout_seconds=float(args.local_adapter_warmup_timeout_seconds),
         require_smoke=bool(args.require_smoke),
         include_retrieval_control=bool(args.include_retrieval_control),
         smoke_report_path=smoke_report_path,
@@ -607,12 +713,53 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     started = _utc_now_iso()
     session = requests.Session()
+    warmup_path: Path | None = None
+    warmup_result: dict[str, Any] | None = None
+    if bool(args.local_adapter_warmup):
+        warmup_result = _warm_local_adapter(
+            session=session,
+            base_url=str(args.base_url),
+            api_key=args.api_key,
+            query=str(args.local_adapter_warmup_query),
+            top_k=max(1, min(int(args.top_k), 3)),
+            timeout=float(args.local_adapter_warmup_timeout_seconds),
+        )
+        warmup_path = (out_dir / "preconditions" / "local_adapter_warmup.json").resolve()
+        _write_json(warmup_path, warmup_result)
+        if str(warmup_result.get("status") or "") != "passed":
+            health_ok, health_status, health_error = _probe_health(
+                session=session,
+                base_url=str(args.base_url),
+                api_key=args.api_key,
+                timeout=min(5.0, float(args.timeout_seconds)),
+            )
+            failure_payload = {
+                "schema_version": SUMMARY_VERSION,
+                "status": "warmup_failed",
+                "run_id": run_id,
+                "condition": "local_adapter",
+                "warmup": warmup_result,
+                "health_probe": {
+                    "ok": health_ok,
+                    "status_code": health_status,
+                    "error": health_error,
+                },
+            }
+            _write_json(out_dir / "benchmark_failure.json", failure_payload)
+            print(
+                "Failed: local-adapter warmup failed before scoring; "
+                f"status={warmup_result.get('status_code')!r} "
+                f"transport_error={warmup_result.get('transport_error')!r} "
+                f"error={warmup_result.get('error')!r}"
+            )
+            return 1
     condition_payloads: dict[str, Any] = {}
     condition_artifact_paths: dict[str, dict[str, str]] = {}
     for condition_name, generate in conditions:
         dataset_metrics: dict[str, Any] = {}
         dataset_paths: dict[str, str] = {}
         for dataset_id in dataset_ids:
+            consecutive_transport_failures = 0
             _, dataset_path = _resolve_dataset(manifest, dataset_id, manifest_path)
             rows = sorted(list(_iter_jsonl(dataset_path)), key=lambda item: str(item.get("id") or ""))
             if args.max_items is not None:
@@ -637,6 +784,44 @@ def main(argv: Sequence[str] | None = None) -> int:
                     if provider and provider != "local_adapter":
                         error = f"unexpected provider={provider}"
                 responses.append({"status_code": status, "payload": payload, "latency_ms": latency, "error": error})
+                transport_error = _transport_error_kind(status_code=status, error=error)
+                if transport_error:
+                    consecutive_transport_failures += 1
+                else:
+                    consecutive_transport_failures = 0
+                max_consecutive = max(0, int(args.max_consecutive_transport_failures))
+                if max_consecutive and consecutive_transport_failures >= max_consecutive:
+                    health_ok, health_status, health_error = _probe_health(
+                        session=session,
+                        base_url=str(args.base_url),
+                        api_key=args.api_key,
+                        timeout=min(5.0, float(args.timeout_seconds)),
+                    )
+                    failure_payload = {
+                        "schema_version": SUMMARY_VERSION,
+                        "status": "aborted_transport_failure",
+                        "run_id": run_id,
+                        "condition": condition_name,
+                        "dataset_id": dataset_id,
+                        "processed_items": len(responses),
+                        "consecutive_transport_failures": consecutive_transport_failures,
+                        "max_consecutive_transport_failures": max_consecutive,
+                        "transport_error": transport_error,
+                        "last_error": error,
+                        "health_probe": {
+                            "ok": health_ok,
+                            "status_code": health_status,
+                            "error": health_error,
+                        },
+                    }
+                    _write_json(out_dir / "benchmark_failure.json", failure_payload)
+                    print(
+                        "Failed: aborting benchmark after "
+                        f"{consecutive_transport_failures} consecutive transport failures "
+                        f"for {condition_name}/{dataset_id}; last_error={error!r}; "
+                        f"health_ok={health_ok} status={health_status!r}"
+                    )
+                    return 1
             metric = _score_dataset(
                 manifest=manifest,
                 items=rows,
@@ -678,6 +863,16 @@ def main(argv: Sequence[str] | None = None) -> int:
             "bundle_copy_sha256": _sha256_file(smoke_copy_path) if smoke_copy_path and smoke_copy_path.exists() else None,
             "status": str((smoke_payload or {}).get("status") or ""),
         },
+        "warmup_precondition": {
+            "required": bool(args.local_adapter_warmup),
+            "path": str(warmup_path) if warmup_path else None,
+            "status": str((warmup_result or {}).get("status") or ""),
+            "status_code": (warmup_result or {}).get("status_code"),
+            "transport_error": (warmup_result or {}).get("transport_error"),
+            "provider": (warmup_result or {}).get("provider"),
+            "model": (warmup_result or {}).get("model"),
+            "trace_id": (warmup_result or {}).get("trace_id"),
+        },
         "git": _git_head_dirty(),
         "benchmark_artifacts_path": str(benchmark_artifacts_path),
         "benchmark_manifest_path": str(benchmark_manifest_path),
@@ -691,6 +886,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "bundle_root": str(out_dir),
         "training_run": run_info,
         "smoke_precondition": summary["smoke_precondition"],
+        "warmup_precondition": summary["warmup_precondition"],
         "benchmark_config": benchmark_config,
         "condition_artifact_paths": condition_artifact_paths,
         "conditions": condition_payloads,
@@ -723,6 +919,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             "source_sha256": smoke_report_sha256,
             "bundle_copy_sha256": _sha256_file(smoke_copy_path) if smoke_copy_path and smoke_copy_path.exists() else None,
             "status": str((smoke_payload or {}).get("status") or ""),
+        },
+        "warmup_precondition": {
+            "required": bool(args.local_adapter_warmup),
+            "path": str(warmup_path) if warmup_path else None,
+            "sha256": _sha256_file(warmup_path) if warmup_path and warmup_path.exists() else None,
+            "status": str((warmup_result or {}).get("status") or ""),
+            "status_code": (warmup_result or {}).get("status_code"),
+            "transport_error": (warmup_result or {}).get("transport_error"),
         },
         "benchmark_config": benchmark_config,
         "config_hash": benchmark_config["config_hash"],

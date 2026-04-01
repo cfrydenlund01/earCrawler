@@ -619,6 +619,91 @@ py -m scripts.eval.run_local_adapter_benchmark `
   --smoke-report kg/reports/local-adapter-smoke.json
 ```
 
+Step 7.3 task breakdown (execute sequentially and log each substep before continuing):
+
+1. `7.3.a` Benchmark preflight on a bounded slice to confirm runtime stability and write location:
+```powershell
+py -m scripts.eval.run_local_adapter_benchmark `
+  --run-dir dist/training/<run_id> `
+  --manifest eval/manifest.json `
+  --dataset-id ear_compliance.v2 `
+  --max-items 5 `
+  --run-id benchmark_<run_id>_preflight `
+  --smoke-report kg/reports/local-adapter-smoke.json `
+  --timeout-seconds 120 `
+  --max-consecutive-transport-failures 3 `
+  --overwrite
+```
+2. `7.3.b` Execute full benchmark for `ear_compliance.v2` only:
+```powershell
+py -m scripts.eval.run_local_adapter_benchmark `
+  --run-dir dist/training/<run_id> `
+  --manifest eval/manifest.json `
+  --dataset-id ear_compliance.v2 `
+  --run-id benchmark_<run_id>_ear_compliance_v2 `
+  --smoke-report kg/reports/local-adapter-smoke.json `
+  --timeout-seconds 120 `
+  --max-consecutive-transport-failures 3 `
+  --overwrite
+```
+3. `7.3.c` Execute full benchmark for `entity_obligations.v2` only:
+```powershell
+py -m scripts.eval.run_local_adapter_benchmark `
+  --run-dir dist/training/<run_id> `
+  --manifest eval/manifest.json `
+  --dataset-id entity_obligations.v2 `
+  --run-id benchmark_<run_id>_entity_obligations_v2 `
+  --smoke-report kg/reports/local-adapter-smoke.json `
+  --timeout-seconds 120 `
+  --max-consecutive-transport-failures 3 `
+  --overwrite
+```
+4. `7.3.d` Execute full benchmark for `unanswerable.v2` only:
+```powershell
+py -m scripts.eval.run_local_adapter_benchmark `
+  --run-dir dist/training/<run_id> `
+  --manifest eval/manifest.json `
+  --dataset-id unanswerable.v2 `
+  --run-id benchmark_<run_id>_unanswerable_v2 `
+  --smoke-report kg/reports/local-adapter-smoke.json `
+  --timeout-seconds 120 `
+  --max-consecutive-transport-failures 3 `
+  --overwrite
+```
+5. `7.3.e` Execute the canonical combined benchmark bundle used by Step 7.4:
+```powershell
+py -m scripts.eval.run_local_adapter_benchmark `
+  --run-dir dist/training/<run_id> `
+  --manifest eval/manifest.json `
+  --dataset-id ear_compliance.v2 `
+  --dataset-id entity_obligations.v2 `
+  --dataset-id unanswerable.v2 `
+  --run-id benchmark_<run_id>_primary `
+  --smoke-report kg/reports/local-adapter-smoke.json `
+  --timeout-seconds 120 `
+  --max-consecutive-transport-failures 3 `
+  --overwrite
+```
+
+Step 7.3 execution-log rule:
+
+- after each substep (`7.3.a` through `7.3.e`), append one line to
+  `docs/ExecutionPlan11.5_log.md` with date/time, exact command, pass/fail,
+  and the produced `dist/benchmarks/<benchmark_run_id>/benchmark_summary.json`
+  path (or failing log path)
+- if any substep fails, stop at that substep and do not run later 7.3 substeps
+  until the failure is resolved and logged
+- do not advance from `7.3.a` to `7.3.b` if the preflight bundle shows any
+  non-zero `transport_failure_rate` or repeated `status_code=0` request errors;
+  that indicates runtime instability, not just strict-output drift
+- keep the local-adapter runtime bounded for benchmark runs by exporting
+  `EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS=20` and
+  `EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS=64` before starting the API so
+  benchmark requests do not outlive the client timeout budget
+- benchmark runs should keep the local-adapter client timeout at `120` seconds
+  so the scored requests can survive the observed warmed local inference
+  outliers without masking real transport failures behind a too-tight client cap
+
 ### Step 7.4 - Validate The Release Evidence Bundle For The Candidate
 Explanation: force the result into one of the contract outcomes:
 `keep_optional`, `reject_candidate`, or `ready_for_formal_promotion_review`.
@@ -628,7 +713,7 @@ Type: `Code`
 ```powershell
 py -m scripts.eval.validate_local_adapter_release_bundle `
   --run-dir dist/training/<run_id> `
-  --benchmark-summary dist/benchmarks/<benchmark_run_id>/benchmark_summary.json `
+  --benchmark-summary dist/benchmarks/benchmark_<run_id>_primary/benchmark_summary.json `
   --smoke-report kg/reports/local-adapter-smoke.json
 ```
 

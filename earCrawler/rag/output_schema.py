@@ -12,6 +12,7 @@ This module enforces a machine-checkable, grounded contract:
 """
 
 import json
+import os
 import re
 from dataclasses import dataclass
 from typing import Dict, Iterable, List, Sequence, Set
@@ -388,7 +389,8 @@ def parse_strict_answer_json(
             raw_text=raw,
             details={"key": "evidence_okay.reasons"},
         )
-    if ok is False:
+    allow_weak_evidence = os.getenv("EARCRAWLER_ALLOW_WEAK_EVIDENCE", "0") == "1"
+    if ok is False and not allow_weak_evidence:
         # Caller requested hard rejection when model flags evidence as not OK.
         raise OutputSchemaError(
             code="evidence_not_ok",

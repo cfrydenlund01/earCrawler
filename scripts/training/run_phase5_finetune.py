@@ -11,6 +11,7 @@ import argparse
 import hashlib
 import inspect
 import json
+import gc
 import re
 import subprocess
 import sys
@@ -806,6 +807,7 @@ def _run_inference_smoke(
     adapter_dir: Path,
     prompt: str,
     max_new_tokens: int,
+    use_4bit: bool,
     allow_pt_bin: bool,
 ) -> dict[str, Any]:
     (
@@ -834,6 +836,26 @@ def _run_inference_smoke(
             model_kwargs["torch_dtype"] = torch.bfloat16
         else:
             model_kwargs["torch_dtype"] = torch.float16
+    if use_4bit:
+        try:
+            from transformers import BitsAndBytesConfig
+        except (
+            Exception
+        ) as exc:  # pragma: no cover - import failure is environment specific
+            raise RuntimeError(
+                "Smoke inference requested 4-bit load, but bitsandbytes support is unavailable."
+            ) from exc
+        compute_dtype = (
+            torch.bfloat16
+            if torch.cuda.is_available() and torch.cuda.is_bf16_supported()
+            else torch.float16
+        )
+        model_kwargs["quantization_config"] = BitsAndBytesConfig(
+            load_in_4bit=True,
+            bnb_4bit_compute_dtype=compute_dtype,
+            bnb_4bit_quant_type="nf4",
+            bnb_4bit_use_double_quant=True,
+        )
     model = AutoModelForCausalLM.from_pretrained(base_model, **model_kwargs)
     model = PeftModel.from_pretrained(model, str(adapter_dir))
     model.eval()
@@ -864,6 +886,16 @@ def _run_inference_smoke(
         "completion": completion,
         "pass": passed,
     }
+
+
+def _release_torch_memory() -> None:
+    gc.collect()
+    try:
+        torch, *_ = _load_training_deps()
+    except Exception:  # pragma: no cover - runtime environment specific
+        return
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def _apply_config_file(
@@ -1161,12 +1193,14 @@ def main(argv: list[str] | None = None) -> int:
         allow_pt_bin=bool(args.allow_pt_bin),
     )
     adapter_dir = run_dir / "adapter"
+    _release_torch_memory()
 
     smoke_report = _run_inference_smoke(
         base_model=args.base_model,
         adapter_dir=adapter_dir,
         prompt=str(args.smoke_prompt),
         max_new_tokens=int(args.smoke_max_new_tokens),
+        use_4bit=bool(args.use_4bit),
         allow_pt_bin=bool(args.allow_pt_bin),
     )
     _write_json(run_dir / "inference_smoke.json", smoke_report)
