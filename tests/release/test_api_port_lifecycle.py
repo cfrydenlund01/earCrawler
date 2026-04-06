@@ -93,3 +93,39 @@ def test_api_start_fails_fast_for_foreign_port_owner(tmp_path: Path) -> None:
     finally:
         server.terminate()
         server.wait(timeout=10)
+
+
+def test_api_stop_recovers_orphan_managed_port_owner(tmp_path: Path) -> None:
+    port = reserve_port()
+    start_lifecycle = tmp_path / "api_start.json"
+    stop_lifecycle = tmp_path / "api_stop_orphan.json"
+    pid_file = ROOT / "kg" / "reports" / "api.pid"
+    state_file = ROOT / "kg" / "reports" / "api.process.json"
+
+    try:
+        run_ps(
+            "api-start.ps1",
+            "-Host",
+            "127.0.0.1",
+            "-Port",
+            str(port),
+            "-LifecycleReportPath",
+            str(start_lifecycle),
+        )
+        pid_file.unlink(missing_ok=True)
+        state_file.unlink(missing_ok=True)
+
+        run_ps(
+            "api-stop.ps1",
+            "-Port",
+            str(port),
+            "-LifecycleReportPath",
+            str(stop_lifecycle),
+        )
+        payload = json.loads(stop_lifecycle.read_text(encoding="utf-8"))
+        assert payload["schema_version"] == "api-stop-lifecycle.v1"
+        assert payload["requested_port"] == port
+        assert payload["status"] == "stopped"
+        assert payload["remaining_port_owners"] == []
+    finally:
+        run_ps("api-stop.ps1", "-Port", str(port), check=False)

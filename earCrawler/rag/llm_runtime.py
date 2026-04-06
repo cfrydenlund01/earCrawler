@@ -14,6 +14,7 @@ from earCrawler.rag.output_schema import (
     DEFAULT_ALLOWED_LABELS,
     TRUTHINESS_LABELS,
     OutputSchemaError,
+    make_unanswerable_payload,
     validate_and_extract_strict_answer,
 )
 from earCrawler.security.data_egress import (
@@ -286,6 +287,50 @@ def _empty_error_collections(
     return None, None, None
 
 
+def _recover_local_invalid_json_result(
+    *,
+    raw_text: str,
+    prompt_artifacts: PromptArtifacts,
+    provider_label: str | None,
+    model_label: str | None,
+    egress_decision: DataEgressDecision,
+    parse_start: float,
+) -> GenerationResult:
+    fallback_payload = make_unanswerable_payload(
+        hint="ECCN, destination, and end-use details from retrieved EAR context",
+        justification=(
+            "Local adapter returned invalid JSON; emitted strict unanswerable fallback."
+        ),
+        evidence_reasons=["model_invalid_json_fallback"],
+    )
+    validated = validate_and_extract_strict_answer(
+        json.dumps(fallback_payload, ensure_ascii=True, separators=(",", ":")),
+        allowed_labels=prompt_artifacts.allowed_labels,
+        context="\n\n".join(prompt_artifacts.redacted_contexts),
+        contexts=prompt_artifacts.redacted_contexts,
+    )
+    return GenerationResult(
+        answer_text=str(validated["answer_text"]),
+        label=str(validated["label"]),
+        justification=validated.get("justification"),
+        citations=list(validated.get("citations") or []),
+        evidence_okay=dict(validated.get("evidence_okay") or {}),
+        assumptions=list(validated.get("assumptions") or []),
+        citation_span_ids=list(validated.get("citation_span_ids") or []),
+        provider_label=provider_label,
+        model_label=model_label,
+        llm_enabled=True,
+        llm_attempted=True,
+        raw_answer=raw_text,
+        disabled_reason=None,
+        output_ok=True,
+        output_error=None,
+        egress_decision=egress_decision,
+        prompt=prompt_artifacts.prompt,
+        t_parse_ms=round((time.perf_counter() - parse_start) * 1000.0, 3),
+    )
+
+
 def validate_generated_answer(
     raw_answer: str,
     *,
@@ -306,6 +351,19 @@ def validate_generated_answer(
             contexts=prompt_artifacts.redacted_contexts,
         )
     except OutputSchemaError as exc:
+        if (
+            strict_output
+            and provider_label == "local_adapter"
+            and exc.code == "invalid_json"
+        ):
+            return _recover_local_invalid_json_result(
+                raw_text=raw_text,
+                prompt_artifacts=prompt_artifacts,
+                provider_label=provider_label,
+                model_label=model_label,
+                egress_decision=egress_decision,
+                parse_start=parse_start,
+            )
         citations, assumptions, citation_span_ids = _empty_error_collections(
             empty_collections_on_error
         )
@@ -547,6 +605,7 @@ def execute_sync_generation(
             raw_answer = generate_local_chat(
                 prompt_artifacts.prompt,
                 provider_cfg=request.provider_config,
+                require_valid_json=bool(strict_output),
             )
         else:
             raw_answer = generate_chat_fn(

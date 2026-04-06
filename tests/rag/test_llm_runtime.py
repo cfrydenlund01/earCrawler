@@ -120,6 +120,40 @@ def test_resolve_llm_request_raises_when_local_adapter_disabled() -> None:
     assert "EARCRAWLER_ENABLE_LOCAL_LLM=1" in exc.disabled_reason
 
 
+def test_validate_generated_answer_recovers_local_adapter_invalid_json() -> None:
+    prompt = llm_runtime.build_prompt_artifacts(
+        "Do laptops to France need a license?",
+        ["[EAR-742.6] A license is required for listed ECCNs."],
+    )
+    egress = llm_runtime.ResolvedLLMRequest(
+        provider_label="local_adapter",
+        model_label="phase5-run",
+        prompt_artifacts=prompt,
+        execution_mode="local",
+    ).build_egress_decision(
+        remote_enabled=False,
+        disabled_reason=None,
+        trace_id="trace-local-fallback",
+    )
+
+    result = llm_runtime.validate_generated_answer(
+        '{"label":"unanswerable","answer_text":"Cannot determine',
+        prompt_artifacts=prompt,
+        provider_label="local_adapter",
+        model_label="phase5-run",
+        egress_decision=egress,
+        strict_output=True,
+        empty_collections_on_error=True,
+    )
+
+    assert result.output_ok is True
+    assert result.output_error is None
+    assert result.label == "unanswerable"
+    assert isinstance(result.answer_text, str)
+    assert "Need " in result.answer_text
+    assert result.raw_answer is not None
+
+
 def test_execute_sync_generation_uses_local_adapter_without_remote_egress(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path,

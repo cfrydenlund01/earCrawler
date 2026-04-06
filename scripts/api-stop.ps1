@@ -1,4 +1,5 @@
 param(
+    [int]$Port = 0,
     [string]$LifecycleReportPath = ''
 )
 
@@ -127,6 +128,16 @@ function Read-ManagedApiState {
     }
 }
 
+function Test-IsRecoverableApiPortOwner {
+    param([string]$CommandLine)
+
+    if (-not $CommandLine) {
+        return $false
+    }
+
+    return [bool]($CommandLine -match 'service\.api_server\.server:app')
+}
+
 function Write-ApiLifecycleReport {
     param(
         [Parameter(Mandatory = $true)]$Payload,
@@ -158,7 +169,10 @@ function Remove-ApiStateArtifacts {
 $state = Read-ManagedApiState -Path $stateFile
 $legacyPid = Read-LegacyPidValue -Path $pidFile
 $portValue = $null
-if ($state -and $state.PSObject.Properties.Name -contains 'port') {
+if ($Port -gt 0) {
+    $portValue = [int]$Port
+}
+elseif ($state -and $state.PSObject.Properties.Name -contains 'port') {
     try {
         $portValue = [int]$state.port
     } catch {
@@ -192,7 +206,12 @@ if ($state -and ($state.PSObject.Properties.Name -contains 'pid')) {
 $targetPids = @($candidatePids | Select-Object -Unique)
 $lifecycle.candidate_pids = @($targetPids)
 
-if (@($targetPids).Count -eq 0 -and -not (Test-Path $pidFile) -and -not (Test-Path $stateFile)) {
+if (
+    @($targetPids).Count -eq 0 `
+    -and -not (Test-Path $pidFile) `
+    -and -not (Test-Path $stateFile) `
+    -and -not $portValue
+) {
     $lifecycle.status = 'not_running'
     Write-Host "API facade is not running (no managed PID or state files found)."
     Write-ApiLifecycleReport -Payload $lifecycle -OutputPaths $lifecyclePaths
@@ -211,25 +230,20 @@ foreach ($targetPid in $targetPids) {
 Remove-ApiStateArtifacts -PidPath $pidFile -StatePath $stateFile
 
 if ($portValue) {
-    $owners = @()
-    $deadline = (Get-Date).AddSeconds(10)
-    do {
-        $owners = Get-ListeningPortOwners -LocalPort $portValue
-        if (@($owners).Count -eq 0) {
-            break
-        }
-        Start-Sleep -Milliseconds 300
-    } while ((Get-Date) -lt $deadline)
-
-    $managedPortOwners = @(
+    $owners = Get-ListeningPortOwners -LocalPort $portValue
+    $recoverablePortOwners = @(
         $owners | Where-Object {
-            [string]$_.command_line -match 'service\.api_server\.server:app'
+            Test-IsRecoverableApiPortOwner -CommandLine ([string]$_.command_line)
         }
     )
-    foreach ($owner in $managedPortOwners) {
-        Stop-ProcessTree -RootProcessId ([int]$owner.pid) -Label 'managed API port owner'
+    foreach ($owner in $recoverablePortOwners) {
+        $ownerPid = [int]$owner.pid
+        Stop-ProcessTree -RootProcessId $ownerPid -Label 'recoverable API port owner'
+        if ($lifecycle.stopped_pids -notcontains $ownerPid) {
+            $lifecycle.stopped_pids += $ownerPid
+        }
     }
-    if (@($managedPortOwners).Count -gt 0) {
+    if (@($recoverablePortOwners).Count -gt 0) {
         $deadline = (Get-Date).AddSeconds(10)
         do {
             $owners = Get-ListeningPortOwners -LocalPort $portValue

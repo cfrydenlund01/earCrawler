@@ -631,6 +631,7 @@ py -m scripts.eval.run_local_adapter_benchmark `
   --run-id benchmark_<run_id>_preflight `
   --smoke-report kg/reports/local-adapter-smoke.json `
   --timeout-seconds 120 `
+  --local-adapter-warmup-timeout-seconds 240 `
   --max-consecutive-transport-failures 3 `
   --overwrite
 ```
@@ -643,6 +644,7 @@ py -m scripts.eval.run_local_adapter_benchmark `
   --run-id benchmark_<run_id>_ear_compliance_v2 `
   --smoke-report kg/reports/local-adapter-smoke.json `
   --timeout-seconds 120 `
+  --local-adapter-warmup-timeout-seconds 240 `
   --max-consecutive-transport-failures 3 `
   --overwrite
 ```
@@ -655,6 +657,7 @@ py -m scripts.eval.run_local_adapter_benchmark `
   --run-id benchmark_<run_id>_entity_obligations_v2 `
   --smoke-report kg/reports/local-adapter-smoke.json `
   --timeout-seconds 120 `
+  --local-adapter-warmup-timeout-seconds 240 `
   --max-consecutive-transport-failures 3 `
   --overwrite
 ```
@@ -667,6 +670,7 @@ py -m scripts.eval.run_local_adapter_benchmark `
   --run-id benchmark_<run_id>_unanswerable_v2 `
   --smoke-report kg/reports/local-adapter-smoke.json `
   --timeout-seconds 120 `
+  --local-adapter-warmup-timeout-seconds 240 `
   --max-consecutive-transport-failures 3 `
   --overwrite
 ```
@@ -681,6 +685,7 @@ py -m scripts.eval.run_local_adapter_benchmark `
   --run-id benchmark_<run_id>_primary `
   --smoke-report kg/reports/local-adapter-smoke.json `
   --timeout-seconds 120 `
+  --local-adapter-warmup-timeout-seconds 240 `
   --max-consecutive-transport-failures 3 `
   --overwrite
 ```
@@ -700,6 +705,10 @@ Step 7.3 execution-log rule:
   `EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS=20` and
   `EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS=64` before starting the API so
   benchmark requests do not outlive the client timeout budget
+- give the initial local-adapter warmup request extra headroom with
+  `--local-adapter-warmup-timeout-seconds 240`; cold model load plus the
+  first structured answer can exceed the per-item scoring timeout even when
+  the steady-state dataset requests stay inside the `120s` benchmark budget
 - benchmark runs should keep the local-adapter client timeout at `120` seconds
   so the scored requests can survive the observed warmed local inference
   outliers without masking real transport failures behind a too-tight client cap

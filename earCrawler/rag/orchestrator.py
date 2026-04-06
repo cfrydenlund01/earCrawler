@@ -331,6 +331,7 @@ async def execute_generation_async(
                 llm_runtime.generate_local_chat,
                 prompt_artifacts.prompt,
                 provider_cfg=llm_request.provider_config,
+                require_valid_json=bool(request.strict_output),
             )
         else:
             raw_answer = await run_generate(

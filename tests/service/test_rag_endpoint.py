@@ -316,6 +316,55 @@ def test_llm_endpoint_retrieval_only_skips_generation(monkeypatch):
     assert data["egress"]["disabled_reason"] == "generation_disabled_by_request"
 
 
+def test_build_prompt_contexts_budgets_local_adapter_prompts(monkeypatch):
+    from service.api_server.rag_service import build_prompt_contexts
+
+    monkeypatch.setenv("LLM_PROVIDER", "local_adapter")
+    monkeypatch.delenv("EARCRAWLER_RAG_PROMPT_MAX_CONTEXTS", raising=False)
+    monkeypatch.delenv("EARCRAWLER_RAG_PROMPT_MAX_CONTEXT_CHARS", raising=False)
+    monkeypatch.delenv("EARCRAWLER_RAG_PROMPT_MAX_TOTAL_CHARS", raising=False)
+    monkeypatch.delenv("EARCRAWLER_RAG_PROMPT_DEDUP", raising=False)
+
+    oversized = "alpha " * 300
+    documents = [
+        {"section_id": "EAR-736.2(b)", "text": oversized},
+        {"section_id": "EAR-736.2(b)", "text": oversized},
+        {"section_id": "EAR-736.2", "text": oversized},
+        {"section_id": "EAR-744.11", "text": oversized},
+        {"section_id": "EAR-744.15", "text": oversized},
+    ]
+
+    contexts = build_prompt_contexts(documents)
+
+    assert len(contexts) == 3
+    assert len(set(contexts)) == 3
+    assert sum(len(item) for item in contexts) <= 3600
+    assert all(len(item) <= 1200 for item in contexts)
+    assert all(item.endswith("[truncated]") for item in contexts)
+
+
+def test_build_prompt_contexts_keeps_remote_contexts_unbounded(monkeypatch):
+    from service.api_server.rag_service import build_prompt_contexts
+
+    monkeypatch.setenv("LLM_PROVIDER", "groq")
+    monkeypatch.delenv("EARCRAWLER_RAG_PROMPT_MAX_CONTEXTS", raising=False)
+    monkeypatch.delenv("EARCRAWLER_RAG_PROMPT_MAX_CONTEXT_CHARS", raising=False)
+    monkeypatch.delenv("EARCRAWLER_RAG_PROMPT_MAX_TOTAL_CHARS", raising=False)
+    monkeypatch.delenv("EARCRAWLER_RAG_PROMPT_DEDUP", raising=False)
+
+    documents = [
+        {"section_id": "EAR-736.2(b)", "text": "A" * 1500},
+        {"section_id": "EAR-736.2(b)", "text": "A" * 1500},
+    ]
+
+    contexts = build_prompt_contexts(documents)
+
+    assert contexts == [
+        f"[EAR-736.2(b)] {'A' * 1500}",
+        f"[EAR-736.2(b)] {'A' * 1500}",
+    ]
+
+
 def test_rag_query_filters_results_by_effective_date():
     class _TemporalRetriever(_StubRetriever):
         def query(self, prompt: str, k: int = 5) -> list[dict]:

@@ -2,8 +2,10 @@ from __future__ import annotations
 
 """Local adapter-backed generation helpers for the optional Phase 5.4 runtime path."""
 
+import gc
 import json
 import os
+import threading
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -19,6 +21,9 @@ class LocalAdapterArtifacts:
     run_dir: Path
     base_model: str
     model_label: str
+
+
+_LOCAL_GENERATION_LOCK = threading.Lock()
 
 
 def _chat_prompt_text(messages: Sequence[dict[str, str]], tokenizer: Any) -> str:
@@ -111,6 +116,8 @@ def _load_local_stack(
                 if getattr(torch.cuda, "is_bf16_supported", lambda: False)()
                 else torch.float16
             )
+            gc.collect()
+            torch.cuda.empty_cache()
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_compute_dtype=dtype,
@@ -118,7 +125,7 @@ def _load_local_stack(
                 bnb_4bit_quant_type="nf4",
             )
             model_kwargs["quantization_config"] = quantization_config
-            model_kwargs["device_map"] = "auto"
+            model_kwargs["device_map"] = {"": torch.cuda.current_device()}
             model_kwargs["low_cpu_mem_usage"] = True
         else:
             raise LLMProviderError(
@@ -127,7 +134,7 @@ def _load_local_stack(
 
     model = AutoModelForCausalLM.from_pretrained(base_model, **model_kwargs)
     model = PeftModel.from_pretrained(model, str(adapter_path))
-    if device_name == "cuda":
+    if device_name == "cuda" and quantization_config is None:
         model = model.to("cuda")
     model.eval()
     eos_token = tokenizer.eos_token or ""
@@ -161,24 +168,72 @@ def _resolve_generation_limits() -> tuple[int, float | None]:
     return max_new_tokens, max_time
 
 
-def generate_local_chat(
-    messages: Sequence[dict[str, str]],
-    *,
-    provider_cfg: ProviderConfig,
-) -> str:
-    artifacts = resolve_local_adapter_artifacts(provider_cfg)
-    device_name = _resolve_device_name()
-    tokenizer, model, eos_token = _load_local_stack(
-        artifacts.base_model,
-        str(artifacts.adapter_dir),
-        device_name,
-    )
-    prompt_text = _chat_prompt_text(messages, tokenizer)
-    max_new_tokens, max_time = _resolve_generation_limits()
+def _resolve_json_retry_max_new_tokens(default_tokens: int) -> int:
+    raw_retry_limit = str(
+        os.getenv("EARCRAWLER_LOCAL_LLM_JSON_RETRY_MAX_NEW_TOKENS", "")
+    ).strip()
+    if not raw_retry_limit:
+        return default_tokens
+    try:
+        retry_limit = int(raw_retry_limit)
+    except ValueError as exc:  # pragma: no cover - defensive env guard
+        raise LLMProviderError(
+            "EARCRAWLER_LOCAL_LLM_JSON_RETRY_MAX_NEW_TOKENS must be a positive integer."
+        ) from exc
+    if retry_limit <= 0:
+        return default_tokens
+    return max(default_tokens, retry_limit)
 
-    inputs = tokenizer(prompt_text, return_tensors="pt")
-    if hasattr(model, "device"):
-        inputs = {key: value.to(model.device) for key, value in inputs.items()}
+
+def _resolve_json_retry_max_time(default_max_time: float | None) -> float | None:
+    if default_max_time is None:
+        return None
+    raw_retry_time = str(
+        os.getenv("EARCRAWLER_LOCAL_LLM_JSON_RETRY_MAX_TIME_SECONDS", "")
+    ).strip()
+    if not raw_retry_time:
+        return default_max_time
+    try:
+        retry_time = float(raw_retry_time)
+    except ValueError as exc:  # pragma: no cover - defensive env guard
+        raise LLMProviderError(
+            "EARCRAWLER_LOCAL_LLM_JSON_RETRY_MAX_TIME_SECONDS must be a positive number."
+        ) from exc
+    if retry_time <= 0:
+        return default_max_time
+    return max(default_max_time, retry_time)
+
+
+def _is_retryable_json_truncation(text: str) -> bool:
+    candidate = str(text or "").strip()
+    if not candidate:
+        return False
+    try:
+        json.loads(candidate)
+        return False
+    except json.JSONDecodeError as exc:
+        if "Unterminated string" in exc.msg:
+            return True
+        near_end = exc.pos >= max(0, len(candidate) - 3)
+        if near_end and exc.msg in {
+            "Expecting value",
+            "Expecting ',' delimiter",
+            "Expecting ':' delimiter",
+            "Expecting property name enclosed in double quotes",
+        }:
+            return True
+        return False
+
+
+def _generate_local_text(
+    *,
+    model: Any,
+    tokenizer: Any,
+    inputs: dict[str, Any],
+    device_name: str,
+    max_new_tokens: int,
+    max_time: float | None,
+) -> str:
     generate_kwargs: dict[str, Any] = {
         "do_sample": False,
         "max_new_tokens": max_new_tokens,
@@ -191,20 +246,82 @@ def generate_local_chat(
     except ImportError:  # pragma: no cover - optional dependency guard
         torch = None
 
-    if torch is not None and hasattr(torch, "inference_mode"):
-        with torch.inference_mode():
-            generated = model.generate(
-                **inputs,
-                **generate_kwargs,
+    generated = None
+    continuation = None
+    try:
+        with _LOCAL_GENERATION_LOCK:
+            if torch is not None and hasattr(torch, "inference_mode"):
+                with torch.inference_mode():
+                    generated = model.generate(
+                        **inputs,
+                        **generate_kwargs,
+                    )
+            else:
+                generated = model.generate(
+                    **inputs,
+                    **generate_kwargs,
+                )
+        prompt_len = int(inputs["input_ids"].shape[-1])
+        continuation = generated[0][prompt_len:]
+        return str(tokenizer.decode(continuation, skip_special_tokens=True)).strip()
+    finally:
+        if generated is not None:
+            del generated
+        if continuation is not None:
+            del continuation
+        if (
+            device_name == "cuda"
+            and torch is not None
+            and getattr(torch.cuda, "is_available", lambda: False)()
+        ):
+            try:
+                torch.cuda.empty_cache()
+            except Exception:  # pragma: no cover - defensive cleanup
+                pass
+            gc.collect()
+
+
+def generate_local_chat(
+    messages: Sequence[dict[str, str]],
+    *,
+    provider_cfg: ProviderConfig,
+    require_valid_json: bool = False,
+) -> str:
+    artifacts = resolve_local_adapter_artifacts(provider_cfg)
+    device_name = _resolve_device_name()
+    tokenizer, model, eos_token = _load_local_stack(
+        artifacts.base_model,
+        str(artifacts.adapter_dir),
+        device_name,
+    )
+    prompt_text = _chat_prompt_text(messages, tokenizer)
+    max_new_tokens, max_time = _resolve_generation_limits()
+    retry_max_new_tokens = _resolve_json_retry_max_new_tokens(max_new_tokens)
+    retry_max_time = _resolve_json_retry_max_time(max_time)
+    attempt_budgets: list[tuple[int, float | None]] = [(max_new_tokens, max_time)]
+    if require_valid_json and retry_max_new_tokens > max_new_tokens:
+        attempt_budgets.append((retry_max_new_tokens, retry_max_time))
+
+    inputs = tokenizer(prompt_text, return_tensors="pt")
+    if hasattr(model, "device"):
+        inputs = {key: value.to(model.device) for key, value in inputs.items()}
+    text = ""
+    try:
+        for attempt_index, (attempt_tokens, attempt_time) in enumerate(attempt_budgets):
+            text = _generate_local_text(
+                model=model,
+                tokenizer=tokenizer,
+                inputs=inputs,
+                device_name=device_name,
+                max_new_tokens=attempt_tokens,
+                max_time=attempt_time,
             )
-    else:
-        generated = model.generate(
-            **inputs,
-            **generate_kwargs,
-        )
-    prompt_len = int(inputs["input_ids"].shape[-1])
-    continuation = generated[0][prompt_len:]
-    text = str(tokenizer.decode(continuation, skip_special_tokens=True)).strip()
+            if not (require_valid_json and _is_retryable_json_truncation(text)):
+                break
+            if attempt_index + 1 >= len(attempt_budgets):
+                break
+    finally:
+        inputs.clear()
     if not text and eos_token:
         text = eos_token
     if not text:

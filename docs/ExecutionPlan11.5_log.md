@@ -2,7 +2,7 @@
 
 Plan: docs/ExecutionPlan11.5.md  
 Date: 2026-03-25 (America/Chicago)
-Status: Step 0.2 complete; Step 1.1 complete; Step 1.2 complete; Step 1.3 complete; Step 1.4 complete; Step 2.1 complete; Step 2.2 complete; Step 2.3 complete; Step 2.4 complete; Step 3.1 complete; Step 3.2 complete (live corpus rebuilt; diagnostics/remediation complete); Step 3.3 complete; Step 3.4 complete; Step 4.1 complete; Step 4.2 complete; Step 4.3 complete; Step 4.4 complete; Step 5.1 complete; Step 5.2 complete; Step 5.3 complete; Step 6.1 complete; Step 6.2 complete; Step 6.3 complete; Step 6.4 complete; Step 7.1 complete (CUDA QLoRA run executed end-to-end with smoke evidence); Phase 0 gate closed; ready to continue to Step 7.2.
+Status: Step 0.2 complete; Step 1.1 complete; Step 1.2 complete; Step 1.3 complete; Step 1.4 complete; Step 2.1 complete; Step 2.2 complete; Step 2.3 complete; Step 2.4 complete; Step 3.1 complete; Step 3.2 complete (live corpus rebuilt; diagnostics/remediation complete); Step 3.3 complete; Step 3.4 complete; Step 4.1 complete; Step 4.2 complete; Step 4.3 complete; Step 4.4 complete; Step 5.1 complete; Step 5.2 complete; Step 5.3 complete; Step 6.1 complete; Step 6.2 complete; Step 6.3 complete; Step 6.4 complete; Step 7.1 complete (CUDA QLoRA run executed end-to-end with smoke evidence); Step 7.2 complete; Step 7.3.a complete (clean rerun under ExecutionPlan11.5.2); Phase 0 gate closed; ready to continue to Step 7.3.b.
 
 ## Phase 0 Baseline Runs
 
@@ -746,3 +746,47 @@ Engineer reference map:
   - result: **failed gate** (bundle written, but `local_adapter.transport_failure_rate=0.2`, `transport_failure_count=1`, first item hit `status_code=0` read timeout; remaining local-adapter items returned `500`)
   - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight/benchmark_summary.json`
   - stop rule applied: did **not** run `7.3.b` because the new preflight showed non-zero transport failure rate
+- `2026-04-01 13:42:10 -05:00` — Step `7.3.b` artifact check:
+  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2/benchmark_summary.json`
+  - result: **failed gate** (`local_adapter.request_422_rate=1.0`, `local_adapter.strict_output_failure_rate=1.0`, `retrieval_only.strict_output_failure_rate=0.7`; no transport failures recorded)
+- `2026-04-01 14:05:39 -05:00` — Step `7.3.a` diagnostic rerun:
+  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --max-items 5 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --max-consecutive-transport-failures 3 --overwrite`
+  - result: **failed warmup** (`status_code=0`, `transport_error=connection_reset`; health probe then failed with `WinError 10061`, indicating the API process dropped during warmup)
+  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight/benchmark_failure.json`
+- `2026-04-01 14:07:41 -05:00` — Step `7.3.b` diagnostic rerun:
+  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2 --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --max-consecutive-transport-failures 3 --overwrite`
+  - result: **failed warmup** (`status_code=500`, no transport error; health probe remained `200`, so this was an application-level failure on the warmup query rather than a dead API)
+  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2/benchmark_failure.json`
+- `2026-04-01 16:43:33 -05:00` — Step `7.3.a` clean rerun:
+  - `EARCRAWLER_BENCHMARK_API_KEY=benchmark:step32-local-benchmark-secret`
+  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --max-items 5 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --max-consecutive-transport-failures 3 --overwrite`
+  - result: **passed gate** (`warmup_precondition.status=passed`, `warmup_precondition.status_code=200`, `local_adapter.transport_failure_rate=0.0`, `retrieval_only.transport_failure_rate=0.0`, no `status_code=0` entries in the bundle)
+  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight/benchmark_summary.json`
+- `2026-04-01 17:13:58 -05:00` — Step `7.3` stabilization changes applied before the full dataset reruns:
+  - `service/api_server/rag_service.py` now bounds local-adapter prompt context size (`max_contexts=3`, per-context truncation, total-context truncation, dedupe) so benchmark prompts stay inside a stable generation budget.
+  - `earCrawler/rag/local_adapter_runtime.py` now serializes local generation, cleans CUDA state between requests, and makes the expanded JSON-retry pass opt-in instead of default-on.
+  - `scripts/api-stop.ps1` now recovers orphan `service.api_server.server:app` listeners by port, and `scripts/eval/run_local_adapter_benchmark.py` passes `-Port` into controlled restart flows.
+  - `scripts/eval/run_local_adapter_benchmark.py` now defaults `--local-adapter-warmup-timeout-seconds` to `240` to match the cold-load behavior observed on this Windows host.
+- `2026-04-01 17:13:17 -05:00` — Step `7.3.c` command rerun:
+  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id entity_obligations.v2 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_entity_obligations_v2 --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --local-adapter-warmup-timeout-seconds 240 --max-consecutive-transport-failures 3 --overwrite`
+  - result: **passed** (`warmup_precondition.status=passed`, `local_adapter.transport_failure_rate=0.0`, `local_adapter.request_422_rate=0.0`, `local_adapter.strict_output_failure_rate=0.0`, `retrieval_only.transport_failure_rate=0.0`)
+  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_entity_obligations_v2/benchmark_summary.json`
+- `2026-04-01 18:14:53 -05:00` — Step `7.3.b` command rerun:
+  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2 --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --local-adapter-warmup-timeout-seconds 240 --max-consecutive-transport-failures 3 --overwrite`
+  - result: **completed with one residual transient timeout** (`warmup_precondition.status=passed`, `local_adapter.transport_failure_rate=0.01`, `transport_error_kinds.read_timeout=1` on `earc2-0050`; `retrieval_only.transport_failure_rate=0.0`)
+  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2/benchmark_summary.json`
+- `2026-04-01 18:15:03 -05:00` — Step `7.3.b` targeted replay on the residual outlier:
+  - replayed `earc2-0050` (`True or false: There is no operative authorization text in § 740.9(a)(2) because it is reserved.`) directly against the warm API with a `240s` client timeout.
+  - result: **returned 200 / output_ok=true in 18.5s**, so the single `7.3.b` benchmark timeout did not reproduce once the process was warm.
+- `2026-04-01 18:49:59 -05:00` — Step `7.3.b` rerun hardening (no new benchmark run started):
+  - diagnosed the dirty `benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2` bundle as two separate operator/runtime issues:
+    - duplicate benchmark processes were allowed to run concurrently against the same `run_id` and telemetry/output directory, which can overwrite auth/summary state
+    - timeout events produced too little evidence to decide whether to rerun, restart, or inspect the API
+  - implemented runner safeguards in `scripts/eval/run_local_adapter_benchmark.py`:
+    - active-run lock at `dist/benchmarks/.locks/<run_id>.lock.json`
+    - explicit auth precondition support via `--require-authenticated-api` and optional `--require-api-key-label`
+    - non-secret auth artifact `preconditions/benchmark_api_auth.json`
+    - timeout/transport diagnostics emitted to `telemetry/transport_diagnostics.jsonl`
+  - updated `docs/api/readme.md` to document the authenticated benchmark-key procedure and the new duplicate-run/timeout-diagnostics behavior
+  - verification: `py -3 -m pytest -q tests/eval/test_local_adapter_benchmark_runner.py --basetemp .pytest_tmp_step42_fix_verify` — **passed** (`12 passed`)
+  - next blocker: rerun `7.3.b` once with the dedicated benchmark key and confirm one benchmark process tree only.

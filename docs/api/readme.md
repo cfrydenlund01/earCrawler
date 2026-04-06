@@ -145,6 +145,24 @@ from the Windows Credential Manager (`EarCrawler-API` service name) or the
 `EARCRAWLER_API_KEYS` environment variable (semicolon-separated
 `label=value` pairs). Anonymous access is allowed with lower quotas.
 
+For local benchmark/debug runs, prefer a dedicated loopback-only key instead of
+using the anonymous bucket. A narrow pattern is:
+`EARCRAWLER_API_KEYS=benchmark=<secret>` on the API host and
+`EARCRAWLER_BENCHMARK_API_KEY=benchmark:<secret>` in the benchmark shell. The
+benchmark runner will use `EARCRAWLER_BENCHMARK_API_KEY` automatically before
+falling back to `EARCRAWLER_API_KEY`.
+
+When the benchmark must prove authenticated traffic, make that expectation
+explicit instead of assuming the shell env is correct. The benchmark runner now
+supports:
+`--require-authenticated-api` and
+`--require-api-key-label benchmark`
+
+Those checks write a non-secret precondition artifact at
+`dist/benchmarks/<run_id>/preconditions/benchmark_api_auth.json` so the run
+bundle records whether benchmark traffic was authenticated and which label path
+was used.
+
 This auth model is sufficient for the supported trusted single-host baseline.
 If the service must be exposed beyond that boundary, do not expose the
 EarCrawler process directly with only `EARCRAWLER_API_KEYS`. Keep the app on a
@@ -154,6 +172,20 @@ The reference Windows pattern is IIS + ARR + Windows Authentication with a
 deployment-owned backend `X-Api-Key` injected on the loopback hop. In that
 pattern, the proxy authenticates the external caller and presents one
 deployment-owned backend `X-Api-Key` to EarCrawler.
+
+## Benchmark Diagnostics
+
+`scripts/eval/run_local_adapter_benchmark.py` now guards one `run_id` with a
+lock file under `dist/benchmarks/.locks/`. If a second process tries to start
+against the same `run_id` while another benchmark is still active, the second
+process fails fast instead of overwriting telemetry or summary artifacts.
+
+When a request hits the benchmark client timeout or another transport error,
+the runner appends diagnostic evidence to
+`dist/benchmarks/<run_id>/telemetry/transport_diagnostics.jsonl`. Those entries
+include the item id, timeout/error details, a live `/health` probe result, and
+matching benchmark/API process snapshots. Inspect that file before deciding to
+rerun or restart anything.
 
 Credential formats:
 

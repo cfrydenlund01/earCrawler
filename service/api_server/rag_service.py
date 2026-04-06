@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import math
+import os
 import time
 from dataclasses import dataclass
 from datetime import datetime
@@ -52,6 +53,14 @@ class ApiAnswerExecution:
     generation: llm_runtime.GenerationResult
 
 
+@dataclass(frozen=True)
+class PromptContextBudget:
+    max_contexts: int | None
+    max_context_chars: int | None
+    max_total_chars: int | None
+    dedupe: bool
+
+
 def _elapsed_ms(start: float) -> float:
     return round((time.perf_counter() - start) * 1000.0, 3)
 
@@ -79,6 +88,77 @@ def _coerce_score(value: object) -> float:
     if num < 0:
         num = 0.0
     return round(num, 4)
+
+
+def _env_optional_int(name: str) -> int | None:
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    text = str(raw).strip()
+    if not text:
+        return None
+    try:
+        value = int(text)
+    except ValueError:
+        return None
+    if value <= 0:
+        return None
+    return value
+
+
+def _env_optional_bool(name: str) -> bool | None:
+    raw = os.getenv(name)
+    if raw is None:
+        return None
+    value = str(raw).strip().lower()
+    if value in {"1", "true", "yes", "on"}:
+        return True
+    if value in {"0", "false", "no", "off"}:
+        return False
+    return None
+
+
+def _resolve_prompt_context_budget() -> PromptContextBudget:
+    provider = str(os.getenv("LLM_PROVIDER") or "").strip().lower()
+    max_contexts = _env_optional_int("EARCRAWLER_RAG_PROMPT_MAX_CONTEXTS")
+    max_context_chars = _env_optional_int("EARCRAWLER_RAG_PROMPT_MAX_CONTEXT_CHARS")
+    max_total_chars = _env_optional_int("EARCRAWLER_RAG_PROMPT_MAX_TOTAL_CHARS")
+    dedupe = _env_optional_bool("EARCRAWLER_RAG_PROMPT_DEDUP")
+
+    if provider == "local_adapter":
+        if max_contexts is None:
+            max_contexts = 3
+        if max_context_chars is None:
+            max_context_chars = 1200
+        if max_total_chars is None:
+            max_total_chars = 3600
+        if dedupe is None:
+            dedupe = True
+    elif dedupe is None:
+        dedupe = False
+
+    return PromptContextBudget(
+        max_contexts=max_contexts,
+        max_context_chars=max_context_chars,
+        max_total_chars=max_total_chars,
+        dedupe=bool(dedupe),
+    )
+
+
+def _truncate_prompt_context(text: str, *, limit: int) -> str:
+    value = str(text or "").strip()
+    if not value or limit <= 0 or len(value) <= limit:
+        return value
+    suffix = " [truncated]"
+    if limit <= len(suffix):
+        return value[:limit].rstrip()
+    clipped = value[: limit - len(suffix)].rstrip()
+    split_at = clipped.rfind(" ")
+    if split_at >= max(0, len(clipped) // 2):
+        clipped = clipped[:split_at].rstrip()
+    if not clipped:
+        clipped = value[: limit - len(suffix)].rstrip()
+    return f"{clipped}{suffix}"
 
 
 async def retrieve_documents(
@@ -256,7 +336,10 @@ async def build_query_answers(
 
 
 def build_prompt_contexts(documents: list[dict]) -> list[str]:
+    budget = _resolve_prompt_context_budget()
     contexts: list[str] = []
+    seen: set[str] = set()
+    total_chars = 0
     for doc in documents:
         text = retrieval_runtime.extract_text(doc)
         if not text:
@@ -272,10 +355,32 @@ def build_prompt_contexts(documents: list[dict]) -> list[str]:
             or _maybe_str(doc.get("entity_id"))
             or _maybe_str(doc.get("section_id"))
         )
+        if budget.max_contexts is not None and len(contexts) >= budget.max_contexts:
+            break
         if section:
-            contexts.append(f"[{section}] {text}")
+            context = f"[{section}] {text}"
         else:
-            contexts.append(text)
+            context = text
+        if budget.dedupe:
+            if context in seen:
+                continue
+            seen.add(context)
+        char_limit = budget.max_context_chars
+        if budget.max_total_chars is not None:
+            remaining_chars = budget.max_total_chars - total_chars
+            if remaining_chars <= 0:
+                break
+            char_limit = (
+                remaining_chars
+                if char_limit is None
+                else min(char_limit, remaining_chars)
+            )
+        if char_limit is not None:
+            context = _truncate_prompt_context(context, limit=char_limit)
+        if not context:
+            continue
+        contexts.append(context)
+        total_chars += len(context)
     return contexts
 
 

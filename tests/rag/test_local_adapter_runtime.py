@@ -50,8 +50,34 @@ class _FakeModel:
         self.generate_kwargs: dict[str, object] | None = None
 
     def generate(self, **kwargs):
+        assert local_adapter_runtime._LOCAL_GENERATION_LOCK.locked() is True
         self.generate_kwargs = kwargs
         return [[1, 2, 3, 4, 5]]
+
+    def eval(self) -> None:
+        return None
+
+
+class _RetryTokenizer(_FakeTokenizer):
+    def __init__(self, outputs: dict[tuple[int, ...], str]) -> None:
+        self._outputs = outputs
+
+    def decode(self, tokens, skip_special_tokens: bool = True) -> str:
+        assert skip_special_tokens is True
+        return self._outputs[tuple(tokens)]
+
+
+class _RetryModel:
+    device = "cpu"
+
+    def __init__(self) -> None:
+        self.calls: list[int] = []
+
+    def generate(self, **kwargs):
+        self.calls.append(int(kwargs["max_new_tokens"]))
+        if len(self.calls) == 1:
+            return [[1, 2, 3, 101]]
+        return [[1, 2, 3, 102]]
 
     def eval(self) -> None:
         return None
@@ -144,3 +170,103 @@ def test_generate_local_chat_applies_generation_limits(monkeypatch) -> None:
     assert fake_model.generate_kwargs["max_time"] == 12.5
     assert fake_model.generate_kwargs["do_sample"] is False
     assert fake_model.generate_kwargs["pad_token_id"] == 99
+
+
+def test_generate_local_chat_retries_once_for_truncated_json(monkeypatch) -> None:
+    retry_model = _RetryModel()
+    retry_tokenizer = _RetryTokenizer(
+        outputs={
+            (101,): '{"label":"unanswerable","answer_text":"Cannot determine',
+            (
+                102,
+            ): '{"label":"unanswerable","answer_text":"Insufficient information to determine. Need ECCN.","citations":[],"evidence_okay":{"ok":true,"reasons":["no_grounded_quote_for_key_claim"]},"assumptions":[]}',
+        }
+    )
+
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS", "64")
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_JSON_RETRY_MAX_NEW_TOKENS", "160")
+    monkeypatch.setattr(
+        local_adapter_runtime,
+        "resolve_local_adapter_artifacts",
+        lambda _provider_cfg: local_adapter_runtime.LocalAdapterArtifacts(
+            adapter_dir=Path("adapter"),
+            run_dir=Path("run"),
+            base_model="Qwen/Qwen2.5-7B-Instruct",
+            model_label="run-1",
+        ),
+    )
+    monkeypatch.setattr(local_adapter_runtime, "_resolve_device_name", lambda: "cpu")
+    monkeypatch.setattr(
+        local_adapter_runtime,
+        "_load_local_stack",
+        lambda *_args: (retry_tokenizer, retry_model, ""),
+    )
+
+    result = local_adapter_runtime.generate_local_chat(
+        [{"role": "user", "content": "Q?"}],
+        provider_cfg=ProviderConfig(
+            provider="local_adapter",
+            api_key="",
+            model="run-1",
+            base_url="",
+            base_model="Qwen/Qwen2.5-7B-Instruct",
+            adapter_dir="adapter",
+            execution_mode="local",
+        ),
+        require_valid_json=True,
+    )
+
+    assert json.loads(result)["label"] == "unanswerable"
+    assert retry_model.calls == [64, 160]
+
+
+def test_generate_local_chat_skips_json_retry_without_explicit_override(
+    monkeypatch,
+) -> None:
+    retry_model = _RetryModel()
+    retry_tokenizer = _RetryTokenizer(
+        outputs={(101,): '{"label":"unanswerable","answer_text":"Cannot determine'}
+    )
+
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS", "64")
+    monkeypatch.delenv(
+        "EARCRAWLER_LOCAL_LLM_JSON_RETRY_MAX_NEW_TOKENS",
+        raising=False,
+    )
+    monkeypatch.delenv(
+        "EARCRAWLER_LOCAL_LLM_JSON_RETRY_MAX_TIME_SECONDS",
+        raising=False,
+    )
+    monkeypatch.setattr(
+        local_adapter_runtime,
+        "resolve_local_adapter_artifacts",
+        lambda _provider_cfg: local_adapter_runtime.LocalAdapterArtifacts(
+            adapter_dir=Path("adapter"),
+            run_dir=Path("run"),
+            base_model="Qwen/Qwen2.5-7B-Instruct",
+            model_label="run-1",
+        ),
+    )
+    monkeypatch.setattr(local_adapter_runtime, "_resolve_device_name", lambda: "cpu")
+    monkeypatch.setattr(
+        local_adapter_runtime,
+        "_load_local_stack",
+        lambda *_args: (retry_tokenizer, retry_model, ""),
+    )
+
+    result = local_adapter_runtime.generate_local_chat(
+        [{"role": "user", "content": "Q?"}],
+        provider_cfg=ProviderConfig(
+            provider="local_adapter",
+            api_key="",
+            model="run-1",
+            base_url="",
+            base_model="Qwen/Qwen2.5-7B-Instruct",
+            adapter_dir="adapter",
+            execution_mode="local",
+        ),
+        require_valid_json=True,
+    )
+
+    assert result == '{"label":"unanswerable","answer_text":"Cannot determine'
+    assert retry_model.calls == [64]
