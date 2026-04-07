@@ -139,7 +139,7 @@ If you are new to the repo, use this rule first:
 - `README.md`, `RUNBOOK.md`, `service/api_server`, `earctl`, and the code and scripts they directly rely on are the supported product/runtime surface.
 - `Research/`, `docs/proposal/`, and design notes for gated or future work are not production commitments by themselves.
 - If a feature is not described through a supported `earctl` or `service.api_server` path with tests and operator docs, treat it as research, experimental, or quarantined.
-- Phase 5 training records keep `Qwen/Qwen2.5-7B-Instruct` as a planning-only future target and include Task 5.3 first-pass tooling in `docs/model_training_first_pass.md` and `scripts/training/`.
+- Phase 5 training records keep `google/gemma-4-E4B-it` as a planning-only future target and include Task 5.3 first-pass tooling in `docs/model_training_first_pass.md` and `scripts/training/`.
 - The training-input contract for this model work is recorded in `docs/model_training_contract.md`; it uses approved eCFR snapshot text and the derived retrieval corpus, not eval fixtures or benchmark artifacts.
 - Training scripts and artifacts are still a phase-gated workflow, not a supported operator runtime path by themselves.
 - Task 5.4 adds a separate optional runtime path that can load a Task 5.3 adapter through `/v1/rag/answer` only when `LLM_PROVIDER=local_adapter`, `EARCRAWLER_ENABLE_LOCAL_LLM=1`, and the recorded adapter artifacts are present.
@@ -275,7 +275,7 @@ $env:EARCTL_USER = 'test_operator'
 $env:EARCRAWLER_API_ENABLE_RAG = '1'
 $env:LLM_PROVIDER = 'local_adapter'
 $env:EARCRAWLER_ENABLE_LOCAL_LLM = '1'
-$env:EARCRAWLER_LOCAL_LLM_BASE_MODEL = 'Qwen/Qwen2.5-7B-Instruct'
+$env:EARCRAWLER_LOCAL_LLM_BASE_MODEL = 'google/gemma-4-E4B-it'
 $env:EARCRAWLER_LOCAL_LLM_ADAPTER_DIR = 'dist/training/<run_id>/adapter'
 $env:EARCRAWLER_LOCAL_LLM_MODEL_ID = '<run_id>'
 py -m earCrawler.cli api start
@@ -714,3 +714,4 @@ Keep using the Trade.gov Data API for entity lookup and the Federal Register API
   corpus build -> corpus validate -> kg-emit -> SHACL gate -> supported API smoke -> no-network RAG smoke.
 - The API smoke gate covers only supported routes: `/health`, `/v1/entities/{entity_id}`, `/v1/lineage/{entity_id}`, and `/v1/sparql`.
 - The no-network RAG smoke gate runs `tests/golden/test_phase2_golden_gate.py` with stubbed retrieval and stubbed LLM outputs; it does not depend on provider keys, FAISS, or live network access.
+

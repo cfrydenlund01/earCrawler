@@ -5,7 +5,7 @@ param(
     [string]$PythonVersion = "3.11",
     [ValidateSet("auto", "cuda", "cpu", "manual")]
     [string]$TorchMode = "auto",
-    [string]$TorchVersion = "2.3.0",
+    [string]$TorchVersion = "2.4.1",
     [string]$CudaWheelTag = "cu121",
     [switch]$SkipBaseInstall,
     [switch]$SkipEditableInstall,
@@ -218,10 +218,11 @@ if (-not $CheckOnly) {
             "pip",
             "install",
             "--upgrade",
-            "transformers==4.39.3",
-            "peft==0.11.1",
-            "accelerate==0.33.0",
-            "trl==0.9.6",
+            "transformers==5.5.0",
+            "peft==0.18.1",
+            "accelerate==1.13.0",
+            "huggingface_hub==1.9.1",
+            "trl==1.0.0",
             "bitsandbytes==0.49.2"
         ) -Step "install-qlora-training-extras"
         $installSummary.training_extras = "installed"

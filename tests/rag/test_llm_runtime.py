@@ -95,7 +95,7 @@ def test_resolve_llm_request_raises_when_local_adapter_disabled() -> None:
                 {
                     "provider": "local_adapter",
                     "model": "phase5-run",
-                    "base_model": "Qwen/Qwen2.5-7B-Instruct",
+                    "base_model": "google/gemma-4-E4B-it",
                     "adapter_dir": "dist/training/phase5-run/adapter",
                 },
             )()
@@ -165,7 +165,7 @@ def test_execute_sync_generation_uses_local_adapter_without_remote_egress(
     (adapter_dir / "tokenizer_config.json").write_text("{}", encoding="utf-8")
     (run_dir / "run_metadata.json").write_text("{}", encoding="utf-8")
     (run_dir / "inference_smoke.json").write_text(
-        json.dumps({"base_model": "Qwen/Qwen2.5-7B-Instruct"}),
+        json.dumps({"base_model": "google/gemma-4-E4B-it"}),
         encoding="utf-8",
     )
 
@@ -182,7 +182,7 @@ def test_execute_sync_generation_uses_local_adapter_without_remote_egress(
                 {
                     "provider": "local_adapter",
                     "model": "phase5-run",
-                    "base_model": "Qwen/Qwen2.5-7B-Instruct",
+                    "base_model": "google/gemma-4-E4B-it",
                     "adapter_dir": str(adapter_dir),
                 },
             )()
@@ -227,3 +227,4 @@ def test_execute_sync_generation_uses_local_adapter_without_remote_egress(
     assert result.provider_label == "local_adapter"
     assert result.model_label == "phase5-run"
     assert result.egress_decision.remote_enabled is False
+

@@ -95,6 +95,14 @@ $ready = $false
 if ($health.Body -and $health.Body.readiness) {
     $ready = ($health.Body.readiness.status -eq 'pass')
 }
+$rateLimitRecommendationInputs = $null
+if ($health.Body -and $health.Body.rate_limit_recommendation_inputs) {
+    $rateLimitRecommendationInputs = $health.Body.rate_limit_recommendation_inputs
+}
+$rateLimitRecommendation = $null
+if ($health.Body -and $health.Body.rate_limit_recommendation) {
+    $rateLimitRecommendation = $health.Body.rate_limit_recommendation
+}
 $healthBudgetOk = ($health.DurationMs -le $apiBudget)
 $report += "Health budget OK: $(if ($healthBudgetOk) { 'yes' } else { 'no' })"
 $listeners = Get-ListeningPortOwners -LocalPort $Port
@@ -167,6 +175,22 @@ if ($JsonReportPath) {
             readiness_pass = $ready
             budget_ok = $healthBudgetOk
             error = if ($health.Error) { [string]$health.Error } else { "" }
+        }
+        rate_limit_recommendation_inputs = if ($null -ne $rateLimitRecommendationInputs) {
+            $rateLimitRecommendationInputs
+        } else {
+            [ordered]@{
+                status = "unknown"
+                reason = "missing_from_health_payload"
+            }
+        }
+        rate_limit_recommendation = if ($null -ne $rateLimitRecommendation) {
+            $rateLimitRecommendation
+        } else {
+            [ordered]@{
+                status = "unknown"
+                reason = "missing_from_health_payload"
+            }
         }
         listeners = [ordered]@{
             port = $Port

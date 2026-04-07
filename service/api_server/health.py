@@ -15,6 +15,7 @@ from fastapi import APIRouter, Request
 
 from earCrawler.observability.config import HealthBudgets
 from .limits import RateLimitExceeded
+from .runtime_state import RATE_LIMIT_RECOMMENDATION_SCHEMA_VERSION
 
 router = APIRouter(tags=["health"])
 _HEALTHY_SOURCE_STATES = {"ok", "no_results"}
@@ -40,6 +41,8 @@ async def health(request: Request) -> Dict[str, Any]:
     readiness_checks["rate_limiter"] = _check_rate_limiter(request, budgets)
     readiness_checks["disk"] = _check_disk(budgets)
     live_sources = _check_live_sources()
+    rate_limit_recommendation_inputs = _check_rate_limit_recommendation_inputs(request)
+    rate_limit_recommendation = _check_rate_limit_recommendation(request)
 
     readiness_status = (
         "pass"
@@ -57,6 +60,8 @@ async def health(request: Request) -> Dict[str, Any]:
             "status": readiness_status,
             "checks": readiness_checks,
         },
+        "rate_limit_recommendation_inputs": rate_limit_recommendation_inputs,
+        "rate_limit_recommendation": rate_limit_recommendation,
         "live_sources": live_sources,
     }
 
@@ -128,6 +133,37 @@ def _check_disk(budgets: HealthBudgets) -> Dict[str, Any]:
     if status == "fail":
         detail["reason"] = "insufficient free space"
     return {"status": status, "details": detail}
+
+
+def _check_rate_limit_recommendation_inputs(request: Request) -> Dict[str, Any]:
+    runtime_state = getattr(request.app.state, "runtime_state", None)
+    if runtime_state is None:
+        return {"status": "unknown", "reason": "runtime_state_missing"}
+    payload_fn = getattr(runtime_state, "recommendation_inputs_payload", None)
+    if not callable(payload_fn):
+        return {"status": "unknown", "reason": "telemetry_not_available"}
+    return {
+        "status": "pass",
+        "schema_version": "api-rate-limit-inputs.v1",
+        "details": payload_fn(),
+    }
+
+
+def _check_rate_limit_recommendation(request: Request) -> Dict[str, Any]:
+    runtime_state = getattr(request.app.state, "runtime_state", None)
+    if runtime_state is None:
+        return {"status": "unknown", "reason": "runtime_state_missing"}
+    payload_fn = getattr(runtime_state, "rate_limit_recommendation_payload", None)
+    if not callable(payload_fn):
+        return {"status": "unknown", "reason": "recommendation_not_available"}
+    payload = payload_fn()
+    status = payload.get("status", "unknown")
+    return {
+        "status": "pass",
+        "schema_version": RATE_LIMIT_RECOMMENDATION_SCHEMA_VERSION,
+        "recommendation_status": status,
+        "details": payload,
+    }
 
 
 def _parse_utc_timestamp(value: object) -> datetime | None:

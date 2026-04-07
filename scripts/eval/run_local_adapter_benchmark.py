@@ -367,7 +367,10 @@ def _capture_transport_diagnostic(
 
 
 def _copy_json(src: Path, dst: Path) -> None:
-    _write_json(dst, _read_json(src))
+    # Validate the source is JSON, then archive the exact bytes for stable SHA linking.
+    _read_json(src)
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(src, dst)
 
 
 def _emit_runtime_event(

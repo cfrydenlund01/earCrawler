@@ -27,7 +27,7 @@ def _make_run_dir(tmp_path: Path) -> Path:
         {
             "manifest_version": "training-package.v1",
             "run_id": "run-1",
-            "base_model": "Qwen/Qwen2.5-7B-Instruct",
+            "base_model": "google/gemma-4-E4B-it",
             "snapshot_id": "ecfr-title15-2026-02-28",
             "retrieval_corpus_digest": "a" * 64,
         },
@@ -43,7 +43,7 @@ def _make_run_dir(tmp_path: Path) -> Path:
     )
     _write_json(
         run_dir / "inference_smoke.json",
-        {"base_model": "Qwen/Qwen2.5-7B-Instruct", "pass": True},
+        {"base_model": "google/gemma-4-E4B-it", "pass": True},
     )
     return run_dir
 
@@ -276,6 +276,11 @@ def test_runner_writes_bundle_and_summary(monkeypatch, tmp_path: Path) -> None:
     assert summary["schema_version"] == "local-adapter-benchmark.v1"
     assert summary["smoke_precondition"]["required"] is True
     assert summary["smoke_precondition"]["bundle_copy_path"] == str((bundle_dir / "preconditions" / "local_adapter_smoke.json").resolve())
+    source_smoke_sha = bench._sha256_file(smoke_report)
+    copied_smoke_sha = bench._sha256_file(bundle_dir / "preconditions" / "local_adapter_smoke.json")
+    assert copied_smoke_sha == source_smoke_sha
+    assert summary["smoke_precondition"]["sha256"] == source_smoke_sha
+    assert summary["smoke_precondition"]["bundle_copy_sha256"] == copied_smoke_sha
     assert summary["auth_precondition"]["status"] == "passed"
     assert (bundle_dir / "preconditions" / "benchmark_api_auth.json").exists()
     assert summary["warmup_precondition"]["required"] is True
@@ -289,6 +294,8 @@ def test_runner_writes_bundle_and_summary(monkeypatch, tmp_path: Path) -> None:
     assert manifest["smoke_precondition"]["required"] is True
     assert manifest["smoke_precondition"]["status"] == "passed"
     assert manifest["smoke_precondition"]["bundle_copy_path"] == str((bundle_dir / "preconditions" / "local_adapter_smoke.json").resolve())
+    assert manifest["smoke_precondition"]["source_sha256"] == source_smoke_sha
+    assert manifest["smoke_precondition"]["bundle_copy_sha256"] == copied_smoke_sha
     assert manifest["summary_json_sha256"]
     assert manifest["artifacts_json_sha256"]
     assert manifest["training_run"]["run_id"] == "run-1"
@@ -979,3 +986,4 @@ def test_runner_blocks_incomplete_training_run_before_benchmarking(tmp_path: Pat
     )
 
     assert rc == 1
+

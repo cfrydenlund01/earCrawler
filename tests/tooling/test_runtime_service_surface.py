@@ -186,11 +186,11 @@ def test_phase5_base_model_selection_is_recorded_as_planning_only() -> None:
         REPO_ROOT / "config" / "training_model_selection.example.env"
     ).read_text(encoding="utf-8")
 
-    assert "Qwen/Qwen2.5-7B-Instruct" in readme
-    assert "Qwen/Qwen2.5-7B-Instruct" in adr
+    assert "google/gemma-4-E4B-it" in readme
+    assert "google/gemma-4-E4B-it" in adr
     assert "planning-only" in adr
     assert "Task 5.1" in execution_plan
-    assert "Qwen/Qwen2.5-7B-Instruct" in config_record
+    assert "google/gemma-4-E4B-it" in config_record
     assert "TRAINING_MODEL_STATUS=planning_only" in config_record
     assert "This file is not consumed by the current runtime" in config_record
 
@@ -251,7 +251,7 @@ def test_phase5_first_finetune_pass_is_recorded_with_repeatable_commands() -> No
     assert "require_qlora_4bit=true" in runbook
     assert "qlora.effective_use_4bit" in runbook
     assert '"schema_version": "training-run-config.v1"' in config_record
-    assert '"base_model": "Qwen/Qwen2.5-7B-Instruct"' in config_record
+    assert '"base_model": "google/gemma-4-E4B-it"' in config_record
     assert '"require_qlora_4bit": true' in config_record
     assert '"use_4bit": true' in config_record
     assert "<snapshot_id>" not in config_record
@@ -816,3 +816,4 @@ def test_cli_entrypoint_is_thin_and_uses_domain_registrars() -> None:
     assert "def _register_shared_commands(" in main_cli
     assert main_cli.count("@click.command(") <= 2
     assert len(main_cli.splitlines()) < 220
+

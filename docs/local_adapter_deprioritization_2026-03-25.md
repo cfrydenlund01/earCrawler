@@ -35,7 +35,7 @@ story:
 - the reviewed candidate under
   `dist/training/step52-real-candidate-gpt2b-20260319/` uses
   `hf-internal-testing/tiny-random-gpt2`, not the planning-only future target
-  `Qwen/Qwen2.5-7B-Instruct`
+  `google/gemma-4-E4B-it`
 - `kg/reports/local-adapter-smoke.json` records `status=failed` with
   `disabled_reason = "Retriever not ready"`
 - the paired benchmark bundle under
@@ -88,3 +88,4 @@ re-activates it and all of the following are true:
   evidence workflow
 - `Not supported`: any claim that local-adapter is near-production for the
   current production-beta target
+

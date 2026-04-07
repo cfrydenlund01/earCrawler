@@ -22,7 +22,7 @@ from typing import Any
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-7B-Instruct"
+DEFAULT_BASE_MODEL = "google/gemma-4-E4B-it"
 DEFAULT_SYSTEM_PROMPT = (
     "Answer only from cited EAR evidence. "
     "If evidence is insufficient, refuse and explain what is missing."
@@ -273,6 +273,28 @@ def _validate_snapshot_preflight(
                 "FAISS index metadata snapshot_sha256 does not match snapshot manifest. "
                 f"index_meta='{index_snapshot_sha}' manifest='{manifest_snapshot_sha}'"
             )
+
+
+def _validate_configured_snapshot_fields(
+    *,
+    snapshot_manifest_value: Any,
+    snapshot_id_value: Any,
+    snapshot_sha256_value: Any,
+) -> None:
+    snapshot_manifest_raw = str(snapshot_manifest_value or "").strip()
+    snapshot_id_raw = str(snapshot_id_value or "").strip()
+    snapshot_sha256_raw = str(snapshot_sha256_value or "").strip()
+
+    if snapshot_manifest_raw and _contains_placeholder(snapshot_manifest_raw):
+        raise ValueError(
+            "Configured snapshot_manifest cannot contain placeholder tokens."
+        )
+    if snapshot_id_raw and _contains_placeholder(snapshot_id_raw):
+        raise ValueError("Configured snapshot_id cannot contain placeholder tokens.")
+    if snapshot_sha256_raw and _contains_placeholder(snapshot_sha256_raw):
+        raise ValueError(
+            "Configured snapshot_sha256 cannot contain placeholder tokens."
+        )
 
 
 def _validate_qlora_preflight(
@@ -705,7 +727,7 @@ def _train_adapter(
         "use_safetensors": not allow_pt_bin,
     }
     if torch.cuda.is_available():
-        model_kwargs["device_map"] = "auto"
+        model_kwargs["device_map"] = None
         if torch.cuda.is_bf16_supported():
             model_kwargs["torch_dtype"] = torch.bfloat16
         else:
@@ -730,6 +752,7 @@ def _train_adapter(
             bnb_4bit_compute_dtype=compute_dtype,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
+            llm_int8_enable_fp32_cpu_offload=False,
         )
 
     model = AutoModelForCausalLM.from_pretrained(base_model, **model_kwargs)
@@ -738,6 +761,22 @@ def _train_adapter(
         raise RuntimeError(
             "Requested --use-4bit, but model load did not report effective 4-bit quantization."
         )
+    # LoRA in peft does not recognize Gemma4ClippableLinear wrappers; when
+    # clipping is disabled (default), unwrap to the inner linear so adapters can
+    # be attached.
+    try:
+        from transformers.models.gemma4.modeling_gemma4 import Gemma4ClippableLinear
+    except Exception:  # pragma: no cover - optional import
+        Gemma4ClippableLinear = None
+
+    def _unwrap_clippable_linears(mod: torch.nn.Module) -> None:
+        for child_name, child in list(mod.named_children()):
+            if Gemma4ClippableLinear and isinstance(child, Gemma4ClippableLinear):
+                setattr(mod, child_name, child.linear)
+                child = getattr(mod, child_name)
+            _unwrap_clippable_linears(child)
+
+    _unwrap_clippable_linears(model)
     if use_4bit:
         model = prepare_model_for_kbit_training(model)
 
@@ -754,7 +793,6 @@ def _train_adapter(
     checkpoints_dir = output_dir / "checkpoints"
     train_args_kwargs: dict[str, Any] = {
         "output_dir": str(checkpoints_dir),
-        "overwrite_output_dir": True,
         "num_train_epochs": float(epochs),
         "learning_rate": float(learning_rate),
         "per_device_train_batch_size": int(batch_size),
@@ -831,7 +869,7 @@ def _run_inference_smoke(
         "use_safetensors": not allow_pt_bin,
     }
     if torch.cuda.is_available():
-        model_kwargs["device_map"] = "auto"
+        model_kwargs["device_map"] = None
         if torch.cuda.is_bf16_supported():
             model_kwargs["torch_dtype"] = torch.bfloat16
         else:
@@ -855,8 +893,22 @@ def _run_inference_smoke(
             bnb_4bit_compute_dtype=compute_dtype,
             bnb_4bit_quant_type="nf4",
             bnb_4bit_use_double_quant=True,
+            llm_int8_enable_fp32_cpu_offload=True,
         )
     model = AutoModelForCausalLM.from_pretrained(base_model, **model_kwargs)
+    try:
+        from transformers.models.gemma4.modeling_gemma4 import Gemma4ClippableLinear
+    except Exception:  # pragma: no cover - optional import
+        Gemma4ClippableLinear = None
+
+    def _unwrap_clippable_linears(mod: torch.nn.Module) -> None:
+        for child_name, child in list(mod.named_children()):
+            if Gemma4ClippableLinear and isinstance(child, Gemma4ClippableLinear):
+                setattr(mod, child_name, child.linear)
+                child = getattr(mod, child_name)
+            _unwrap_clippable_linears(child)
+
+    _unwrap_clippable_linears(model)
     model = PeftModel.from_pretrained(model, str(adapter_dir))
     model.eval()
 
@@ -1010,6 +1062,16 @@ def main(argv: list[str] | None = None) -> int:
         )
     except (FileNotFoundError, ValueError) as exc:
         print(f"Training corpus preflight failed: {exc}", file=sys.stderr)
+        return 2
+
+    try:
+        _validate_configured_snapshot_fields(
+            snapshot_manifest_value=args.snapshot_manifest,
+            snapshot_id_value=args.snapshot_id,
+            snapshot_sha256_value=args.snapshot_sha256,
+        )
+    except ValueError as exc:
+        print(f"Training snapshot preflight failed: {exc}", file=sys.stderr)
         return 2
 
     snapshot_manifest = (
@@ -1228,3 +1290,4 @@ def main(argv: list[str] | None = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover
     raise SystemExit(main())
+

@@ -175,7 +175,7 @@ def test_phase5_training_runner_prepare_only_writes_manifest_and_metadata(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     assert manifest["manifest_version"] == "training-package.v1"
-    assert manifest["base_model"] == "Qwen/Qwen2.5-7B-Instruct"
+    assert manifest["base_model"] == "google/gemma-4-E4B-it"
     assert manifest["example_count"] == 4
     assert metadata["status"] == "prepare_only"
     assert metadata["prepare_only"] is True
@@ -511,3 +511,53 @@ def test_phase5_training_runner_fails_when_qlora_required_without_4bit(
     assert proc.returncode == 2
     assert "Training QLoRA preflight failed:" in proc.stdout
     assert "use_4bit is false" in proc.stdout
+
+
+def test_phase5_training_runner_rejects_placeholder_snapshot_fields(
+    tmp_path: Path,
+) -> None:
+    corpus = tmp_path / "retrieval_corpus.jsonl"
+    _write_corpus(corpus)
+    index_meta = tmp_path / "index.meta.json"
+    _write_index_meta(
+        index_meta,
+        corpus_digest=_sha256_file(corpus),
+        doc_count=2,
+    )
+    contract = tmp_path / "training_input_contract.json"
+    _write_training_contract(contract, corpus=corpus, index_meta=index_meta)
+
+    proc = subprocess.run(
+        [
+            sys.executable,
+            "scripts/training/run_phase5_finetune.py",
+            "--prepare-only",
+            "--retrieval-corpus",
+            str(corpus),
+            "--training-input-contract",
+            str(contract),
+            "--index-meta",
+            str(index_meta),
+            "--output-root",
+            str(tmp_path / "dist_training"),
+            "--run-id",
+            "phase5-placeholder-snapshot-fields",
+            "--snapshot-id",
+            "<snapshot_id>",
+            "--snapshot-sha256",
+            "<snapshot_sha256>",
+            "--max-examples",
+            "4",
+        ],
+        cwd=REPO_ROOT,
+        text=True,
+        encoding="utf-8",
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        check=False,
+    )
+
+    assert proc.returncode == 2
+    assert "Training snapshot preflight failed:" in proc.stdout
+    assert "Configured snapshot_id cannot contain placeholder tokens." in proc.stdout
+

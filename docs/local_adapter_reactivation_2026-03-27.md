@@ -58,7 +58,7 @@ baseline release decision.
 
 ## Operational guardrails
 
-- Use `Qwen/Qwen2.5-7B-Instruct` as the intended base model for the first real
+- Use `google/gemma-4-E4B-it` as the intended base model for the first real
   candidate.
 - Keep training inputs pinned to the approved snapshot and retrieval-corpus
   chain recorded in the current Phase 3 artifact index.
@@ -73,3 +73,4 @@ baseline release decision.
 ## Immediate next step
 
 Proceed to Step 6.2 only.
+

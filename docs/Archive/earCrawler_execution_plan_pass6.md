@@ -1,5 +1,8 @@
 # earCrawler Execution Plan Going Forward
-_Source basis:_ This plan is derived from the uploaded **Run Pass 6** analysis as the primary project source. It translates the report’s findings into an ordered execution plan for work performed in **VS Code on Windows using the Codex plugin**. The only outside-source addition is the requested 7B model recommendation for a future training phase.
+
+> Archive note (2026-04-07): Active local-adapter baseline switched to `google/gemma-4-E4B-it`. This archived document is retained for historical context only and no longer governs active execution.
+
+_Source basis:_ This plan is derived from the uploaded **Run Pass 6** analysis as the primary project source. It translates the report’s findings into an ordered execution plan for work performed in **VS Code on Windows using the Codex plugin**. The only outside-source addition is the requested 4B model recommendation for a future training phase.
 
 ## Planning assumptions from the analysis
 - Supported production surface is intentionally narrow: **`earctl` + `service/api_server`**.
@@ -372,26 +375,26 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 
 ---
 
-### Task 5.1 — Select the production 7B model
-**Recommendation:** **Qwen2.5-7B-Instruct**  
-**Why this is a good fit:** It is an openly available 7B instruction model from the Qwen family, with official model and repository pages available.
+### Task 5.1 — Select the production 4B model
+**Recommendation:** **Gemma-4-E4B-it**  
+**Why this is a good fit:** It is an openly available 4B-class instruction model from the Gemma family, with official model and repository pages available.
 
 **Official model page**
-- Hugging Face: `Qwen/Qwen2.5-7B-Instruct`
+- Hugging Face: `google/gemma-4-E4B-it`
 
 **Official repository**
-- GitHub: `QwenLM/Qwen` 
+- GitHub: `google/gemma_pytorch` 
 
 **Recommended model:** GPT-5.4  
 **Reasoning level:** Medium  
-**Why this level:** Selection is bounded and based on a straightforward fit to your 7B requirement.
+**Why this level:** Selection is bounded and based on a straightforward fit to your 4B requirement.
 
 **Exit criteria**
 - One production-intended base model is chosen and written into docs/config.
 
 **Implementation status (March 11, 2026)**
 - Completed.
-- Recorded the production-intended base model as `Qwen/Qwen2.5-7B-Instruct`
+- Recorded the production-intended base model as `google/gemma-4-E4B-it`
   in `docs/model_training_surface_adr.md`.
 - Added planning-only config record
   `config/training_model_selection.example.env` so later training work has a
@@ -433,7 +436,7 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 
 ---
 
-### Task 5.3 — Run first production-oriented 7B fine-tuning pass
+### Task 5.3 — Run first production-oriented 4B fine-tuning pass
 **Goal:** Train the first production candidate model.  
 **Why now:** Only after the production path is stable should the model become another moving part.
 
@@ -552,7 +555,7 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 11. Add latency/failure budgets.
 12. Write single authoritative deployment/recovery flow.
 13. Lock single-host semantics.
-14. Select 7B production model.
+14. Select 4B production model.
 15. Prepare deterministic training contract.
 16. Train first production-oriented model.
 17. Integrate model conservatively.
@@ -580,7 +583,7 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 | 4.2 | Latency/failure budgets | GPT-5.4 | High |
 | 4.3 | Deployment/recovery story | GPT-5.4 | High |
 | 4.4 | Lock single-host semantics | GPT-5.4 | Medium |
-| 5.1 | Choose 7B production model | GPT-5.4 | Medium |
+| 5.1 | Choose 4B production model | GPT-5.4 | Medium |
 | 5.2 | Training data/contract prep | GPT-5.4 | High |
 | 5.3 | First fine-tuning pass | GPT-5.3-Codex | High |
 | 5.4 | Conservative model integration | GPT-5.4 | High |
@@ -590,3 +593,4 @@ This ordering follows the analysis emphasis on architectural ambiguity over obvi
 
 ## Practical next move
 Start with **Tasks 1.1, 1.2, and 1.3 only**. That trio turns the project from “green but slightly theatrical” into “green for the path that actually matters.” After that, make the KG support decision with a clean table and a clean gate in hand.
+

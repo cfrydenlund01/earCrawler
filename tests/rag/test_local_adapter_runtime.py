@@ -95,7 +95,7 @@ def test_resolve_local_adapter_artifacts_requires_expected_files(tmp_path: Path)
     run_dir = tmp_path / "run"
     adapter_dir = run_dir / "adapter"
     adapter_dir.mkdir(parents=True)
-    cfg = _provider_cfg(base_model="Qwen/Qwen2.5-7B-Instruct", adapter_dir=adapter_dir)
+    cfg = _provider_cfg(base_model="google/gemma-4-E4B-it", adapter_dir=adapter_dir)
     with pytest.raises(LLMProviderError, match="adapter_config.json"):
         local_adapter_runtime.resolve_local_adapter_artifacts(cfg)
 
@@ -113,7 +113,7 @@ def test_resolve_local_adapter_artifacts_rejects_base_model_mismatch(
         json.dumps({"base_model": "meta-llama/Llama-3.1-8B-Instruct"}),
         encoding="utf-8",
     )
-    cfg = _provider_cfg(base_model="Qwen/Qwen2.5-7B-Instruct", adapter_dir=adapter_dir)
+    cfg = _provider_cfg(base_model="google/gemma-4-E4B-it", adapter_dir=adapter_dir)
     with pytest.raises(LLMProviderError, match="base model mismatch"):
         local_adapter_runtime.resolve_local_adapter_artifacts(cfg)
 
@@ -140,7 +140,7 @@ def test_generate_local_chat_applies_generation_limits(monkeypatch) -> None:
         lambda _provider_cfg: local_adapter_runtime.LocalAdapterArtifacts(
             adapter_dir=Path("adapter"),
             run_dir=Path("run"),
-            base_model="Qwen/Qwen2.5-7B-Instruct",
+            base_model="google/gemma-4-E4B-it",
             model_label="run-1",
         ),
     )
@@ -158,7 +158,7 @@ def test_generate_local_chat_applies_generation_limits(monkeypatch) -> None:
             api_key="",
             model="run-1",
             base_url="",
-            base_model="Qwen/Qwen2.5-7B-Instruct",
+            base_model="google/gemma-4-E4B-it",
             adapter_dir="adapter",
             execution_mode="local",
         ),
@@ -191,7 +191,7 @@ def test_generate_local_chat_retries_once_for_truncated_json(monkeypatch) -> Non
         lambda _provider_cfg: local_adapter_runtime.LocalAdapterArtifacts(
             adapter_dir=Path("adapter"),
             run_dir=Path("run"),
-            base_model="Qwen/Qwen2.5-7B-Instruct",
+            base_model="google/gemma-4-E4B-it",
             model_label="run-1",
         ),
     )
@@ -209,7 +209,7 @@ def test_generate_local_chat_retries_once_for_truncated_json(monkeypatch) -> Non
             api_key="",
             model="run-1",
             base_url="",
-            base_model="Qwen/Qwen2.5-7B-Instruct",
+            base_model="google/gemma-4-E4B-it",
             adapter_dir="adapter",
             execution_mode="local",
         ),
@@ -243,7 +243,7 @@ def test_generate_local_chat_skips_json_retry_without_explicit_override(
         lambda _provider_cfg: local_adapter_runtime.LocalAdapterArtifacts(
             adapter_dir=Path("adapter"),
             run_dir=Path("run"),
-            base_model="Qwen/Qwen2.5-7B-Instruct",
+            base_model="google/gemma-4-E4B-it",
             model_label="run-1",
         ),
     )
@@ -261,7 +261,7 @@ def test_generate_local_chat_skips_json_retry_without_explicit_override(
             api_key="",
             model="run-1",
             base_url="",
-            base_model="Qwen/Qwen2.5-7B-Instruct",
+            base_model="google/gemma-4-E4B-it",
             adapter_dir="adapter",
             execution_mode="local",
         ),
@@ -270,3 +270,4 @@ def test_generate_local_chat_skips_json_retry_without_explicit_override(
 
     assert result == '{"label":"unanswerable","answer_text":"Cannot determine'
     assert retry_model.calls == [64]
+

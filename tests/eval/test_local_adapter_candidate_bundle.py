@@ -20,7 +20,7 @@ def _make_run_dir(tmp_path: Path) -> Path:
         {
             "manifest_version": "training-package.v1",
             "run_id": "run-1",
-            "base_model": "Qwen/Qwen2.5-7B-Instruct",
+            "base_model": "google/gemma-4-E4B-it",
             "snapshot_id": "ecfr-title15-2026-02-28",
             "snapshot_sha256": "a" * 64,
             "retrieval_corpus_path": "data/faiss/retrieval_corpus.jsonl",
@@ -45,7 +45,7 @@ def _make_run_dir(tmp_path: Path) -> Path:
         run_dir / "inference_smoke.json",
         {
             "pass": True,
-            "base_model": "Qwen/Qwen2.5-7B-Instruct",
+            "base_model": "google/gemma-4-E4B-it",
         },
     )
     _write_json(adapter / "adapter_config.json", {})
@@ -233,7 +233,9 @@ def test_builder_writes_reviewable_candidate_bundle(tmp_path: Path) -> None:
     )
 
     assert rc == 0
-    bundle_dir = out_root / "local_adapter_candidate_run-1_bundle-1"
+    bundle_dirs = [p for p in out_root.iterdir() if p.is_dir()]
+    assert len(bundle_dirs) == 1
+    bundle_dir = bundle_dirs[0]
     manifest = json.loads((bundle_dir / "bundle_manifest.json").read_text(encoding="utf-8"))
     assert manifest["schema_version"] == "local-adapter-review-bundle.v1"
     assert manifest["decision"] == "ready_for_formal_promotion_review"
@@ -241,3 +243,19 @@ def test_builder_writes_reviewable_candidate_bundle(tmp_path: Path) -> None:
     assert (bundle_dir / "benchmark" / "benchmark_summary.json").exists()
     assert (bundle_dir / "runtime" / "local-adapter-smoke.json").exists()
     assert (bundle_dir / "docs" / "rollback" / "windows_single_host_operator.md").exists()
+
+
+def test_builder_bounds_default_bundle_id_for_long_windows_paths(tmp_path: Path) -> None:
+    long_name = "gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1"
+    run_dir = _make_run_dir(tmp_path)
+    benchmark_summary = _make_benchmark_bundle(
+        tmp_path,
+        run_dir,
+        _make_smoke_report(tmp_path, run_dir),
+    )
+    benchmark_root = benchmark_summary.parent
+
+    bounded = bundle._default_bundle_id(Path(long_name), benchmark_root)
+    assert len(bounded) <= 120
+    assert bounded.startswith("local_adapter_candidate_")
+

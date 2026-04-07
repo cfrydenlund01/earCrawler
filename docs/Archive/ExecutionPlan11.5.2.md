@@ -1,5 +1,8 @@
 # Execution Plan 11.5.2
 
+> Archive note (2026-04-07): Active local-adapter baseline switched to `google/gemma-4-E4B-it`. This archived document is retained for historical context only and no longer governs active execution.
+
+
 Source guidance:
 
 - `docs/ExecutionPlan11.5.md` as structure/template only
@@ -35,8 +38,8 @@ The finish line is not "more investigation." The finish line is:
 
 Working target for this debug plan:
 
-- `run_id`: `qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1`
-- `run_dir`: `dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1`
+- `run_id`: `gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1`
+- `run_dir`: `dist/training/gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1`
 - benchmark API base URL: `http://127.0.0.1:9001`
 - benchmark manifest: `eval/manifest.json`
 - runtime smoke precondition: `kg/reports/local-adapter-smoke.json`
@@ -120,9 +123,9 @@ $env:EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS='64'
 $env:EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS='20'
 $env:LLM_PROVIDER='local_adapter'
 $env:EARCRAWLER_ENABLE_LOCAL_LLM='1'
-$env:EARCRAWLER_LOCAL_LLM_BASE_MODEL='Qwen/Qwen2.5-7B-Instruct'
-$env:EARCRAWLER_LOCAL_LLM_ADAPTER_DIR='dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/adapter'
-$env:EARCRAWLER_LOCAL_LLM_MODEL_ID='qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1'
+$env:EARCRAWLER_LOCAL_LLM_BASE_MODEL='google/gemma-4-E4B-it'
+$env:EARCRAWLER_LOCAL_LLM_ADAPTER_DIR='dist/training/gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/adapter'
+$env:EARCRAWLER_LOCAL_LLM_MODEL_ID='gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1'
 pwsh scripts/api-stop.ps1
 Remove-Item kg/reports/api-debug.out.log,kg/reports/api-debug.err.log -ErrorAction SilentlyContinue
 Start-Process -FilePath '.venv\Scripts\python.exe' `
@@ -280,10 +283,10 @@ Type: `Code`
 
 ```powershell
 .venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 `
+  --run-dir dist/training/gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 `
   --manifest eval/manifest.json `
   --dataset-id ear_compliance.v2 `
-  --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_retrieval_only_probe `
+  --run-id benchmark_gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_retrieval_only_probe `
   --smoke-report kg/reports/local-adapter-smoke.json `
   --timeout-seconds 120 `
   --max-consecutive-transport-failures 3 `
@@ -292,7 +295,7 @@ Type: `Code`
 
 Expected evidence:
 
-- `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_retrieval_only_probe/benchmark_summary.json`
+- `dist/benchmarks/benchmark_gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_retrieval_only_probe/benchmark_summary.json`
   or `benchmark_failure.json`
 
 ### Step 3.2 - Debug Retrieval-Only `429` Or Session-Contamination Failures Until Control Passes Cleanly
@@ -332,11 +335,11 @@ Type: `Code`
 
 ```powershell
 .venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 `
+  --run-dir dist/training/gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 `
   --manifest eval/manifest.json `
   --dataset-id ear_compliance.v2 `
   --max-items 5 `
-  --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight `
+  --run-id benchmark_gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight `
   --smoke-report kg/reports/local-adapter-smoke.json `
   --timeout-seconds 120 `
   --max-consecutive-transport-failures 3 `
@@ -362,10 +365,10 @@ Type: `Code`
 
 ```powershell
 .venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 `
+  --run-dir dist/training/gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 `
   --manifest eval/manifest.json `
   --dataset-id ear_compliance.v2 `
-  --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2 `
+  --run-id benchmark_gemma4-e4b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2 `
   --smoke-report kg/reports/local-adapter-smoke.json `
   --timeout-seconds 120 `
   --max-consecutive-transport-failures 3 `
@@ -391,3 +394,4 @@ Contingency if gate fails:
 - `7.3.b` passes cleanly
 - the original `docs/ExecutionPlan11.5_log.md` can then be refreshed from the
   final passing artifacts instead of partial failure snapshots
+

@@ -90,7 +90,7 @@
         "EARCRAWLER_LOCAL_LLM_ADAPTER_DIR=<run-dir>/adapter"
       ],
       "contract_artifacts": "documented_only",
-      "notes": "Requires an explicit Task 5.3/5.4 adapter artifact and validation path. The current reviewed evidence bundle is not promotion-ready, and the local-adapter track is formally deprioritized for the current production-beta target pending a later dated reactivation decision. Any future promotion would still inherit the advisory-only answer posture unless a dated decision widens it."
+      "notes": "Requires an explicit Task 5.3/5.4 adapter artifact and validation path. The current reviewed candidate was rejected on April 6, 2026 by the active release-evidence contract, so local-adapter serving is formally deprioritized, remains optional, and stays outside formal promotion review for the current production-beta target. Any future promotion would still inherit the advisory-only answer posture unless a later dated decision widens it."
     },
     {
       "id": "api.search",
@@ -204,3 +204,4 @@
     }
   ]
 }
+

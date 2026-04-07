@@ -249,7 +249,7 @@ def test_llm_endpoint_supports_local_adapter_without_remote_egress(
     (adapter_dir / "tokenizer_config.json").write_text("{}", encoding="utf-8")
     (run_dir / "run_metadata.json").write_text("{}", encoding="utf-8")
     (run_dir / "inference_smoke.json").write_text(
-        json.dumps({"base_model": "Qwen/Qwen2.5-7B-Instruct"}),
+        json.dumps({"base_model": "google/gemma-4-E4B-it"}),
         encoding="utf-8",
     )
 
@@ -276,7 +276,7 @@ def test_llm_endpoint_supports_local_adapter_without_remote_egress(
     )
     monkeypatch.setenv("LLM_PROVIDER", "local_adapter")
     monkeypatch.setenv("EARCRAWLER_ENABLE_LOCAL_LLM", "1")
-    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_BASE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+    monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_BASE_MODEL", "google/gemma-4-E4B-it")
     monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_ADAPTER_DIR", str(adapter_dir))
     monkeypatch.setenv("EARCRAWLER_LOCAL_LLM_MODEL_ID", "phase5-run")
     monkeypatch.setenv("EARCRAWLER_SKIP_LLM_SECRETS_FILE", "1")
@@ -591,3 +591,4 @@ def test_llm_endpoint_ungrounded_quote_returns_422(monkeypatch):
     assert data["output_ok"] is False
     assert data["output_error"]["code"] == "ungrounded_citation"
     assert data["egress"]["remote_enabled"] is True
+

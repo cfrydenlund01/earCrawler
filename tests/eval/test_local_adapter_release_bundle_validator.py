@@ -26,7 +26,7 @@ def _make_run_dir(
         {
             "manifest_version": "training-package.v1",
             "run_id": "run-1",
-            "base_model": "Qwen/Qwen2.5-7B-Instruct",
+            "base_model": "google/gemma-4-E4B-it",
             "snapshot_id": "ecfr-title15-2026-02-28",
             "snapshot_sha256": "a" * 64,
             "retrieval_corpus_path": "data/faiss/retrieval_corpus.jsonl",
@@ -66,7 +66,7 @@ def _make_run_dir(
         run_dir / "inference_smoke.json",
         {
             "pass": True,
-            "base_model": "Qwen/Qwen2.5-7B-Instruct",
+            "base_model": "google/gemma-4-E4B-it",
         },
     )
     _write_json(adapter / "adapter_config.json", {})
@@ -298,3 +298,4 @@ def test_validator_rejects_candidate_without_required_qlora_4bit_evidence(
     assert payload["decision"] == "reject_candidate"
     assert any("use_4bit" in item for item in payload["failing_evidence"])
     assert any("effective_use_4bit" in item for item in payload["failing_evidence"])
+

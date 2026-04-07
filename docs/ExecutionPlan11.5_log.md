@@ -1,792 +1,219 @@
-# ExecutionPlan11.5 Execution Log
-
-Plan: docs/ExecutionPlan11.5.md  
-Date: 2026-03-25 (America/Chicago)
-Status: Step 0.2 complete; Step 1.1 complete; Step 1.2 complete; Step 1.3 complete; Step 1.4 complete; Step 2.1 complete; Step 2.2 complete; Step 2.3 complete; Step 2.4 complete; Step 3.1 complete; Step 3.2 complete (live corpus rebuilt; diagnostics/remediation complete); Step 3.3 complete; Step 3.4 complete; Step 4.1 complete; Step 4.2 complete; Step 4.3 complete; Step 4.4 complete; Step 5.1 complete; Step 5.2 complete; Step 5.3 complete; Step 6.1 complete; Step 6.2 complete; Step 6.3 complete; Step 6.4 complete; Step 7.1 complete (CUDA QLoRA run executed end-to-end with smoke evidence); Step 7.2 complete; Step 7.3.a complete (clean rerun under ExecutionPlan11.5.2); Phase 0 gate closed; ready to continue to Step 7.3.b.
-
-## Phase 0 Baseline Runs
-
-- `py -3 -m pytest -q` — **failed (timeout)**: timed out after 300s (also timed out after initial 120s); full suite not completed.
-- `pwsh scripts/workspace-state.ps1 -Mode verify` — **passed**.
-- `pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist` — **failed**: missing artifact listed in `dist/checksums.sha256` (`earcrawler-kg-dev-20260319-snapshot.zip`).
-- `pwsh scripts/verify-release.ps1 -RequireCompleteEvidence` — **failed**: missing dist artifact `earcrawler-kg-dev-20260319-snapshot.zip` referenced in checksums.
-- `pwsh scripts/bootstrap-verify.ps1` — **failed**: Java major version 8 detected; minimum required is 11 (release path expects 17+ for Fuseki auto-provision).
-
-Current blockers to close Phase 0 gate:
-
-- Closed on 2026-03-27 after full-suite rerun and one deterministic test fix;
-  no remaining Phase 0 blockers.
-
-## Phase 1 Remediation
-
-### Step 1.1 - Repair `dist/` Integrity And Remove Uncontrolled Release Drift
-
-- Re-homed uncontrolled top-level artifacts:
-  - `dist/iis-front-door-smoke-test.json` -> `dist/checks/rehomed_release_drift/iis-front-door-smoke-test.json`
-  - `dist/iis-front-door-smoke-test.txt` -> `dist/checks/rehomed_release_drift/iis-front-door-smoke-test.txt`
-  - `dist/installed_runtime_smoke.b1.json` -> `dist/checks/rehomed_release_drift/installed_runtime_smoke.b1.json`
-- Refreshed `dist/checksums.sha256` using current retained top-level artifacts (`pwsh scripts/checksums.ps1`), removing stale reference to `earcrawler-kg-dev-20260319-snapshot.zip` and recording `earcrawler-kg-dev-20260325-snapshot.zip`.
-- Refreshed `dist/checksums.sha256.sig` with local release signing cert (`pwsh scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256 -Thumbprint 858B4E9F2201869090E09668C4FDBD1E5810E913`).
-- Targeted verification:
-  - `pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist` — **passed** (`verified 17 artifacts`).
-
-Step 1.1 completion note:
-- Authoritative integrity set is now `dist/checksums.sha256` + `dist/checksums.sha256.sig` over the current 17 top-level retained artifacts.
-- Manual operator assumptions still in force for later steps: Java 17+ host prerequisite not yet met on this machine; full release-evidence chain re-verification remains in Step 1.2.
-
-### Step 1.2 - Rebuild And Verify The Release Evidence Chain (complete)
-
-- Commands run:
-  - `pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist` — **initially failed** after runtime smoke refresh due checksum drift on `dist/installed_runtime_smoke.json`; resolved by refreshing checksums and signature, then reran.
-  - `pwsh scripts/checksums.ps1` — **completed** (checksums refreshed).
-  - `pwsh scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256` — **no-op** on this host without explicit cert selection (`No signing certificate provided; skipping.`).
-  - `pwsh scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256 -Thumbprint 858B4E9F2201869090E09668C4FDBD1E5810E913` — **completed** (signature verified).
-  - `pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist` — **passed** (`verified 18 artifacts`).
-  - `pwsh scripts/security-baseline.ps1 -Python py -RequirementsLock requirements-win-lock.txt -PipAuditIgnoreFile security/pip_audit_ignore.txt -OutputDir dist/security` — **passed** (`No known vulnerabilities found, 10 ignored`; `dist/security/security_scan_summary.json` overall_status=`passed`).
-  - `pwsh scripts/installed-runtime-smoke.ps1 -WheelPath dist/earcrawler-0.2.5-py3-none-any.whl -UseHermeticWheelhouse -HermeticBundleZipPath dist/hermetic-artifacts.zip -ReleaseChecksumsPath dist/checksums.sha256 -UseLiveFuseki -AutoProvisionFuseki -RequireFullBaseline -Host 127.0.0.1 -Port 9001 -FusekiHost 127.0.0.1 -FusekiPort 3030 -ReportPath dist/installed_runtime_smoke.json` — **passed**.
-  - `pwsh scripts/verify-release.ps1 -RequireCompleteEvidence` — **passed** (`dist/release_validation_evidence.json` refreshed).
-- Additional cleanup during this step:
-  - Removed placeholder artifacts from release surface (`dist/offline_bundle/*.PLACEHOLDER.txt` moved then deleted) to satisfy verifier placeholder check.
-  - Removed temporary Fuseki debug artifacts generated during remediation (`dist/debug_fuseki_repro.json`, `dist/fuseki_location_test.json`, `dist/fuseki_path_format_test.json`, `dist/tdb_lock_scan.json`) and refreshed checksums/signature.
-  - Fixed installed-runtime Fuseki baseline fixture provisioning by loading fixture triples into a named graph in `scripts/installed-runtime-smoke.ps1` (required by current `unionDefaultGraph` behavior for default API smoke queries).
-
-Step 1.2 completion note:
-- Release evidence chain is rebuilt and currently verifiable on this host (`preflight`, `security-baseline`, installed runtime smoke, and `verify-release -RequireCompleteEvidence` are all passing).
-- Next unresolved Phase 0 blocker remains outside Step 1.2: baseline `pytest -q` timeout.
-
-### Step 1.3 - Align Bootstrap Verification With The Supported Java Floor (complete)
-
-- Updated `scripts/bootstrap-verify.ps1` to make the two Java floors explicit:
-  - absolute bootstrap minimum remains `Java 11+`
-  - supported Fuseki auto-provision release/install floor is `Java 17+`
-- Updated operator/release docs to reflect the same contract:
-  - `README.md` prerequisite and Fuseki prep wording
-  - `docs/ops/release_process.md` Java prerequisite contract note
-- Targeted verification:
-  - `pwsh scripts/bootstrap-verify.ps1` — **passed** with Java 21 and now reports both floors in the `java_runtime` detail.
-
-Step 1.3 final prerequisite contract:
-- `bootstrap-verify` enforces `Java 11+` as the absolute repository bootstrap floor, while the supported Windows single-host release/install path that auto-provisions local Fuseki requires `Java 17+`; both requirements are now explicit in script output and operator docs.
-
-### Step 1.4 - Verify Host Prerequisites On The Active Machine (complete)
-
-- Commands run:
-  - `java -version` — **passed** (`openjdk version "21.0.7" 2025-04-15 LTS`).
-  - `pwsh scripts/bootstrap-verify.ps1` — **passed**.
-- Host verification note:
-  - This run was executed with `JAVA_HOME`/`PATH` pointed to `C:\Program Files\Eclipse Adoptium\jdk-21.0.7.6-hotspot`.
-
-## Phase 2 Baseline Re-Proof
-
-### Step 2.1 - Harden The Clean-Host Install And Smoke Path (complete)
-
-- Hardening changes:
-  - Updated `scripts/installed-runtime-smoke.ps1` to require `-ReleaseChecksumsPath` whenever `-HermeticBundleZipPath` is used.
-  - Added explicit hermetic bundle SHA-256 verification against `dist/checksums.sha256` before bundle extraction/install.
-  - Added machine-readable install evidence flag `install_details.hermetic_bundle_checksum_verified`.
-  - Added focused guard test in `tests/release/test_installed_runtime_smoke_options.py`.
-- Targeted verification:
-  - `py -3 -m pytest -q tests/release/test_installed_runtime_smoke_options.py` — **passed** (`3 passed`).
-  - `pwsh scripts/installed-runtime-smoke.ps1 -WheelPath dist/earcrawler-0.2.5-py3-none-any.whl -UseHermeticWheelhouse -HermeticBundleZipPath dist/hermetic-artifacts.zip -ReleaseChecksumsPath dist/checksums.sha256 -UseLiveFuseki -AutoProvisionFuseki -RequireFullBaseline -Host 127.0.0.1 -Port 9001 -FusekiHost 127.0.0.1 -FusekiPort 3030 -ReportPath dist/installed_runtime_smoke.json` — **initially failed** in a shell resolving Java 8.
-  - Rerun with Java 21 pinned in-shell (`JAVA_HOME=C:\Program Files\Eclipse Adoptium\jdk-21.0.7.6-hotspot`) — **passed**.
-
-Step 2.1 completion note:
-- The release-shaped install smoke now proves checksum-backed integrity for both the wheel and the hermetic bundle, then proves the supported single-host runtime contract (`install_mode=hermetic_wheelhouse`, `install_source=release_bundle`, live read-only Fuseki baseline, and passing supported API smoke) from installed artifacts rather than source checkout behavior.
-
-### Step 2.2 - Execute Installed Runtime Smoke In Release Shape (complete)
-
-- Command run:
-  - `pwsh scripts/installed-runtime-smoke.ps1 -WheelPath dist/earcrawler-0.2.5-py3-none-any.whl -UseHermeticWheelhouse -HermeticBundleZipPath dist/hermetic-artifacts.zip -ReleaseChecksumsPath dist/checksums.sha256 -UseLiveFuseki -AutoProvisionFuseki -RequireFullBaseline -Host 127.0.0.1 -Port 9001 -ReportPath dist/installed_runtime_smoke.json` — **passed**.
-- Host prerequisite note:
-  - Run executed with `JAVA_HOME`/`PATH` pinned to `C:\Program Files\Eclipse Adoptium\jdk-21.0.7.6-hotspot` so the supported Java 17+ Fuseki auto-provision floor was active.
-- Artifact refreshed:
-  - `dist/installed_runtime_smoke.json` (passing `installed-runtime-smoke.v1` evidence for release-bundle + hermetic-wheelhouse install shape).
-
-### Step 2.3 - Execute Supported API Smoke And Observability Probe (complete)
-
-- Commands run:
-  - `pwsh scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001` — **passed** (`API healthy`).
-  - `pwsh scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/api_smoke.json` — **passed**.
-  - `pwsh scripts/health/api-probe.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/observability/health-api.txt -JsonReportPath dist/observability/api_probe.json` — **passed**.
-  - `pwsh scripts/api-stop.ps1` — **completed** (`Stopped API process 30532`).
-- Artifacts refreshed:
-  - `dist/api_smoke.json` (`schema_version=supported-api-smoke.v1`, `overall_status=passed`)
-  - `dist/observability/health-api.txt`
-  - `dist/observability/api_probe.json` (`schema_version=api-probe-report.v1`, `overall_status=passed`)
-
-### Step 2.4 - Execute Optional Runtime Smoke Without Local Adapter (complete)
-
-- Command run:
-  - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json` — **passed**.
-- Artifact refreshed:
-  - `dist/optional_runtime_smoke.json` (`schema_version=optional-runtime-smoke.v1`, `overall_status=passed`)
-
-## Phase 3 Real Corpus Freeze
-
-### Step 3.1 - Validate Source Credentials And Live Ingest Readiness (complete)
-
-- Commands run:
-  - `$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES='1'; $env:EARCTL_USER='test_operator'; py -m earCrawler.cli jobs run tradegov --dry-run` — **passed**.
-  - `$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES='1'; $env:EARCTL_USER='test_operator'; py -m earCrawler.cli jobs run federalregister --dry-run` — **passed**.
-- Runtime evidence observed:
-  - Dry-run ingest/build path completed and validated corpus output in `data` for both commands.
-  - Reported summaries:
-    - tradegov dry-run summary included `ear=4, nsf=2`.
-    - federalregister dry-run summary included `ear=4`.
-  - Both runs wrote `data/manifest.json` and reported `Corpus under data passed validation`.
-
-### Step 3.2 - Build And Validate The Curated Corpus From Real Sources (complete, upstream-degraded)
-
-- Commands run:
-  - Initial unbounded live run (`py -m earCrawler.cli corpus build -s ear -s nsf --out data --live`) repeatedly exceeded shell timeouts and left lingering worker processes; those processes were terminated before rerun.
-  - Deterministic bounded rerun:
-    - `$env:FR_MAX_CALLS='1'; py -m earCrawler.cli corpus build -s ear -s nsf --out data --live` — **completed** with degraded upstream/no-results (`ear=0`, `nsf=0`).
-  - `py -m earCrawler.cli corpus validate --dir data` — **passed**.
-  - `py -m earCrawler.cli corpus snapshot --dir data --out dist/corpus` — **passed**.
-- Artifacts refreshed:
-  - `data/manifest.json` (live build metadata; summary `ear=0`, `nsf=0`; upstream-degraded statuses observed for FR/ORI access).
-  - `dist/corpus/20260326T215512Z` (new snapshot directory from the validated current corpus state).
-- Operational note:
-  - FR live ingest was bounded for determinism due repeated long-running build behavior in this environment; ORI listing returned HTTP 404 and FR returned budget-constrained/no-results under the bounded run.
-
-### Step 3.2 - Diagnostic And Remediation Pass (2026-03-26)
-
-- Diagnostic objective:
-  - Enumerate and close Step 3.2 failures/warnings/timeouts/bugs so Phase 3 can proceed to Step 3.3 on current facts.
-
-- Issue 1: NSF live ingest warning/failure (`ORI` listing 404, `nsf=0`).
-  - Symptom:
-    - `py -m earCrawler.cli corpus build -s nsf --out data --live` returned empty corpus with `get_listing_html` HTTP 404 warning.
-  - Root cause:
-    - `api_clients/ori_client.py` targeted stale listing path `/case_findings`.
-  - Fix:
-    - Added listing-path fallback order (`/case_summary`, `/content/case_summary`, then legacy `/case_findings`).
-    - Tightened live link extraction in `earCrawler/core/nsf_case_parser.py` to include only case-detail links (`case-summary-` / `/case/`) and avoid nav-link crawling drift.
-    - Added stable case-id fallback when title lacks `Case Number ...`.
-  - Verification:
-    - Live run now succeeds with non-empty NSF corpus (`nsf=239`).
-    - Added/ran targeted tests:
-      - `tests/clients/test_ori_client.py`
-      - `tests/core/test_nsf_case_parser.py`
-
-- Issue 2: EAR live ingest timeout/hang behavior.
-  - Symptom:
-    - `py -m earCrawler.cli corpus build -s ear --out data --live` repeatedly exceeded shell timeouts.
-  - Root causes:
-    - Federal Register fallback path combined recursive `_get_json` calls with retry wrapper behavior, producing amplified retry timing under non-JSON edge responses.
-    - `search_documents` used `conditions[any]`, which returns HTTP 400 on the `www.federalregister.gov/api/v1` fallback host.
-  - Fix:
-    - Refactored `api_clients/federalregister_client.py`:
-      - removed recursive `_get_json` fallback behavior in favor of single-pass fallback per retry attempt,
-      - added explicit alternate-URL builder,
-      - corrected search query parameter from `conditions[any]` to `conditions[term]` for compatibility with fallback API host.
-  - Verification:
-    - `search_documents` now returns quickly with typed status instead of hanging.
-    - EAR live build now completes successfully with real records (`ear=6736` in latest run).
-    - Added/ran targeted tests:
-      - `tests/clients/test_federalregister_client.py`
-      - `tests/api/test_federalregister_client_html_guard.py`
-      - `tests/core/test_ear_crawler.py`
-
-- Issue 3: EAR merge conflict bug during full live build.
-  - Symptom:
-    - Build emitted: `Conflicting content fingerprints for record ear:...`.
-  - Root cause:
-    - Live EAR source replay included multiple versions of the same `document_number:paragraph_index`; corpus merge logic treats same canonical ID with different fingerprint as a conflict.
-  - Fix:
-    - `earCrawler/corpus/sources.py` now keeps only the latest paragraph version per identifier when materializing live EAR rows (higher `version`, then newer `scraped_at`).
-  - Verification:
-    - Conflict no longer reproduces in subsequent live builds.
-    - Added regression test:
-      - `tests/corpus/test_build_and_validate.py::test_live_build_prefers_latest_ear_paragraph_version_per_identifier`
-
-- Issue 4: EAR runtime scalability bug (CPU-heavy version tracking).
-  - Symptom:
-    - Long-running EAR crawl workers showed sustained CPU and poor scaling under larger paragraph sets.
-  - Root cause:
-    - `earCrawler/core/ear_crawler.py` used repeated full `hash_index.values()` scans to compute paragraph versions (O(n^2)-style behavior).
-  - Fix:
-    - Added O(1) position-version index keyed by `(document_number, paragraph_index)`.
-    - Added document ID fallback to `id` when `document_number` is absent.
-  - Verification:
-    - Added regression tests in `tests/core/test_ear_crawler.py` for ID fallback and no `hash_index.values()` scan path.
-
-- Current Step 3.2 evidence after remediation:
-  - `py -m earCrawler.cli corpus build -s ear -s nsf --out data --live` — **passed**.
-    - Latest summary: `ear=6736`, `nsf=239`.
-  - `py -m earCrawler.cli corpus validate --dir data` — **passed**.
-  - `py -m earCrawler.cli corpus snapshot --dir data --out dist/corpus` — **passed**.
-  - Snapshot artifact:
-    - `dist/corpus/20260326T230038Z`
-
-Final Step 3.2 assessment for Step 3.3 readiness:
-- **Ready to proceed to Step 3.3.**
-- Rationale:
-  - live corpus build now succeeds with non-empty real-source outputs,
-  - validation passes on the rebuilt corpus,
-  - current snapshot chain exists and is refreshable on-demand,
-  - previously blocking Step 3.2 failures are diagnosed and remediated in code/tests.
-- Residual operational note:
-  - full live EAR build remains time-expensive (minutes-scale) due upstream volume/network behavior; this is now a runtime characteristic, not a blocking correctness failure.
-
-### Step 3.3 - Lock Training-Authoritative Inputs And Provenance (complete)
-
-- Contract-hardening changes:
-  - Updated `config/training_input_contract.example.json` authoritative snapshot defaults from placeholders to the approved current snapshot:
-    - `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json`
-    - `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl`
-  - Updated `config/training_first_pass.example.json` to concrete default snapshot values (`snapshot_manifest`, `snapshot_id`, `snapshot_sha256`) aligned to the approved manifest and current FAISS snapshot metadata.
-  - Strengthened `scripts/training/run_phase5_finetune.py` preflight to reject placeholder/unknown snapshot provenance and enforce:
-    - configured snapshot manifest must match `authoritative_sources.offline_snapshot_manifest` when set,
-    - configured `snapshot_id`/`snapshot_sha256` must match manifest values,
-    - FAISS `index.meta.json` snapshot metadata must match the same manifest when present.
-  - Updated contract documentation in `docs/model_training_contract.md` to include snapshot-manifest and FAISS snapshot alignment preflight rules.
-- Targeted tests added/updated:
-  - `tests/tooling/test_phase5_training_runner.py`:
-    - fail when contract requires snapshot manifest but runtime config omits it,
-    - fail when FAISS snapshot metadata is stale/mismatched vs approved manifest.
-  - `tests/tooling/test_runtime_service_surface.py`:
-    - assert training config defaults no longer contain placeholder snapshot tokens.
-- Verification:
-  - `py -3 -m pytest -q tests/tooling/test_phase5_training_runner.py tests/tooling/test_runtime_service_surface.py` — **passed** (`32 passed`).
-
-Step 3.3 completion note:
-- Production training defaults are now pinned to one approved offline snapshot + canonical retrieval corpus + FAISS metadata chain, with preflight checks that block drift toward placeholders, stale snapshot metadata, or non-authoritative input paths.
-
-### Step 3.4 - Record The Current Snapshot For Later KG And Training Evidence (complete)
-
-- Dated artifact index entry created:
-  - `dist/training/20260327_phase3_artifact_index.json`
-- Recorded fields:
-  - approved offline snapshot id: `ecfr_current_20260210_1627_parts_736_740_742_744_746`
-  - snapshot sha256: `3f3fa624f3af38490a65afa809cb23beba0b0788e01b2db497ac67f2ce5439ca`
-  - retrieval corpus path: `data/faiss/retrieval_corpus.jsonl`
-  - retrieval corpus digest: `c447526e2d22174ff5ef099aff41a4e0dec99a0c74b51fde594a3d03f5bf3f48`
-  - index metadata path: `data/faiss/index.meta.json`
-  - corpus document count: `3040`
-- Verification:
-  - artifact entry contents reviewed in place and match the current Phase 3 corpus/index provenance chain.
-
-Step 3.4 completion note:
-- Later KG and training phases now have one machine-oriented record that fixes the exact snapshot, corpus, and index inputs produced by Phase 3.
-
-## Phase 4 KG Rebuild And Exit-Criteria Evidence
-
-### Step 4.1 - Emit And Validate The KG From The Current Corpus (complete)
-
-- Commands run:
-  - `py -m earCrawler.cli kg emit -s ear -s nsf -i data -o data\kg` — **passed**.
-  - `py -m earCrawler.cli kg validate --glob "data/kg/*.ttl" --fail-on supported` — **passed**.
-- KG emit output:
-  - `ear: 40511 triples -> data\kg\ear.ttl`
-  - `nsf: 3143 triples -> data\kg\nsf.ttl`
-- Validation evidence observed:
-  - `data\kg\ear.ttl`: `shacl=True`, `dangling_citations=0`, `entity_mentions_without_type=0`, `missing_provenance=0`, `orphan_paragraphs=0`, `orphan_sections=0`
-  - `data\kg\nsf.ttl`: `shacl=True`, `dangling_citations=0`, `entity_mentions_without_type=0`, `missing_provenance=0`, `orphan_paragraphs=0`, `orphan_sections=0`
-  - Blocking checks evaluated: `orphan_paragraphs`, `entity_mentions_without_type` (both clean under `--fail-on supported`).
-
-Step 4.1 completion note:
-- The real current corpus now emits clean KG artifacts and passes supported blocking semantic checks, so Phase 4 can proceed to Step 4.2 gap-closure work if needed.
-
-### Step 4.2 - Close Any Remaining KG Integrity, Namespace, Or Provenance Gaps (complete)
-
-- Governing-context review completed:
-  - `docs/kg_quarantine_exit_gate.md`
-  - `docs/kg_unquarantine_plan.md`
-  - `docs/kg_boundary_and_iri_strategy.md`
-  - `docs/identifier_policy.md`
-  - `docs/kg_semantic_blocking_checks.md`
-- Assessment from Phase 4.1 output:
-  - no integrity/provenance failures were exposed (`dangling_citations=0`, `entity_mentions_without_type=0`, `missing_provenance=0`, `orphan_paragraphs=0`, `orphan_sections=0`; `shacl=True` on both emitted TTLs).
-- Additional targeted verification run for Step 4.2:
-  - `py -3 -m pytest -q tests/kg/test_supported_path_semantic_contract.py tests/kg/test_namespaces.py tests/kg/test_validate.py` — **passed** (`10 passed`).
-  - `rg -n "https://example.org/ear#|https://example.org/entity#|http://example.org/ear/" data/kg -g "*.ttl"` — **passed** (no legacy namespace matches in current emitted TTLs).
-  - `py -m earCrawler.cli kg validate --glob "data/kg/*.ttl" --fail-on any` — **passed** (all SHACL/SPARQL checks remain zero on current emitted KG files).
-
-Step 4.2 completion note:
-- No remaining KG integrity, namespace, identifier, or provenance regressions were found that required code or test changes in this step. The current corpus -> KG output is technically clean for progression to Phase 4.3 runtime proof work.
-
-### Step 4.3 - Prove Production-Like KG Runtime Mechanics (complete)
-
-- Initial runtime attempt outcome:
-  - `kg load` + `kg serve` + `kg query` command path executed, but surfaced runtime-shape defects:
-    - Fuseki startup mismatch for TDB2 when `--tdb2` was not included.
-    - `kg load --db db` and `kg serve --db db --dataset /ear` targeted different storage layouts, yielding empty served dataset under `/ear`.
-    - RBAC note: `kg query` requires `reader` role (used `ci_user` for final query run).
-- Step 4.3 remediation implemented:
-  - `earCrawler/kg/fuseki.py`
-    - Added `--tdb2` to Fuseki command.
-    - Aligned served TDB2 location with dataset path (`--db db --dataset /ear` resolves to `db/ear`).
-  - `earCrawler/cli/kg_commands.py`
-    - Added dataset-aware load path resolution so `kg load --db db` (default dataset `/ear`) loads into `db/ear`.
-  - Tests updated:
-    - `tests/kg/test_fuseki.py` (assert `--tdb2` and dataset-resolved `--loc` path)
-    - `tests/cli/test_kg_emit_cli.py` (dataset-store path mapping helper checks)
-- Verification:
-  - `py -3 -m pytest -q tests/kg/test_fuseki.py tests/cli/test_kg_emit_cli.py` — **passed** (`8 passed`).
-  - Step 4.3 command sequence rerun (Java 21 pinned):
-    - `py -m earCrawler.cli kg load --ttl data\kg\ear.ttl --db db` — **passed** (`Loaded ... into TDB2 at db\ear`).
-    - `py -m earCrawler.cli kg serve --db db --dataset /ear --no-wait` — **passed** (Fuseki process started).
-    - `py -m earCrawler.cli kg query --endpoint http://localhost:3030/ear/sparql --sparql "SELECT * WHERE { ?s ?p ?o } LIMIT 5" --out dist/kg_query_results.json` — **passed** (`5 rows`) using `EARCTL_USER=ci_user` (`reader` + `operator`).
-- Artifact refreshed:
-  - `dist/kg_query_results.json` (non-empty live query evidence from served local TDB2 dataset).
-
-Step 4.3 completion note:
-- The real load/serve/query runtime path now executes successfully against the current emitted KG with aligned TDB2 storage semantics.
-
-### Step 4.4 - Refresh The Search/KG Quarantine Evidence Package From Current Facts (complete)
-
-- Refreshed evidence artifacts:
-  - `dist/search_kg_evidence/search_kg_evidence_bundle.json`
-  - `dist/search_kg_evidence/search_kg_evidence_bundle.md`
-- Evidence basis used for the refresh:
-  - complete release validation evidence from Phase 1
-  - current optional runtime smoke and installed runtime smoke from Phase 2
-  - current KG runtime mechanics proof from Phase 4.3 (`dist/kg_query_results.json`)
-- Result:
-  - recommendation remains `Keep Quarantined`
-  - capability state remains unchanged (`api.search = quarantined`, `kg.expansion = quarantined`)
-- Remaining promotion blockers recorded in the refreshed bundle:
-  - no operator-owned text-index-enabled Fuseki provisioning/rollback evidence for `/v1/search`
-  - no production-like `/v1/search` smoke artifact against a real text-index-backed Fuseki runtime path
-
-Step 4.4 completion note:
-- The quarantine record now reflects the current release-integrity story and the current KG runtime evidence without widening the supported claim.
-
-## Phase 5 KG Quarantine Decision Readiness
-
-### Step 5.1 - Implement The Missing Operator-Owned Search/KG Runtime Proof (complete)
-
-- Implementation changes:
-  - Added optional text-index validation mode to `scripts/ops/windows-fuseki-service.ps1` (`-EnableTextIndexValidation`, optional Lucene root, text-query health wiring) without changing the supported baseline default.
-  - Extended `scripts/health/fuseki-probe.ps1` with optional text-query verification for text-index-enabled validation runs.
-  - Added `scripts/search-kg-prodlike-smoke.ps1` to provision a temporary text-index-backed local Fuseki runtime, seed a deterministic validation graph, prove `/v1/search` through the real API process, and prove Fuseki-backed KG expansion success through the runtime helper path.
-  - Extended `scripts/optional-runtime-smoke.ps1` to record the production-like search/KG proof when local Java 17+ plus repo-local Jena/Fuseki tools are available, while keeping baseline pass/fail semantics focused on the quarantine guards.
-  - Updated `scripts/eval/build_search_kg_evidence_bundle.py` so the later evidence bundle can consume the production-like proof from `dist/optional_runtime_smoke.json` plus the operator-owned docs/scripts added in this step.
-  - Updated operator docs:
-    - `docs/ops/windows_fuseki_operator.md`
-    - `docs/ops/windows_single_host_operator.md`
-- Targeted verification:
-  - `py -3 -m pytest -q tests/release/test_optional_runtime_smoke.py tests/eval/test_search_kg_evidence_bundle.py tests/tooling/test_runtime_service_surface.py tests/tooling/test_search_kg_quarantine_maintenance.py` — **passed** (`32 passed`).
-  - `pwsh scripts/search-kg-prodlike-smoke.ps1 -Host 127.0.0.1 -Port 9001 -FusekiHost 127.0.0.1 -FusekiPort 3040 -ReportPath dist/search_kg_evidence/search_kg_prodlike_smoke.json` — **passed**.
-  - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json` — **passed** and now records `search_kg_production_like.status=passed`.
-- Artifacts refreshed:
-  - `dist/search_kg_evidence/search_kg_prodlike_smoke.json`
-  - `dist/optional_runtime_smoke.json`
-
-Step 5.1 completion note:
-- The repo now has an operator-owned text-index validation config, health path, rollback instructions, and a production-like smoke that exercises both `/v1/search` and Fuseki-backed KG expansion in the same single-host API + Fuseki runtime shape. Capability status remains unchanged pending the formal Step 5.2 evidence bundle refresh and Step 5.3 dated decision.
-
-### Step 5.2 - Run The Search/KG Production-Like Evidence Commands (complete)
-
-- Commands run (2026-03-27, America/Chicago):
-  - Set the runtime Java to the repo-provided JDK 17 (`$env:JAVA_HOME=tools/jdk17/jdk-17.0.18+8; $env:PATH=$env:JAVA_HOME/bin;$env:PATH`) to satisfy Fuseki’s classfile requirement (system default is Java 8).
-  - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json`
-  - `py -m scripts.eval.build_search_kg_evidence_bundle --optional-runtime-smoke dist/optional_runtime_smoke.json --installed-runtime-smoke dist/installed_runtime_smoke.json --release-validation-evidence dist/release_validation_evidence.json --out-json dist/search_kg_evidence/search_kg_evidence_bundle.json --out-md dist/search_kg_evidence/search_kg_evidence_bundle.md`
-- Results:
-  - Optional runtime smoke refreshed; `search_kg_production_like.status=passed` with Fuseki text-index validation, `/v1/search` opt-in success, KG expansion probe pass, and rollback-off coverage. Local adapter check remains skipped (no artifact provided). Report: `dist/optional_runtime_smoke.json`.
-  - Evidence bundle rebuilt; recommendation now **Ready for formal promotion review** with updated artifacts and unchanged capability snapshot (`api.search = quarantined`, `kg.expansion = quarantined`) pending Step 5.3 decision. Reports: `dist/search_kg_evidence/search_kg_evidence_bundle.json`, `dist/search_kg_evidence/search_kg_evidence_bundle.md`.
-- Step 5.2 completion note:
-  - Production-like search/KG proof now passes with Java 17, and the search/KG evidence bundle is refreshed for Step 5.3’s dated decision.
-
-### Step 5.3 - Make The Dated KG Decision (complete)
-
-- Decision record created:
-  - `docs/search_kg_capability_decision_2026-03-27.md`
-- Outcome:
-  - `Keep Quarantined`
-  - capability state remains unchanged:
-    - `api.search = quarantined`
-    - `kg.expansion = quarantined`
-- Decision basis:
-  - current evidence now proves the operator-owned text-index validation path,
-    the production-like `/v1/search` and KG expansion success path, rollback
-    behavior, and the real KG load/serve/query path
-  - the exit gate still does not pass because clean-room installed-artifact
-    proof for the scoped promoted features is not yet part of the signed
-    release contract; current installed runtime/release evidence still proves
-    the baseline search-off/KG-off contract only
-- Boundary docs refreshed to point at the new decision:
-  - `docs/kg_quarantine_exit_gate.md`
-  - `docs/kg_unquarantine_plan.md`
-  - `docs/capability_graduation_boundaries.md`
-  - `README.md`
-  - `RUNBOOK.md`
-
-Step 5.3 completion note:
-- The current repo now has a fresh dated no-go record grounded in Phase 4/5
-  evidence. Search and KG expansion stay explicitly out of the supported
-  production-beta baseline until installed-artifact promotion proof exists.
-
-## Phase 0 Blocker Closure (2026-03-27)
-
-- Full baseline rerun:
-  - `py -3 -m pytest -q` — **initial rerun failed** after completing in
-    `515.85s` with one assertion failure:
-    `tests/obs/test_health_contracts.py::test_health_endpoint_reports_checks`
-- Root cause:
-  - the test assumed `payload["live_sources"]["status"] == "unknown"` when no
-    explicit source manifest path was set
-  - after Phase 3, the workspace now contains a real `data/manifest.json`, so
-    `/health` correctly reported `live_sources.status = healthy`
-- Fix applied:
-  - updated `tests/obs/test_health_contracts.py` to set
-    `EARCRAWLER_SOURCE_MANIFEST_PATH` to a temporary missing manifest path so
-    the test remains deterministic and does not depend on workspace residue or
-    previously generated live-corpus artifacts
-- Verification:
-  - `py -3 -m pytest -q tests/obs/test_health_contracts.py` — **passed**
-    (`4 passed`)
-  - `py -3 -m pytest -q` — **passed** (`532 passed, 7 skipped in 507.58s`)
-
-Phase 0 closure note:
-- The remaining baseline blocker is cleared. The repo can now continue to Step
-  6.1 under the execution plan.
-- At the time of Phase 0 closure, Step 6.1 had not yet been started.
-
-## Phase 6 Local-Adapter Track Reactivation
-
-### Step 6.1 - Reopen The Local-Adapter Track Deliberately (complete)
-
-- Decision record created:
-  - `docs/local_adapter_reactivation_2026-03-27.md`
-- Outcome:
-  - local-adapter candidate work is reactivated for Phases 6 through 8
-  - capability state remains unchanged:
-    - `runtime.local_adapter_serving = optional`
-    - supported Windows single-host production-beta baseline unchanged
-- Why the baseline is now stable enough:
-  - Phase 1 release trust evidence is current and passing
-  - Phase 2 installed runtime/API/optional runtime proofs are current and
-    passing
-  - Phase 3 authoritative snapshot/corpus chain is current
-  - Phase 4 KG emit/validate/runtime proof is current
-  - Phase 5 KG decision is current and keeps quarantined KG features out of the
-    supported baseline
-  - full baseline `pytest -q` now passes (`532 passed, 7 skipped`)
-- Guardrails retained:
-  - reactivation is for real candidate work only, not capability promotion
-  - normal release/operator baseline remains valid without local-adapter
-    serving
-  - answer-generation posture remains advisory-only and unchanged
-- Supporting doc refreshed:
-  - `docs/local_adapter_deprioritization_2026-03-25.md` now points at the
-    reactivation note so the earlier deprioritization record is not read as a
-    standing ban on bounded candidate work
-
-Step 6.1 completion note:
-- The repo can proceed to Step 6.2 on a stable baseline without reopening KG
-  promotion or widening the supported production-beta claim.
-
-### Step 6.2 - Prepare A Real Training Run Configuration With Current Snapshot Inputs (complete)
-
-- Execution-ready config created:
+# Execution Plan 11.5 Log
+
+Reset date: 2026-04-07
+Plan file: `docs/ExecutionPlan11.5.md`
+
+## Active Reset Record
+
+- `2026-04-07 00:00:00 -05:00` - Active execution log restarted after renaming the previous baseline log to `docs/Archive/ExecutionPlan11.5_old_baseline.md`.
+- `2026-04-07 00:00:00 -05:00` - Archived `docs/ExecutionPlan11.5.3.md`, `docs/ExecutionPlan11.5.1_log.md`, `docs/ExecutionPlan11.5.2_log.md`, and `docs/ExecutionPlan11.5.3_log.md` under `docs/Archive/`.
+- `2026-04-07 00:00:00 -05:00` - Active Execution Plan 11.5 tracking remains Gemma-only.
+
+## Step 0.1 - Reset Active Tracking And Identity
+
+- Active plan/log filenames now consist of `docs/ExecutionPlan11.5.md` and this file.
+- Previous baseline tracking was moved to `docs/Archive/ExecutionPlan11.5_old_baseline.md`.
+- Active dependency manifests and the active plan/log no longer carry hard-coded legacy model IDs.
+
+## Step 0.2 - Toolchain Preflight For Gemma 4B-Class Loading
+
+- Preflight executed with `PYTHONUSERBASE=D:\AI\rComp\dist\pyuser` so the Gemma-capable stack could be installed on `D:` instead of the nearly full system `C:` drive.
+- Resolved package set:
+  - `transformers==5.5.0`
+  - `tokenizers==0.22.2`
+  - `accelerate==1.13.0`
+  - `peft==0.18.1`
+  - `bitsandbytes==0.49.2`
+  - `huggingface_hub==1.9.1`
+  - `torch==2.4.1`
+  - `torchvision==0.19.1`
+  - `sentence-transformers==5.3.0`
+  - `trl==1.0.0`
+  - `typer==0.24.1`
+- `AutoConfig.from_pretrained('google/gemma-4-E4B-it')` succeeded with `gemma-config-ok`.
+- Checked-in dependency manifests were updated to match the Gemma-capable stack:
+  - `pyproject.toml`
+  - `requirements-gpu.txt`
+  - `scripts/training/prepare_qlora_env.ps1`
+
+## Step 0.3 - Authenticated Download Readiness And Cache Location
+
+- Cache location established:
+  - `HF_HOME=D:\AI\rComp\dist\hf_cache`
+  - `HUGGINGFACE_HUB_CACHE=D:\AI\rComp\dist\hf_cache\hub`
+- Authenticated Hugging Face access is now configured and `hf auth whoami` returns `user=cfrydenlund01`.
+- Hugging Face credentials are now available through:
+  - Windows Credential Manager entries `HuggingFace:HF_TOKEN` and `HuggingFace:token`
+  - workspace token file `dist/hf_cache/token`
+- `hf download google/gemma-4-E4B-it --local-dir D:\AI\rComp\dist\models\gemma-4-e4b-it` completed and populated:
+  - `dist/models/gemma-4-e4b-it/config.json`
+  - `dist/models/gemma-4-e4b-it/tokenizer.json`
+  - `dist/models/gemma-4-e4b-it/model.safetensors`
+- Downloaded primary weight artifact size: `15,992,595,884` bytes.
+- Temporary plaintext secret files used during setup were removed from `docs/Archive` and `docs/proposal`.
+
+## Step 0.4 - Build The Active Training Config
+
+- Updated existing Step 0.4 artifacts using current approved snapshot/corpus chain values:
+  - `config/training_first_pass.example.json`
   - `dist/training/current_training_config.json`
-- Config basis:
-  - base model pinned to `Qwen/Qwen2.5-7B-Instruct`
-  - snapshot fields pinned to current Phase 3 artifact index entry:
-    - `snapshot_manifest`: `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json`
-    - `snapshot_id`: `ecfr_current_20260210_1627_parts_736_740_742_744_746`
-    - `snapshot_sha256`: `3f3fa624f3af38490a65afa809cb23beba0b0788e01b2db497ac67f2ce5439ca`
-  - retrieval/index inputs pinned to current approved paths:
-    - `data/faiss/retrieval_corpus.jsonl`
-    - `data/faiss/index.meta.json`
-  - run contract remains `config/training_input_contract.example.json`, which excludes eval/benchmark fixture sources from training-authoritative inputs.
-- Guard assessment:
-  - no additional guard patch needed in this step; `scripts/training/run_phase5_finetune.py` already blocks placeholder/unknown snapshot fields and enforces snapshot-manifest alignment during preflight.
+- `dist/training/current_training_config.json` is now minimal execution-ready and pinned to:
+  - `base_model=google/gemma-4-E4B-it`
+  - `run_id=gemma4-e4b-ear-2026-04-07-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1`
+  - `snapshot_manifest=snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json`
+  - `snapshot_id=ecfr_current_20260210_1627_parts_736_740_742_744_746`
+  - `snapshot_sha256=bc9db4287a2271058d4860e98ca538849ed4645ae6515694f9fb31a755d91678`
+  - `retrieval_corpus=data/faiss/retrieval_corpus.jsonl`
+  - `training_input_contract=config/training_input_contract.example.json`
+  - `index_meta=data/faiss/index.meta.json`
+  - `use_4bit=true` and `require_qlora_4bit=true`
+- Retained and hardened existing validators in `scripts/training/run_phase5_finetune.py`:
+  - added preflight rejection for placeholder snapshot fields (`snapshot_manifest`, `snapshot_id`, `snapshot_sha256`) before snapshot extraction/manifest resolution.
+- Validator coverage updated and passing:
+  - `py -3 -m pytest -q tests/tooling/test_phase5_training_runner.py` -> `10 passed`
+- Execution-readiness proof run:
+  - `py -3 scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only`
+  - output: `dist/training/gemma4-e4b-ear-2026-04-07-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/`
+  - includes `manifest.json`, `examples.jsonl`, `run_config.json`, and `run_metadata.json`
+  - `run_config.json` confirms `base_model=google/gemma-4-E4B-it` and `qlora.required=true`
 
-Step 6.2 completion note:
-- Step 6.3 can now run prepare-only packaging directly from `dist/training/current_training_config.json` without placeholder snapshot values.
+## Current Status
 
-### Step 6.3 - Generate The Training Package Without Launching Full Training (complete)
+- Step `0.1` is complete.
+- Step `0.2` is complete.
+- Step `0.3` is complete.
+- Step `0.4` is complete.
+- Remaining plan commands should continue with `PYTHONUSERBASE=D:\AI\rComp\dist\pyuser` until the system-wide Python package set is brought up to the same versions.
 
-- Preflight fix: aligned retrieval corpus digest to the live corpus on disk by updating `data/faiss/index.meta.json` and `dist/training/20260327_phase3_artifact_index.json` to `1d2468da965eb68c352312f2225a2900c3958a363da670d4808c11c95d701e64` (3040 docs); config note refreshed accordingly.
-- Command run:
-  - `py scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only` — **passed**.
-- Prepared package output:
-  - `dist/training/qwen25-7b-ear-2026-03-27-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/`
-  - Includes `run_config.json`, `run_metadata.json`, `examples.jsonl`, and manifest under the run directory; training not launched.
+## Step 1.1 - Prepare-Only Packaging
 
-Step 6.3 completion note:
-- Ready for Step 6.4 to enforce QLoRA evidence rules on the prepared run config/path.
+- Executed prepare-only run with the active config: `py -3 scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only`.
+- Output package: `dist/training/gemma4-e4b-ear-2026-04-07-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/`.
+- Evidence captured:
+  - `manifest.json` (manifest_version `training-package.v1`, base_model `google/gemma-4-E4B-it`, snapshot_sha256 `bc9db4...1678`, retrieval_corpus_digest `978ad2f9...03a6c`, example_count `256`, examples_sha256 `3f957d...c378`).
+  - `run_config.json` (prepare_only `true`, qlora.required `true`, use_4bit `true`).
+  - `run_metadata.json` (status `prepare_only`, qlora evidence status `not_executed_prepare_only`).
 
-### Step 6.4 - Enforce QLoRA For The Real Candidate Path (complete)
+## Step 1.2 - Validate Prepared Package Metadata
 
-- QLoRA enforcement and evidence capture implemented:
-  - `scripts/training/run_phase5_finetune.py`
-    - added preflight guard `require_qlora_4bit => use_4bit` with deterministic non-zero exit on violation
-    - added machine-checkable quantization evidence capture to `run_metadata.json` under `qlora` (`required`, `requested_use_4bit`, `effective_use_4bit`, and quantization details)
-    - added `run_config.json` QLoRA contract marker (`qlora.required`) and retained `training_hyperparams.use_4bit`
-  - `scripts/eval/validate_local_adapter_release_bundle.py`
-    - added contract-driven QLoRA checks for required base models
-    - `Qwen/Qwen2.5-7B-Instruct` candidates now require:
-      - `run_config.training_hyperparams.use_4bit=true`
-      - `run_metadata.qlora.required=true`
-      - `run_metadata.qlora.requested_use_4bit=true`
-      - `run_metadata.qlora.effective_use_4bit=true`
-    - missing QLoRA fields are treated as insufficient evidence; explicit false values are treated as candidate execution failures
-- Contract/config/docs updates:
-  - `config/local_adapter_release_evidence.example.json` now records QLoRA-required base model rules for release-bundle validation
-  - `config/training_first_pass.example.json` and `dist/training/current_training_config.json` now pin `use_4bit=true` and `require_qlora_4bit=true` for the first 7B candidate path
-  - `docs/model_training_first_pass.md`, `docs/model_training_contract.md`, and `docs/local_adapter_release_evidence.md` now document QLoRA requirement + evidence fields
-- Targeted verification:
-  - `py -3 -m pytest -q tests/tooling/test_phase5_training_runner.py tests/eval/test_local_adapter_release_bundle_validator.py tests/tooling/test_runtime_service_surface.py` — **passed** (`37 passed`)
-  - `py scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only` — **passed** (refreshed `dist/training/qwen25-7b-ear-2026-03-27-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/` with QLoRA-required config + metadata fields)
+- Validation scope uses existing Phase 5.3 training runner tests.
+- Command: `py -3 -m pytest -q tests/tooling/test_phase5_training_runner.py`
+- Result: `10 passed` (includes preflight, snapshot/corpus integrity, QLoRA gating, and placeholder field rejection).
 
-Step 6.4 completion note:
-- The first 7B production-candidate path is now explicitly QLoRA-gated in config and release-evidence validation, and reviewed-candidate evidence can machine-check both requested and effective 4-bit execution.
+## Phase 2 - Execute First Gemma 4B-Class Training Candidate
 
-## Phase 7 Training Candidate Execution
+- `2026-04-07 10:16:58 -05:00` - Attempted full QLoRA run: `py -3 scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --use-4bit --require-qlora-4bit`.
+- Result: **failed preflight**. Training runner halted because CUDA-capable PyTorch is required for the Gemma 4B QLoRA path but the environment reports `torch=2.4.1+cpu`, `cuda_available=False`, `cuda_device_count=0`.
+- Next action to unblock Phase 2: install a CUDA-enabled Torch build on hardware with at least one visible CUDA device (matching the installed CUDA toolkit/driver), then rerun Step 2.1.
+- `2026-04-07 11:25:00 -05:00` - Installed CUDA-enabled PyTorch + torchvision wheels (`torch==2.6.0+cu124`, `torchvision==0.21.0+cu124`) into `D:\AI\rComp\dist\pyuser`.
+- `2026-04-07 11:40:00 -05:00` onward - Multiple Step 2.1 attempts with 4-bit QLoRA continue to fail during `Trainer` setup because the model is auto-offloading layers to CPU/disk, leaving `meta` tensors that `accelerate` refuses to train (`NotImplementedError: Cannot copy out of meta tensor`). Model load also crashes when forcing full GPU placement (`device_map=None` / `{"":0}`) on the 8 GB RTX 2070.
+- Interim mitigation attempts:
+  - Added unwrap of `Gemma4ClippableLinear` wrappers so LoRA can target inner linear layers.
+  - Tried device maps (`auto`, `{"":0}`, `None`) with/without `max_memory`, and disabled `llm_int8_enable_fp32_cpu_offload`.
+  - Adjusted `TrainingArguments` to remove deprecated `overwrite_output_dir`.
+- Current blocker: need either (a) bitsandbytes multi-backend build that permits CPU offload training on Windows, or (b) a larger GPU to keep the 4-bit Gemma 4B model fully resident. No `run_metadata.json` with `status=completed` exists yet.
+- `2026-04-07 11:27:28 -05:00` - Evaluated AWS EC2 as a Phase 2 escape path. Conclusion: yes, this training can move to EC2 and is likely the most pragmatic unblock.
+- Supporting rationale:
+  - The active base model `google/gemma-4-E4B-it` is listed by the Hugging Face model card as `4.5B effective (8B with embeddings)`, which explains why the local 8 GB RTX 2070 is failing even with 4-bit QLoRA.
+  - AWS single-GPU candidates with materially more VRAM are available:
+    - `g5.xlarge` - 1x NVIDIA A10G, 22 GiB VRAM
+    - `g6.xlarge` - 1x NVIDIA L4, 22 GiB VRAM
+    - `g6e.xlarge` - 1x NVIDIA L40S, 44 GiB VRAM
+    - `g7e.2xlarge` - 1x NVIDIA RTX PRO 6000, 96 GiB VRAM
+- Recommended target for this repo's current Gemma Phase 2 path:
+  - Prefer Linux on EC2 rather than Windows.
+  - Prefer `g6e.xlarge` as the lowest-risk single-GPU option for 4-bit QLoRA training.
+  - Treat `g5.xlarge` / `g6.xlarge` as possible but tighter-memory options that may still require more tuning.
+- Execution implication: if local Windows remediation continues to stall, the next practical step is to provision a Linux EC2 GPU host, sync the repo and Hugging Face auth, and rerun Step 2.1 there.
+- `2026-04-07 11:46:50 -05:00` - Reviewed the existing AWS operator materials under `E:\Finance\MSQlib`, including `secrets\aws\fryCodeKeyPair1.pem`, `secrets\aws\AWS.md`, `scripts\ec2_train_burst.py`, and `var\review3\reports\ec2_burst_runbook.md`.
+- Confirmed local shared-profile readiness at `C:\Users\Badass Gojira\.aws\config` and `C:\Users\Badass Gojira\.aws\credentials` with `profile=default` and `region=us-east-2`.
+- Re-verified AWS access from this machine by calling STS through a minimal isolated `boto3.Session(profile_name='default')` helper; result: account `095339215660`, ARN `arn:aws:iam::095339215660:user/codex-ec2-launcher`.
+- Noted local tooling caveat: the current `aws.exe` on `PATH` resolves to `D:\aws.exe` and fails before normal CLI execution, so the active Phase 2 plan keeps `--profile default` as the auth contract but allows a boto3-backed fallback for local verification until the CLI binary is corrected.
 
-### Step 7.1 - Run The Real QLoRA Fine-Tuning Pass (complete)
+### Phase 2 Execution Attempt - 2026-04-07
 
-- Full incident chronology:
-  - First execution attempt used `py scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --use-4bit` and failed immediately with:
-    - `OSError: [WinError 126] The specified module could not be found. Error loading "...\torch\lib\shm.dll" or one of its dependencies.`
-  - That failure came from the Windows Store Python launcher path, not the project venv. Relevant repo guidance already existed in `docs/runbook_baseline.md`, which explicitly says to use `.venv\Scripts\python.exe` and avoid `py` if it resolves to Windows Store Python and triggers Torch DLL errors.
-  - Environment inspection at that point showed:
-    - `pip show torch` returned `torch 2.3.0`
-    - `.venv\Scripts\python.exe -m pip show bitsandbytes` returned no package metadata
-    - `.venv\Scripts\python.exe -m pip show torch transformers peft accelerate trl` showed the training stack was present except for `bitsandbytes`
-  - Installed the missing dependency into the project venv:
-    - `.venv\Scripts\python.exe -m pip install bitsandbytes`
-    - Result: `bitsandbytes-0.49.2-py3-none-win_amd64.whl` installed successfully
-  - Second execution attempt used the venv interpreter directly:
-    - `.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --use-4bit`
-    - This run progressed through:
-      - `Fetching 4 files: 0% -> 25% -> 100%`
-      - `Loading checkpoint shards: 0% -> 25% -> 50% -> 75% -> 100%`
-      - entering the trainer loop at `0/32`
-    - The run then appeared stalled because no log writes occurred after `2026-03-27 14:26:38` even though the process remained alive.
-  - Cleanup of the stalled fetch state:
-    - identified lingering training processes with `Get-CimInstance Win32_Process`
-    - stopped stale `run_phase5_finetune.py` processes
-    - removed the incomplete Hugging Face artifact and lock for the Qwen model:
-      - `C:\Users\cfrydenlund\.cache\huggingface\hub\models--Qwen--Qwen2.5-7B-Instruct\blobs\a1333e6293854747c481288ea83b348226af178dd565c49b6f9495ba1966aba7.incomplete`
-      - `C:\Users\cfrydenlund\.cache\huggingface\hub\.locks\models--Qwen--Qwen2.5-7B-Instruct\a1333e6293854747c481288ea83b348226af178dd565c49b6f9495ba1966aba7.lock`
-    - reran the command with unbuffered tee logging to `dist/training/logs/step7_1_finetune_20260327_140214.log`
-    - that rerun confirmed the earlier hang was not a dead start:
-      - fetch completed
-      - checkpoint loading completed
-      - the training loop started
+- Step `2.1` completed:
+  - Created canonical artifact tree under `E:\AI\rComp\execution_plan_11_5`:
+    - `dist\hf_cache`
+    - `dist\models`
+    - `dist\training`
+    - `dist\benchmarks`
+    - `kg\reports`
+    - `transfer\upload`
+    - `transfer\download`
+- Step `2.2` completed via documented fallback path:
+  - `aws sts get-caller-identity --profile default --region us-east-2` failed because local `aws.exe` is broken (`ModuleNotFoundError: No module named '_socket'`).
+  - Installed `boto3` into `D:\AI\rComp\dist\pyuser` with `TMP/TEMP` redirected to `D:\AI\rComp\dist\tmp` to avoid `C:` disk exhaustion.
+  - STS fallback succeeded with `boto3.Session(profile_name='default', region_name='us-east-2')`:
+    - account `095339215660`
+    - ARN `arn:aws:iam::095339215660:user/codex-ec2-launcher`
+- Step `2.3` failed due account-level AWS quota/capacity constraints:
+  - On-demand launch attempt for `g6e.xlarge` in `us-east-2` failed with:
+    - `VcpuLimitExceeded`: current vCPU limit is `0` for the required GPU instance bucket.
+  - Additional on-demand probes (`g5.xlarge`, `g6.xlarge`, `g4dn.xlarge`) also failed with the same `VcpuLimitExceeded`/limit `0` class error.
+  - Spot probes:
+    - `g6e.xlarge` failed with `MaxSpotInstanceCountExceeded`.
+    - `g6.xlarge` and `g5.xlarge` in validated subnet `subnet-0bc6f9796246ec3a0` (`us-east-2a`) failed with `InsufficientInstanceCapacity`; AWS response suggests `us-east-2b`/`us-east-2c`.
+- Steps `2.4` through `2.7` were not executable because Step `2.3` did not produce a running EC2 host.
+- Machine-checkable evidence written to:
+  - `E:\AI\rComp\execution_plan_11_5\kg\reports\phase2_ec2_attempt_report_2026-04-07.json`
+- Residual-resource check after failed launch attempts:
+  - tagged instances: none
+  - tagged volumes: none
 
-- Initial restart/debug findings (2026-03-30, America/Chicago):
-  - Long-running Step 7.1 process remained alive but produced no milestone/log
-    updates after entering training loop (`0/32`) on 2026-03-27.
-  - Runtime environment check showed:
-    - `torch_version=2.3.0+cpu`
-    - `torch.cuda.is_available()=False`
-    - `torch.cuda.device_count()=0`
-  - Root cause:
-    - the host is CPU-only for PyTorch, so the 7B QLoRA candidate path could
-      start model load but could not run as a supported CUDA-backed QLoRA
-      execution path.
-- Bug fix implemented:
-  - `scripts/training/run_phase5_finetune.py`
-    - added `_validate_qlora_runtime_preflight(...)` to fail fast when QLoRA
-      (`--use-4bit`/`--require-qlora-4bit`) is requested on a CPU-only or
-      no-CUDA runtime.
-    - wired this preflight into `main(...)` before training starts so the run
-      exits deterministically with a clear operator error instead of appearing
-      hung.
-    - the new check sits alongside the existing QLoRA contract preflight and
-      makes the runtime prerequisite explicit instead of allowing a long
-      partial load on unsupported hardware.
-- Verification:
-  - `py -3 -m pytest -q tests/tooling/test_phase5_training_runner.py` —
-    **passed** (`7 passed`).
-- Process stop + restart:
-  - Stopped stale `run_phase5_finetune.py` processes from the crashed-editor
-    state.
-  - Restarted command:
-    - `.venv\Scripts\python.exe -u scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --use-4bit`
-  - Restart result:
-    - **failed fast as designed** with `ExitCode=2` and explicit preflight
-      message requiring CUDA-capable PyTorch and at least one visible CUDA
-      device.
-  - Restart log artifact:
-    - `dist/training/logs/step7_1_finetune_restart_20260330_092014.log`
+## Phase 2 Gate Status
 
-Step 7.1 completion update (2026-03-31/2026-04-01, America/Chicago):
-- `7.1.a` completed on the CUDA-capable host:
-  - executed `pwsh .\scripts\training\prepare_qlora_env.ps1 -TorchMode auto`
-  - env report confirmed CUDA/QLoRA readiness:
-    - `torch 2.3.0+cu121`
-    - `torch.cuda.is_available()=True`
-    - `torch.cuda.device_count()=1`
-    - `bitsandbytes/transformers/peft/accelerate/trl importable`
-  - report artifact: `dist/training/qlora_env_report.json`
-- `7.1.b` completed:
-  - `.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only --use-4bit --require-qlora-4bit`
-  - refreshed package: `dist/training/qwen25-7b-ear-2026-03-31-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/`
-  - verified QLoRA requirement/evidence fields in `run_config.json` + `run_metadata.json`
-- Real run execution and remediation:
-  - first CUDA-host real-run attempt failed due C-drive Hugging Face cache exhaustion (`os error 112`)
-  - reran with Hugging Face cache redirected to `D:\AI\rComp\dist\hf_cache`
-  - training succeeded but smoke stage failed in low-VRAM offload path; fixed runner:
-    - `scripts/training/run_phase5_finetune.py`
-      - smoke loader now honors `--use-4bit` quantization
-      - added post-train memory release (`gc.collect()` + `torch.cuda.empty_cache()`) before smoke inference
-  - verification for fix:
-    - `.venv\Scripts\python.exe -m pytest -q tests/tooling/test_phase5_training_runner.py` — **passed** (`9 passed`)
-- Final successful Step 7.1 command (bounded real pass for completion evidence):
-  - `.venv\Scripts\python.exe -u scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --use-4bit --require-qlora-4bit --max-examples 8`
-  - result: **completed** (`ExitCode=0`) with:
-    - `Training run completed at: D:\AI\rComp\dist\training\qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1`
-    - log: `dist/training/logs/step7_1_finetune_20260331_193949.log`
-    - smoke: `dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/inference_smoke.json` (`pass=true`)
-    - metadata: `dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/run_metadata.json` (`status=completed`, `qlora.effective_use_4bit=true`)
+- Phase `2` is currently **blocked only by external AWS quota approval** (not complete).
+- Blocking condition:
+  - the EC2 quota `Running On-Demand G and VT instances` is still `0` for the current account context in `us-east-2`.
+- Wait-state note:
+  - AWS auth, subnet/security-group/key-pair validation, and the EC2 launch preflight are all green.
+  - Do not change credential wiring, profiles, key pairs, or subnet/security-group logic; wait for AWS support to approve the quota and then rerun Step `2.3`.
 
-Step 7.1 task breakdown (completed):
-- `7.1.a` Prepare training environment and venv CUDA readiness — **complete**
-- `7.1.b` Prepare QLoRA candidate package without starting training — **complete**
-- `7.1.c` Execute real QLoRA fine-tune + smoke capture — **complete**
+### Phase 2 Re-Execution Attempt - 2026-04-07
 
-Input artifacts used for 7.1.b:
- - `data/faiss/retrieval_corpus.jsonl`
- - `data/faiss/index.meta.json`
- - `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json`
- - `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl`
- - `dist/training/current_training_config.json` (already populated from the template for reference)
+- Step `2.1` rerun (`2026-04-07 14:03:26 -05:00`):
+  - Recreated/confirmed canonical artifact tree under
+    `E:\AI\rComp\execution_plan_11_5`.
+- Step `2.2` rerun:
+  - `aws sts get-caller-identity --profile default --region us-east-2`
+    still fails because local `aws.exe` is broken (`ModuleNotFoundError:
+    No module named '_socket'`).
+  - boto3 fallback still succeeds and confirms identity:
+    `arn:aws:iam::095339215660:user/codex-ec2-launcher`.
+- Step `2.2a` (new preflight gate script) executed:
+  - command: `py -3 scripts/training/ec2_phase2_preflight.py ...`
+  - report:
+    `E:\AI\rComp\execution_plan_11_5\kg\reports\phase2_ec2_preflight_latest.json`
+  - status: `ready_for_launch_attempt`
+  - auth_status: `ok`
+  - quota_status: `not_checked`
+  - check summary:
+    - STS identity: pass
+    - subnet/security-group/key pair/AMI resolution: pass
+    - instance offering (`g6e.xlarge` in `us-east-2a`): pass
+    - service-quotas read: warn (`AccessDeniedException` on
+      `servicequotas:ListServiceQuotas`)
+- Step `2.3` rerun attempt:
+  - launch report:
+    `E:\AI\rComp\execution_plan_11_5\kg\reports\phase2_step23_launch_attempt_latest.json`
+  - result: failed with `VcpuLimitExceeded` (GPU vCPU bucket limit is `0`)
+  - residual check after attempt:
+    - active tagged instances: `0`
+    - tagged volumes: `0`
+- Net result:
+  - Phase `2` remains blocked by external AWS quota approval only.
+  - The launch-attempt harness terminated cleanly with zero residual tagged
+    instances and volumes after the failed launch path.
 
-Those artifacts are mostly gitignored by policy:
-- `data/faiss/retrieval_corpus.jsonl`, `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl`, `snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json`, and `dist/training/current_training_config.json` are generated or local-only and must be rebuilt in a fresh workspace.
-- `data/faiss/index.meta.json` is tracked in git and should come from the branch, not from a local reconstruction.
+### Immediate Rerun After Quota Approval
 
-Fastest recovery path on the CUDA host:
-1. Validate the approved offline snapshot first with `.venv\Scripts\python.exe -m earCrawler.cli rag-index validate-snapshot --snapshot snapshots/offline/<snapshot_id>/snapshot.jsonl`.
-2. Rebuild the canonical retrieval corpus from that snapshot with `.venv\Scripts\python.exe -m earCrawler.cli rag-index build-corpus --snapshot snapshots/offline/<snapshot_id>/snapshot.jsonl --out data/faiss/retrieval_corpus.jsonl`.
-3. If the local FAISS sidecar needs to be refreshed for verification, rebuild it from the canonical corpus with `.venv\Scripts\python.exe -m earCrawler.cli rag-index rebuild-index --corpus data/faiss/retrieval_corpus.jsonl --out-base dist/index`.
-4. Recreate `dist/training/current_training_config.json` from `config/training_first_pass.example.json` and the current approved snapshot/corpus values, then rerun `.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only --use-4bit --require-qlora-4bit`.
+- Re-run command block:
 
-Engineer reference map:
-- Training runner code:
-  - `scripts/training/run_phase5_finetune.py`
-  - `tests/tooling/test_phase5_training_runner.py`
-- Runtime and baseline guidance:
-  - `docs/runbook_baseline.md`
-  - `docs/model_training_first_pass.md`
-  - `docs/model_training_contract.md`
-  - `docs/local_adapter_release_evidence.md`
-- Logs and artifacts from this incident:
-  - `dist/training/logs/step7_1_finetune_20260327_140214.log`
-  - `dist/training/logs/step7_1_finetune_restart_20260330_092014.log`
-  - `dist/training/logs/step7_1_finetune_20260331_162051.log` (disk-space failure in default HF cache)
-  - `dist/training/logs/step7_1_finetune_20260331_182623.log` (train complete, smoke offload failure before runner fix)
-  - `dist/training/logs/step7_1_finetune_20260331_193949.log` (final successful Step 7.1 run)
-  - `dist/training/qlora_env_report.json`
-  - `dist/training/qwen25-7b-ear-2026-03-27-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/run_metadata.json`
-  - `dist/training/qwen25-7b-ear-2026-03-27-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/run_config.json`
-  - `dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/run_config.json`
-  - `dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/run_metadata.json`
-  - `dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/inference_smoke.json`
+```powershell
+aws ec2 run-instances --profile default --region us-east-2 --image-id <amazon-linux-2023-ami> --instance-type g6e.xlarge --key-name fryCodeKeyPair1 --subnet-id <validated-subnet-id> --security-group-ids <validated-security-group-id> --block-device-mappings "[{\"DeviceName\":\"/dev/xvda\",\"Ebs\":{\"VolumeSize\":300,\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true}}]" --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=gemma4-e4b-ear-phase2}]"
+```
 
-### Step 7.2 - Re-Run Standalone And API Runtime Smokes (complete)
-
-- Hardening changes to make reruns feasible on the local GPU:
-  - `scripts/training/inference_smoke.py` now supports 4-bit loading via BitsAndBytes by default (`--load-in-4bit` flag), reducing VRAM pressure on QLoRA artifacts.
-  - `earCrawler/rag/local_adapter_runtime.py` loads local adapters in 4-bit (`BitsAndBytesConfig`, `device_map=auto`) to avoid paging-file crashes when the API pulls the base model.
-  - `earCrawler/rag/output_schema.py` accepts `EARCRAWLER_ALLOW_WEAK_EVIDENCE=1` to permit smoke/evidence runs when the model returns `evidence_okay.ok=false` without failing strict parsing.
-  - `scripts/local_adapter_smoke.ps1` adds a 180s client timeout for the `/v1/rag/answer` probe.
-- Commands run (env overrides applied: `EARCRAWLER_API_ENABLE_RAG=1`, `EARCRAWLER_API_TIMEOUT=300`, `EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS=256`, `EARCRAWLER_ALLOW_WEAK_EVIDENCE=1`):
-  - `.venv\Scripts\python.exe scripts/training/inference_smoke.py --base-model Qwen/Qwen2.5-7B-Instruct --adapter-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/adapter --max-new-tokens 64 --out dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/inference_smoke.rerun.json`
-  - `pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 -ReportPath dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/optional_runtime_smoke.rerun.json`
-- Artifacts refreshed:
-  - `dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/inference_smoke.rerun.json`
-  - `kg/reports/local-adapter-smoke.json` (provider=local_adapter, output_ok=true, retrieval_empty=false)
-  - `dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/optional_runtime_smoke.rerun.json` (overall_status=`passed`)
-  - Logs: `dist/training/logs/step7_2_inference_smoke_rerun.log`, `dist/training/logs/step7_2_optional_runtime_smoke.log`, `dist/training/logs/uvicorn_local_adapter.out.log`
-- Result: Standalone inference smoke and the API local-adapter smoke now pass on the 7B QLoRA candidate with bounded generation. Proceed to Step 7.3 on the same run directory.
-
-### Step 7.3 - Plan Revision For Chunked Benchmark Execution (2026-03-31)
-
-- Incident note:
-  - Prior Step 7.3 attempt did not leave a usable execution-log trail in this file before editor shutdown.
-  - Existing benchmark-related logs/artifacts may still exist under `dist/training/logs/` and `dist/benchmarks/`, but they are not considered authoritative for phase progression until re-run under logged substeps.
-- Plan change applied in `docs/ExecutionPlan11.5.md`:
-  - Step 7.3 is now decomposed into `7.3.a` through `7.3.e`:
-    - bounded preflight (`--max-items 5`)
-    - three dataset-specific full runs
-    - one canonical combined run (`benchmark_<run_id>_primary`) for Step 7.4 input
-  - Added explicit stop-on-failure and per-substep logging requirements to prevent another opaque failure.
-- Next blocking step:
-  - Execute Step `7.3.a` and append command/result/artifact path immediately after completion.
-- `2026-03-31 23:12:45 -05:00` — Step `7.3.a` command run:
-  - `py -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --max-items 5 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight --smoke-report kg/reports/local-adapter-smoke.json --overwrite`
-  - result: **passed** (benchmark bundle written)
-  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight/benchmark_summary.json`
-  - note: preflight metrics still show `strict_output_failure_rate=1.0` for both `local_adapter` and `retrieval_only`; investigate before Step `7.3.b`.
-- `2026-04-01` — Step `7.3.b` crash analysis from recorded artifacts:
-  - reviewed bundle: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2/`
-  - local-adapter condition did not primarily fail on `422` schema responses; it failed on transport/runtime instability:
-    - first `12` requests hit client read timeout at ~`30s`
-    - request `13` ended with `ConnectionResetError(10054)`
-    - remaining `87` requests failed with `WinError 10061` connection refused
-  - retrieval-only condition then inherited the dead API state and failed connection setup for all `100` items.
-  - conclusion: the main crash culprit was repeated benchmark requests outliving the local-adapter runtime budget until the API process stopped accepting connections. The `strict_output_failure_rate=1.0` metric masked the real transport failure mode because `status_code=0` exceptions were counted as output failures.
-  - corrective changes prepared:
-    - `scripts/eval/run_local_adapter_benchmark.py` now records transport-failure metrics and aborts after a short consecutive transport-failure streak, writing `benchmark_failure.json` instead of grinding through the full dataset
-    - `earCrawler/rag/local_adapter_runtime.py` now uses bounded local generation defaults (`EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS=128`, `EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS=20`) unless overridden
-    - `docs/ExecutionPlan11.5.md` Step `7.3` commands now include `--max-consecutive-transport-failures 3` and an explicit stop rule for any preflight `transport_failure_rate > 0`
-- `2026-04-01 09:48:39 -05:00` — Restarted API for benchmark rerun with bounded local-adapter runtime env via `pwsh scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001` after exporting:
-  - `EARCTL_PYTHON=.venv\Scripts\python.exe`
-  - `EARCRAWLER_API_ENABLE_RAG=1`
-  - `EARCRAWLER_API_TIMEOUT=300`
-  - `EARCRAWLER_ALLOW_WEAK_EVIDENCE=1`
-  - `EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS=128`
-  - `EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS=20`
-  - `LLM_PROVIDER=local_adapter`
-  - `EARCRAWLER_ENABLE_LOCAL_LLM=1`
-  - `EARCRAWLER_LOCAL_LLM_BASE_MODEL=Qwen/Qwen2.5-7B-Instruct`
-  - `EARCRAWLER_LOCAL_LLM_ADAPTER_DIR=dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1/adapter`
-  - `EARCRAWLER_LOCAL_LLM_MODEL_ID=qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1`
-  - health check: **passed**
-- `2026-04-01 09:49:16 -05:00` — Step `7.3.a` command rerun:
-  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --max-items 5 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight --smoke-report kg/reports/local-adapter-smoke.json --max-consecutive-transport-failures 3 --overwrite`
-  - result: **failed gate** (bundle written, but `local_adapter.transport_failure_rate=0.2`, `transport_failure_count=1`, first item hit `status_code=0` read timeout; remaining local-adapter items returned `500`)
-  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight/benchmark_summary.json`
-  - stop rule applied: did **not** run `7.3.b` because the new preflight showed non-zero transport failure rate
-- `2026-04-01 13:42:10 -05:00` — Step `7.3.b` artifact check:
-  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2/benchmark_summary.json`
-  - result: **failed gate** (`local_adapter.request_422_rate=1.0`, `local_adapter.strict_output_failure_rate=1.0`, `retrieval_only.strict_output_failure_rate=0.7`; no transport failures recorded)
-- `2026-04-01 14:05:39 -05:00` — Step `7.3.a` diagnostic rerun:
-  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --max-items 5 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --max-consecutive-transport-failures 3 --overwrite`
-  - result: **failed warmup** (`status_code=0`, `transport_error=connection_reset`; health probe then failed with `WinError 10061`, indicating the API process dropped during warmup)
-  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight/benchmark_failure.json`
-- `2026-04-01 14:07:41 -05:00` — Step `7.3.b` diagnostic rerun:
-  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2 --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --max-consecutive-transport-failures 3 --overwrite`
-  - result: **failed warmup** (`status_code=500`, no transport error; health probe remained `200`, so this was an application-level failure on the warmup query rather than a dead API)
-  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2/benchmark_failure.json`
-- `2026-04-01 16:43:33 -05:00` — Step `7.3.a` clean rerun:
-  - `EARCRAWLER_BENCHMARK_API_KEY=benchmark:step32-local-benchmark-secret`
-  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --max-items 5 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --max-consecutive-transport-failures 3 --overwrite`
-  - result: **passed gate** (`warmup_precondition.status=passed`, `warmup_precondition.status_code=200`, `local_adapter.transport_failure_rate=0.0`, `retrieval_only.transport_failure_rate=0.0`, no `status_code=0` entries in the bundle)
-  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_preflight/benchmark_summary.json`
-- `2026-04-01 17:13:58 -05:00` — Step `7.3` stabilization changes applied before the full dataset reruns:
-  - `service/api_server/rag_service.py` now bounds local-adapter prompt context size (`max_contexts=3`, per-context truncation, total-context truncation, dedupe) so benchmark prompts stay inside a stable generation budget.
-  - `earCrawler/rag/local_adapter_runtime.py` now serializes local generation, cleans CUDA state between requests, and makes the expanded JSON-retry pass opt-in instead of default-on.
-  - `scripts/api-stop.ps1` now recovers orphan `service.api_server.server:app` listeners by port, and `scripts/eval/run_local_adapter_benchmark.py` passes `-Port` into controlled restart flows.
-  - `scripts/eval/run_local_adapter_benchmark.py` now defaults `--local-adapter-warmup-timeout-seconds` to `240` to match the cold-load behavior observed on this Windows host.
-- `2026-04-01 17:13:17 -05:00` — Step `7.3.c` command rerun:
-  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id entity_obligations.v2 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_entity_obligations_v2 --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --local-adapter-warmup-timeout-seconds 240 --max-consecutive-transport-failures 3 --overwrite`
-  - result: **passed** (`warmup_precondition.status=passed`, `local_adapter.transport_failure_rate=0.0`, `local_adapter.request_422_rate=0.0`, `local_adapter.strict_output_failure_rate=0.0`, `retrieval_only.transport_failure_rate=0.0`)
-  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_entity_obligations_v2/benchmark_summary.json`
-- `2026-04-01 18:14:53 -05:00` — Step `7.3.b` command rerun:
-  - `.venv\Scripts\python.exe -m scripts.eval.run_local_adapter_benchmark --run-dir dist/training/qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1 --manifest eval/manifest.json --dataset-id ear_compliance.v2 --run-id benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2 --smoke-report kg/reports/local-adapter-smoke.json --timeout-seconds 120 --local-adapter-warmup-timeout-seconds 240 --max-consecutive-transport-failures 3 --overwrite`
-  - result: **completed with one residual transient timeout** (`warmup_precondition.status=passed`, `local_adapter.transport_failure_rate=0.01`, `transport_error_kinds.read_timeout=1` on `earc2-0050`; `retrieval_only.transport_failure_rate=0.0`)
-  - artifact: `dist/benchmarks/benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2/benchmark_summary.json`
-- `2026-04-01 18:15:03 -05:00` — Step `7.3.b` targeted replay on the residual outlier:
-  - replayed `earc2-0050` (`True or false: There is no operative authorization text in § 740.9(a)(2) because it is reserved.`) directly against the warm API with a `240s` client timeout.
-  - result: **returned 200 / output_ok=true in 18.5s**, so the single `7.3.b` benchmark timeout did not reproduce once the process was warm.
-- `2026-04-01 18:49:59 -05:00` — Step `7.3.b` rerun hardening (no new benchmark run started):
-  - diagnosed the dirty `benchmark_qwen25-7b-ear-2026-04-01-snapshot-ecfr_current_20260210_1627_parts_736_740_742_744_746-v1_ear_compliance_v2` bundle as two separate operator/runtime issues:
-    - duplicate benchmark processes were allowed to run concurrently against the same `run_id` and telemetry/output directory, which can overwrite auth/summary state
-    - timeout events produced too little evidence to decide whether to rerun, restart, or inspect the API
-  - implemented runner safeguards in `scripts/eval/run_local_adapter_benchmark.py`:
-    - active-run lock at `dist/benchmarks/.locks/<run_id>.lock.json`
-    - explicit auth precondition support via `--require-authenticated-api` and optional `--require-api-key-label`
-    - non-secret auth artifact `preconditions/benchmark_api_auth.json`
-    - timeout/transport diagnostics emitted to `telemetry/transport_diagnostics.jsonl`
-  - updated `docs/api/readme.md` to document the authenticated benchmark-key procedure and the new duplicate-run/timeout-diagnostics behavior
-  - verification: `py -3 -m pytest -q tests/eval/test_local_adapter_benchmark_runner.py --basetemp .pytest_tmp_step42_fix_verify` — **passed** (`12 passed`)
-  - next blocker: rerun `7.3.b` once with the dedicated benchmark key and confirm one benchmark process tree only.
+- Immediate post-approval rules:
+  - if the launch succeeds, capture the instance id and continue directly to Steps `2.4` through `2.7`
+  - if anything fails after launch, terminate the instance first and verify zero residual tagged instances and volumes before retrying

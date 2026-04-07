@@ -1,5 +1,8 @@
 # Run Pass 8
 
+> Archive note (2026-04-07): Active local-adapter baseline switched to `google/gemma-4-E4B-it`. This archived document is retained for historical context only and no longer governs active execution.
+
+
 Audit date: 2026-03-18
 
 ## 1. Executive Summary
@@ -223,7 +226,7 @@ Current model stack present in code and docs:
 
 - Retrieval embeddings: `all-MiniLM-L12-v2` is the active embedding model recorded in current FAISS metadata.
 - Remote generation providers: Groq and NVIDIA NIM are supported through an OpenAI-compatible client layer.
-- Local generation path: the codebase references a local adapter workflow and documentation for a Qwen/Qwen2.5 7B-style instruction model path, but the repository does not currently contain a fully evidenced trained adapter artifact for a supported deployment.
+- Local generation path: the codebase references a local adapter workflow and documentation for a Google Gemma 4B-class instruction model path, but the repository does not currently contain a fully evidenced trained adapter artifact for a supported deployment.
 
 The implementation uses models conservatively. Remote generation is disabled unless explicit policy and enablement flags are set, and the orchestrator validates structure and evidence before accepting output.
 
@@ -410,3 +413,4 @@ For optional capability graduation such as local models or default-on search: an
 3. Decide, with evidence, whether search and runtime KG expansion are being promoted or intentionally kept quarantined.
 
 Overall conclusion: this is a serious codebase with better architectural discipline than most AI projects at the same maturity stage. The path to a stable handoff is not to add more major features first. The path is to tighten the boundary between supported runtime and active research, then operationalize the missing deployment and model-evidence pieces behind that boundary.
+

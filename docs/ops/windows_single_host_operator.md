@@ -218,7 +218,7 @@ also set:
 ```powershell
 [System.Environment]::SetEnvironmentVariable('LLM_PROVIDER', 'local_adapter', 'Machine')
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_ENABLE_LOCAL_LLM', '1', 'Machine')
-[System.Environment]::SetEnvironmentVariable('EARCRAWLER_LOCAL_LLM_BASE_MODEL', 'Qwen/Qwen2.5-7B-Instruct', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_LOCAL_LLM_BASE_MODEL', 'google/gemma-4-E4B-it', 'Machine')
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_LOCAL_LLM_ADAPTER_DIR', 'C:\ProgramData\EarCrawler\models\<run_id>\adapter', 'Machine')
 [System.Environment]::SetEnvironmentVariable('EARCRAWLER_LOCAL_LLM_MODEL_ID', '<run_id>', 'Machine')
 ```
@@ -316,6 +316,98 @@ pwsh scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath C:\ProgramData
 
 Treat failures in the supported API smoke report or the `/health` runtime
 contract fields above as deployment blockers.
+
+## Rate-limit recommendation use and rollback
+
+The supported baseline remains fixed operator-set configuration. If you do not
+set rate-limit env vars explicitly, the current service defaults are:
+
+- `EARCRAWLER_API_AUTH_PER_MIN=120`
+- `EARCRAWLER_API_ANON_PER_MIN=30`
+
+The recommendation output exposed in `/health.rate_limit_recommendation` and
+`scripts/health/api-probe.ps1 -JsonReportPath ...` is informational only. It
+does not change runtime configuration by itself. The authoritative values
+remain the currently active machine env vars:
+
+- `EARCRAWLER_API_AUTH_PER_MIN`
+- `EARCRAWLER_API_ANON_PER_MIN`
+
+Interpret the recommendation in this order:
+
+- Check `rate_limit_recommendation.recommendation_status`.
+- If the status is `insufficient_evidence`, keep the current limits and gather a
+  longer observation window.
+- If the status is `unsupported_topology`, do not apply the recommendation. The
+  supported guidance is only for one host and one API instance.
+- If the status is `ready`, compare the recommended values against the current
+  env vars before changing anything.
+
+Use the recommendation details to explain why the value moved:
+
+- `capacity_inputs.host_budget_rpm` is the bounded host minute budget derived
+  from the slowest eligible non-health route class.
+- `clamp_reasons` shows whether the value was reduced by
+  `error_pressure`, `concurrency_pressure`, or `latency_pressure`, or forced to
+  a boundary by `min_clamp` or `max_clamp`.
+- `configured_limit_binding` means the current limiter produced `429` activity
+  without host-distress evidence by itself; treat that as "current policy is
+  binding", not automatically as "the host is overloaded".
+
+When to lower limits:
+
+- the recommendation status is `ready`
+- the recommended value is materially below the current env var
+- `clamp_reasons` includes host-pressure signals such as `error_pressure`,
+  `concurrency_pressure`, or `latency_pressure`
+- the operator wants to reduce overload risk on the supported single-host
+  baseline
+
+When to raise limits:
+
+- the recommendation status is `ready`
+- the recommended value is above the current env var
+- the host has a full eligible observation window with no pressure reasons that
+  suggest distress
+- the operator is intentionally widening the manual limit based on retained
+  evidence, not expecting automatic tuning
+
+Apply a manual change by setting explicit machine env vars and restarting the
+service:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_API_AUTH_PER_MIN', '145', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_API_ANON_PER_MIN', '36', 'Machine')
+C:\tools\nssm\nssm.exe restart EarCrawler-API
+Invoke-WebRequest http://127.0.0.1:9001/health -UseBasicParsing
+```
+
+After any change, retain the resulting `/health` payload or
+`dist/observability/api_probe.json` report with the host-local install or
+change record so the chosen values can be tied to observed evidence.
+
+Rollback to explicit prior manual values the same way:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_API_AUTH_PER_MIN', '120', 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_API_ANON_PER_MIN', '30', 'Machine')
+C:\tools\nssm\nssm.exe restart EarCrawler-API
+Invoke-WebRequest http://127.0.0.1:9001/health -UseBasicParsing
+```
+
+If you want to remove an override and return to the built-in service defaults,
+clear the machine env vars and restart:
+
+```powershell
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_API_AUTH_PER_MIN', $null, 'Machine')
+[System.Environment]::SetEnvironmentVariable('EARCRAWLER_API_ANON_PER_MIN', $null, 'Machine')
+C:\tools\nssm\nssm.exe restart EarCrawler-API
+Invoke-WebRequest http://127.0.0.1:9001/health -UseBasicParsing
+```
+
+Rollback is complete only after `/health` shows the intended limits in
+`readiness.checks.rate_limiter.details.limit` for a probe request and the
+recommendation output remains informational.
 
 ## Upgrade
 

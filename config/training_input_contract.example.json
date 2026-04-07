@@ -1,7 +1,7 @@
 {
   "status": "planning_only",
   "schema_version": "training-input-contract.v1",
-  "base_model": "Qwen/Qwen2.5-7B-Instruct",
+  "base_model": "google/gemma-4-E4B-it",
   "authoritative_sources": {
     "offline_snapshot_manifest": "snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/manifest.json",
     "offline_snapshot_payload": "snapshots/offline/ecfr_current_20260210_1627_parts_736_740_742_744_746/snapshot.jsonl",
@@ -30,3 +30,4 @@
     "Benchmark data is deferred until Phase 6."
   ]
 }
+

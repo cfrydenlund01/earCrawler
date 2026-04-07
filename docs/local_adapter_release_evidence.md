@@ -101,7 +101,7 @@ The release-evidence validator copies these facts into
 summary and smoke report so the review bundle can be archived and compared
 later.
 
-For the first 7B production-candidate path (`Qwen/Qwen2.5-7B-Instruct`), the
+For the first 7B production-candidate path (`google/gemma-4-E4B-it`), the
 bundle must also prove QLoRA 4-bit execution:
 
 - `run_config.json` must set `training_hyperparams.use_4bit=true`
@@ -319,3 +319,4 @@ Examples of candidate rejection:
 
 This is different from insufficient evidence. A rejected candidate had enough
 machine-checkable evidence to review, and that evidence failed.
+

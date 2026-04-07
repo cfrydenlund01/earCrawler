@@ -7,6 +7,13 @@ This document summarises the monitoring signals introduced in B.23.
 * `GET /health` returns liveness + readiness information.
 * Readiness aggregates Fuseki latency, template registry load, rate limiter
   state, and free disk space.
+* `rate_limit_recommendation_inputs` surfaces process-local route-class
+  telemetry (`request_count`, `p95_latency_ms`, `429/503` pressure, and
+  concurrency saturation) as informational input for rate-limit advice.
+* `rate_limit_recommendation` surfaces bounded, informational recommendation
+  output (`api-rate-limit-recommendation.v1`) derived from host telemetry. It
+  does not mutate configured limits; operators must explicitly change env vars
+  to apply any recommendation.
 * `live_sources` reports live upstream-source freshness and degradation based on
   `data/manifest.json` (`upstream_status`) by default.
 * `live_sources.failure_taxonomy` summarizes upstream states so operators can
@@ -26,6 +33,35 @@ This document summarises the monitoring signals introduced in B.23.
       "templates": {"status": "pass", "details": {"templates": 3}},
       "rate_limiter": {"status": "pass", "details": {"limit": 120}},
       "disk": {"status": "pass", "details": {"free_mb": 1024}}
+    }
+  },
+  "rate_limit_recommendation_inputs": {
+    "status": "pass",
+    "schema_version": "api-rate-limit-inputs.v1",
+    "details": {
+      "total_request_count": 42,
+      "route_classes": {
+        "query": {
+          "request_count": 30,
+          "p95_latency_ms": 250.0,
+          "rate_429": 0.0,
+          "rate_503": 0.0,
+          "concurrency_saturation_rate": 0.03
+        }
+      }
+    }
+  },
+  "rate_limit_recommendation": {
+    "status": "pass",
+    "schema_version": "api-rate-limit-recommendation.v1",
+    "recommendation_status": "insufficient_evidence",
+    "details": {
+      "capacity_inputs": {"safety_factor": 0.7, "host_budget_rpm": 0},
+      "recommendations": {
+        "authenticated_per_minute": null,
+        "anonymous_per_minute": null
+      },
+      "operator_override": {"env_vars_authoritative": true}
     }
   },
   "live_sources": {
@@ -73,7 +109,9 @@ contain `upstream_status`.
   latency budgets by default, then writes `kg/reports/health-api.txt`.
   When `-JsonReportPath` is provided it also writes a machine-readable
   `api-probe-report.v1` payload used by release validation (for example
-  `dist/observability/api_probe.json`).
+  `dist/observability/api_probe.json`) and includes
+  `rate_limit_recommendation_inputs` and `rate_limit_recommendation` from
+  `/health` when available.
   For local validation only, pass `-IncludeQuarantinedSearch` to also probe
   quarantined `/v1/search`.
 * `scripts/canary/run-canaries.ps1` loads `canary/config.yml`, executes the API

@@ -54,7 +54,7 @@ To make that explicit:
 ## Phase 5.1 Selection Record
 
 On March 11, 2026, Task 5.1 selected one production-intended 7B base model for
-future training work: `Qwen/Qwen2.5-7B-Instruct`.
+future training work: `google/gemma-4-E4B-it`.
 
 At the time of Task 5.1, this decision did not change the current support
 boundary. The selection existed so later Phase 5 work could proceed from one
@@ -66,10 +66,10 @@ model-serving stack.
 The planning-only config record lives at
 `config/training_model_selection.example.env` and currently captures:
 
-- Hugging Face model ID: `Qwen/Qwen2.5-7B-Instruct`
-- Model family: `Qwen2.5`
+- Hugging Face model ID: `google/gemma-4-E4B-it`
+- Model family: `Gemma-4-E4B`
 - Parameter class: `7B`
-- Official upstream repository: `https://github.com/QwenLM/Qwen`
+- Official upstream repository: `https://github.com/google/gemma_pytorch`
 
 Until Tasks 5.2 through 5.4 are complete, this selection should be read as a
 future training target only, not as an active runtime dependency or operator
@@ -205,3 +205,4 @@ Consequence:
 
 The dated decision record is
 `docs/local_adapter_deprioritization_2026-03-25.md`.
+

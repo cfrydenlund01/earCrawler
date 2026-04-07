@@ -6,7 +6,7 @@ opt-in and does not expand the supported runtime surface by itself.
 ## Goal
 
 Run the first production-oriented fine-tuning pass for
-`Qwen/Qwen2.5-7B-Instruct` using the Task 5.2 input contract, then save
+`google/gemma-4-E4B-it` using the Task 5.2 input contract, then save
 artifacts and run metadata in a deterministic layout.
 
 ## Inputs
@@ -65,7 +65,7 @@ Standalone inference smoke for a previously produced adapter:
 
 ```powershell
 .venv\Scripts\python.exe scripts/training/inference_smoke.py `
-  --base-model Qwen/Qwen2.5-7B-Instruct `
+  --base-model google/gemma-4-E4B-it `
   --adapter-dir dist/training/<run_id>/adapter `
   --out dist/training/<run_id>/inference_smoke.rerun.json
 ```
@@ -123,7 +123,7 @@ Default run-id pattern:
 
 Example:
 
-- `qwen25-7b-ear-2026-03-11-snapshot-ecfr-title15-2026-02-28-v1`
+- `gemma4-e4b-ear-2026-03-11-snapshot-ecfr-title15-2026-02-28-v1`
 
 Output layout:
 
@@ -191,3 +191,4 @@ Output layout:
   `dist/training/<run_id>/` artifact from Task 5.3. If that artifact is not
   present in the current checkout, the smoke remains a documented prerequisite,
   not an executed result.
+

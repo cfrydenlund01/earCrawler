@@ -1,5 +1,8 @@
 # RunPass11
 
+> Archive note (2026-04-07): Active local-adapter baseline switched to `google/gemma-4-E4B-it`. This archived document is retained for historical context only and no longer governs active execution.
+
+
 Prepared: March 19, 2026
 
 Scope: full repository and workspace audit for the currently open `earCrawler` project, including source, docs, config, dependencies, tests, generated artifacts, release evidence, and research material.
@@ -120,7 +123,7 @@ Supported baseline model behavior:
 Training and local-model posture:
 
 - The codebase contains a planning and evidence workflow for local adapter candidates.
-- The selected future base-model target is `Qwen/Qwen2.5-7B-Instruct`.
+- The selected future base-model target is `google/gemma-4-E4B-it`.
 - The currently reviewed local training candidate under `dist/training/step52-real-candidate-gpt2b-20260319/` is not reviewable for promotion and remains optional.
 
 ### State management
@@ -314,7 +317,7 @@ The project currently uses AI in three different layers:
 
 The training story is intentionally partial:
 
-- the intended base model is `Qwen/Qwen2.5-7B-Instruct`
+- the intended base model is `google/gemma-4-E4B-it`
 - the current local candidate reviewed in the workspace is based on `hf-internal-testing/tiny-random-gpt2`
 - the current candidate fails its evidence contract and remains optional
 
@@ -561,3 +564,4 @@ To reach a broader `AI product` production posture including validated local mod
 ### Closing judgment
 
 This is a strong engineering codebase with unusually good caution around claims, evidence, and regulatory answer quality. The current repository is good enough for a new developer to take over. The current workspace is not yet in a true production phase because it still mixes authoritative source with stale generated evidence and partially removed capability traces. Fixing that mismatch should be the immediate focus.
+

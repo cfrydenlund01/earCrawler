@@ -81,9 +81,22 @@ def _copy_path(src: Path, dst: Path) -> None:
 
 
 def _default_bundle_id(run_dir: Path, benchmark_root: Path) -> str:
+    run_short = _safe_name(run_dir.name)[:32].rstrip("._-") or "run"
+    benchmark_short = _safe_name(benchmark_root.name)[:24].rstrip("._-") or "benchmark"
+    seed = f"{run_dir.name}::{benchmark_root.name}"
+    seed_hash = hashlib.sha256(seed.encode("utf-8")).hexdigest()[:10]
     return _safe_name(
-        f"local_adapter_candidate_{run_dir.name}__{benchmark_root.name}"
+        f"local_adapter_candidate_{run_short}_{benchmark_short}_{seed_hash}"
     )
+
+
+def _bounded_bundle_id(value: str, *, max_chars: int = 120) -> str:
+    safe = _safe_name(value)
+    if len(safe) <= max_chars:
+        return safe
+    suffix = hashlib.sha256(safe.encode("utf-8")).hexdigest()[:10]
+    prefix = safe[: max_chars - (len(suffix) + 1)].rstrip("._-") or "bundle"
+    return f"{prefix}_{suffix}"
 
 
 def _collect_bundle_files(root: Path) -> list[dict[str, Any]]:
@@ -239,7 +252,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Failed: {exc}")
         return 1
 
-    bundle_id = _safe_name(
+    bundle_id = _bounded_bundle_id(
         args.bundle_id or _default_bundle_id(run_dir, benchmark_root)
     )
     bundle_root = (args.out_root / bundle_id).resolve()

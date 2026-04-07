@@ -79,6 +79,24 @@ def test_health_reports_single_host_runtime_contract(app) -> None:
     assert capabilities["api.search"]["status"] == "quarantined"
     assert capabilities["retrieval.hybrid"]["status"] == "optional"
     assert capabilities["kg.expansion"]["default_posture"] == "disabled"
+    recommendation_inputs = payload["rate_limit_recommendation_inputs"]
+    assert recommendation_inputs["status"] == "pass"
+    assert recommendation_inputs["schema_version"] == "api-rate-limit-inputs.v1"
+    details = recommendation_inputs["details"]
+    assert details["total_request_count"] >= 0
+    assert "route_classes" in details
+    assert "concurrency_gate" in details
+    recommendation = payload["rate_limit_recommendation"]
+    assert recommendation["status"] == "pass"
+    assert recommendation["schema_version"] == "api-rate-limit-recommendation.v1"
+    assert recommendation["recommendation_status"] in {
+        "ready",
+        "insufficient_evidence",
+        "unsupported_topology",
+    }
+    recommendation_details = recommendation["details"]
+    assert recommendation_details["operator_override"]["env_vars_authoritative"] is True
+    assert "recommendations" in recommendation_details
 
 
 def test_create_app_rejects_multi_instance_without_override() -> None:

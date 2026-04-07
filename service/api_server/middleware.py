@@ -43,6 +43,7 @@ class RequestContextMiddleware:
         request.state.trace_id = trace_id
         request.state.rate_limit = None
         request.state.rate_scope = request.url.path
+        request.state.concurrency_saturated = False
         response_started = False
 
         async def send_with_headers(message) -> None:
@@ -58,6 +59,12 @@ class RequestContextMiddleware:
                     duration,
                     request.state.rate_limit,
                 )
+                status_code = int(message.get("status", 0))
+                _record_recommendation_input(
+                    request,
+                    status_code=status_code,
+                    latency_ms=duration * 1000.0,
+                )
             await send(message)
 
         try:
@@ -68,6 +75,11 @@ class RequestContextMiddleware:
         except RateLimitExceeded as exc:
             if response_started:
                 raise
+            _record_recommendation_input(
+                request,
+                status_code=429,
+                latency_ms=(time.perf_counter() - start) * 1000.0,
+            )
             response = _problem_response(
                 status=429,
                 problem=ProblemDetails(
@@ -92,6 +104,11 @@ class RequestContextMiddleware:
         except asyncio.TimeoutError:
             if response_started:
                 raise
+            _record_recommendation_input(
+                request,
+                status_code=504,
+                latency_ms=(time.perf_counter() - start) * 1000.0,
+            )
             response = _problem_response(
                 status=504,
                 problem=ProblemDetails(
@@ -109,6 +126,11 @@ class RequestContextMiddleware:
         except Exception:
             if response_started:
                 raise
+            _record_recommendation_input(
+                request,
+                status_code=500,
+                latency_ms=(time.perf_counter() - start) * 1000.0,
+            )
             _logger.exception(
                 "Unhandled API exception",
                 extra={"trace_id": trace_id, "path": request.url.path},
@@ -135,13 +157,37 @@ class ConcurrencyGate:
     def __init__(self, limit: int) -> None:
         self.limit = limit
         self._sem = asyncio.Semaphore(limit)
+        self._inflight = 0
+        self._acquire_attempts = 0
+        self._saturated_attempts = 0
+
+    def mark_attempt(self) -> bool:
+        self._acquire_attempts += 1
+        saturated = self._inflight >= self.limit
+        if saturated:
+            self._saturated_attempts += 1
+        return saturated
 
     async def __aenter__(self) -> "ConcurrencyGate":
         await self._sem.acquire()
+        self._inflight += 1
         return self
 
     async def __aexit__(self, exc_type, exc, tb) -> None:
+        self._inflight = max(0, self._inflight - 1)
         self._sem.release()
+
+    def saturation_snapshot(self) -> dict[str, float | int]:
+        attempts = self._acquire_attempts
+        saturated = self._saturated_attempts
+        rate = round(saturated / attempts, 4) if attempts else 0.0
+        return {
+            "limit": self.limit,
+            "inflight": self._inflight,
+            "attempt_count": attempts,
+            "saturated_count": saturated,
+            "saturation_rate": rate,
+        }
 
 
 class ConcurrencyLimitMiddleware(BaseHTTPMiddleware):
@@ -152,6 +198,7 @@ class ConcurrencyLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        request.state.concurrency_saturated = self._gate.mark_attempt()
         async with self._gate:
             return await call_next(request)
 
@@ -294,3 +341,32 @@ def _problem_response(
         headers["X-RateLimit-Limit"] = str(rate_limit.get("limit", 0))
         headers["X-RateLimit-Remaining"] = str(max(0, rate_limit.get("remaining", 0)))
     return Response(content=content, status_code=status, headers=headers)
+
+
+def _classify_route_class(path: str) -> str:
+    if path == "/health":
+        return "health"
+    if path == "/v1/rag/answer":
+        return "answer"
+    if path.startswith("/v1/"):
+        return "query"
+    return "other"
+
+
+def _record_recommendation_input(
+    request: Request, *, status_code: int, latency_ms: float
+) -> None:
+    runtime_state = getattr(request.app.state, "runtime_state", None)
+    if runtime_state is None:
+        return
+    collector = getattr(runtime_state, "rate_limit_recommendation_inputs", None)
+    if collector is None:
+        return
+    collector.record(
+        route_class=_classify_route_class(request.url.path),
+        status_code=int(status_code),
+        latency_ms=latency_ms,
+        concurrency_saturated=bool(
+            getattr(request.state, "concurrency_saturated", False)
+        ),
+    )

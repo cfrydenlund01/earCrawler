@@ -50,7 +50,7 @@
   },
   "qlora": {
     "required_for_base_models": [
-      "Qwen/Qwen2.5-7B-Instruct"
+      "google/gemma-4-E4B-it"
     ],
     "evidence_note": "For the first 7B production-candidate path, run_config.training_hyperparams.use_4bit and run_metadata.qlora.effective_use_4bit must both prove a 4-bit run."
   },
@@ -77,3 +77,4 @@
     "promotion_note": "A passing bundle does not auto-promote local_adapter to Supported. Promotion still requires a dated decision record and updates to the capability registry and operator docs."
   }
 }
+

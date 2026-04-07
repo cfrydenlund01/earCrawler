@@ -1,5 +1,8 @@
 # RunPass10 Technical Review
 
+> Archive note (2026-04-07): Active local-adapter baseline switched to `google/gemma-4-E4B-it`. This archived document is retained for historical context only and no longer governs active execution.
+
+
 Prepared: March 19, 2026  
 Repository: `earCrawler`  
 Package version observed: `0.2.5`
@@ -446,7 +449,7 @@ Observed model usage patterns:
 - Retrieval embeddings and optional dense retrieval rely on a sentence-transformer style stack and FAISS.
 - Default retriever wiring in the API references `all-MiniLM-L12-v2` as the baseline embedding model.
 - Remote answer generation supports OpenAI-compatible providers such as Groq and NVIDIA NIM.
-- Future local adapter training targets `Qwen/Qwen2.5-7B-Instruct` as the selected 7B base model.
+- Future local adapter training targets `google/gemma-4-E4B-it` as the selected 4B-class base model.
 - Local adapter serving is deliberately gated behind explicit environment variables and artifact checks.
 
 ### 4.3 Theoretical and Algorithmic Ideas
@@ -766,3 +769,4 @@ More precise breakdown:
 A new developer can take over this project effectively because the repository has unusually strong support-boundary documentation, release evidence, and operator guidance for its size. The codebase is not finished in every direction, but it is honest about that fact.
 
 The supported product is narrower than the total code present in the repository. That is the right posture. The next phase should preserve that rigor: improve reliability and deployment evidence for the supported baseline first, then graduate optional capabilities only when the evidence actually supports promotion.
+

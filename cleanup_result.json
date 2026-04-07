@@ -1,0 +1,2514 @@
+{
+  "created_at_utc": "2026-04-07T14:30:59.145431+00:00",
+  "report_path": "report.json",
+  "selected_recommendations": [
+    1,
+    2,
+    4
+  ],
+  "allow_risky": false,
+  "execute": true,
+  "warnings": [
+    "Skipped risky category in safe mode: [virtual_memory_pagefile] C:\\pagefile.sys",
+    "Skipped risky category in safe mode: [system_heavy_winsxs] C:\\Windows\\WinSxS",
+    "Skipped risky category in safe mode: [hibernate_file] C:\\hiberfil.sys",
+    "Skipped risky category in safe mode: [system_heavy_driverstore] C:\\Windows\\System32\\DriverStore\\FileRepository",
+    "Skipped risky category in safe mode: [swap_file] C:\\swapfile.sys",
+    "Skipped risky category in safe mode: [recycle_bin] C:\\$Recycle.Bin",
+    "Skipped unknown category in safe mode: [prefetch_cache] C:\\Windows\\Prefetch",
+    "Skipped risky category in safe mode: [system_heavy_search_index] C:\\ProgramData\\Microsoft\\Search\\Data",
+    "Skipped risky category in safe mode: [system_heavy_windowsapps] C:\\Program Files\\WindowsApps",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Image-Line\\FL Studio 21\\FLEngine_x64_Copy1.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Image-Line\\FL Studio 21\\FLEngine_x64_Copy2.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Image-Line\\FL Studio 21\\FLEngine_x64_Copy3.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Image-Line\\FL Studio 21\\FLEngine_x64_Copy4.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Image-Line\\FL Studio 21\\FLEngine_x64_Copy5.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\resources.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\resources.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\resources.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\resources.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\resources.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\ResiliencyLinks\\resources.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\resources.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\ResiliencyLinks\\resources.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\resources.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\146.0.3856.97\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\icudtl.dat.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\ResiliencyLinks\\icudtl.dat.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\icudtl.dat.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\ResiliencyLinks\\icudtl.dat.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\Microsoft-Edge-WebView\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-edge-webview_31bf3856ad364e35_10.0.26100.8036_none_2eddbf5f3aa19f00\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\OSClient.NET.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.FileExp_cw5n1h2txyewy\\OSClient.NET.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\Shared\\AOT\\OSClient.NET.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-aot_31bf3856ad364e35_10.0.26100.8036_none_3df7202e74f7c236\\OSClient.NET.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\09e625cf2db6dc0101000000484dc02a\\amd64_microsoft-windows-i..-unicode-components_31bf3856ad364e35_10.0.26100.7309_none_b466748741b989f8\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\d97966b7406adc0190080000dc2f1458\\amd64_microsoft-windows-i..-unicode-components_31bf3856ad364e35_10.0.26100.7019_none_b487e49541a04f7c\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-i..-unicode-components_31bf3856ad364e35_10.0.26100.7705_none_b43b8ff741d99338\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-onedrive-setup_31bf3856ad364e35_10.0.26100.5074_none_c1340e9ad5f0a5d0\\OneDriveSetup.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-s..boot-firmwareupdate_31bf3856ad364e35_10.0.26100.8036_none_50b5c563b566885b\\BucketConfidenceData.cab",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\dxcompiler.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\dxcompiler.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\dxcompiler.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\08bf45dc9aaadc0136040000d4080043\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7462_none_6e40f9a54c678a40\\Microsoft.ui.xaml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\09e625cf2db6dc0101000000484dc02a\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7623_none_6e2741dd4c7b7667\\Microsoft.ui.xaml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\194e1aaa55c1dc01a5040000ec616486\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7705_none_6e1a43cd4c8592ec\\Microsoft.ui.xaml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7920_none_6e0716714c937d57\\Microsoft.ui.xaml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\WidevineCdm\\_platform_specific\\win_x64\\widevinecdm.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\WidevineCdm\\_platform_specific\\win_x64\\widevinecdm.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\WidevineCdm\\_platform_specific\\win_x64\\widevinecdm.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\mspdf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\mspdf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\mspdf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_netfx4-mscorlib_ni_b03f5f7f11d50a3a_4.0.15920.100_none_cd7b5c7ef5d6d4e5\\mscorlib.ni.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\assembly\\NativeImages_v4.0.30319_64\\mscorlib\\76cc8cd31b99e4657b7fa51813603db8\\mscorlib.ni.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\x86_netfx4-mscorlib_ni_b03f5f7f11d50a3a_4.0.15920.100_none_152893560a52fdeb\\mscorlib.ni.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\assembly\\NativeImages_v4.0.30319_32\\mscorlib\\b7f46ecd62a3aa399275b2302e207290\\mscorlib.ni.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719890.Voiess_cw5n1h2txyewy\\VoiceAccess\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719895.Livtop_cw5n1h2txyewy\\LiveCaptions\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719896.Speion_cw5n1h2txyewy\\SpeechSynthesizer\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719898.InpApp_cw5n1h2txyewy\\TextInput\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\82FEA24A\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\LiveCaptions\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\SpeechSynthesizer\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\VoiceAccess\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\Shared\\Microsoft.CognitiveServices.Speech.extension.onnxruntime\\2FE731A990CC8A34E9C328A390C0B6B8832881BB3299D24D56A34C3B35D8863E\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\Microsoft.CognitiveServices.Speech.extension.onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\dxcompiler.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\dxcompiler.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\WidevineCdm\\_platform_specific\\win_x64\\widevinecdm.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\WidevineCdm\\_platform_specific\\win_x64\\widevinecdm.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\CatRoot\\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\\oem21.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\CatRoot\\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\\oem86.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\cui_dch.inf_amd64_38cfab2b652e4701\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\igcc_dch.inf_amd64_c2ac023763d5d3ad\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\iigd_dch.inf_amd64_51f685305808e3a5\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\mspdf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\mspdf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\servicing\\Sessions\\Sessions.xml",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_hyperv-vmfirmware-hcl_31bf3856ad364e35_10.0.26100.8036_none_28d4798143ff01c3\\vmfirmwarehcl.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Boot\\DVD\\PCAT\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\RE_DRIVE\\RECOVERYCD_ISO\\Boot\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SysWOW64\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-b..environment-dvd-efi_31bf3856ad364e35_10.0.26100.1_none_d23b3fb5ed0fb788\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-b..environment-dvd-efi_31bf3856ad364e35_10.0.26100.3037_none_71371b783467649c\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-b..nvironment-dvd-pcat_31bf3856ad364e35_10.0.26100.1_none_970b79c3990b4446\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-b..nvironment-dvd-pcat_31bf3856ad364e35_10.0.26100.3037_none_36075585e062f15a\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-winre-recoverytools_31bf3856ad364e35_10.0.26100.7920_none_70dbb0112156b558\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_microsoft-windows-winre-recoverytools_31bf3856ad364e35_10.0.26100.1_none_dc9627270e16a6e8\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_microsoft-windows-winre-recoverytools_31bf3856ad364e35_10.0.26100.7920_none_7b305a6355b77753\\boot.sdi",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\CatRoot\\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\\oem72.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\CatRoot\\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\\oem84.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\cui_dch.inf_amd64_f3a64c75ee4defb7\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\igcc_dch.inf_amd64_77afa5654b325675\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\msdk.inf_amd64_c03be30a746c89a2\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-edge-webview_31bf3856ad364e35_10.0.26100.8036_none_2eddbf5f3aa19f00\\resources.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Steam\\bin\\cef\\cef.win7x64\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Nsight Compute 2024.1.1\\host\\windows-desktop-win7-x64\\resources\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Nsight Systems 2023.4.4\\host-windows-x64\\resources\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\netwtw08.inf_amd64_deec0647934eebd2\\Netwfw08.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\drivers\\Netwfw08.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-speechrecognizer-en-us_31bf3856ad364e35_10.0.26100.1_none_b402723554f94742\\l1033.ngr",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\CatRoot\\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\\oem93.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\cui_dch.inf_amd64_12ed482042e0dee5\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\igcc_dch.inf_amd64_003a6d3c4c50c291\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\mfxplugin64_hw.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\08bf45dc9aaadc0136040000d4080043\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7462_none_6e40f9a54c678a40\\Microsoft.UI.Xaml.Controls.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\09e625cf2db6dc0101000000484dc02a\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7623_none_6e2741dd4c7b7667\\Microsoft.UI.Xaml.Controls.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\194e1aaa55c1dc01a5040000ec616486\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7705_none_6e1a43cd4c8592ec\\Microsoft.UI.Xaml.Controls.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7920_none_6e0716714c937d57\\Microsoft.UI.Xaml.Controls.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-ie-htmlrendering_31bf3856ad364e35_11.0.26100.7920_none_f289022bfbcb7df5\\edgehtml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\drivers\\RTAIODAT.DAT",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Redist\\MSVC\\v143\\vc_redist.x64.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\mip_core_gn.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\mip_core_gn.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\mip_core_gn.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\EBWebView\\x64\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\EBWebView\\x64\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\EBWebView\\x64\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\Shared\\AOT\\OSClient.UWP.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-aot_31bf3856ad364e35_10.0.26100.8036_none_3df7202e74f7c236\\OSClient.UWP.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-imageres_31bf3856ad364e35_10.0.26100.7705_none_785eac2ba80586bc\\imageres.dll.mun",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-oobe_31bf3856ad364e35_10.0.26100.7920_none_54661da37a6f9c70\\OOBE\\WindowsOobeAppHost.AOT.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-i..tmlrendering-legacy_31bf3856ad364e35_11.0.26100.7920_none_f178039c8bf8488b\\mshtml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-speechrecognizer-en-us_31bf3856ad364e35_10.0.26100.1_none_b402723554f94742\\t1033.ngr",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719890.Voiess_cw5n1h2txyewy\\VoiceAccessCommon\\FlexibleCommandingTrainingFile.json",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-core_31bf3856ad364e35_10.0.26100.8036_none_541bf90f7aa6dcbf\\Core\\VoiceAccessCommon\\FlexibleCommandingTrainingFile.json",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-sxs_31bf3856ad364e35_10.0.26100.8036_none_41fe16a872609c56\\60719890.Voiess\\VoiceAccessCommon\\FlexibleCommandingTrainingFile.json",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemResources\\directml_arm64.dll.mun",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemResources\\directml_x64.dll.mun",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-directml_31bf3856ad364e35_10.0.26100.5074_none_4f3d17e7a0d6896e\\directml.dll.mun",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Nsight Systems 2023.4.4\\target-linux-x64\\host-linux-x64\\libarrow.so.500",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Nsight Systems 2023.4.4\\target-linux-x64\\host-linux-x64\\libarrow.so.500.0.0",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\CatRoot\\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\\oem96.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\cui_dch.inf_amd64_b8e01d9e8716d2a7\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\igcc_dch.inf_amd64_54b736e5be5b50b2\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_winappsdk-vnext-cbs_31bf3856ad364e35_10.0.26100.7920_none_447ba5908a3d661d\\onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\libGLESv2.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\libGLESv2.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\libGLESv2.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719890.Voiess_cw5n1h2txyewy\\VoiceAccess\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719895.Livtop_cw5n1h2txyewy\\LiveCaptions\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719898.InpApp_cw5n1h2txyewy\\TextInput\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\B7C5FBEA\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\LiveCaptions\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\VoiceAccess\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\Shared\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime\\5B8CE2387ABD9E52A9069367FBAC7A96FF5D47A605258CE4987BDEE8316CD6D6\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\Microsoft.CognitiveServices.Speech.extension.embedded.sr.runtime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\iigd_dch.inf_amd64_51f685305808e3a5\\mfxplugin32_hw.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-edge-webview_31bf3856ad364e35_10.0.26100.8036_none_2eddbf5f3aa19f00\\dxcompiler.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_microsoft-windows-ie-htmlrendering_31bf3856ad364e35_11.0.26100.7920_none_fcddac7e302c3ff0\\edgehtml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\msedge.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\msedge.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\msedge.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\SynTPRes.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-edge-webview_31bf3856ad364e35_10.0.26100.8036_none_2eddbf5f3aa19f00\\WidevineCdm\\_platform_specific\\win_x64\\widevinecdm.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\System.ServiceModel.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.ServiceModel\\v4.0_4.0.0.0__b77a5c561934e089\\System.ServiceModel.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_system.servicemodel_b77a5c561934e089_4.0.15920.100_none_f6acb0beb1064ffb\\System.ServiceModel.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\sonar.apo.inf_amd64_66827a20ee9f589a\\Sonar.APO.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\WPF\\PresentationFramework.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\PresentationFramework\\v4.0_4.0.0.0__31bf3856ad364e35\\PresentationFramework.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_presentationframework_31bf3856ad364e35_4.0.15920.102_none_a3a3d5e11df00214\\PresentationFramework.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_microsoft-windows-i..tmlrendering-legacy_31bf3856ad364e35_11.0.26100.7920_none_fbccadeec0590a86\\mshtml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-edge-webview_31bf3856ad364e35_10.0.26100.8036_none_2eddbf5f3aa19f00\\mspdf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\CatRoot\\{F750E6C3-38EE-11D1-85E5-00C04FC295EE}\\oem75.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\cui_dch.inf_amd64_6be8e5b7f731a6e5\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\msdk.inf_amd64_9b41c9ec72be975b\\igdlh.cat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_winappsdk-vnext-cbs_31bf3856ad364e35_10.0.26100.7920_none_447ba5908a3d661d\\DirectML.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-shell32_31bf3856ad364e35_10.0.26100.7920_none_07b7067ac22958af\\shell32.dll.mun",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-directx-graphics-tools_31bf3856ad364e35_10.0.26100.7705_none_cb6027cd0c5055b0\\DXCaptureReplay.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_helloface.inf_31bf3856ad364e35_10.0.26100.7920_none_d6cbcbfdb8d7ddd1\\FaceDetectorResources.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\netwtw08.inf_amd64_deec0647934eebd2\\Netwtw08.sys",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\drivers\\Netwtw08.sys",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\System.Windows.Forms.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.Windows.Forms\\v4.0_4.0.0.0__b77a5c561934e089\\System.Windows.Forms.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_system.windows.forms_b77a5c561934e089_4.0.15920.100_none_82ae39b669eb556d\\System.Windows.Forms.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-directui_31bf3856ad364e35_10.0.26100.7920_none_5283cf499ec36a63\\Windows.UI.Xaml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\oneauth.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\oneauth.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\oneauth.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-i..ntrolpanel.appxmain_31bf3856ad364e35_10.0.26100.8036_none_b6adaed146ebe233\\Windows.UI.SettingsAppThreshold.pri",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\mip_core_gn.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\mip_core_gn.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\EBWebView\\x64\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\EBWebView\\x64\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\Cortana.UI\\cache\\SVLocal\\Desktop\\12.js",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\Cortana.UI\\cache\\WV2Local\\desktop\\12.js",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.CBS_cw5n1h2txyewy\\Cortana.UI\\cache\\WV2Local\\desktopdefault\\13.js",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\Cortana.UI\\cache\\SVLocal\\DesktopDefault\\13.js",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\Cortana.UI\\cache\\SVLocal\\Desktop\\12.js",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\Cortana.UI\\cache\\WV2Local\\desktop\\12.js",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\Cortana.UI\\cache\\WV2Local\\desktopdefault\\13.js",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\StartMenu\\AdaptiveCards.ObjectModel.Uwp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\Shared\\AdaptiveCards.ObjectModel.Uwp\\EA6BCDA30FD38ED2CC0D99FEE96E88CD468FDC53800BE0B6E63100F361951DBE\\AdaptiveCards.ObjectModel.Uwp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.57242383.Tasbar_cw5n1h2txyewy\\Taskbar\\AdaptiveCards.ObjectModel.Uwp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\09e625cf2db6dc0101000000484dc02a\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7309_none_b2c278b170c88441\\AdaptiveCards.ObjectModel.Uwp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\194e1aaa55c1dc01a5040000ec616486\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7705_none_b297942170e88d81\\AdaptiveCards.ObjectModel.Uwp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\Widgets\\AdaptiveCards.ObjectModel.Uwp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\AdaptiveCards.ObjectModel.Uwp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-ddores_31bf3856ad364e35_10.0.26100.1_none_1bb984d9a7191d92\\DDORes.dll.mun",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\EBWebView\\x86\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\EBWebView\\x86\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\EBWebView\\x86\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\mip_core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\mip_core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\mip_core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\nvmii.inf_amd64_7cc6a5bab6864a91\\nvcuvid32.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\elevated_tracing_service.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\elevated_tracing_service.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\elevated_tracing_service.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Git\\mingw64\\bin\\git-upload-archive.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Git\\mingw64\\bin\\git-upload-pack.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Git\\mingw64\\bin\\git.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Git\\mingw64\\libexec\\git-core\\git.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Installer\\setup.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Installer\\setup.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Installer\\setup.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\dual_engine_adapter_x64.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\dual_engine_adapter_x64.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\dual_engine_adapter_x64.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\System.Design.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.Design\\v4.0_4.0.0.0__b03f5f7f11d50a3a\\System.Design.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_system.design_b03f5f7f11d50a3a_4.0.15920.100_none_070c61d329803f49\\System.Design.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_winappsdk-vnext-cbs_31bf3856ad364e35_10.0.26100.7920_none_447ba5908a3d661d\\Microsoft.ui.xaml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\DynamicLottieUwp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-core_31bf3856ad364e35_10.0.26100.8036_none_541bf90f7aa6dcbf\\Core\\DynamicLottie.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-sxs_31bf3856ad364e35_10.0.26100.8036_none_41fe16a872609c56\\57242383.Tasbar\\DynamicLottie.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\msedge.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\msedge.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\new_msedge.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Windows Kits\\10\\Debuggers\\x64\\debugger.chm",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Windows Kits\\10\\Debuggers\\x86\\debugger.chm",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_microsoft-windows-directui_31bf3856ad364e35_10.0.26100.7920_none_5cd8799bd3242c5e\\Windows.UI.Xaml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Installer2\\Display.PhysX.{E13C2D87-EE95-48A7-A20D-E21E191816A5}\\files\\Engine\\86C5F4F22ECD\\ImplicitLibs\\PhysX3Gpu_x64.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\msedge_elf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\msedge_elf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\msedge_elf.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\DynamicLottieWinUI3.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\d3dcompiler_47.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\d3dcompiler_47.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\d3dcompiler_47.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\vk_swiftshader.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\vk_swiftshader.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\vk_swiftshader.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\libGLESv2.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\libGLESv2.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\spool\\drivers\\x64\\3\\FXSRES.DLL",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_prnms002.inf_31bf3856ad364e35_10.0.26100.8036_none_89743062796304bb\\Amd64\\FXSRES.DLL",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft Visual Studio\\2022\\BuildTools\\VC\\Redist\\MSVC\\v143\\vc_redist.x86.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_microsoft-windows-directx-graphics-tools_31bf3856ad364e35_10.0.26100.7705_none_d5b4d21f40b117ab\\DXCaptureReplay.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Git\\mingw64\\libexec\\git-core\\scalar.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\sonar.apo.inf_amd64_66827a20ee9f589a\\DirectML.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\mscopilot.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\mscopilot.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\mscopilot.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-s..states-english-main_31bf3856ad364e35_10.0.26100.7019_none_47eca78a60c88ac0\\MsSp7en-US.lex",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_helloface.inf_31bf3856ad364e35_10.0.26100.7920_none_d6cbcbfdb8d7ddd1\\facerecognitionsensoradapterresources.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\08bf45dc9aaadc0136040000d4080043\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7462_none_6e40f9a54c678a40\\WinUIEdit.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\09e625cf2db6dc0101000000484dc02a\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7623_none_6e2741dd4c7b7667\\WinUIEdit.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\194e1aaa55c1dc01a5040000ec616486\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7705_none_6e1a43cd4c8592ec\\WinUIEdit.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7920_none_6e0716714c937d57\\WinUIEdit.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\msedgewebview2.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\msedgewebview2.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\msedgewebview2.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-os-kernel_31bf3856ad364e35_10.0.26100.8036_none_0820060964073223\\ntoskrnl.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\nvcuvid.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\SynCntxt.rtf",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_netfx4-system_ni_b03f5f7f11d50a3a_4.0.15912.0_none_ec66f5979abecd83\\system.ni.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\TemplateExpander.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_helloface.inf_31bf3856ad364e35_10.0.26100.7920_none_d6cbcbfdb8d7ddd1\\FaceRecognitionEngineAdapterResources_v5.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\ml.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\ml.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\ml.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\ml.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\ml.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\ta.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\ta.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\ta.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\ta.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\ta.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-font-truetype-segoeui_31bf3856ad364e35_10.0.26100.7705_none_6c5d0cb1c25c2eed\\seguiemj.ttf",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\notification_helper.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\notification_helper.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\notification_click_helper.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\notification_helper.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\passkey_authenticator_plugin.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\Shared\\Microsoft.CognitiveServices.Speech.extension.embedded.tts\\1025507B0EB5F5E98033152719A43D9F2D1CEA5406994CF6DB483888C1FCC736\\Microsoft.CognitiveServices.Speech.extension.embedded.tts.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\Microsoft.CognitiveServices.Speech.extension.embedded.tts.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\System.Data.Entity.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System.Data.Entity\\v4.0_4.0.0.0__b77a5c561934e089\\System.Data.Entity.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_system.data.entity_b77a5c561934e089_4.0.15920.100_none_058840d8dd15b06e\\System.Data.Entity.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719896.Speion_cw5n1h2txyewy\\SpeechSynthesizer\\Microsoft.CognitiveServices.Speech.extension.embedded.tts.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\422DD6B7\\Microsoft.CognitiveServices.Speech.extension.embedded.tts.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\SearchUx.UI.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\MSI\\MSI Remind Manager\\MSI Remind Manager.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\LiveCaptions\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\SpeechSynthesizer\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\VoiceAccess\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\Shared\\Microsoft.CognitiveServices.Speech.core\\7C2A78E424D9E3EE2511D78565B30451DBABC35DA2018E7BBC02081D95BEAFB3\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\7C2A78E4\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719890.Voiess_cw5n1h2txyewy\\VoiceAccess\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719895.Livtop_cw5n1h2txyewy\\LiveCaptions\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719896.Speion_cw5n1h2txyewy\\SpeechSynthesizer\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.60719898.InpApp_cw5n1h2txyewy\\TextInput\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\Microsoft.CognitiveServices.Speech.core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\oneauth.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\oneauth.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeUpdate\\Download\\{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5}\\146.0.3856.97\\MicrosoftEdge_X64_146.0.3856.97_146.0.3856.84.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\resources.pri",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_netwsw00.inf_31bf3856ad364e35_10.0.26100.1_none_cfdd0446867ebb39\\Netwsw00.sys",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\194e1aaa55c1dc01a5040000ec616486\\amd64_userexperience-photon_31bf3856ad364e35_10.0.26100.7705_none_fad96b7121898910\\Photon\\hermes.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\PendingDeletes\\0c9842da2db6dc0150020000484dc02a.hermes.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-photon_31bf3856ad364e35_10.0.26100.7920_none_fac63e152197737b\\Photon\\hermes.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_netrtwlane.inf_31bf3856ad364e35_10.0.26100.1_none_1ac2368c9a62e771\\rtwlane.sys",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\ka.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\ka.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\ka.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\ka.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\ka.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\kn.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\kn.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\kn.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\kn.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\kn.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_32\\mscorlib\\v4.0_4.0.0.0__b77a5c561934e089\\mscorlib.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_mscorlib_b77a5c561934e089_4.0.15920.100_none_43471084a9070ef4\\mscorlib.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\or.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\or.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\or.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\or.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\or.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\08bf45dc9aaadc0136040000d4080043\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7462_none_6e40f9a54c678a40\\dwmcorei.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\09e625cf2db6dc0101000000484dc02a\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7623_none_6e2741dd4c7b7667\\dwmcorei.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\Temp\\InFlight\\194e1aaa55c1dc01a5040000ec616486\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7705_none_6e1a43cd4c8592ec\\dwmcorei.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_winappsdk-cbs-stable_31bf3856ad364e35_10.0.26100.7920_none_6e0716714c937d57\\dwmcorei.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-lockapp.appxmain_31bf3856ad364e35_10.0.26100.7920_none_82fdee25841f4652\\LockApp.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\te.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\te.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\te.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\te.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\te.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-sxs_31bf3856ad364e35_10.0.26100.8036_none_41fe16a872609c56\\57242383.Tasbar\\Taskbar.View.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-core_31bf3856ad364e35_10.0.26100.8036_none_541bf90f7aa6dcbf\\Core\\Taskbar.View.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\telclient.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\telclient.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\telclient.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\TextInput.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-sxs_31bf3856ad364e35_10.0.26100.8036_none_41fe16a872609c56\\60719898.InpApp\\TextInput.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Installer2\\Display.PhysX.{E13C2D87-EE95-48A7-A20D-E21E191816A5}\\files\\Engine\\86C5F4F22ECD\\APEX_Particles_x64.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_netfx4-system_core_ni_b03f5f7f11d50a3a_4.0.15912.0_none_4319750523600bf1\\system.core.ni.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\km.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\km.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\km.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\km.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\km.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\ne.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\ne.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\ne.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\ne.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\ne.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-t..peech-en-us-onecore_31bf3856ad364e35_10.0.26100.1_none_f8f09a49f1697814\\M1033Eva.voiceAssistant.WVE",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_64\\mscorlib\\v4.0_4.0.0.0__b77a5c561934e089\\mscorlib.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_mscorlib_b77a5c561934e089_4.0.15920.100_none_1978c96ae7bc79d7\\mscorlib.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Installer2\\Display.PhysX.{E13C2D87-EE95-48A7-A20D-E21E191816A5}\\files\\Engine\\07022E82A068\\GRB_1_x86.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\EBWebView\\x86\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\EBWebView\\x86\\EmbeddedBrowserWebView.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\mip_core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\mip_core.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_32\\System.Web\\v4.0_4.0.0.0__b03f5f7f11d50a3a\\System.Web.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_system.web_b03f5f7f11d50a3a_4.0.15920.102_none_72ba37c4fe2d9346\\System.Web.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\bn-IN.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\bn-IN.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\bn-IN.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\bn-IN.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\bn-IN.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_64\\System.Web\\v4.0_4.0.0.0__b03f5f7f11d50a3a\\System.Web.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_system.web_b03f5f7f11d50a3a_4.0.15920.102_none_48ebf0ab3ce2fe29\\System.Web.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-onecore-udiapi_31bf3856ad364e35_10.0.26100.7920_none_71ca75b68e6bba1e\\UdiApiClient.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_netwtw02.inf_31bf3856ad364e35_10.0.26100.1_none_c51ef4926adbca70\\Netwfw02.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_helloface.inf_31bf3856ad364e35_10.0.26100.7920_none_d6cbcbfdb8d7ddd1\\facerecognitionengineadapterresourcessecure.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-mediaplayer-core_31bf3856ad364e35_10.0.26100.7920_none_a6f79ebbff472485\\wmp.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\System.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\Microsoft.NET\\assembly\\GAC_MSIL\\System\\v4.0_4.0.0.0__b77a5c561934e089\\System.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_system_b77a5c561934e089_4.0.15920.105_none_2c572e4f82548228\\System.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\x86_netfx4-system_ni_b03f5f7f11d50a3a_4.0.15912.0_none_34142c6eaf3af689\\system.ni.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-ai-machinelearning_31bf3856ad364e35_10.0.26100.7623_none_a01a5bb409e08f22\\onnxruntime.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\elevation_service.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\elevation_service.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\elevation_service.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-oobe_31bf3856ad364e35_10.0.26100.7920_none_54661da37a6f9c70\\OOBE\\WXHWinRTAdapter.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\e16p7ims.inf_amd64_6df6623e45e489b8\\E16P7IMS.ROM",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\SteelSeries\\GG\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\as.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\as.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\as.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\as.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\as.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\Adobe\\Acrobat DC\\Acrobat\\AcroCEF\\icudtl.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\pa.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\pa.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\pa.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\pa.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\pa.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\drivers\\gm.dls",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_multimedia-generalmididata_31bf3856ad364e35_10.0.26100.1_none_85b0f42bbeefade9\\gm.dls",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\wow64_multimedia-generalmididata_31bf3856ad364e35_10.0.26100.1_none_90059e7df3506fe4\\gm.dls",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\rtsuer.inf_amd64_c30a544a83e79288\\RsCRIcon.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\mr.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\mr.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\mr.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\mr.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\mr.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_netwtw10.inf_31bf3856ad364e35_10.0.26100.1_none_73845a84922e14db\\Netwfw10.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-directml_31bf3856ad364e35_10.0.26100.5074_none_4f3d17e7a0d6896e\\directml.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\gu.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\gu.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\gu.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\gu.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\gu.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\MicrosoftWindows.Client.Core_cw5n1h2txyewy\\Widgets.Taskbar\\Microsoft.Graphics.Canvas.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\Shared\\Microsoft.Graphics.Canvas\\E3FE1A23C1ADA9A83E8DD89732B36433EDDAF49A7218ED5BD9977FA468BE8E3F\\Microsoft.Graphics.Canvas.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\SystemApps\\SxS\\MicrosoftWindows.57242383.Tasbar_cw5n1h2txyewy\\Taskbar\\Widgets.Taskbar\\Microsoft.Graphics.Canvas.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-core_31bf3856ad364e35_10.0.26100.8036_none_541bf90f7aa6dcbf\\Core\\Widgets.Taskbar\\Microsoft.Graphics.Canvas.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-desktop_31bf3856ad364e35_10.0.26100.8036_none_c84590c11a2e4d54\\CBS\\Widgets\\Microsoft.Graphics.Canvas.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_userexperience-shared_31bf3856ad364e35_10.0.26100.7922_none_b284393570f6ab2e\\Microsoft.Graphics.Canvas.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\hi.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\hi.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\hi.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\hi.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\hi.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\elevated_tracing_service.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\elevated_tracing_service.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Installer2\\Display.PhysX.{E13C2D87-EE95-48A7-A20D-E21E191816A5}\\files\\Engine\\A0A1369354E1\\PhysX3Gpu_x86.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\Installer\\setup.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\Installer\\setup.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\dual_engine_adapter_x64.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\dual_engine_adapter_x64.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\Locales\\ml.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\ResiliencyLinks\\Locales\\ml.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\Locales\\ml.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\ResiliencyLinks\\Locales\\ml.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_netfx4-clr_dll_b03f5f7f11d50a3a_4.0.15920.100_none_384ce7e61a862e96\\clr.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\lo.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\lo.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\lo.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\lo.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\lo.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\Locales\\ta.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\ResiliencyLinks\\Locales\\ta.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\Locales\\ta.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\ResiliencyLinks\\Locales\\ta.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\oneds.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\oneds.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\oneds.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.97\\notification_helper.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\notification_click_helper.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\notification_helper.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.97\\passkey_authenticator_plugin.exe",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Installer2\\Display.PhysX.{E13C2D87-EE95-48A7-A20D-E21E191816A5}\\files\\Engine\\82D8704BAB07\\PhysXCore.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Installer2\\Display.PhysX.{E13C2D87-EE95-48A7-A20D-E21E191816A5}\\files\\Engine\\549B931E903E\\PhysXCore.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Installer2\\Display.PhysX.{E13C2D87-EE95-48A7-A20D-E21E191816A5}\\files\\Engine\\C22346819C37\\PhysXCore.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\kok.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\kok.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\kok.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\kok.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\kok.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_dual_netrtwlanu.inf_31bf3856ad364e35_10.0.26100.1_none_f16f85ce7960ec61\\rtwlanu.sys",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files\\NVIDIA Corporation\\Installer2\\Display.PhysX.{E13C2D87-EE95-48A7-A20D-E21E191816A5}\\files\\Engine\\5182B3C9EFEC\\PhysXCore.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeCore\\Optimized\\Locales\\th.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\Locales\\th.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\EdgeWebView\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\th.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\Locales\\th.pak",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\146.0.3856.84\\ResiliencyLinks\\Locales\\th.pak.DATA",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\DriverStore\\FileRepository\\prnms003.inf_x86_ff37b47c1ea5a3a8\\I386\\PrintConfig.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\System32\\spool\\drivers\\W32X86\\3\\PrintConfig.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\x86_dual_prnms003.inf_31bf3856ad364e35_10.0.26100.8036_none_56676b0039eb8c84\\I386\\PrintConfig.dll",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-s..voicecommon-onecore_31bf3856ad364e35_10.0.26100.7920_none_d0cf538b8fb19994\\MSTTSLocEnUS.dat",
+    "Skipped duplicate file outside C:\\Users in safe mode: C:\\Windows\\WinSxS\\amd64_microsoft-windows-twinui-pcshell_31bf3856ad364e35_10.0.26100.8036_none_8e393ff7d07a5707\\twinui.pcshell.dll",
+    "Failed to list directory C:\\Windows\\Temp: [WinError 5] Access is denied: 'C:\\\\Windows\\\\Temp'",
+    "Failed to list directory C:\\Windows\\LiveKernelReports: [WinError 5] Access is denied: 'C:\\\\Windows\\\\LiveKernelReports'",
+    "Failed to list directory C:\\Users\\Badass Gojira\\AppData\\Local\\Microsoft\\Windows\\Temporary Internet Files: [WinError 5] Access is denied: 'C:\\\\Users\\\\Badass Gojira\\\\AppData\\\\Local\\\\Microsoft\\\\Windows\\\\Temporary Internet Files'"
+  ],
+  "prepared_item_count": 287,
+  "prepared_known_file_bytes": 376742503,
+  "results": [
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\Download\\33ec2b5517b91eb5b2a1e71afeff7b0d33e9e9cb",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_update_download_cache"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\Download\\436740cf2bb06adf76c117f664e19042",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_update_download_cache"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\Download\\7f9b239047f54ff38b54f8b9a93b590d7287221a",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_update_download_cache"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\Download\\8130d39c024e56b661945e57db15efca32d91dfd",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_update_download_cache"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\Download\\9ed2e654c2d889ee1104337e29bb2fb1",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_update_download_cache"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\Download\\e06aeae46e96c9312e04d752761f53bd",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_update_download_cache"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\Download\\SharedFileCache",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_update_download_cache"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\CBS",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_logs"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\DISM",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_logs"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\NetSetup",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_logs"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\StorGroupPolicy.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_logs"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\waasmedic",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_logs"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\waasmediccapsule",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_logs"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\WindowsUpdate",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_logs"
+    },
+    {
+      "path": "C:\\ProgramData\\Microsoft\\Windows\\WER\\ReportArchive",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_error_reporting"
+    },
+    {
+      "path": "C:\\ProgramData\\Microsoft\\Windows\\WER\\ReportQueue",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_error_reporting"
+    },
+    {
+      "path": "C:\\ProgramData\\Microsoft\\Windows\\WER\\Temp",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "windows_error_reporting"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\090627ac-b399-4405-a39b-377b2caa6af2.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\372334da-271a-4859-9711-888c380df12d.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\60c76393-e5f6-4b10-a19a-c400d547a560.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\6d94437d-1b4a-4286-b2ff-9b1e538215b2.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\72f55d97-0345-4eb8-aeef-14384f985489.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\7a74ea00-ff66-410f-8aea-28fe66ce5bac.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\a3d3bc12-7777-4d56-9f42-11161dd5d5a9.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\ac68cea1-8702-49e9-bbae-43e228098874.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\Acrobat Distiller DC",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\Adobe",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\AdobeARM.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\adobegc.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\collab_low",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\cv_debug.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\d930f182-df36-43c9-9bc5-054bfeedc156.tmp",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\DiagOutputDir",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\distNGLLog.txt",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\LogMeInLogs",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\NGL",
+      "success": false,
+      "message": "SHFileOperationW error code 124",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\oobelib.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\StructuredQuery.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (10).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (11).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (12).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (13).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (14).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (15).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (16).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (17).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (18).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (19).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (2).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (20).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (21).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (22).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (23).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (24).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (25).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (26).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (27).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (28).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (29).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (3).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (30).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (31).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (32).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (4).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (5).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (6).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (7).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (8).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file (9).xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Temp\\xml_file.xml",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_temp"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Microsoft\\Windows\\INetCache\\Content.IE5",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_internet_cache"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\Microsoft\\Windows\\INetCache\\IE",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "user_internet_cache"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Roaming\\Code\\Cache\\Cache_Data",
+      "success": false,
+      "message": "SHFileOperationW error code 124",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "vscode_cache"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Roaming\\Code\\Cache\\No_Vary_Search",
+      "success": false,
+      "message": "SHFileOperationW error code 124",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "vscode_cache"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\pip\\Cache\\http-v2",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "pip_cache"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\AppData\\Local\\pip\\Cache\\selfcheck",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Temp and cache review",
+      "source_category": "pip_cache"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\Bently's Thumbdrive\\UPL training documents\\UPL Videos\\Policies regulations\\UPLHandbook3-1RR201811.pdf",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\Bently's Thumbdrive\\UPL training documents\\UPL Videos\\Testing documents\\UPLHandbook3-1RR201811.pdf",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\Bently's Thumbdrive\\UPL training documents\\UPLHandbook3-1RR201811.pdf",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\Policies regulations\\UPLHandbook3-1RR201811.pdf",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\Testing documents\\UPLHandbook3-1RR201811.pdf",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\Bently's Thumbdrive\\UPL training documents\\UPL Videos\\DTP software\\DTPLite_6.0.8.2.exe",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\DTP software\\DTPLite_6.0.8.2.exe",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\.vscode\\extensions\\openai.chatgpt-26.325.31654-win32-x64\\webview\\assets\\index-CpiKkRDN.js.map",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\Bently's Thumbdrive\\UPL training documents\\ARIMS filing\\Army Consolidated Records Schedule (ACRS).pptx",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\Desktop\\Lorellie Drive\\UPL\\Bently's Thumbdrive\\UPL training documents\\UPL Videos\\ARIMS filing\\Army Consolidated Records Schedule (ACRS).pptx",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\.vscode\\cli\\servers\\Stable-cfbea10c5ffb233ea9177d34726e6056e89913dc\\server\\node_modules\\@github\\copilot\\sharp\\node_modules\\@img\\sharp-wasm32\\lib\\sharp-wasm32.node.wasm",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Duplicate file review",
+      "source_category": "duplicate_file"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Security.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Store%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\PowerShellCore%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\System.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Application.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\debug\\WIA\\wiatrace.log",
+      "success": false,
+      "message": "SHFileOperationW error code 32",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-AppXDeploymentServer%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-SMBServer%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-GroupPolicy%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Cisco AnyConnect Secure Mobility Client.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\.vscode-server\\data\\logs\\20260406T094924\\exthost2\\openai.chatgpt\\Codex.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Ntfs%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Windows PowerShell.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Storage-Storport%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-StateRepository%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\.vscode-server\\data\\logs\\20260406T094924\\exthost2\\remoteexthost.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-WebAuthN%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Windows Defender%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-SmbClient%4Connectivity.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-PnP%4Device Management.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\catroot2\\edb.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\catroot2\\edbtmp.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\DataStore\\Logs\\edb00004.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\DataStore\\Logs\\edb.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\DataStore\\Logs\\edb00003.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\DataStore\\Logs\\edb00005.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\DataStore\\Logs\\edb00006.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\DataStore\\Logs\\edbtmp.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\CBS\\CBS.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Hyper-V-VmSwitch-Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-User Profile Service%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-WHEA%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Partition%4Diagnostic.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-AppReadiness%4Admin.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Privacy-Auditing%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-AppReadiness%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-PowerShell%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Audio%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Crypto-DPAPI%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-TaskScheduler%4Maintenance.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Crypto-NCrypt%4KeyMgmt.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Application-Experience%4Program-Telemetry.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-AppxPackaging%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Realtek.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Security-Mitigations%4KernelMode.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-HelloForBusiness%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Diagnostics-Performance%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-AppModel-Runtime%4Admin.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider%4Sync.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-CloudStore%4Initialization.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Perflib%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-CoreSystem-SmsRouter-Events%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-Boot%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-WinRM%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Winlogon%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Audio%4PlaybackManager.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-CloudStore%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-CertificateServicesClient-Lifecycle-User%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-CodeIntegrity%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Shell-Core%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-NetworkProfile%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-AAD%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-PCI%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Client-Licensing-Platform%4Admin.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-NCSI%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-LiveId%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-UserSettingsBackup-Orchestrator%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Diagnosis-DPS%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Dhcp-Client%4Admin.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-UniversalTelemetryClient%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-DeviceManagement-Enterprise-Diagnostics-Provider%4Admin.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Provisioning-Diagnostics-Provider%4Admin.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Dhcpv6-Client%4Admin.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-PushNotification-Platform%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Diagnosis-PCW%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Known Folders API Service.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-VolumeSnapshot-Driver%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-StorageVolume%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-WER-PayloadHealth%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-EnhancedStorage-EhStorClass%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-WindowsUpdateClient%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Crypto-NCrypt%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-DeviceSetupManager%4Admin.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-SmartCard-DeviceEnum%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-ShimEngine%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-CloudRestoreLauncher%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Time-Service%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Shell-Core%4AppDefaults.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-WMI-Activity%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-AppXDeployment%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Wcmsvc%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-TerminalServices-LocalSessionManager%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-PnP%4Configuration.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Bits-Client%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\OneApp_IGCC.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-Cache%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Windows Firewall With Advanced Security%4Firewall.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-WLAN-AutoConfig%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.002.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.004.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.007.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.008.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.015.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.016.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.018.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.019.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.020.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.023.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.024.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.026.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.027.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.028.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.029.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.030.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.001.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.003.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.005.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.006.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.009.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.010.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.017.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.022.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.025.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.011.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.012.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.013.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\UNP\\Logs\\UpdateNotificationPipeline.014.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass_000_vcRuntimeMinimum_x64.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\.vscode\\cli\\tunnel-service.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\.vscode-server\\data\\logs\\20260401T130020\\exthost2\\vscode.git\\Git.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass_001_vcRuntimeAdditional_x86.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files (x86)\\Google\\GoogleUpdater\\updater.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass_001_vcRuntimeAdditional_x64.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass_000_vcRuntimeMinimum_x86.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\Performance\\WinSAT\\DataStore\\2019-07-13 19.07.50.396.winsat.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\SoftwareDistribution\\ReportingEvents.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\wbem\\WMIMigration.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.007.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.016.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.004.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.010.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.022.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.006.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.001.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.013.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.027.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.014.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.030.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.031.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.033.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.009.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.036.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.019.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.039.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.020.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.042.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.043.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.044.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.023.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.011.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.003.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.050.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.026.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.029.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.001.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.004.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.008.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.017.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.016.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.037.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.040.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.046.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.047.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.049.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.024.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.002.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.005.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.006.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.009.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.010.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.012.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files\\RUXIM\\Logs\\RUXIMLog.034.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.017.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.003.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.007.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.011.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.013.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.014.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\Logs\\UpdateHealthTools.015.etl",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\drivers\\RivetNetworks\\Killer\\aperture3.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\Logs\\DISM\\dism.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Users\\Badass Gojira\\.vscode-server\\data\\logs\\20260406T094924\\exthost2\\vscode.git\\Git.log",
+      "success": true,
+      "message": "moved to recycle bin",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Program Files (x86)\\Common Files\\Adobe\\Installers\\CoreSyncInstall.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\Microsoft.NET\\Framework\\v4.0.30319\\ngen.log",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-StoreMgr%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-LanguagePackSetup%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-WDI%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-Kernel-WHEA%4Errors.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    },
+    {
+      "path": "C:\\Windows\\System32\\winevt\\Logs\\Microsoft-Windows-KernelStreaming%4Operational.evtx",
+      "success": false,
+      "message": "SHFileOperationW error code 120",
+      "source_recommendation": "Crash dump and log review",
+      "source_category": "crash_or_log"
+    }
+  ]
+}

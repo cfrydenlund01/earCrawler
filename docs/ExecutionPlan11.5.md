@@ -1,9 +1,11 @@
 # Execution Plan 11.5
 
+Prepared: April 7, 2026
+Status: Step 0 and Phase 1 complete; Phase 2 waiting only on external AWS GPU quota approval as of 2026-04-07
+
 Source guidance:
 
 - `docs/production_beta_readiness_review_2026-03-25.md`
-- `docs/Archive/ExecutionPlanRunPass11.md` as structure/template only
 - `docs/kg_quarantine_exit_gate.md`
 - `docs/kg_unquarantine_plan.md`
 - `docs/model_training_surface_adr.md`
@@ -13,202 +15,111 @@ Source guidance:
 - `docs/ops/release_process.md`
 - `docs/ops/windows_single_host_operator.md`
 
-Prepared: March 25, 2026
-
 ## Purpose
 
-This document replaces directionless review loops with one execution path to a
-production-ready result for the supported Windows single-host baseline.
+This document keeps the same production-readiness goal as Execution Plan 11.5,
+but resets execution to Step 0 for a model-baseline switch.
 
-The finish line is not "another assessment." The finish line is:
+The finish line is:
 
-1. release evidence is trustworthy again,
-2. the supported host baseline is reproducible on a clean machine,
-3. the real corpus -> retrieval -> KG -> API path is current and validated,
-4. KG-backed runtime features are either unquarantined with evidence or kept
-   explicitly out of scope,
-5. the local-adapter path is either evidence-backed with a real QLoRA candidate
-   or remains deliberately non-release,
-6. a final production decision can be made from current artifacts instead of
-   aspiration.
+1. release evidence is trustworthy,
+2. supported Windows single-host deployment is reproducible,
+3. corpus -> retrieval -> KG -> API path is current and validated,
+4. KG-backed runtime features are either evidenced or explicitly out of scope,
+5. the local-adapter path is evidence-backed with a real Gemma 4B-class QLoRA
+   candidate (or deliberately remains non-release),
+6. one final production decision can be made from current artifacts.
 
-## Model Guidance
+## Active Model Baseline (Hard Requirement)
 
-Working rule:
-
-- Use `GPT-5.3-Codex` for implementation, tests, scripts, CI, packaging, and
-  workflow repair.
-- Use `GPT-5.4` for architecture, support-boundary decisions, operator docs,
-  and dated decision records.
-- Use `GPT-5.4-Mini` only for bounded documentation refreshes, evidence-index
-  alignment, or small non-architectural cleanup.
-- Use `medium` when the task is bounded and the target state is already clear.
-- Use `high` when a task spans multiple modules, changes release/operator
-  behavior, or must preserve support boundaries carefully.
-- Use `extra high` only once: the final production decision step.
-
-This plan intentionally keeps `extra high` to one final synthesis step.
-
-## Non-Negotiable Strengths To Preserve
-
-- Keep the supported product claim narrow: one Windows host, one API instance,
-  one local read-only Fuseki dependency.
-- Preserve authored-source versus generated-artifact separation.
-- Preserve release evidence discipline and checksum/signature verification.
-- Preserve the advisory-only, abstention-first answer posture unless a later
-  dated decision explicitly widens it.
-- Do not silently promote optional or quarantined capabilities.
-- Keep rollback paths and default-off safety controls intact while expanding
-  capability evidence.
+- Base model ID: `google/gemma-4-E4B-it`
+- Family target: Google Gemma 4B-class baseline
+- Fine-tuning mode: QLoRA (`--use-4bit` + `--require-qlora-4bit`)
+- Training run ID prefix: `gemma4-e4b-ear-<yyyy-mm-dd>-...`
+- Benchmark run ID prefix: `benchmark_gemma4-e4b-ear-...`
+- Active execution docs, active logs, active config, and active runtime env vars
+  must not contain hard-coded legacy model IDs.
 
 ## Execution Rules
 
+- Start from Step 0. Do not skip to later phases.
 - Do not start a later phase until the current phase gate passes.
-- Every prompt step must end with updated artifacts, targeted verification, and
-  a brief completion record.
-- Every command step must save or confirm evidence under `dist/`, `kg/reports/`,
-  or the dated docs named in that phase.
-- If a gate fails, execute the contingency in that phase before moving on.
+- Every completed step must leave machine-checkable evidence under `dist/`,
+  `kg/reports/`, or this plan log.
+- If a gate fails, execute the contingency in that phase before proceeding.
 
-## Phase 0 - Baseline Capture And Workstream Lock
+## Execution Storage Rules
 
-Goal: record the current state once, lock the target, and stop drifting between
-review and implementation.
+- Canonical large-artifact root for this plan: `E:\AI\rComp\execution_plan_11_5`
+- `HF_HOME`, model cache, prepared packages, training runs, smoke outputs,
+  benchmark outputs, candidate bundles, upload/download tarballs, and other
+  high-volume results must live under that `E:\` root.
+- If repo-relative commands still refer to `dist/` or `kg/reports/`, resolve
+  them to the `E:\` root via absolute paths or filesystem indirection. Do not
+  keep duplicate large copies on `D:\AI\rComp`.
+- EC2 training may use only short-lived instance storage or
+  delete-on-termination EBS. After artifacts are downloaded back to `E:\`,
+  AWS retained storage must be zero: no running or stopped instance, no
+  detached volume, no snapshot, no AMI, no S3 object, and no remote cache.
 
-### Step 0.1 - Capture The Current Baseline
-Explanation: run the current checks once and record the real starting point for
-this plan.
+## Step 0 - Gemma Switch Reset (Start Here)
+
+Goal: make the workspace and plan clean for Gemma 4B-class download and
+training.
+
+### Step 0.1 - Reset Active Tracking And Identity
+Explanation: reset the active execution trail so current progress starts with
+Gemma-only identifiers.
 
 Type: `Code`
 
 ```powershell
-py -3 -m pytest -q
-pwsh scripts/workspace-state.ps1 -Mode verify
-pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist
-pwsh scripts/verify-release.ps1 -RequireCompleteEvidence
-pwsh scripts/bootstrap-verify.ps1
+rg -n -S "google/gemma-4-E4B-it|gemma4-e4b-ear|benchmark_gemma4-e4b-ear" docs/ExecutionPlan11.5.md docs/ExecutionPlan11.5_log.md docs/Archive
 ```
 
 Expected evidence:
 
-- current pass/fail console output copied into the execution log for this run
-- no new interpretation work yet; just a fixed baseline
+- zero legacy hard-coded model identifiers in active execution docs after edits
+- `docs/ExecutionPlan11.5_log.md` begins with this reset
 
-### Step 0.2 - Create A Single Tracking Record For ExecutionPlan11.5
-Explanation: create one dated progress log tied to this plan so work stops
-fragmenting across ad hoc notes.
-
-Type: `Prompt`
-
-Model: `GPT-5.4-Mini`
-Reasoning: `medium`
-
-Prompt:
-```text
-Use docs/ExecutionPlan11.5_log.md as the execution log and if not done already seed it with the current Phase 0 baseline results only. Keep it short and operational: date, command run, pass/fail, artifact path if any, and next blocking step. Do not create a new plan or new review. Cross-link only the minimum governing docs. Afterward, ensure this execution log is referenced by name in docs/ExecutionPlan11.5.md where explicitly or implicitly referenced.
-```
-
-Phase gate:
-
-- baseline commands have been run once
-- one execution log exists and names the current blockers
-
-Contingency if gate fails:
-
-- if the log draft expands into another narrative review, replace it with a
-  terse run ledger before continuing
-
-Phase 0 dependency note:
-
-- Phase 1 is the remediation stream for the blockers found in Phase 0.
-- Do not advance to Phase 2 or later until the Phase 0 gate passes.
-
-## Phase 1 - Restore Release Trust
-
-Goal: make the live workspace pass its own release-integrity rules again.
-
-This phase is intentionally part of the path to satisfying the Phase 0 gate.
-Steps 1.1, 1.2, 1.3, and 1.4 are the remediation work that must close the
-baseline blockers before the plan can advance.
-
-### Step 1.1 - Repair `dist/` Integrity And Remove Uncontrolled Release Drift
-Explanation: the March 25 review identified stale checksum references and
-uncontrolled top-level artifacts as the first hard blocker.
-
-Type: `Prompt`
-
-Model: `GPT-5.3-Codex`
-Reasoning: `high`
-
-Prompt:
-```text
-Use docs/production_beta_readiness_review_2026-03-25.md and docs/ops/release_process.md as governing context. Repair the live dist/ workspace so release evidence is trustworthy again. Fix the checksum drift between dist/checksums.sha256 and the current retained artifacts, remove or re-home uncontrolled top-level release artifacts that do not belong beside checksums, and preserve the repo's strict publication guards.
-
-Do not weaken verification. Prefer the smallest defensible change set across release scripts, tests, manifests, and retained evidence. End by running the narrowest release-integrity verification needed and summarizing exactly what was changed, what artifacts are authoritative now, and what manual operator assumptions still remain.
-```
-
-### Step 1.2 - Rebuild And Verify The Release Evidence Chain
-Explanation: once `dist/` is controlled, regenerate and verify the release
-evidence expected by the supported release process.
+### Step 0.2 - Toolchain Preflight For Gemma 4B-Class Loading
+Explanation: verify the local Python environment can resolve Gemma 4 config and
+that training dependencies are present before attempting full weights download.
 
 Type: `Code`
 
 ```powershell
-pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist
-pwsh scripts/checksums.ps1
-pwsh scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256
-pwsh scripts/security-baseline.ps1 -Python py -RequirementsLock requirements-win-lock.txt -PipAuditIgnoreFile security/pip_audit_ignore.txt -OutputDir dist/security
-pwsh scripts/verify-release.ps1 -RequireCompleteEvidence
+py -3 -m pip show transformers tokenizers accelerate peft bitsandbytes huggingface_hub
+py -3 -c "from transformers import AutoConfig; AutoConfig.from_pretrained('google/gemma-4-E4B-it'); print('gemma-config-ok')"
 ```
 
-### Step 1.3 - Align Bootstrap Verification With The Supported Java Floor
-Explanation: the supported Fuseki auto-provision flow now expects Java 17+ even
-though the bootstrap verifier only caught the current host at Java 8 vs minimum
-11. The host and the docs/scripts must agree.
+Expected evidence:
 
-Type: `Prompt`
+- dependency versions are visible in console/log
+- Gemma config resolution succeeds with `gemma-config-ok`
 
-Model: `GPT-5.3-Codex`
-Reasoning: `medium`
-
-Prompt:
-```text
-Use docs/production_beta_readiness_review_2026-03-25.md, docs/ops/release_process.md, docs/ops/windows_fuseki_operator.md, README.md, and scripts/bootstrap-verify.ps1 as governing context. Tighten the repo's bootstrap/runtime prerequisite story so maintainers and operators can see the difference between the absolute Java minimum and the Java 17+ requirement for the supported Fuseki auto-provision release path. Update the narrowest scripts/docs/tests necessary, without broadening the support claim.
-
-Finish by running the relevant verifier(s) and summarize the final prerequisite contract in one short paragraph.
-```
-
-### Step 1.4 - Verify Host Prerequisites On The Active Machine
-Explanation: after the repo is aligned, confirm the active machine actually
-meets the supported floor.
+### Step 0.3 - Authenticated Download Readiness And Cache Location
+Explanation: establish deterministic model download location and verify
+authenticated access.
 
 Type: `Code`
 
 ```powershell
-java -version
-pwsh scripts/bootstrap-verify.ps1
+$env:HF_HOME = "E:\AI\rComp\execution_plan_11_5\dist\hf_cache"
+$env:HUGGINGFACE_HUB_CACHE = "$env:HF_HOME\hub"
+huggingface-cli whoami
+huggingface-cli download google/gemma-4-E4B-it --local-dir E:\AI\rComp\execution_plan_11_5\dist\models\gemma-4-e4b-it --resume-download
 ```
 
-Phase gate:
+Expected evidence:
 
-- `scripts/release-evidence-preflight.ps1 -AllowEmptyDist` passes
-- `scripts/verify-release.ps1 -RequireCompleteEvidence` passes
-- `scripts/bootstrap-verify.ps1` passes on the active host
+- authenticated Hugging Face identity is confirmed
+- Gemma model files begin populating
+  `E:\AI\rComp\execution_plan_11_5\dist\models\gemma-4-e4b-it`
 
-Contingency if gate fails:
-
-- if `dist/` still drifts, stop and re-run Step 1.1 instead of layering more
-  evidence on stale artifacts
-- if Java still fails, install or repair JDK 17+ first; do not start clean-host
-  or Fuseki proof work on an unsupported machine
-
-## Phase 2 - Re-Prove The Supported Windows Single-Host Baseline
-
-Goal: make the supported deployment story reproducible in the real field shape.
-
-### Step 2.1 - Harden The Clean-Host Install And Smoke Path
-Explanation: the release/install path must work from release artifacts, not
-just from a checkout.
+### Step 0.4 - Build The Active Training Config
+Explanation: produce one execution-ready config bound to Gemma 4B-class base
+model and approved corpus inputs.
 
 Type: `Prompt`
 
@@ -217,221 +128,315 @@ Reasoning: `high`
 
 Prompt:
 ```text
-Use docs/production_beta_readiness_review_2026-03-25.md, docs/ops/windows_single_host_operator.md, docs/ops/release_process.md, and the current installed-runtime smoke path as governing context. Close any remaining gap between source-checkout success and the supported clean-host Windows single-host install shape: wheel + hermetic bundle + local read-only Fuseki + API service.
-
-Keep scope tight. Reuse the existing installed-runtime smoke, optional-runtime smoke, health contract, and operator scripts where possible. Do not add multi-instance or container claims. End by running targeted verification and summarizing exactly what is now proven on a clean host.
+Use config/training_first_pass.example.json, config/training_input_contract.example.json, docs/model_training_contract.md, and the latest Phase 3 artifact index as governing context. Create the smallest non-placeholder execution-ready training config at dist/training/current_training_config.json for a real first-pass candidate using google/gemma-4-E4B-it and current approved snapshot/corpus values. Preserve the rule that eval and benchmark datasets remain excluded from training inputs. Add/retain validators so placeholder snapshot fields cannot ship.
 ```
 
-### Step 2.2 - Execute Installed Runtime Smoke In Release Shape
-Explanation: prove the supported install path using the actual release-shaped
-artifact flow.
+Phase 0 gate:
 
-Type: `Code`
-
-```powershell
-pwsh scripts/installed-runtime-smoke.ps1 `
-  -WheelPath dist/earcrawler-*.whl `
-  -UseHermeticWheelhouse `
-  -HermeticBundleZipPath dist/hermetic-artifacts.zip `
-  -ReleaseChecksumsPath dist/checksums.sha256 `
-  -UseLiveFuseki `
-  -AutoProvisionFuseki `
-  -RequireFullBaseline `
-  -Host 127.0.0.1 `
-  -Port 9001 `
-  -ReportPath dist/installed_runtime_smoke.json
-```
-
-### Step 2.3 - Execute Supported API Smoke And Observability Probe
-Explanation: verify the runtime contract and supported routes on the validated
-install shape.
-
-Type: `Code`
-
-```powershell
-pwsh scripts/api-start.ps1 -Host 127.0.0.1 -Port 9001
-pwsh scripts/api-smoke.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/api_smoke.json
-pwsh scripts/health/api-probe.ps1 -Host 127.0.0.1 -Port 9001 -ReportPath dist/observability/health-api.txt -JsonReportPath dist/observability/api_probe.json
-pwsh scripts/api-stop.ps1
-```
-
-### Step 2.4 - Execute Optional Runtime Smoke Without Local Adapter
-Explanation: keep the current baseline honest while proving the quarantine and
-rollback controls still behave correctly.
-
-Type: `Code`
-
-```powershell
-pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json
-```
-
-Phase gate:
-
-- `dist/installed_runtime_smoke.json` is passing
-- `dist/api_smoke.json` is passing
-- `dist/observability/api_probe.json` is passing
-- `dist/optional_runtime_smoke.json` is passing
+- Step 0.1 through Step 0.4 are complete
+- Active plan/log/config only reference the Gemma 4B-class baseline
+- model download path and run-id naming are ready for training
 
 Contingency if gate fails:
 
-- if installed-runtime smoke fails, return to release packaging and operator
-  script repair before touching KG or training work
-- if only optional-runtime smoke fails, fix the gating/rollback behavior before
-  considering any feature promotion
+- do not start training; resolve auth/toolchain/config blockers first
 
-## Phase 3 - Gather And Freeze The Real Corpus
+## Phase 1 - Prepare And Validate Training Package
 
-Goal: move from fixture-safe confidence to a current, authoritative corpus and
-snapshot chain.
+Goal: produce a valid, non-placeholder training package before GPU-heavy runs.
 
-### Step 3.1 - Validate Source Credentials And Live Ingest Readiness
-Explanation: confirm the host can gather real upstream data before rebuilding
-the corpus.
-
+### Step 1.1 - Prepare-Only Packaging
 Type: `Code`
 
 ```powershell
-$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES='1'
-$env:EARCTL_USER='test_operator'
-py -m earCrawler.cli jobs run tradegov --dry-run
-py -m earCrawler.cli jobs run federalregister --dry-run
+py scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --prepare-only
 ```
 
-### Step 3.2 - Build And Validate The Curated Corpus From Real Sources
-Explanation: produce fresh corpus artifacts from real inputs, not fixtures.
-
+### Step 1.2 - Validate Prepared Package Metadata
 Type: `Code`
 
 ```powershell
-$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES='1'
-$env:EARCTL_USER='test_operator'
-py -m earCrawler.cli corpus build -s ear -s nsf --out data --live
-py -m earCrawler.cli corpus validate --dir data
-py -m earCrawler.cli corpus snapshot --dir data --out dist/corpus
+py -3 -m pytest -q tests/training
 ```
 
-### Step 3.3 - Lock Training-Authoritative Inputs And Provenance
-Explanation: make the rebuilt corpus and snapshot the current training truth,
-with no leakage from eval, tests, or scratch data.
+Expected evidence:
 
-Type: `Prompt`
+- `dist/training/<run_id>/run_config.json` shows `base_model=google/gemma-4-E4B-it`
+- package metadata is complete and validator checks pass
 
-Model: `GPT-5.3-Codex`
-Reasoning: `medium`
+Phase 1 gate:
 
-Prompt:
-```text
-Use docs/model_training_contract.md, docs/data_artifact_inventory.md, docs/offline_snapshot_spec.md, and the outputs from Phase 3 as governing context. Tighten the repository's authoritative training-input path so the current approved offline snapshot, retrieval corpus, and index metadata are the only production training defaults. Prevent accidental drift toward eval, fixture, experimental, or stale corpus inputs. Update the smallest set of docs/config/tests needed and verify the contract.
+- prepare-only run passes
+- package metadata is valid and complete
+
+## Phase 2 - Execute First Gemma 4B-Class Training Candidate On EC2
+
+Goal: run the first real QLoRA candidate on Linux EC2 because the local Windows
+GPU path is blocked by VRAM and offload limits.
+
+EC2 execution constraints:
+
+- target instance: `g6e.xlarge`
+- region: `us-east-2`
+- OS: Amazon Linux 2023
+- GPU shape: `1x NVIDIA L40S, 44 GiB VRAM`
+- storage: one delete-on-termination gp3 root/data volume sized only for the
+  run; no persistent AWS storage after completion
+- AWS auth path: local shared `default` profile
+- operator materials already reviewed and available under `E:\Finance`:
+  `E:\Finance\MSQlib\secrets\aws\fryCodeKeyPair1.pem`,
+  `E:\Finance\MSQlib\secrets\aws\AWS.md`,
+  `E:\Finance\MSQlib\var\review3\reports\ec2_burst_runbook.md`, and prior EC2
+  launch state under `E:\Finance\MSQlib\var\review3\state\ec2_burst\`
+- current readiness confirmation: the `default` profile resolves in
+  `C:\Users\Badass Gojira\.aws\config` and `.aws\credentials`, and STS caller
+  identity succeeds for `us-east-2`
+- Current wait-state: AWS auth and EC2 preflight are green; the only open gate
+  is external approval for the EC2 quota `Running On-Demand G and VT instances`
+  in `us-east-2`.
+
+### Step 2.1 - Establish The E Drive Artifact Root
+Type: `Code`
+
+```powershell
+$planRoot = "E:\AI\rComp\execution_plan_11_5"
+New-Item -ItemType Directory -Force -Path `
+  "$planRoot\dist\hf_cache", `
+  "$planRoot\dist\models", `
+  "$planRoot\dist\training", `
+  "$planRoot\dist\benchmarks", `
+  "$planRoot\kg\reports", `
+  "$planRoot\transfer\upload", `
+  "$planRoot\transfer\download" | Out-Null
 ```
 
-### Step 3.4 - Record The Current Snapshot For Later KG And Training Evidence
-Explanation: capture the exact snapshot identity, payload hash, corpus digest,
-and doc count that all later phases must use.
+Expected evidence:
 
-Type: `Prompt`
+- the canonical execution artifact tree exists on `E:\`
+- all later large artifacts have a single approved destination
 
-Model: `GPT-5.4-Mini`
-Reasoning: `low`
+### Step 2.2 - Confirm AWS Authentication And Operator Inputs
+Type: `Code`
 
-Prompt:
-```text
-Create or refresh one dated artifact index entry that records the current approved offline snapshot id, snapshot sha256, retrieval corpus path, retrieval corpus digest, index metadata path, and corpus document count produced in Phase 3. Keep it short and machine-oriented. Do not create a new design note.
+```powershell
+aws sts get-caller-identity --profile default --region us-east-2
 ```
 
-Phase gate:
+Expected evidence:
 
-- live corpus build succeeds
-- `py -m earCrawler.cli corpus validate --dir data` passes
-- a current snapshot and corpus digest are recorded for later KG/training work
+- STS resolves the active caller identity for the `default` profile
+- the selected subnet, security group, key pair, and PEM path are taken from
+  the validated operator materials under `E:\Finance`
+
+Note:
+
+- If the local `aws.exe` remains unusable, run the same check through a minimal
+  `boto3.Session(profile_name='default')` helper rather than changing
+  credentials or creating a second profile.
+
+### Step 2.2a - Run EC2 Launch Preflight Gate
+Type: `Code`
+
+```powershell
+$env:PYTHONUSERBASE="D:\AI\rComp\dist\pyuser"
+py -3 scripts/training/ec2_phase2_preflight.py --profile default --region us-east-2 --instance-type g6e.xlarge --subnet-id <validated-subnet-id> --security-group-id <validated-security-group-id> --key-name fryCodeKeyPair1 --report-path E:\AI\rComp\execution_plan_11_5\kg\reports\phase2_ec2_preflight_latest.json
+```
+
+Expected evidence:
+
+- `E:\AI\rComp\execution_plan_11_5\kg\reports\phase2_ec2_preflight_latest.json`
+  exists and is machine-readable
+- status is `ready_for_launch_attempt` before Step `2.3` is attempted
+- if status is `blocked`, record exact blocking checks in
+  `docs/ExecutionPlan11.5_log.md` and resolve them before rerunning Step `2.3`
+
+### Step 2.3 - Provision The Short-Lived EC2 Training Host
+Type: `Code`
+
+```powershell
+aws ec2 run-instances `
+  --profile default `
+  --region us-east-2 `
+  --image-id <amazon-linux-2023-ami> `
+  --instance-type g6e.xlarge `
+  --key-name fryCodeKeyPair1 `
+  --subnet-id <validated-subnet-id> `
+  --security-group-ids <validated-security-group-id> `
+  --block-device-mappings "[{\"DeviceName\":\"/dev/xvda\",\"Ebs\":{\"VolumeSize\":300,\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true}}]" `
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=gemma4-e4b-ear-phase2}]"
+```
+
+Expected evidence:
+
+- one `g6e.xlarge` Linux host is running in `us-east-2`
+- the attached volume is delete-on-termination
+- no additional persistent AWS storage is provisioned for the run
+
+### Step 2.4 - Stage Only The Minimum Training Inputs
+Type: `Code`
+
+```powershell
+tar -czf E:\AI\rComp\execution_plan_11_5\transfer\upload\gemma4-phase2-inputs.tgz `
+  config\training_first_pass.example.json `
+  config\training_input_contract.example.json `
+  dist\training\current_training_config.json `
+  data\faiss\retrieval_corpus.jsonl `
+  data\faiss\index.meta.json `
+  snapshots\offline\ecfr_current_20260210_1627_parts_736_740_742_744_746\manifest.json `
+  scripts\training
+scp -i E:\Finance\MSQlib\secrets\aws\fryCodeKeyPair1.pem E:\AI\rComp\execution_plan_11_5\transfer\upload\gemma4-phase2-inputs.tgz ec2-user@<public-ip>:/home/ec2-user/
+```
+
+Expected evidence:
+
+- the upload bundle exists under `E:\AI\rComp\execution_plan_11_5\transfer\upload`
+- only repo code, config, manifests, and approved corpus inputs are uploaded
+- do not upload the unfine-tuned base model from local storage; download the
+  base model directly on EC2 with authenticated Hugging Face access
+
+### Step 2.5 - Bootstrap The EC2 Host And Run QLoRA Training
+Type: `Code`
+
+```powershell
+ssh -i E:\Finance\MSQlib\secrets\aws\fryCodeKeyPair1.pem ec2-user@<public-ip> @'
+set -euo pipefail
+mkdir -p /mnt/gemma-phase2/{hf_cache,training}
+tar -xzf /home/ec2-user/gemma4-phase2-inputs.tgz -C /home/ec2-user
+export HF_HOME=/mnt/gemma-phase2/hf_cache
+export HUGGINGFACE_HUB_CACHE=$HF_HOME/hub
+cd /home/ec2-user/rComp
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-gpu.txt
+huggingface-cli whoami
+python scripts/training/run_phase5_finetune.py --config dist/training/current_training_config.json --use-4bit --require-qlora-4bit
+'@
+```
+
+Expected evidence:
+
+- the remote host downloads `google/gemma-4-E4B-it` directly into remote
+  transient storage rather than receiving a copied local base-model tarball
+- training completes on the EC2 GPU host
+- remote artifacts exist before download under the remote training root
+
+### Step 2.6 - Download Artifacts Back To E And Confirm Completion
+Type: `Code`
+
+```powershell
+scp -i E:\Finance\MSQlib\secrets\aws\fryCodeKeyPair1.pem -r ec2-user@<public-ip>:/mnt/gemma-phase2/training/<run_id> E:\AI\rComp\execution_plan_11_5\dist\training\
+py scripts/training/inference_smoke.py --base-model google/gemma-4-E4B-it --adapter-dir E:\AI\rComp\execution_plan_11_5\dist\training\<run_id>\adapter --out E:\AI\rComp\execution_plan_11_5\dist\training\<run_id>\inference_smoke.json
+```
+
+Expected evidence:
+
+- `E:\AI\rComp\execution_plan_11_5\dist\training\<run_id>\run_metadata.json`
+  exists with `status=completed`
+- the adapter, run metadata, and smoke artifact exist on `E:\`
+- no canonical training result is left only on the EC2 host
+
+### Step 2.7 - Terminate The EC2 Host And Verify Zero AWS Residual Storage
+Type: `Code`
+
+```powershell
+aws ec2 terminate-instances --profile default --region us-east-2 --instance-ids <instance-id>
+aws ec2 wait instance-terminated --profile default --region us-east-2 --instance-ids <instance-id>
+```
+
+Expected evidence:
+
+- the training instance is terminated
+- its delete-on-termination volume is gone with the instance
+- there are no retained snapshots, stopped instances, detached volumes, or
+  copied training artifacts left in AWS for this run
+
+Phase 2 gate:
+
+- `E:\AI\rComp\execution_plan_11_5\dist\training\<run_id>\run_metadata.json`
+  exists with `status=completed`
+- smoke artifact exists and is valid
+- the EC2 instance used for training is terminated
+- AWS retained storage for the run is zero
 
 Contingency if gate fails:
 
-- if live ingest blocks on credentials or upstream availability, do not proceed
-  with training; fix ingest readiness first
-- if the live corpus build is unstable, repair deterministic corpus generation
-  before KG or adapter work
+- if EC2 launch fails with `VcpuLimitExceeded` or spot quota/capacity errors,
+  do not continue to Steps 2.4-2.7; wait for AWS support to approve the
+  `Running On-Demand G and VT instances` quota for `us-east-2`, then rerun
+  Step `2.3` immediately.
 
-## Phase 4 - Rebuild The KG And Satisfy The Technical Exit Criteria
-
-Goal: prove the real corpus -> KG -> validation chain before making any
-unquarantine decision.
-
-### Step 4.1 - Emit And Validate The KG From The Current Corpus
-Explanation: regenerate KG artifacts from the current corpus and run the
-blocking semantic checks that matter for a real promotion decision.
-
+### Immediate Rerun After Quota Approval
 Type: `Code`
 
 ```powershell
-py -m earCrawler.cli kg emit -s ear -s nsf -i data -o data\kg
-py -m earCrawler.cli kg validate --glob "data/kg/*.ttl" --fail-on supported
+aws ec2 run-instances `
+  --profile default `
+  --region us-east-2 `
+  --image-id <amazon-linux-2023-ami> `
+  --instance-type g6e.xlarge `
+  --key-name fryCodeKeyPair1 `
+  --subnet-id <validated-subnet-id> `
+  --security-group-ids <validated-security-group-id> `
+  --block-device-mappings "[{\"DeviceName\":\"/dev/xvda\",\"Ebs\":{\"VolumeSize\":300,\"VolumeType\":\"gp3\",\"DeleteOnTermination\":true}}]" `
+  --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=gemma4-e4b-ear-phase2}]"
 ```
 
-### Step 4.2 - Close Any Remaining KG Integrity, Namespace, Or Provenance Gaps
-Explanation: if the current corpus or KG output exposes namespace, identifier,
-or lineage regressions, fix them now before touching runtime promotion.
+Teardown safety note:
 
-Type: `Prompt`
+- if this rerun ever succeeds and later steps fail, terminate the instance
+  immediately before any retry and confirm zero residual tagged instances and
+  volumes before reattempting
 
-Model: `GPT-5.3-Codex`
-Reasoning: `high`
+## Phase 3 - Runtime Smoke And Benchmark Evidence
 
-Prompt:
-```text
-Use docs/kg_quarantine_exit_gate.md, docs/kg_unquarantine_plan.md, docs/kg_boundary_and_iri_strategy.md, docs/identifier_policy.md, docs/kg_semantic_blocking_checks.md, and the Phase 4.1 KG validation output as governing context. Close the remaining code, test, or artifact gaps that prevent the current corpus -> KG pipeline from satisfying the technical correctness prerequisites for a future unquarantine decision.
+Goal: prove the candidate works in the optional local-adapter runtime path.
 
-Keep the work concrete: fix integrity/provenance/identifier issues, add targeted tests, and preserve the current narrow support boundary. End by rerunning the exact validation needed to prove the corrected state.
-```
-
-### Step 4.3 - Prove Production-Like KG Runtime Mechanics
-Explanation: the exit gate requires more than emit/validate; it requires a real
-load/serve/query shape.
-
+### Step 3.1 - Local Adapter Runtime Smoke
 Type: `Code`
 
 ```powershell
-$env:EARCTL_ALLOW_UNSAFE_ENV_OVERRIDES='1'
-$env:EARCTL_USER='test_operator'
-py -m earCrawler.cli kg load --ttl data\kg\ear.ttl --db db
-py -m earCrawler.cli kg serve --db db --dataset /ear --no-wait
-py -m earCrawler.cli kg query --endpoint http://localhost:3030/ear/sparql --sparql "SELECT * WHERE { ?s ?p ?o } LIMIT 5" --out dist/kg_query_results.json
+pwsh scripts/local_adapter_smoke.ps1 -RunDir E:\AI\rComp\execution_plan_11_5\dist\training\<run_id>
 ```
 
-### Step 4.4 - Refresh The Search/KG Quarantine Evidence Package From Current Facts
-Explanation: even if KG remains quarantined for one more phase, the evidence
-package must stop referring to stale release-integrity facts.
+### Step 3.2 - Benchmark Preflight
+Type: `Code`
 
-Type: `Prompt`
-
-Model: `GPT-5.4-Mini`
-Reasoning: `medium`
-
-Prompt:
-```text
-Use docs/search_kg_quarantine_decision_package_2026-03-19.md, dist/search_kg_evidence/*, and the completed Phase 1 through Phase 4 evidence as governing context. Refresh the search/KG quarantine record so it cites the current release-integrity story and current runtime evidence instead of stale March 19 assumptions. Keep the capability state unchanged unless the fresh evidence truly justifies reopening promotion work.
+```powershell
+py -m scripts.eval.run_local_adapter_benchmark --run-dir E:\AI\rComp\execution_plan_11_5\dist\training\<run_id> --manifest eval/manifest.json --dataset-id ear_compliance.v2 --max-items 5 --run-id benchmark_gemma4-e4b-ear-<run_tag>_preflight --smoke-report E:\AI\rComp\execution_plan_11_5\kg\reports\local-adapter-smoke.json --timeout-seconds 120 --max-consecutive-transport-failures 3 --overwrite
 ```
 
-Phase gate:
+### Step 3.3 - Primary Benchmark Run
+Type: `Code`
 
-- KG emit and validate pass against the current corpus
-- a real load/serve/query path has been exercised successfully
-- the quarantine evidence package is current, not stale
+```powershell
+py -m scripts.eval.run_local_adapter_benchmark --run-dir E:\AI\rComp\execution_plan_11_5\dist\training\<run_id> --manifest eval/manifest.json --dataset-id ear_compliance.v2 --dataset-id entity_obligations.v2 --dataset-id unanswerable.v2 --run-id benchmark_gemma4-e4b-ear-<run_tag>_primary --smoke-report E:\AI\rComp\execution_plan_11_5\kg\reports\local-adapter-smoke.json --timeout-seconds 120 --local-adapter-warmup-timeout-seconds 240 --max-consecutive-transport-failures 3 --require-authenticated-api --require-api-key-label benchmark --overwrite
+```
 
-Contingency if gate fails:
+Phase 3 gate:
 
-- if KG emit/validate fails, fix the data or emitter first
-- if load/serve/query fails, stop and repair the real runtime mechanics before
-  any unquarantine decision
+- smoke passes
+- benchmark bundle exists and contains preconditions + summary
 
-## Phase 5 - Decide Whether KG Can Leave Quarantine
+## Phase 4 - Candidate Validation And Release Decision Inputs
 
-Goal: make one evidence-based decision on KG-backed runtime behavior, with a
-default of staying quarantined unless the exit gate is fully passed.
+Goal: produce one machine-checkable decision artifact for the candidate.
 
-### Step 5.1 - Implement The Missing Operator-Owned Search/KG Runtime Proof
-Explanation: `/v1/search` and KG expansion cannot leave quarantine without the
-operator-owned text-index and success-path proof named by the exit gate.
+### Step 4.1 - Validate Local Adapter Release Bundle
+Type: `Code`
 
+```powershell
+py -m scripts.eval.validate_local_adapter_release_bundle --run-dir E:\AI\rComp\execution_plan_11_5\dist\training\<run_id> --benchmark-summary E:\AI\rComp\execution_plan_11_5\dist\benchmarks\benchmark_gemma4-e4b-ear-<run_tag>_primary\benchmark_summary.json --smoke-report E:\AI\rComp\execution_plan_11_5\kg\reports\local-adapter-smoke.json
+```
+
+### Step 4.2 - Build Reviewable Candidate Bundle
+Type: `Code`
+
+```powershell
+py -m scripts.eval.build_local_adapter_candidate_bundle --run-dir E:\AI\rComp\execution_plan_11_5\dist\training\<run_id> --benchmark-summary E:\AI\rComp\execution_plan_11_5\dist\benchmarks\benchmark_gemma4-e4b-ear-<run_tag>_primary\benchmark_summary.json --smoke-report E:\AI\rComp\execution_plan_11_5\kg\reports\local-adapter-smoke.json --overwrite
+```
+
+### Step 4.3 - Update Capability Decision Inputs
 Type: `Prompt`
 
 Model: `GPT-5.4`
@@ -439,484 +444,90 @@ Reasoning: `high`
 
 Prompt:
 ```text
-Use docs/kg_quarantine_exit_gate.md, docs/kg_unquarantine_plan.md, docs/search_kg_quarantine_decision_package_2026-03-19.md, docs/ops/windows_single_host_operator.md, and the current optional-runtime smoke path as governing context. Implement the smallest complete operator-owned proof package required to reconsider promotion of /v1/search and KG expansion: text-index-enabled Fuseki provisioning if needed, production-like smoke in the actual supported runtime shape, explicit health/failure/rollback docs, and any release-gated test or script changes needed to keep the promotion evidence honest.
-
-Do not auto-promote the capability. The goal is to make a clean pass/fail decision possible from current evidence.
+Use docs/local_adapter_release_evidence.md, docs/answer_generation_posture.md, the new Gemma candidate bundle, and current runtime/operator docs. Refresh the dated capability decision inputs so they reflect only current Gemma run evidence and clearly state whether local-adapter serving remains Optional or is ready for formal promotion review.
 ```
 
-### Step 5.2 - Run The Search/KG Production-Like Evidence Commands
-Explanation: once the operator-owned path exists, execute the evidence package.
+Phase 4 gate:
 
+- candidate bundle is reviewable
+- decision outcome is explicit (`keep_optional`, `reject_candidate`, or `ready_for_formal_promotion_review`)
+
+## Phase 5 - Post-Run Consolidation And Cleanup
+
+Goal: keep only durable evidence while removing single-use local and AWS
+artifacts that no longer justify storage or cost.
+
+### Step 5.1 - Freeze The Retained Artifact Set On E
 Type: `Code`
 
 ```powershell
-pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -SkipLocalAdapter -ReportPath dist/optional_runtime_smoke.json
-py -m scripts.eval.build_search_kg_evidence_bundle --optional-runtime-smoke dist/optional_runtime_smoke.json --installed-runtime-smoke dist/installed_runtime_smoke.json --release-validation-evidence dist/release_validation_evidence.json --out-json dist/search_kg_evidence/search_kg_evidence_bundle.json --out-md dist/search_kg_evidence/search_kg_evidence_bundle.md
+Get-ChildItem -Recurse E:\AI\rComp\execution_plan_11_5\dist\training\<run_id>
+Get-ChildItem -Recurse E:\AI\rComp\execution_plan_11_5\dist\benchmarks\benchmark_gemma4-e4b-ear-<run_tag>_primary
 ```
 
-### Step 5.3 - Make The Dated KG Decision
-Explanation: after current evidence exists, either explicitly unquarantine the
-scoped KG features or explicitly keep them out of the supported production-beta
-baseline.
+Retain only:
 
-Type: `Prompt`
+- final adapter directory
+- `run_config.json`, `run_metadata.json`, `inference_smoke.json`
+- benchmark summaries and supporting reports needed for release evidence
+- the final candidate bundle and decision artifacts
 
-Model: `GPT-5.4`
-Reasoning: `high`
-
-Prompt:
-```text
-Use docs/kg_quarantine_exit_gate.md, docs/kg_unquarantine_plan.md, the refreshed search/KG evidence bundle, the current operator docs, and the completed Phase 4/5 runtime evidence as governing context. Produce one dated decision record with exactly one outcome:
-
-1. Graduate the specifically named KG-backed features, or
-2. Keep them quarantined.
-
-The record must link each decision to current evidence, name rollback ownership, and update only the minimum boundary docs that must reflect the result. Do not write a broad review. Write the actual decision record.
-```
-
-Phase gate:
-
-- either the exit gate is passed and a dated pass record exists, or
-- a fresh dated no-go record exists and the supported product scope remains
-  explicit
-
-Contingency if gate fails:
-
-- default to `Keep Quarantined`; do not stall the entire program on KG
-  promotion if the supported baseline can still ship without it
-
-## Phase 6 - Re-Activate The Real Training Track
-
-Goal: replace placeholder local-adapter evidence with a real, reviewable
-training candidate path.
-
-### Step 6.1 - Reopen The Local-Adapter Track Deliberately
-Explanation: the repo currently marks the track deprioritized. Reopen it only
-if Phase 1 through Phase 5 are stable enough that model work is not building on
-an untrustworthy baseline.
-
-Type: `Prompt`
-
-Model: `GPT-5.4`
-Reasoning: `medium`
-
-Prompt:
-```text
-Use docs/local_adapter_deprioritization_2026-03-25.md, docs/model_training_surface_adr.md, docs/model_training_contract.md, docs/local_adapter_release_evidence.md, and the completed baseline evidence from Phases 1 through 5 as governing context. Produce one short dated reactivation note for the local-adapter track only if the repository baseline is now stable enough for real candidate work. If it is not stable, say so explicitly and name the remaining blocker. Keep the note operational, not aspirational.
-```
-
-### Step 6.2 - Prepare A Real Training Run Configuration With Current Snapshot Inputs
-Explanation: the training config must stop using placeholder values and must
-bind to the current snapshot/corpus digests from Phase 3.
-
-Type: `Prompt`
-
-Model: `GPT-5.3-Codex`
-Reasoning: `medium`
-
-Prompt:
-```text
-Use config/training_first_pass.example.json, config/training_input_contract.example.json, docs/model_training_contract.md, and the current Phase 3 artifact index as governing context. Create the smallest non-placeholder, execution-ready local training config at dist/training/current_training_config.json for a real first-pass candidate using Qwen/Qwen2.5-7B-Instruct and the current approved snapshot/corpus values. Preserve the rule that eval and benchmark datasets remain excluded from training inputs. If a small validator or config guard is needed so placeholder snapshot fields cannot accidentally ship, add it.
-```
-
-### Step 6.3 - Generate The Training Package Without Launching Full Training
-Explanation: prove the inputs and package are correct before consuming GPU time.
-
+### Step 5.2 - Delete Single-Use Local Files
 Type: `Code`
 
 ```powershell
-py scripts/training/run_phase5_finetune.py `
-  --config dist/training/current_training_config.json `
-  --prepare-only
+Remove-Item E:\AI\rComp\execution_plan_11_5\transfer -Recurse -Force
 ```
 
-### Step 6.4 - Enforce QLoRA For The Real Candidate Path
-Explanation: the repository already supports 4-bit loading via `--use-4bit`,
-but the real candidate path must treat that as intentional, not optional drift.
+After Phase 4 evidence is accepted and no immediate rerun window remains, also
+delete single-use local artifacts such as:
 
-Type: `Prompt`
+- upload and download tarballs
+- temporary bootstrap installers and ad hoc EC2 helper environments
+- redundant local copies of the unfine-tuned base model
+- any stale or duplicate prepared-package outputs that are not part of the
+  retained artifact set
 
-Model: `GPT-5.3-Codex`
-Reasoning: `high`
-
-Prompt:
-```text
-Use scripts/training/run_phase5_finetune.py, docs/model_training_first_pass.md, docs/local_adapter_release_evidence.md, and the current training config as governing context. Make the real production-candidate training path explicitly QLoRA-backed for the first 7B candidate, with machine-checkable evidence that the reviewed run used the intended 4-bit path. Keep scope narrow: config validation, metadata capture, docs, and any focused tests needed. Do not redesign the training stack.
-```
-
-Phase gate:
-
-- a real non-placeholder run config exists
-- prepare-only packaging succeeds
-- the intended candidate path has explicit QLoRA evidence rules
-
-Contingency if gate fails:
-
-- if prepare-only packaging fails, do not start GPU training
-- if QLoRA evidence is ambiguous, fix metadata/config validation before training
-
-## Phase 7 - Train, Smoke, And Benchmark A Real Candidate
-
-Goal: produce one evidence-backed local-adapter candidate that can actually be
-reviewed.
-
-### Step 7.1 - Run The Real QLoRA Fine-Tuning Pass
-Explanation: execute the first actual candidate run against the approved base
-model and current corpus.
-
+### Step 5.3 - Verify Zero AWS Residual Storage
 Type: `Code`
 
 ```powershell
-py scripts/training/run_phase5_finetune.py `
-  --config dist/training/current_training_config.json `
-  --use-4bit
+aws ec2 describe-instances --profile default --region us-east-2 --filters "Name=tag:Name,Values=gemma4-e4b-ear-phase2"
+aws ec2 describe-volumes --profile default --region us-east-2 --filters "Name=status,Values=available,in-use"
+aws ec2 describe-snapshots --profile default --region us-east-2 --owner-ids self
 ```
 
-Step 7.1 task breakdown before launching full training:
+Expected evidence:
 
-1. `7.1.a` Prepare the venv for CUDA-capable QLoRA execution (auto-apply when available; support manual mode):
-```powershell
-pwsh .\scripts\training\prepare_qlora_env.ps1 `
-  -TorchMode auto
-```
-2. `7.1.b` Rebuild the deterministic run package with QLoRA-required config and metadata, but do not start training:
-```powershell
-.venv\Scripts\python.exe scripts/training/run_phase5_finetune.py `
-  --config config/training_first_pass.example.json `
-  --prepare-only `
-  --use-4bit `
-  --require-qlora-4bit
-```
+- no EC2 instance from this run remains running or stopped
+- no detached EBS volume or snapshot remains for the training run
+- no copied model, cache, or result artifact remains stored anywhere in AWS
 
-### Step 7.2 - Re-Run Standalone And API Runtime Smokes
-Explanation: a candidate is not reviewable unless both the adapter artifact and
-the supported `/v1/rag/answer` runtime path work.
+Phase 5 gate:
 
-Type: `Code`
+- only durable final evidence remains on `E:\`
+- single-use local artifacts are removed
+- AWS retained storage is zero after training and artifact download
 
-```powershell
-py scripts/training/inference_smoke.py `
-  --base-model Qwen/Qwen2.5-7B-Instruct `
-  --adapter-dir dist/training/<run_id>/adapter `
-  --out dist/training/<run_id>/inference_smoke.rerun.json
+## Completion Condition
 
-pwsh scripts/local_adapter_smoke.ps1 -RunDir dist/training/<run_id>
-```
+Execution Plan 11.5 is complete when:
 
-### Step 7.3 - Run The Primary Benchmark Suite With Retrieval-Only Control
-Explanation: benchmark the actual candidate through the supported API route,
-not through notebook-only or direct model calls.
-
-Type: `Code`
-
-```powershell
-py -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/<run_id> `
-  --manifest eval/manifest.json `
-  --dataset-id ear_compliance.v2 `
-  --dataset-id entity_obligations.v2 `
-  --dataset-id unanswerable.v2 `
-  --smoke-report kg/reports/local-adapter-smoke.json
-```
-
-Step 7.3 task breakdown (execute sequentially and log each substep before continuing):
-
-1. `7.3.a` Benchmark preflight on a bounded slice to confirm runtime stability and write location:
-```powershell
-py -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/<run_id> `
-  --manifest eval/manifest.json `
-  --dataset-id ear_compliance.v2 `
-  --max-items 5 `
-  --run-id benchmark_<run_id>_preflight `
-  --smoke-report kg/reports/local-adapter-smoke.json `
-  --timeout-seconds 120 `
-  --local-adapter-warmup-timeout-seconds 240 `
-  --max-consecutive-transport-failures 3 `
-  --overwrite
-```
-2. `7.3.b` Execute full benchmark for `ear_compliance.v2` only:
-```powershell
-py -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/<run_id> `
-  --manifest eval/manifest.json `
-  --dataset-id ear_compliance.v2 `
-  --run-id benchmark_<run_id>_ear_compliance_v2 `
-  --smoke-report kg/reports/local-adapter-smoke.json `
-  --timeout-seconds 120 `
-  --local-adapter-warmup-timeout-seconds 240 `
-  --max-consecutive-transport-failures 3 `
-  --overwrite
-```
-3. `7.3.c` Execute full benchmark for `entity_obligations.v2` only:
-```powershell
-py -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/<run_id> `
-  --manifest eval/manifest.json `
-  --dataset-id entity_obligations.v2 `
-  --run-id benchmark_<run_id>_entity_obligations_v2 `
-  --smoke-report kg/reports/local-adapter-smoke.json `
-  --timeout-seconds 120 `
-  --local-adapter-warmup-timeout-seconds 240 `
-  --max-consecutive-transport-failures 3 `
-  --overwrite
-```
-4. `7.3.d` Execute full benchmark for `unanswerable.v2` only:
-```powershell
-py -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/<run_id> `
-  --manifest eval/manifest.json `
-  --dataset-id unanswerable.v2 `
-  --run-id benchmark_<run_id>_unanswerable_v2 `
-  --smoke-report kg/reports/local-adapter-smoke.json `
-  --timeout-seconds 120 `
-  --local-adapter-warmup-timeout-seconds 240 `
-  --max-consecutive-transport-failures 3 `
-  --overwrite
-```
-5. `7.3.e` Execute the canonical combined benchmark bundle used by Step 7.4:
-```powershell
-py -m scripts.eval.run_local_adapter_benchmark `
-  --run-dir dist/training/<run_id> `
-  --manifest eval/manifest.json `
-  --dataset-id ear_compliance.v2 `
-  --dataset-id entity_obligations.v2 `
-  --dataset-id unanswerable.v2 `
-  --run-id benchmark_<run_id>_primary `
-  --smoke-report kg/reports/local-adapter-smoke.json `
-  --timeout-seconds 120 `
-  --local-adapter-warmup-timeout-seconds 240 `
-  --max-consecutive-transport-failures 3 `
-  --overwrite
-```
-
-Step 7.3 execution-log rule:
-
-- after each substep (`7.3.a` through `7.3.e`), append one line to
-  `docs/ExecutionPlan11.5_log.md` with date/time, exact command, pass/fail,
-  and the produced `dist/benchmarks/<benchmark_run_id>/benchmark_summary.json`
-  path (or failing log path)
-- if any substep fails, stop at that substep and do not run later 7.3 substeps
-  until the failure is resolved and logged
-- do not advance from `7.3.a` to `7.3.b` if the preflight bundle shows any
-  non-zero `transport_failure_rate` or repeated `status_code=0` request errors;
-  that indicates runtime instability, not just strict-output drift
-- keep the local-adapter runtime bounded for benchmark runs by exporting
-  `EARCRAWLER_LOCAL_LLM_MAX_TIME_SECONDS=20` and
-  `EARCRAWLER_LOCAL_LLM_MAX_NEW_TOKENS=64` before starting the API so
-  benchmark requests do not outlive the client timeout budget
-- give the initial local-adapter warmup request extra headroom with
-  `--local-adapter-warmup-timeout-seconds 240`; cold model load plus the
-  first structured answer can exceed the per-item scoring timeout even when
-  the steady-state dataset requests stay inside the `120s` benchmark budget
-- benchmark runs should keep the local-adapter client timeout at `120` seconds
-  so the scored requests can survive the observed warmed local inference
-  outliers without masking real transport failures behind a too-tight client cap
-
-### Step 7.4 - Validate The Release Evidence Bundle For The Candidate
-Explanation: force the result into one of the contract outcomes:
-`keep_optional`, `reject_candidate`, or `ready_for_formal_promotion_review`.
-
-Type: `Code`
-
-```powershell
-py -m scripts.eval.validate_local_adapter_release_bundle `
-  --run-dir dist/training/<run_id> `
-  --benchmark-summary dist/benchmarks/benchmark_<run_id>_primary/benchmark_summary.json `
-  --smoke-report kg/reports/local-adapter-smoke.json
-```
-
-### Step 7.5 - Repair Candidate Defects Until One Reviewable Outcome Exists
-Explanation: the first real run may fail; that is acceptable. What is not
-acceptable is stopping with an unreviewable placeholder again.
-
-Type: `Prompt`
-
-Model: `GPT-5.3-Codex`
-Reasoning: `high`
-
-Prompt:
-```text
-Use the actual dist/training/<run_id>/ artifacts, benchmark summary, release_evidence_manifest.json, and docs/local_adapter_release_evidence.md as governing context. If the current candidate is not reviewable or is rejected, implement the smallest corrective changes needed to produce one genuinely reviewable next candidate. Focus on concrete defects: retrieval readiness, runtime smoke, strict-output failures, threshold misses, or missing evidence artifacts. Preserve the advisory-only answer posture and keep the runtime opt-in.
-```
-
-Phase gate:
-
-- at least one named candidate has a complete machine-checkable evidence bundle
-- the evidence outcome is either `reject_candidate` or
-  `ready_for_formal_promotion_review`
-
-Contingency if gate fails:
-
-- if repeated runs remain `keep_optional`, stop and repair the workflow until it
-  can at least produce reviewable evidence; do not claim progress from partial
-  artifacts
-
-## Phase 8 - Decide The Product Role Of Generated Answers
-
-Goal: make the local-adapter and answer-generation posture explicit enough for
-production release.
-
-### Step 8.1 - Decide Whether The Local Adapter Stays Optional Or Advances
-Explanation: even a strong candidate does not auto-promote the capability.
-
-Type: `Prompt`
-
-Model: `GPT-5.4`
-Reasoning: `high`
-
-Prompt:
-```text
-Use docs/local_adapter_release_evidence.md, docs/answer_generation_posture.md, the reviewable candidate bundle, the benchmark outputs, and the current runtime/operator docs as governing context. Produce one dated capability decision for local-adapter serving with exactly one outcome:
-
-1. remain Optional, or
-2. move to formal promotion review for the scoped optional runtime path.
-
-Do not broaden the product claim beyond advisory-only answer generation. Update only the minimum registry/docs required by the decision.
-```
-
-### Step 8.2 - Re-Run Optional Runtime Smoke With The Reviewed Candidate
-Explanation: if the local-adapter track is still active after Step 8.1, prove
-the optional runtime state in the same release-shaped smoke path.
-
-Type: `Code`
-
-```powershell
-pwsh scripts/optional-runtime-smoke.ps1 -Host 127.0.0.1 -Port 9001 -LocalAdapterRunDir dist/training/<run_id> -ReportPath dist/optional_runtime_smoke.json
-```
-
-### Step 8.3 - Refresh The Supported Answer-Generation Posture
-Explanation: bind the answer claim to the current evidence and the actual
-capability decision.
-
-Type: `Prompt`
-
-Model: `GPT-5.4`
-Reasoning: `medium`
-
-Prompt:
-```text
-Use docs/answer_generation_posture.md, the local-adapter capability decision, the reviewable candidate evidence, and the current API/runtime docs as governing context. Refresh the supported answer-generation posture so it exactly matches the evidence-backed runtime shape, abstention requirements, and human-review boundary now in force. Keep the claim narrow and operational.
-```
-
-Phase gate:
-
-- the local-adapter capability state is explicitly decided
-- optional runtime smoke reflects the current decision
-- answer-generation policy is current and evidence-backed
-
-Contingency if gate fails:
-
-- keep local-adapter serving `Optional` and unpromoted; do not let model work
-  block the supported baseline release if the baseline is otherwise ready
-
-## Phase 9 - Assemble The Production Release Candidate
-
-Goal: produce one release candidate whose artifacts, operator path, and current
-decision records all agree.
-
-### Step 9.1 - Run The Full Release Process Against Current Artifacts
-Explanation: build the release candidate using the current repo, current
-operator evidence, and current policy decisions.
-
-Type: `Code`
-
-```powershell
-pwsh scripts/release-evidence-preflight.ps1 -AllowEmptyDist
-pwsh scripts/build-wheel.ps1
-pwsh scripts/package-wheel-smoke.ps1 -WheelPath dist/earcrawler-*.whl
-pwsh scripts/build-wheelhouse.ps1 -LockFile requirements-win-lock.txt
-pwsh scripts/build-exe.ps1
-pwsh scripts/make-installer.ps1
-pwsh scripts/checksums.ps1
-pwsh scripts/sign-manifest.ps1 -FilePath dist/checksums.sha256
-pwsh scripts/verify-release.ps1 -RequireSignedExecutables -RequireCompleteEvidence -ApiSmokeReportPath dist/api_smoke.json -OptionalRuntimeSmokeReportPath dist/optional_runtime_smoke.json -InstalledRuntimeSmokeReportPath dist/installed_runtime_smoke.json -SecuritySummaryPath dist/security/security_scan_summary.json -ObservabilityApiProbePath dist/observability/api_probe.json -EvidenceOutPath dist/release_validation_evidence.json
-```
-
-### Step 9.2 - Refresh Operator-Facing Release And Rollback Records
-Explanation: make sure the shipping artifact, operator guide, and current
-capability state all line up.
-
-Type: `Prompt`
-
-Model: `GPT-5.4-Mini`
-Reasoning: `medium`
-
-Prompt:
-```text
-Use docs/ops/windows_single_host_operator.md, docs/ops/release_process.md, service/docs/capability_registry.json, and the completed Phase 9 release evidence as governing context. Make the minimum documentation and evidence-index updates needed so the operator handoff matches the actual release candidate that is about to be judged. Do not create new roadmap notes or reviews.
-```
-
-Phase gate:
-
-- the release verifier passes with complete evidence
-- operator docs and capability registry reflect the current release candidate
-
-Contingency if gate fails:
-
-- if the release verifier fails, return to the failing upstream phase instead of
-  patching around the verifier
-
-## Phase 10 - Final Production Decision
-
-Goal: make the one repository-wide judgment that justifies ending this plan.
-
-### Step 10.1 - Production-Ready Beta Decision
-Explanation: this is the only step that should use `extra high` because it is
-the only non-decomposable repository-wide synthesis.
-
-Type: `Prompt`
-
-Model: `GPT-5.4`
-Reasoning: `extra high`
-
-Prompt:
-```text
-Use docs/ExecutionPlan11.5.md, docs/production_beta_readiness_review_2026-03-25.md, the completed outputs from all prior phases, and the current release/operator evidence as governing context. Produce one final decision document that answers only this question: does earCrawler now qualify as production-ready for its supported Windows single-host baseline?
-
-Evaluate:
-1. whether the March 25 blockers were actually closed,
-2. whether the original strengths were preserved,
-3. whether the release/install/operator story is trustworthy,
-4. whether KG-backed runtime behavior is either properly evidenced or properly constrained,
-5. whether the answer-generation and local-adapter posture is evidence-backed and operationally safe,
-6. whether any residual risks are acceptable for the final label.
-
-End with exactly one of:
-- Production-ready beta
-- Production-ready beta with named constraints
-- Not production-ready beta
-
-Do not write a new execution plan. Write the final decision and name the concrete residual constraints or blockers.
-```
-
-Completion condition:
-
-- this final decision is the only remaining review artifact
-- if the result is positive, the repo has current evidence to support it
-- if the result is negative, the residual blockers must be concrete and few
+1. Step 0 through Phase 5 are complete with machine-checkable artifacts,
+2. active execution docs/logs/config contain only Gemma 4B-class model IDs,
+3. canonical model, training, and benchmark artifacts are stored on `E:\` and
+   not duplicated unnecessarily on the local workspace drive,
+4. EC2-based Gemma download + training + benchmark reruns are documented and
+   repeatable,
+5. final production decision inputs are current,
+6. AWS retained storage for the training run is zero.
 
 ## Recommended Execution Order
 
-1. Finish Phase 0 and Phase 1 without parallelizing unrelated feature work.
-2. Finish Phase 2 before relying on any deployment or runtime claim.
-3. Finish Phase 3 before KG or training work.
-4. Finish Phase 4 before reopening KG promotion.
-5. Execute Phase 5 once current KG evidence exists; default to quarantine if it
-   does not pass cleanly.
-6. Reopen training only after the baseline and release path are stable.
-7. Do not run the final production decision until every intended artifact and
-   dated decision record exists.
+1. Finish Step 0 completely before any training command.
+2. Finish Phase 1 before running full training.
+3. Finish Phase 2 before any runtime or benchmark claim.
+4. Finish Phase 3 before any capability or production decision input updates.
+5. Finish Phase 4 before post-run cleanup.
+6. Finish Phase 5 before final production-readiness synthesis.
 
-## Notes On Scope Discipline
-
-- Do not use KG promotion as an excuse to delay the supported baseline release
-  if the baseline can ship with KG still quarantined.
-- Do not use local-adapter experimentation as a substitute for shipping the
-  supported baseline.
-- Do not claim QLoRA success from a config flag alone; require run metadata and
-  evidence.
-- Do not use `extra high` for implementation steps just because they touch
-  multiple files.
-- If a phase is blocked by missing external prerequisites, stop and clear that
-  blocker before consuming more repo context.

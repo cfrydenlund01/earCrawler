@@ -19,7 +19,7 @@ The contract is designed to keep model training tied to:
 ## Scope
 
 This contract applies to the first production-oriented fine-tuning pass planned
-in Task 5.3 for `Qwen/Qwen2.5-7B-Instruct`.
+in Task 5.3 for `google/gemma-4-E4B-it`.
 
 It is intentionally narrow:
 
@@ -42,7 +42,7 @@ All production training examples MUST be traceable to the following sources:
    - paired FAISS metadata path: `data/faiss/index.meta.json`
    - contract reference: `retrieval_corpus_contract.md`
 3. A recorded base-model selection:
-   - `Qwen/Qwen2.5-7B-Instruct`
+   - `google/gemma-4-E4B-it`
    - reference: `docs/model_training_surface_adr.md`
 
 ## Non-authoritative and excluded sources
@@ -86,7 +86,7 @@ The future training packer for Task 5.3 should emit a deterministic directory:
 The `run_id` SHOULD encode the snapshot identity and package version, for
 example:
 
-- `qwen25-7b-ear-2026-03-11-snapshot-2026-02-28-v1`
+- `gemma4-e4b-ear-2026-03-11-snapshot-2026-02-28-v1`
 
 ## Example schema
 
@@ -98,7 +98,7 @@ Required fields:
 - `example_id`: stable unique identifier
 - `split`: MUST equal `train`
 - `task`: one of `answer`, `refusal`
-- `base_model`: MUST equal `Qwen/Qwen2.5-7B-Instruct` for the first pass
+- `base_model`: MUST equal `google/gemma-4-E4B-it` for the first pass
 - `question`: natural-language user question
 - `messages`: ordered chat messages used for supervised fine-tuning
 - `evidence`: array of supporting retrieval documents
@@ -132,7 +132,7 @@ Example shape:
   "example_id": "ear-answer-736_2b_0001",
   "split": "train",
   "task": "answer",
-  "base_model": "Qwen/Qwen2.5-7B-Instruct",
+  "base_model": "google/gemma-4-E4B-it",
   "question": "When is a license required under 15 CFR 736.2(b)?",
   "messages": [
     {
@@ -286,3 +286,4 @@ Task 5.2 is complete when the repo has one clear answer to these questions:
   - No, not for the first pass.
 - Can eval or benchmark data leak into training?
   - No; they are explicitly excluded by contract.
+
